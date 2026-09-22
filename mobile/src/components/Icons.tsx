@@ -153,4 +153,50 @@ export const IconClose: React.FC<IconProps> = ({ size = 20, color = 'currentColo
   </Svg>
 );
 
+export const IconWrench: React.FC<IconProps> = ({ size = 22, color = 'currentColor', strokeWidth = 1.7 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+  </Svg>
+);
+
+export const IconZap: React.FC<IconProps> = ({ size = 20, color = 'currentColor', strokeWidth = 1.8 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+  </Svg>
+);
+
+export const IconAlertTriangle: React.FC<IconProps> = ({ size = 20, color = 'currentColor', strokeWidth = 1.8 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+    <Path d="M12 9v4m0 4h.01" />
+  </Svg>
+);
+
+export const IconUsers: React.FC<IconProps> = ({ size = 20, color = 'currentColor', strokeWidth = 1.8 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <Circle cx="9" cy="7" r="4" />
+    <Path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    <Path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </Svg>
+);
+
+export const IconMapPin: React.FC<IconProps> = ({ size = 20, color = 'currentColor', strokeWidth = 1.8 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+    <Circle cx="12" cy="10" r="3" />
+  </Svg>
+);
+
+export const IconCar: React.FC<IconProps> = ({ size = 20, color = 'currentColor', strokeWidth = 1.8 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.5 2.8C2.1 11.2 2 11.6 2 12v4c0 .6.4 1 1 1h2" />
+    <Circle cx="7" cy="17" r="2" />
+    <Path d="M9 17h6" />
+    <Circle cx="17" cy="17" r="2" />
+  </Svg>
+);
+
+
+
 

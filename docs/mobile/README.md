@@ -20,10 +20,15 @@ O app mobile conecta-se diretamente ao Supabase através da biblioteca `@supabas
    - Cálculo dinâmico de dias para o término de vigência e detecção de contratos com vigência a expirar nos próximos 30 dias.
 3. **Tabela `descentralizacoes`**:
    - Créditos orçamentários descentralizados para o cálculo do saldo disponível em tempo real.
-4. **Tabela `licitacoes_pncp`**:
+4. **Tabela `atividades`**:
+   - Atividades orçamentárias planejadas do campus, isoladas por unidade gestora SUAP (`suap_unit_code`, ex: `19` para Currais Novos) e sincronizações ativas (`sync_active !== false`), garantindo convergência exata com o sistema web.
+5. **Tabela `licitacoes_pncp`**:
    - Pregões eletrônicos e compras públicas integrados com o PNCP, dados de UASG, modalidade, datas de propostas, homologação e link externo.
-5. **View `atas_registro_precos_resumo`** (e tabelas filhas):
+6. **View `atas_registro_precos_resumo`** (e tabelas filhas):
    - Atas de Registro de Preços consolidadas com itens, adesões, status de vigência e vínculo da unidade (gerenciadora, participante, carona/aderente).
+7. **Tabelas de Infraestrutura (`manutencao_ocorrencias`, `energia_consumo_faturas`, `energia_solar_geracao`)**:
+   - Ocorrências e chamados de manutenção com ambientes, fotos, problemas e status.
+   - Histórico de faturas de consumo elétrico (COSERN e Mercatto) e registros de geração das Usinas Fotovoltaicas (UFV).
 
 ### Mecanismos de Resiliência e UX:
 - **Pull-to-Refresh**: Todas as telas contam com gesto de arrastar para baixo (`RefreshControl`) para forçar a sincronização instantânea.
@@ -34,7 +39,7 @@ O app mobile conecta-se diretamente ao Supabase através da biblioteca `@supabas
 1. **Dashboard (Visão Geral - 01)**:
    - Identificação do campus: `IFRN / Campus Currais Novos`.
    - **Filtro funcional por PTRES / Origem de Recurso**: Seletor interativo no topo (`[ 🏷️ PTRES: Todos ▾ ]` ou `[ 🏷️ PTRES 231796 ▾ ]`) que abre modal com busca e opções consolidadas (`Todos`, `231796 - PROAD`, `261941 - DIAE`, `231802 - PROEN`, `231798 - PROEN`, `171166 - DIGPE`, `260296 - PROEN`, etc.), recalculando instantaneamente Planejado, Descentralizado, Empenhado, Crédito Disponível, Liquidado, Pago e o gráfico de evolução semestral.
-   - Card Hero de **Total Planejado**: com gradiente (`#10307e` a `#234fc8`), valor em tempo real, quantidade de atividades e rosca de progresso empenhado/descentralizado.
+   - Card Hero de **Total Planejado**: com gradiente (`#10307e` a `#234fc8`), valor em tempo real convergente com o sistema web (R$ 3,41M geral e R$ 2,35M no PTRES 231796), quantidade de atividades e rosca de progresso empenhado/descentralizado.
    - Grid de indicadores de execução: Empenhado, Crédito Disponível (oficial SIAFI), Liquidado e Pago.
    - Faixa auxiliar: A pagar e percentual de execução no planejado.
    - Card de **Execução no Semestre**: Gráfico vetorial SVG dinâmico com barras pareadas escaladas proporcionalmente aos valores reais.
@@ -57,8 +62,14 @@ O app mobile conecta-se diretamente ao Supabase através da biblioteca `@supabas
    - **Pregões**: Resumo de valor homologado/estimado e propostas abertas, busca em tempo real, chips (`Todos`, `Propostas abertas`, `Encerradas`, `Somente SRP`) e cards com selo SRP, modalidade, status da proposta e botão de acesso direto ao PNCP.
    - **Atas**: Resumo de atas cadastradas e vigentes/a vencer, busca por número da ata, compra ou objeto, chips (`Todas`, `Vigentes`, `A vencer`, `Campus Currais Novos`) e cards com selo de vínculo (`Gerenciadora`, `Participante`, `Aderente`), dias restantes de vigência e total de itens/adesões.
 
-5. **Navegação Inferior (Bottom Navigation)**:
-   - 4 abas (`Visão Geral`, `Empenhos`, `Contratos`, `Licitações`) com ícones vetoriais SVG e tratamento de Safe Area Insets (iOS e Android).
+5. **Infraestrutura (Manutenção, Portaria e Energia - 05)**:
+   - Seletor segmentado superior com 3 abas: `[ Manutenção ]`, `[ Portaria ]` e `[ Energia ]`.
+   - **Manutenção**: Cards de chamados/ocorrências com identificação de ambiente, bloco, badges de status (`Pendente`, `Em andamento`, `Resolvido`), chips com tags de problemas (vazamentos, elétrica, ar condicionado, limpeza), observações, fotos anexadas e avaliações. Chips de filtro por status e KPIs de pendências.
+   - **Portaria**: Painel para o porteiro acompanhar os eventos diários do campus e controle de acesso. Exibe horário de início/término, local/sala, contato do organizador, alerta de instruções da portaria (estacionamento/cancelas) e contador de presença. Ao tocar no evento, abre a lista completa de participantes autorizados com busca instantânea por nome, documento ou placa de veículo, filtros por status e botão de check-in com 1 toque.
+   - **Energia**: Painel de faturas e geração solar fotovoltaica. Cards de consumo faturado em kWh e valores em R$ discriminados por fornecedor (`COSERN`, `Mercatto`), e acompanhamento de geração das UFVs. Chips de filtro por fonte e KPIs de consumo e valor total.
+
+6. **Navegação Inferior (Bottom Navigation)**:
+   - 5 abas (`Dashboard`, `Empenhos`, `Contratos`, `Licitações`, `Infra`) com ícones vetoriais SVG e tratamento de Safe Area Insets (iOS e Android).
 
 ## Como Executar
 

@@ -1318,6 +1318,7 @@ export default function RequisicaoCompraPage() {
                     const isDraft = requisicao.status === 'draft' || requisicao.status === 'rejected';
                     const isEnviada = requisicao.status === 'enviada_fornecedor' || requisicao.status === 'review' || requisicao.status === 'approved';
                     const isLiquidada = requisicao.status === 'liquidada';
+                    const canDelete = isFiscalOrManager || (isCreator && requisicao.status !== 'liquidada');
 
                     const requisicaoEmpenhoLabels = requisicao.empenhos?.length
                       ? requisicao.empenhos.map((empenho) => empenho.empenhoNumero).filter(Boolean)
@@ -1448,36 +1449,34 @@ export default function RequisicaoCompraPage() {
                               </DropdownMenu>
                             )}
 
-                            {/* Ações para Rascunho */}
-                            {isDraft && (
-                              <>
-                                {!isFiscalOrManager && (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold shrink-0"
-                                    title="Enviar ao Fornecedor"
-                                    aria-label={`Enviar requisição ${requisicao.number} ao fornecedor`}
-                                    onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
-                                  >
-                                    <Send className="h-3.5 w-3.5" />
-                                    <span>Enviar</span>
-                                  </Button>
-                                )}
-                                {(isCreator || isFiscalOrManager) && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    aria-label={`Excluir requisição ${requisicao.number}`}
-                                    title="Excluir requisição"
-                                    onClick={() => handleDeleteRequisicao(requisicao.id)}
-                                    className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 shrink-0"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </>
+                            {/* Envio ao Fornecedor */}
+                            {isDraft && !isFiscalOrManager && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold shrink-0"
+                                title="Enviar ao Fornecedor"
+                                aria-label={`Enviar requisição ${requisicao.number} ao fornecedor`}
+                                onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
+                              >
+                                <Send className="h-3.5 w-3.5" />
+                                <span>Enviar</span>
+                              </Button>
+                            )}
+
+                            {/* Excluir Requisição */}
+                            {canDelete && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                aria-label={`Excluir requisição ${requisicao.number}`}
+                                title="Excluir requisição"
+                                onClick={() => handleDeleteRequisicao(requisicao.id)}
+                                className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 shrink-0"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             )}
                           </div>
                         </TableCell>

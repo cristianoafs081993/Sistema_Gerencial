@@ -1,6 +1,31 @@
 import { supabase, DEFAULT_CAMPUS_UASG } from '../lib/supabase';
-import { EmpenhoItem, ContratoItem, NotificationItem, PregaoItem, AtaItem, PtresItem } from '../types';
-import { dashboardData, empenhosData, contratosData, mockNotificationsData, pregoesData, atasData, defaultPtresList } from '../constants/data';
+import {
+  EmpenhoItem,
+  ContratoItem,
+  NotificationItem,
+  PregaoItem,
+  AtaItem,
+  PtresItem,
+  OcorrenciaItem,
+  EnergiaFaturaItem,
+  EnergiaSolarItem,
+  PortariaEventoItem,
+  PortariaParticipanteItem,
+} from '../types';
+import {
+  dashboardData,
+  empenhosData,
+  contratosData,
+  mockNotificationsData,
+  pregoesData,
+  atasData,
+  defaultPtresList,
+  ocorrenciasData,
+  energiaFaturasData,
+  energiaSolarData,
+  portariaEventosData,
+  portariaParticipantesData,
+} from '../constants/data';
 
 export interface DashboardMetricsResult {
   exercicio: string;
@@ -114,16 +139,49 @@ const getDaysRemaining = (endDateStr?: string | null): { days: number; text: str
   }
 };
 
+export const CAMPUS_TO_SUAP_UNIT: Record<string, string> = {
+  '158366': '19', // Currais Novos
+  '158371': '13', // Apodi
+  '158370': '14', // Caicó
+  '154839': '18', // Canguaretama
+  '152711': '30', // Natal - Cidade Alta
+  '154838': '17', // Ceará-Mirim
+  '158369': '33', // Natal - Central
+  '158367': '20', // Ipanguaçu
+  '158373': '24', // João Câmara
+  '158365': '15', // Mossoró
+  '158375': '23', // Macau
+  '152757': '31', // Nova Cruz
+  '152756': '28', // Parnamirim
+  '158374': '16', // Pau dos Ferros
+  '158372': '27', // Santa Cruz
+  '154582': '26', // São Gonçalo do Amarante
+  '154840': '22', // São Paulo do Potengi
+  '158368': '32', // Natal - Zona Norte
+};
+
+export function getCampusSuapUnitCode(campusUasg: string): string {
+  return CAMPUS_TO_SUAP_UNIT[campusUasg] || '19';
+}
+
 export async function fetchDashboardMetrics(
   campusUasg = DEFAULT_CAMPUS_UASG,
   selectedPtres = 'all'
 ): Promise<DashboardMetricsResult> {
   try {
-    // 0. Fetch atividades do campus para o Planejado
-    const { data: atividadesRows } = await supabase
+    // 0. Fetch atividades do campus para o Planejado (isolado por unidade gestora SUAP e sincronizações ativas)
+    const targetUnitCode = getCampusSuapUnitCode(campusUasg);
+    let atividadesQuery = supabase
       .from('atividades')
-      .select('valor_total, origem_recurso')
-      .eq('campus_uasg', campusUasg);
+      .select('valor_total, origem_recurso, suap_unit_code, sync_active')
+      .eq('campus_uasg', campusUasg)
+      .neq('sync_active', false);
+
+    if (targetUnitCode) {
+      atividadesQuery = atividadesQuery.or(`suap_unit_code.eq.${targetUnitCode},suap_unit_code.is.null`);
+    }
+
+    const { data: atividadesRows } = await atividadesQuery;
 
     // 1. Fetch empenhos do exercício corrente (tipo = 'exercicio' e não cancelados)
     const { data: empenhosRows, error: empenhosError } = await supabase
@@ -955,5 +1013,211 @@ export async function fetchAtas(
     return atasData;
   }
 }
+
+export async function fetchOcorrencias(): Promise<OcorrenciaItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('manutencao_ocorrencias')
+      .select('*, ambiente:ambiente_id(nome, codigo, bloco)')
+      .order('created_at', { ascending: false });
+
+    if (error || !data || data.length === 0) {
+      if (error) console.warn('Erro ao buscar ocorrências no Supabase:', error);
+      return ocorrenciasData;
+    }
+
+    return data.map((row: any) => ({
+      id: String(row.id),
+      ambienteNome: row.ambiente?.nome || 'Ambiente não identificado',
+      ambienteCodigo: row.ambiente?.codigo || 'N/A',
+      bloco: row.ambiente?.bloco || null,
+      status: (row.status || 'pendente') as OcorrenciaItem['status'],
+      avaliacao: Number(row.avaliacao || 0),
+      problemas: Array.isArray(row.problemas) ? row.problemas : [],
+      observacao: row.observacao || null,
+      fotoUrl: row.foto_path || null,
+      data: row.created_at,
+      resolvidoEm: row.resolvido_em || null,
+    }));
+  } catch (err) {
+    console.warn('Erro ao buscar ocorrências, usando fallback:', err);
+    return ocorrenciasData;
+  }
+}
+
+export async function fetchEnergiaFaturas(): Promise<EnergiaFaturaItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('energia_consumo_faturas')
+      .select('id, fonte, competencia, ano, consumo_total_kwh, valor_faturado, fatura_numero, fornecedor, leitura_fim')
+      .order('ano', { ascending: false })
+      .order('competencia', { ascending: false });
+
+    if (error || !data || data.length === 0) {
+      if (error) console.warn('Erro ao buscar faturas de energia:', error);
+      return energiaFaturasData;
+    }
+
+    return data.map((row: any) => ({
+      id: String(row.id),
+      fonte: (row.fonte === 'mercatto' ? 'mercatto' : 'cosern') as 'cosern' | 'mercatto',
+      competencia: row.competencia || `${row.ano || ''}`,
+      ano: Number(row.ano || 0),
+      consumoKwh: Number(row.consumo_total_kwh || 0),
+      valor: Number(row.valor_faturado || 0),
+      faturaNumero: row.fatura_numero || undefined,
+      fornecedor: row.fornecedor || (row.fonte === 'mercatto' ? 'Mercatto Energia' : 'Neoenergia Cosern'),
+      leituraFim: row.leitura_fim || undefined,
+    }));
+  } catch (err) {
+    console.warn('Erro ao buscar faturas de energia, usando fallback:', err);
+    return energiaFaturasData;
+  }
+}
+
+export async function fetchEnergiaSolar(): Promise<EnergiaSolarItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('energia_solar_geracao')
+      .select('id, ufv_nome, data_referencia, ano, mes, energia_gerada_kwh')
+      .order('data_referencia', { ascending: false });
+
+    if (error || !data || data.length === 0) {
+      if (error) console.warn('Erro ao buscar dados solar:', error);
+      return energiaSolarData;
+    }
+
+    return data.map((row: any) => ({
+      id: String(row.id),
+      ufvNome: row.ufv_nome || 'UFV Campus',
+      dataReferencia: row.data_referencia || '',
+      ano: Number(row.ano || 0),
+      mes: Number(row.mes || 0),
+      energiaGeradaKwh: Number(row.energia_gerada_kwh || 0),
+    }));
+  } catch (err) {
+    console.warn('Erro ao buscar dados de energia solar, usando fallback:', err);
+    return energiaSolarData;
+  }
+}
+
+export async function fetchPortariaEventos(campusUasg?: string): Promise<PortariaEventoItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('portaria_eventos')
+      .select(`
+        id,
+        titulo,
+        descricao,
+        local,
+        ambiente_id,
+        data_inicio,
+        data_fim,
+        responsavel_nome,
+        responsavel_contato,
+        tipo,
+        status,
+        observacoes_portaria,
+        portaria_evento_participantes (
+          id,
+          presente
+        )
+      `)
+      .eq('campus_uasg', campusUasg || DEFAULT_CAMPUS_UASG)
+      .order('data_inicio', { ascending: true });
+
+    if (error || !data || data.length === 0) {
+      if (error) console.warn('Erro ao buscar eventos da portaria no Supabase:', error);
+      return portariaEventosData;
+    }
+
+    return data.map((row: any) => {
+      const participantes = Array.isArray(row.portaria_evento_participantes)
+        ? row.portaria_evento_participantes
+        : [];
+      const totalParticipantes = participantes.length;
+      const totalPresentes = participantes.filter((p: any) => p.presente === true).length;
+
+      return {
+        id: String(row.id),
+        titulo: row.titulo,
+        descricao: row.descricao || null,
+        local: row.local,
+        ambienteId: row.ambiente_id ? String(row.ambiente_id) : null,
+        dataInicio: row.data_inicio,
+        dataFim: row.data_fim || null,
+        responsavelNome: row.responsavel_nome || null,
+        responsavelContato: row.responsavel_contato || null,
+        tipo: row.tipo || 'academico',
+        status: row.status || 'confirmado',
+        observacoesPortaria: row.observacoes_portaria || null,
+        totalParticipantes,
+        totalPresentes,
+      };
+    });
+  } catch (err) {
+    console.warn('Erro ao buscar eventos da portaria, usando fallback:', err);
+    return portariaEventosData;
+  }
+}
+
+export async function fetchPortariaParticipantes(eventoId: string): Promise<PortariaParticipanteItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('portaria_evento_participantes')
+      .select('id, evento_id, nome, documento, instituicao, tipo, presente, horario_entrada, veiculo_placa, observacao')
+      .eq('evento_id', eventoId)
+      .order('nome', { ascending: true });
+
+    if (error || !data || data.length === 0) {
+      if (error) console.warn('Erro ao buscar participantes da portaria:', error);
+      return portariaParticipantesData[eventoId] || [];
+    }
+
+    return data.map((row: any) => ({
+      id: String(row.id),
+      eventoId: String(row.evento_id),
+      nome: row.nome,
+      documento: row.documento || null,
+      instituicao: row.instituicao || null,
+      tipo: row.tipo || 'participante',
+      presente: Boolean(row.presente),
+      horarioEntrada: row.horario_entrada || null,
+      veiculoPlaca: row.veiculo_placa || null,
+      observacao: row.observacao || null,
+    }));
+  } catch (err) {
+    console.warn('Erro em fetchPortariaParticipantes:', err);
+    return portariaParticipantesData[eventoId] || [];
+  }
+}
+
+export async function toggleParticipanteCheckin(
+  participanteId: string,
+  presente: boolean
+): Promise<boolean> {
+  try {
+    const updatePayload: Record<string, any> = {
+      presente,
+      horario_entrada: presente ? new Date().toISOString() : null,
+    };
+
+    const { error } = await supabase
+      .from('portaria_evento_participantes')
+      .update(updatePayload)
+      .eq('id', participanteId);
+
+    if (error) {
+      console.warn('Erro ao atualizar presença do participante:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Erro em toggleParticipanteCheckin:', err);
+    return false;
+  }
+}
+
+
 
 

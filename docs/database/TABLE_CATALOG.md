@@ -502,14 +502,15 @@ Campos-chave:
 - `created_by` (FK para auth.users)
 
 Regras:
-- `save_requisicao_compra` salva cabeçalho, empenhos vinculados e itens na mesma transação.
+- `save_requisicao_compra` salva cabeçalho, empenhos vinculados e itens na mesma transação. A RPC é `SECURITY DEFINER` e valida perfil de terceirizado, permissões em `terceirizado_permissions` e suficiência de saldo.
 - O fluxo utiliza 3 status: `draft` (Rascunho), `enviada_fornecedor` (Enviada ao Fornecedor) e `liquidada` (Liquidada).
 - A RLS permite leitura ao criador, superadministrador, `diretores`, `teste`, fiscais de contratos e todo usuário que visualiza o menu **Refeitório**. O slug canônico atual é `fiscais-de-contratos`; `fiscal-contratos` permanece aceito para compatibilidade com instalações antigas. Essa leitura compartilhada inclui os itens e empenhos vinculados, mas não amplia as permissões de escrita.
+- As políticas RLS de atualização e manipulação de itens e empenhos vinculados suportam os status `draft`, `review` e `enviada_fornecedor`.
 - Leitura anônima de requisições e seus itens liberada para Notificações Mobile via migration `20260909191500_grant_anon_notifications_read.sql`.
 - Requisições em `enviada_fornecedor` exigem ao menos uma NE, itens com `empenho_id` e permissão explícita para terceirizados. O saldo disponível valida e abate concorrentemente outras requisições já enviadas ao fornecedor da mesma NE.
 - Requisições com status `liquidada` não acumulam desconto no módulo para evitar duplicidade com as liquidações oficiais registradas no SIAFI.
 - Itens de requisições com status diferente de `draft` compõem o consumo automático de insumos no ambiente canônico `REFEITORIO` / Refeitório. A data analítica é `consumo_iniciado_em`.
-- `fn_empenho_saldo_disponivel` calcula saldo de exercício com dados SIAFI locais e prioriza `saldo_rap_oficial` para RAP.
+- `fn_empenho_saldo_disponivel` é `SECURITY DEFINER`, calcula saldo de exercício com dados SIAFI locais e prioriza `saldo_rap_oficial` para RAP.
 
 ### `requisicao_compra_empenhos`
 
@@ -1394,7 +1395,8 @@ Consumido por src/services/inventory.ts e src/pages/Almoxarifado.tsx.
 - `quantity` aceita zero para rascunhos e impressao; valores negativos continuam invalidos na RPC `save_requisicao_compra`.
 - A RLS de `terceirizados` e `terceirizado_permissions` tambem reconhece o grupo `assistencia`, que possui acesso explicito ao cadastro e a gestao de vinculos em `/cadastro-terceirizados`.
 
-- A política de exclusão de `requisicoes_compra` permite ao criador remover registros em `draft`, mantendo a exclusão irrestrita por gestores e superadministradores.
+- A política de exclusão de `requisicoes_compra` permite ao criador remover suas próprias requisições enquanto não liquidadas (`draft` e `enviada_fornecedor`), mantendo a exclusão irrestrita por gestores, fiscais (`fiscais-de-contratos`, `fiscal-contratos`, `diretores`, `teste`) e superadministradores.
+- `default_org_id()` obtém o id do órgão padrão consultando `orgs` diretamente com `SECURITY DEFINER` e nunca invoca `current_user_org_id()`, eliminando o risco de recursão mútua (`stack depth limit exceeded`).
 
 ## Sincronização do Plano SUAP
 
@@ -1467,3 +1469,57 @@ A migration 20260905173000 adiciona pncp_sync_attempted_at e pncp_sync_error.
 Tentativas são independentes dos marcos de sucesso por documentos/instrumentos.
 A função enqueue_pncp_contract_sync é restrita a service_role e ao proprietário;
 usa credencial do Vault, sem segredo no texto do cron. Ver [operação](../ops/PNCP_CONTRACT_SYNC.md).
+
+## Infraestrutura e Portaria
+
+### `portaria_eventos`
+
+Finalidade:
+- Cadastro e acompanhamento de eventos nos espaços físicos do campus para controle de acesso na portaria e recepção.
+
+Campos-chave:
+- `id`, `org_id`, `campus_uasg`, `titulo`, `descricao`;
+- `local`, `ambiente_id` (vínculo opcional com `manutencao_ambientes`);
+- `data_inicio`, `data_fim`;
+- `responsavel_nome`, `responsavel_contato`;
+- `tipo` (`academico`, `cultural`, `esportivo`, `reuniao`, `palestra`, `externo`, `outro`);
+- `status` (`confirmado`, `em_andamento`, `concluido`, `cancelado`);
+- `observacoes_portaria` (instruções operacionais diretas para os porteiros e controle de cancelas/estacionamento);
+- `created_at`, `updated_at`.
+
+RLS e índices:
+- `authenticated`: controle total (CRUD);
+- `anon`: leitura (`SELECT`) autorizada para exibição na portaria mobile/totens do campus;
+- Índices em `(campus_uasg, data_inicio)` e `status`.
+
+Consumido por:
+- [portariaEventosService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/portariaEventosService.ts)
+- [PortariaEventos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/PortariaEventos.tsx)
+- [mobile/src/services/api.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/mobile/src/services/api.ts)
+- [InfraestruturaScreen.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/mobile/src/screens/InfraestruturaScreen.tsx)
+
+### `portaria_evento_participantes`
+
+Finalidade:
+- Registro de participantes autorizados ou inscritos em eventos do campus, com suporte a controle de acesso de veículos e confirmação de presença (check-in).
+
+Campos-chave:
+- `id`, `evento_id` (FK para `portaria_eventos` ON DELETE CASCADE);
+- `nome`, `documento`, `instituicao`;
+- `tipo` (`participante`, `palestrante`, `organizador`, `autoridade`, `convidado`);
+- `presente` (boolean, status de check-in);
+- `horario_entrada` (timestamp registrado na confirmação de entrada);
+- `veiculo_placa` (placa do veículo para liberação do estacionamento);
+- `observacao`, `created_at`.
+
+RLS e índices:
+- `authenticated`: controle total (CRUD);
+- `anon`: leitura (`SELECT`) e atualização de presença (`UPDATE` em `presente` e `horario_entrada`) para check-in instantâneo via mobile/guarita;
+- Índices em `evento_id`, `(evento_id, presente)` e `nome`.
+
+Consumido por:
+- [portariaEventosService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/portariaEventosService.ts)
+- [PortariaEventos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/PortariaEventos.tsx)
+- [mobile/src/services/api.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/mobile/src/services/api.ts)
+- [ParticipantesModal.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/mobile/src/components/ParticipantesModal.tsx)
+

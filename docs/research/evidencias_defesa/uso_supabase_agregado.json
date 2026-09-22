@@ -1,0 +1,50 @@
+{
+  "extracted_at": "2026-09-12T18:18:25.717Z",
+  "since": "2026-06-01T03:00:00.000Z",
+  "scope": "IFRN Campus Currais Novos",
+  "audit": {
+    "rows": 2602,
+    "total": 2602,
+    "first": "2026-07-12T01:04:11.541836+00:00",
+    "last": "2026-09-11T17:45:00.646747+00:00",
+    "events": {
+      "login": 2602
+    },
+    "unique_accounts": 7,
+    "login_days": 55,
+    "months": {
+      "2026-07": {
+        "records": 498,
+        "events": {
+          "login": 498
+        },
+        "accounts": 6,
+        "login_days": 18
+      },
+      "2026-08": {
+        "records": 1577,
+        "events": {
+          "login": 1577
+        },
+        "accounts": 5,
+        "login_days": 26
+      },
+      "2026-09": {
+        "records": 527,
+        "events": {
+          "login": 527
+        },
+        "accounts": 6,
+        "login_days": 11
+      }
+    }
+  },
+  "email_ingestion": {
+    "error": {
+      "status": 400,
+      "code": "42703",
+      "message": "column email_csv_ingestion_runs.org_id does not exist"
+    }
+  },
+  "automation_events_count": "*/0"
+}

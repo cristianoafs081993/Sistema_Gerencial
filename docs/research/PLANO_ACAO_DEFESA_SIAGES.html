@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Plano de ação pós-qualificação para alinhar a dissertação, o artefato SIAGES e as evidências necessárias à banca de defesa." />
+  <title>SIAGES — Plano de ação para a defesa</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7f5;
+      --surface: #ffffff;
+      --surface-2: #edf3ef;
+      --text: #17231d;
+      --muted: #53635b;
+      --border: #cfdad3;
+      --brand: #176b42;
+      --brand-strong: #0d4f30;
+      --brand-soft: #dff2e7;
+      --accent: #a44e00;
+      --accent-soft: #fff0df;
+      --danger: #a12b2b;
+      --danger-soft: #fde8e8;
+      --info: #205b85;
+      --info-soft: #e4f0f8;
+      --shadow: 0 12px 32px rgba(24, 53, 38, 0.08);
+      --radius: 16px;
+      --sidebar: 286px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.62;
+    }
+
+    a { color: var(--brand-strong); text-underline-offset: 3px; }
+    a:hover { color: var(--brand); }
+
+    :focus-visible {
+      outline: 3px solid #2f8f5f;
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 8px;
+      left: 8px;
+      z-index: 100;
+      transform: translateY(-150%);
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: var(--text);
+      color: #fff;
+    }
+
+    .skip-link:focus { transform: translateY(0); }
+
+    .layout {
+      display: grid;
+      grid-template-columns: var(--sidebar) minmax(0, 1fr);
+      min-height: 100dvh;
+    }
+
+    aside {
+      position: sticky;
+      top: 0;
+      height: 100dvh;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      background: #f9fbfa;
+      padding: 28px 22px;
+    }
+
+    .brand-lockup {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 30px;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: var(--brand-strong);
+      color: #fff;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .brand-lockup strong { display: block; font-size: 18px; }
+    .brand-lockup span { color: var(--muted); font-size: 12px; }
+
+    nav a {
+      display: flex;
+      align-items: center;
+      min-height: 44px;
+      margin: 2px 0;
+      padding: 8px 10px;
+      border-radius: 9px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 650;
+      text-decoration: none;
+    }
+
+    nav a:hover { background: var(--brand-soft); color: var(--brand-strong); }
+
+    .progress-card {
+      margin-top: 28px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+    }
+
+    .progress-card p { margin: 0 0 8px; color: var(--muted); font-size: 12px; }
+    .progress-card strong { font-size: 22px; }
+
+    progress {
+      width: 100%;
+      height: 10px;
+      margin-top: 10px;
+      accent-color: var(--brand);
+    }
+
+    .aside-actions { display: grid; gap: 8px; margin-top: 18px; }
+
+    button {
+      min-height: 44px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover { border-color: var(--brand); background: var(--brand-soft); }
+
+    main {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      padding: 36px clamp(20px, 5vw, 72px) 96px;
+    }
+
+    section { scroll-margin-top: 28px; margin-top: 64px; }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(28px, 5vw, 56px);
+      border: 1px solid #b7cbbf;
+      border-radius: 24px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -72px;
+      bottom: -72px;
+      width: 230px;
+      height: 230px;
+      border: 34px solid var(--brand-soft);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--brand-strong);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 { line-height: 1.17; letter-spacing: -0.025em; }
+    h1 { max-width: 820px; margin: 0; font-size: clamp(36px, 6vw, 68px); }
+    h2 { margin: 0 0 12px; font-size: clamp(28px, 4vw, 42px); }
+    h3 { margin: 0 0 10px; font-size: 20px; }
+    h4 { margin: 0 0 8px; font-size: 16px; }
+
+    .hero .lede {
+      position: relative;
+      z-index: 1;
+      max-width: 770px;
+      margin: 20px 0 0;
+      color: var(--muted);
+      font-size: 19px;
+    }
+
+    .meta-row {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 28px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 5px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #f9fbfa;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .section-heading { max-width: 790px; margin-bottom: 28px; }
+    .section-heading p { margin: 0; color: var(--muted); font-size: 18px; }
+
+    .grid { display: grid; gap: 18px; }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .card {
+      padding: 22px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: 0 6px 18px rgba(24, 53, 38, 0.045);
+    }
+
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .card .kicker { margin: 0 0 10px; color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; }
+    .metric { font-size: 34px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+    .metric-label { margin-top: 8px; color: var(--muted); font-size: 13px; }
+
+    .verdict {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+      gap: 22px;
+      margin-top: 22px;
+      border-left: 6px solid var(--brand);
+    }
+
+    .verdict blockquote {
+      margin: 0;
+      color: var(--brand-strong);
+      font-size: clamp(22px, 3vw, 31px);
+      font-weight: 780;
+      line-height: 1.3;
+    }
+
+    .verdict ul { margin: 0; padding-left: 20px; }
+
+    .alert {
+      padding: 18px 20px;
+      border: 1px solid;
+      border-radius: 12px;
+    }
+
+    .alert strong { display: block; margin-bottom: 4px; }
+    .alert-danger { border-color: #edb7b7; background: var(--danger-soft); color: #6f1d1d; }
+    .alert-warning { border-color: #edc58f; background: var(--accent-soft); color: #6c3500; }
+    .alert-info { border-color: #b9d2e3; background: var(--info-soft); color: #173f5b; }
+    .alert-success { border-color: #b4d7c1; background: var(--brand-soft); color: var(--brand-strong); }
+
+    .priority {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 850;
+      letter-spacing: 0.04em;
+    }
+
+    .p0 { background: var(--danger-soft); color: var(--danger); }
+    .p1 { background: var(--accent-soft); color: var(--accent); }
+    .p2 { background: var(--info-soft); color: var(--info); }
+    .ok { background: var(--brand-soft); color: var(--brand-strong); }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    table { width: 100%; border-collapse: collapse; min-width: 760px; }
+    th, td { padding: 15px 16px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: var(--surface-2); color: var(--brand-strong); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    td { font-size: 14px; }
+
+    .quote {
+      margin: 18px 0 0;
+      padding: 18px 20px;
+      border-left: 4px solid var(--border);
+      background: #fafcfb;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .contract {
+      border: 2px solid var(--brand);
+      background: #fbfffc;
+    }
+
+    .contract-row { padding: 16px 0; border-bottom: 1px solid var(--border); }
+    .contract-row:last-child { border-bottom: 0; }
+    .contract-row dt { margin-bottom: 6px; color: var(--brand-strong); font-size: 12px; font-weight: 850; letter-spacing: 0.05em; text-transform: uppercase; }
+    .contract-row dd { margin: 0; font-size: 17px; }
+
+    .scope-column ul, .evidence-list, .plain-list { padding-left: 20px; }
+    .scope-in { border-top: 5px solid var(--brand); }
+    .scope-out { border-top: 5px solid var(--muted); }
+
+    .task-list { display: grid; gap: 12px; }
+
+    .task {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: start;
+      padding: 17px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+    }
+
+    .task input { width: 20px; height: 20px; margin-top: 3px; accent-color: var(--brand); }
+    .task label { cursor: pointer; }
+    .task label strong { display: block; }
+    .task label span { display: block; margin-top: 3px; color: var(--muted); font-size: 14px; }
+    .task:has(input:checked) { background: var(--brand-soft); border-color: #a8d0b6; }
+    .task:has(input:checked) label strong { text-decoration: line-through; text-decoration-thickness: 2px; }
+
+    .route-card { position: relative; }
+    .route-card.recommended { border: 2px solid var(--brand); }
+    .route-badge { position: absolute; top: 16px; right: 16px; }
+
+    .timeline { position: relative; display: grid; gap: 0; margin-top: 24px; }
+    .timeline::before { content: ""; position: absolute; top: 12px; bottom: 12px; left: 21px; width: 2px; background: var(--border); }
+    .week { position: relative; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; padding-bottom: 24px; }
+    .week-marker { z-index: 1; display: grid; place-items: center; width: 44px; height: 44px; border: 2px solid var(--brand); border-radius: 50%; background: var(--surface); color: var(--brand-strong); font-size: 12px; font-weight: 850; }
+    .week-content { padding: 4px 0 0; }
+    .week-content p { margin: 5px 0 0; color: var(--muted); }
+    .week-content ul { margin: 8px 0 0; padding-left: 20px; }
+
+    details {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+    }
+
+    details + details { margin-top: 10px; }
+    summary { min-height: 52px; padding: 13px 16px; cursor: pointer; font-weight: 780; }
+    details > div { padding: 0 16px 16px; color: var(--muted); }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: var(--surface-2);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    .source-list { display: grid; gap: 10px; padding: 0; list-style: none; }
+    .source-list li { padding: 14px 16px; border-left: 3px solid var(--border); background: var(--surface); }
+    .source-list small { display: block; color: var(--muted); }
+
+    .footer-note {
+      margin-top: 72px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 980px) {
+      .layout { display: block; }
+      aside { position: relative; width: auto; height: auto; overflow: visible; border-right: 0; border-bottom: 1px solid var(--border); padding: 18px 20px; }
+      .brand-lockup { margin-bottom: 12px; }
+      nav { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; }
+      nav a { flex: 0 0 auto; }
+      .progress-card, .aside-actions { display: none; }
+      main { padding-top: 24px; }
+      .grid-4, .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 700px) {
+      .grid-2, .grid-3, .grid-4, .verdict { grid-template-columns: 1fr; }
+      .hero { border-radius: 18px; }
+      .hero::after { opacity: 0.45; }
+      section { margin-top: 48px; }
+      .task { grid-template-columns: 28px minmax(0, 1fr); }
+      .task .priority { grid-column: 2; justify-self: start; }
+      .metric { font-size: 30px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+    }
+
+    @media print {
+      :root { --bg: #fff; --shadow: none; }
+      body { font-size: 11pt; }
+      .layout { display: block; }
+      aside, .skip-link, .no-print, button { display: none !important; }
+      main { width: 100%; padding: 0; }
+      .hero, .card, .table-wrap, details { box-shadow: none; break-inside: avoid; }
+      section { margin-top: 34px; break-before: auto; }
+      details > div { display: block !important; }
+      a { color: inherit; text-decoration: none; }
+      .task { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
+  <div class="layout">
+    <aside aria-label="Navegação do relatório">
+      <div class="brand-lockup">
+        <div class="brand-mark" aria-hidden="true">S</div>
+        <div><strong>SIAGES</strong><span>Plano para a defesa</span></div>
+      </div>
+      <nav aria-label="Seções">
+        <a href="#diagnostico">Diagnóstico</a>
+        <a href="#decisao">Decisão central</a>
+        <a href="#contrato">Contrato da pesquisa</a>
+        <a href="#escopo">Recorte do artefato</a>
+        <a href="#correcoes">Correções</a>
+        <a href="#metodo">Método e avaliação</a>
+        <a href="#evidencias">Evidências do sistema</a>
+        <a href="#cronograma">Cronograma</a>
+        <a href="#defesa">Preparação da defesa</a>
+        <a href="#fontes">Fontes</a>
+      </nav>
+      <div class="progress-card" aria-live="polite">
+        <p>Progresso do plano</p>
+        <strong id="progressText">0%</strong>
+        <progress id="progressBar" value="0" max="100">0%</progress>
+      </div>
+      <div class="aside-actions no-print">
+        <button id="printButton" type="button">Imprimir / salvar PDF</button>
+        <button id="resetButton" type="button">Limpar marcações</button>
+      </div>
+    </aside>
+
+    <main id="conteudo">
+      <header class="hero">
+        <p class="eyebrow">Pós-qualificação · 12 de setembro de 2026</p>
+        <h1>Do SIPE ao SIAGES: um plano defensável para chegar à banca final</h1>
+        <p class="lede">Plano de ação construído a partir do projeto escrito, da transcrição da qualificação, dos anexos de requisitos e UML e do estado observado do repositório. O foco é transformar um sistema amplo em um recorte de pesquisa pequeno, rastreável e sustentado por evidências.</p>
+        <div class="meta-row" aria-label="Metadados da análise">
+          <span class="pill">Qualificação: 16/06/2026</span>
+          <span class="pill">Banca: 106 minutos</span>
+          <span class="pill">Artefato atual: SIAGES</span>
+          <span class="pill">Método: Design Science Research</span>
+          <span class="pill">Rota recomendada: avaliação qualitativa delimitada</span>
+        </div>
+      </header>
+
+      <section id="diagnostico">
+        <div class="section-heading">
+          <p class="eyebrow">Leitura executiva</p>
+          <h2>Diagnóstico em uma página</h2>
+          <p>A pesquisa continua relevante e viável, mas o texto de junho e o produto de setembro contam histórias diferentes. A defesa depende de reconciliá-las.</p>
+        </div>
+
+        <div class="grid grid-4">
+          <article class="card"><div class="metric">1</div><div class="metric-label">decisão estrutural: qual parte do SIAGES é a instanciação avaliada</div></article>
+          <article class="card"><div class="metric">3</div><div class="metric-label">cenários prioritários para demonstrar e avaliar</div></article>
+          <article class="card"><div class="metric">70</div><div class="metric-label">itens no questionário atual — excesso para o universo descrito</div></article>
+          <article class="card"><div class="metric">D+56</div><div class="metric-label">plano de recuperação sugerido, a confirmar com orientação e programa</div></article>
+        </div>
+
+        <article class="card verdict">
+          <div>
+            <p class="kicker">Parecer consolidado</p>
+            <blockquote>O problema não é falta de sistema. É excesso de escopo acadêmico e falta de uma cadeia explícita entre requisito, implementação e evidência.</blockquote>
+          </div>
+          <ul>
+            <li>A banca reconheceu relevância, inovação local e aderência ao mestrado profissional.</li>
+            <li>Vinícius e Miler convergiram na redução de escopo e no aprofundamento da modelagem.</li>
+            <li>O repositório já ultrapassou o SIPE: o SIAGES reúne muitos módulos que não devem entrar no recorte empírico.</li>
+            <li>Os anexos de requisitos e UML já fornecem uma base melhor que a descrita no projeto de junho.</li>
+          </ul>
+        </article>
+
+        <div class="grid grid-2" style="margin-top:18px">
+          <div class="alert alert-success"><strong>O que está forte</strong>Problema prático claro; acesso ao campo; DSR coerente; artefato funcional; documentação técnica recente; código, testes e fontes de dados observáveis.</div>
+          <div class="alert alert-danger"><strong>O que ameaça a defesa</strong>SIPE versus SIAGES; cronograma vencido; promessa de “impacto” sem desenho causal; questionário superdimensionado; referências incompletas; ausência de protocolo explícito para a revisão chamada de sistemática.</div>
+        </div>
+      </section>
+
+      <section id="decisao">
+        <div class="section-heading">
+          <p class="eyebrow">Decisão central</p>
+          <h2>O SIAGES é o produto; apenas um núcleo é o artefato da pesquisa</h2>
+          <p>A mudança de nome precisa vir acompanhada de uma mudança de enquadramento. Não tente fazer a dissertação explicar ou avaliar todo o SIAGES.</p>
+        </div>
+
+        <div class="grid grid-2">
+          <article class="card route-card recommended">
+            <span class="priority ok route-badge">RECOMENDADA</span>
+            <p class="kicker">Rota A</p>
+            <h3>Design + demonstração + avaliação qualitativa delimitada</h3>
+            <p>Defina três cenários críticos, congele uma versão do núcleo, execute tarefas com usuários-chave e use entrevistas como evidência principal. Logs e medidas simples de tarefa entram como triangulação, não como prova estatística de impacto.</p>
+            <p><strong>Usar quando:</strong> houver autorização institucional/ética aplicável e pelo menos seis a oito semanas úteis para coleta, análise e redação.</p>
+          </article>
+          <article class="card route-card">
+            <span class="priority p1 route-badge">CONTINGÊNCIA</span>
+            <p class="kicker">Rota B</p>
+            <h3>Design + implementação + demonstração técnica</h3>
+            <p>Concentre a contribuição em requisitos, arquitetura, princípios de design, testes e demonstração com dados controlados. Retire alegações sobre impacto, aceitação e mudança decisória que não tenham sido avaliadas.</p>
+            <p><strong>Usar quando:</strong> prazo ou tramitação impedir coleta com participantes. A adequação desta rota deve ser validada formalmente com orientador e coordenação.</p>
+          </article>
+        </div>
+
+        <div class="alert alert-warning" style="margin-top:18px"><strong>Regra de decisão imediata</strong>Se até D+7 não houver definição do prazo real da defesa e da situação ética/institucional da coleta, assuma a Rota B como base segura. Só reincorpore a avaliação com usuários quando houver autorização e tempo confirmado.</div>
+      </section>
+
+      <section id="contrato">
+        <div class="section-heading">
+          <p class="eyebrow">Versão recomendada</p>
+          <h2>Contrato da pesquisa reescrito</h2>
+          <p>Texto-base para discussão com o orientador. Ele reduz causalidade, explicita o recorte e mantém a contribuição de DSR.</p>
+        </div>
+
+        <article class="card contract">
+          <dl>
+            <div class="contract-row">
+              <dt>Título sugerido</dt>
+              <dd>Integração entre planejamento, execução orçamentária e contratos em um campus de Instituto Federal: desenvolvimento e avaliação qualitativa do SIAGES por Design Science Research</dd>
+            </div>
+            <div class="contract-row">
+              <dt>Pergunta de pesquisa</dt>
+              <dd>Como uma instanciação delimitada do SIAGES pode integrar informações de planejamento, execução orçamentária e contratos, com rastreabilidade, para apoiar cenários prioritários de gestão na Diretoria de Administração do IFRN – Campus Currais Novos?</dd>
+            </div>
+            <div class="contract-row">
+              <dt>Objetivo geral</dt>
+              <dd>Projetar, implementar e avaliar qualitativamente uma instanciação delimitada do SIAGES para integrar informações de planejamento, execução orçamentária e contratos em cenários prioritários da Diretoria de Administração do IFRN – Campus Currais Novos.</dd>
+            </div>
+            <div class="contract-row">
+              <dt>Objetivo específico 1</dt>
+              <dd>Diagnosticar o fluxo atual e derivar requisitos rastreáveis para os cenários selecionados, identificando fontes, retrabalho, lacunas e regras de associação.</dd>
+            </div>
+            <div class="contract-row">
+              <dt>Objetivo específico 2</dt>
+              <dd>Projetar e implementar no SIAGES os fluxos mínimos de integração e consulta correspondentes aos requisitos priorizados.</dd>
+            </div>
+            <div class="contract-row">
+              <dt>Objetivo específico 3</dt>
+              <dd>Demonstrar e avaliar qualitativamente a utilidade, a rastreabilidade e as limitações da instanciação nos cenários definidos, explicitando princípios de design e condições de uso.</dd>
+            </div>
+            <div class="contract-row">
+              <dt>Classe de problemas</dt>
+              <dd>Fragmentação informacional entre planejamento institucional, execução orçamentária e acompanhamento contratual em unidades públicas descentralizadas.</dd>
+            </div>
+            <div class="contract-row">
+              <dt>Contribuição científica esperada</dt>
+              <dd>Princípios de design e conhecimento contingencial sobre como integrar fontes heterogêneas, explicitar vínculos e preservar rastreabilidade em contextos administrativos descentralizados — não apenas o código do sistema.</dd>
+            </div>
+          </dl>
+        </article>
+
+        <div class="alert alert-info" style="margin-top:18px"><strong>Se a Rota B for adotada</strong>Troque “avaliar qualitativamente” por “demonstrar tecnicamente”; substitua o objetivo específico 3 por uma demonstração baseada em cenários e testes; remova do título e das conclusões qualquer promessa de impacto sobre fluxo de trabalho, aceitação ou decisão.</div>
+      </section>
+
+      <section id="escopo">
+        <div class="section-heading">
+          <p class="eyebrow">Fronteira de defesa</p>
+          <h2>O que entra e o que fica fora</h2>
+          <p>O recorte deve ser funcional e empírico. Módulos externos podem ser citados como evolução do produto, mas não como objeto avaliado.</p>
+        </div>
+
+        <div class="grid grid-2">
+          <article class="card scope-column scope-in">
+            <p class="kicker">Dentro do recorte</p>
+            <h3>Núcleo orçamentário-contratual</h3>
+            <ul>
+              <li>Planejamento/atividade, origem de recurso, PTRES e Plano Interno.</li>
+              <li>Crédito/descentralização, empenho, liquidação e pagamento.</li>
+              <li>Contrato, processo, fornecedor, vigência e empenhos/faturas associados.</li>
+              <li>Metadados de fonte, período, atualização e regra de vínculo.</li>
+              <li>Exceções ou limitações visíveis, sem substituir o registro oficial.</li>
+              <li>Autorização por usuário/unidade necessária aos cenários do piloto.</li>
+            </ul>
+          </article>
+          <article class="card scope-column scope-out">
+            <p class="kicker">Fora do recorte empírico</p>
+            <h3>Capacidades amplas do SIAGES</h3>
+            <ul>
+              <li>Pesquisa de preços, licitações, atas e fornecedores.</li>
+              <li>Editor/gerador de documentos, consultor jurídico e automações de IA.</li>
+              <li>Energia, almoxarifado, refeitório, portaria e infraestrutura.</li>
+              <li>Aplicativo móvel e extensão global como produtos autônomos.</li>
+              <li>Administração de órgãos/usuários além do mínimo de acesso ao piloto.</li>
+              <li>Replicação e validação em dois ou três campi no ciclo atual.</li>
+            </ul>
+          </article>
+        </div>
+
+        <h3 style="margin-top:28px">Três cenários de demonstração</h3>
+        <div class="grid grid-3">
+          <article class="card"><p class="kicker">Cenário 1</p><h3>Planejado versus executado</h3><p>Selecionar unidade, período, origem/PTRES/PI; localizar atividade; comparar planejamento, descentralização e empenho; registrar fonte e data de atualização.</p></article>
+          <article class="card"><p class="kicker">Cenário 2</p><h3>Contrato e cadeia financeira</h3><p>Abrir um contrato; identificar processo, fornecedor e vigência; percorrer empenhos e faturas/liquidações; explicar saldos e limites da associação.</p></article>
+          <article class="card"><p class="kicker">Cenário 3</p><h3>Resposta gerencial rastreável</h3><p>Responder uma pergunta real da DIAD com filtros reproduzíveis, dados de origem, ressalvas e evidência exportável ou documentada.</p></article>
+        </div>
+      </section>
+
+      <section id="correcoes">
+        <div class="section-heading">
+          <p class="eyebrow">Backlog pós-banca</p>
+          <h2>Correções priorizadas</h2>
+          <p>Marque as tarefas no próprio relatório. O progresso fica salvo somente neste navegador.</p>
+        </div>
+
+        <div class="task-list">
+          <div class="task"><input id="t01" data-task type="checkbox"><label for="t01"><strong>Aprovar o recorte e a rota metodológica com o orientador</strong><span>Registrar por escrito se a entrega será Rota A ou B, o prazo real de defesa e os produtos exigidos.</span></label><span class="priority p0">P0</span></div>
+          <div class="task"><input id="t02" data-task type="checkbox"><label for="t02"><strong>Substituir SIPE por SIAGES com definição formal</strong><span>Na primeira ocorrência, apresentar o nome completo atual; explicar brevemente a evolução do SIPE para o SIAGES e delimitar a instanciação estudada.</span></label><span class="priority p0">P0</span></div>
+          <div class="task"><input id="t03" data-task type="checkbox"><label for="t03"><strong>Reescrever título, pergunta e objetivos como um único contrato</strong><span>Evitar “avaliar impactos” se não houver comparação e evidência adequadas; usar verbos coerentes em todas as seções e instrumentos.</span></label><span class="priority p0">P0</span></div>
+          <div class="task"><input id="t04" data-task type="checkbox"><label for="t04"><strong>Corrigir o cronograma vencido</strong><span>O projeto previa defesa em agosto de 2026. Atualizar datas, dependências, folgas e marcos de submissão com base na situação real do programa.</span></label><span class="priority p0">P0</span></div>
+          <div class="task"><input id="t05" data-task type="checkbox"><label for="t05"><strong>Confirmar exigência e situação do CEP/CONEP e anuência institucional</strong><span>Entrevistas, gravações e dados identificáveis exigem decisão ética documentada antes da coleta. Validar com orientação e instâncias competentes.</span></label><span class="priority p0">P0</span></div>
+          <div class="task"><input id="t06" data-task type="checkbox"><label for="t06"><strong>Sanear referências e citações</strong><span>Completar Reisch; incluir Silveira et al. (2017) ou remover a citação; substituir todos os “[data]”; conferir correspondência citação–referência e padrão vigente.</span></label><span class="priority p0">P0</span></div>
+          <div class="task"><input id="t07" data-task type="checkbox"><label for="t07"><strong>Corrigir a referência ao PDI do IFRN</strong><span>O manuscrito lista “PDI 2022–2026”, enquanto fontes oficiais consultadas identificam o PDI 2019–2026. Conferir o documento efetivamente usado e atualizar texto, referência e período.</span></label><span class="priority p0">P0</span></div>
+          <div class="task"><input id="t08" data-task type="checkbox"><label for="t08"><strong>Decidir se a revisão é realmente sistemática</strong><span>Se mantiver esse rótulo, documentar bases, strings, período, critérios, seleção e síntese. Caso contrário, nomear corretamente como revisão narrativa, integrativa ou estado da arte.</span></label><span class="priority p1">P1</span></div>
+          <div class="task"><input id="t09" data-task type="checkbox"><label for="t09"><strong>Fortalecer a lacuna empírica</strong><span>Adicionar evidências do fluxo atual: sistemas consultados, passos, tempo aproximado, retrabalho, dependências, erros e decisões prejudicadas. Não transformar experiência pessoal em evidência sem protocolo.</span></label><span class="priority p1">P1</span></div>
+          <div class="task"><input id="t10" data-task type="checkbox"><label for="t10"><strong>Incluir benchmarks institucionais</strong><span>Comparar finalidade, unidade de análise, dados, limitações e lições de casos como UFMS, UFRN e iniciativas de monitoramento de PDI, sem tratá-los como equivalentes ao SIAGES.</span></label><span class="priority p1">P1</span></div>
+          <div class="task"><input id="t11" data-task type="checkbox"><label for="t11"><strong>Atualizar a arquitetura descrita para o sistema real</strong><span>O texto de junho enfatiza Portal da Transparência; o sistema atual usa Supabase, SUAP, Comprasnet/PNCP, importações e caches. Descrever somente as fontes usadas nos três cenários.</span></label><span class="priority p1">P1</span></div>
+          <div class="task"><input id="t12" data-task type="checkbox"><label for="t12"><strong>Construir a matriz Requisito → Código → Teste → Evidência</strong><span>Para cada requisito do recorte, marcar: previsto, implementado, testado, demonstrado e avaliado. Não equiparar requisito a resultado.</span></label><span class="priority p1">P1</span></div>
+          <div class="task"><input id="t13" data-task type="checkbox"><label for="t13"><strong>Reduzir e reposicionar o questionário de 70 itens</strong><span>Entrevista deve ser o instrumento principal. Se houver escala, manter um bloco curto e complementar, sem inferência estatística.</span></label><span class="priority p1">P1</span></div>
+          <div class="task"><input id="t14" data-task type="checkbox"><label for="t14"><strong>Explicitar reflexividade e anterioridade do artefato</strong><span>Como o sistema preexistia à pesquisa formal e o pesquisador atua no campo, registrar decisões retrospectivas, versões, vieses, papéis e medidas de controle.</span></label><span class="priority p1">P1</span></div>
+          <div class="task"><input id="t15" data-task type="checkbox"><label for="t15"><strong>Retirar a validação em 2–3 campi do escopo obrigatório</strong><span>Mover para trabalhos futuros, salvo se já houver autorização, participantes e tempo. Generalização analítica deve vir dos princípios de design e dos limites do caso.</span></label><span class="priority p2">P2</span></div>
+          <div class="task"><input id="t16" data-task type="checkbox"><label for="t16"><strong>Atualizar TCLE, roteiros, questionário e slides</strong><span>Todos os instrumentos devem usar SIAGES, o recorte definitivo, os três cenários, o prazo real e a forma de análise escolhida.</span></label><span class="priority p2">P2</span></div>
+          <div class="task"><input id="t17" data-task type="checkbox"><label for="t17"><strong>Preparar o PTT no formato vigente do PROFIAP</strong><span>Tratar o PTT como entrega derivada da dissertação, com problema, solução, aplicabilidade, inovação, público, evidências, limites e acesso ao produto.</span></label><span class="priority p2">P2</span></div>
+          <div class="task"><input id="t18" data-task type="checkbox"><label for="t18"><strong>Fazer revisão final de linguagem e normalização</strong><span>Corrigir acentuação, coesão, numeração de quadros/figuras, siglas, legendas, chamadas no texto, URLs, datas de acesso e padrão de referências.</span></label><span class="priority p2">P2</span></div>
+        </div>
+      </section>
+
+      <section id="metodo">
+        <div class="section-heading">
+          <p class="eyebrow">Desenho viável</p>
+          <h2>Método e avaliação sem excesso</h2>
+          <p>O objetivo é produzir evidência suficiente para sustentar afirmações limitadas, não maximizar a quantidade de instrumentos.</p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Etapa</th><th>Procedimento</th><th>Evidência</th><th>Afirmação permitida</th></tr></thead>
+            <tbody>
+              <tr><td>Diagnóstico</td><td>Entrevistas semiestruturadas e mapeamento do fluxo atual com usuários intencionalmente selecionados.</td><td>Mapa as-is, categorias, exemplos codificados, requisitos derivados.</td><td>Quais problemas, necessidades e regras foram identificados naquele contexto.</td></tr>
+              <tr><td>Design</td><td>Priorização dos requisitos essenciais e registro das decisões de projeto.</td><td>Matriz de rastreabilidade, UML atualizada, histórico de versões.</td><td>Como e por que o artefato foi projetado para responder ao diagnóstico.</td></tr>
+              <tr><td>Demonstração</td><td>Execução dos três cenários com conjunto de dados definido.</td><td>Roteiro, capturas, resultados, origem dos dados, testes automatizados.</td><td>Que o artefato executa os cenários sob condições especificadas.</td></tr>
+              <tr><td>Avaliação</td><td>Tarefas guiadas + entrevista pós-uso; escala curta apenas se útil.</td><td>Conclusão de tarefa, tempo aproximado, incidentes, falas codificadas, logs permitidos.</td><td>Utilidade, clareza, rastreabilidade e limitações percebidas pelos participantes — sem generalização estatística.</td></tr>
+              <tr><td>Aprendizagem</td><td>Síntese de padrões e condições que favoreceram ou limitaram o resultado.</td><td>Princípios de design ligados às evidências e contraexemplos.</td><td>Generalização analítica prudente para a classe de problemas.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="grid grid-2" style="margin-top:18px">
+          <article class="card">
+            <p class="kicker">Protocolo enxuto de sessão</p>
+            <ol class="plain-list">
+              <li>Contextualização, consentimento e perfil funcional.</li>
+              <li>Execução dos cenários sem induzir a resposta.</li>
+              <li>Registro de conclusão, dúvidas, desvios e fontes consultadas.</li>
+              <li>Entrevista pós-uso de 30–45 minutos.</li>
+              <li>Validação de uma síntese factual pelo participante, se prevista no protocolo.</li>
+            </ol>
+          </article>
+          <article class="card">
+            <p class="kicker">Categorias iniciais</p>
+            <ul class="plain-list">
+              <li>Rastreabilidade e confiança na origem.</li>
+              <li>Completude e clareza da informação.</li>
+              <li>Esforço para concluir a tarefa.</li>
+              <li>Utilidade para o cenário decisório.</li>
+              <li>Limitações, exceções e dependências humanas.</li>
+              <li>Condições de adoção e continuidade.</li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="alert alert-danger" style="margin-top:18px"><strong>Evitar na redação</strong>“O SIAGES melhorou a tomada de decisão” sem baseline e cadeia causal; médias de Likert apresentadas como validação estatística; “tempo real” sem definição de frequência/latência; “integração automática” quando há importação ou vínculo humano; “generalizável a todos os campi” a partir de um único caso.</div>
+      </section>
+
+      <section id="evidencias">
+        <div class="section-heading">
+          <p class="eyebrow">Sistema observado</p>
+          <h2>O que o repositório já permite demonstrar</h2>
+          <p>A base técnica é mais madura que o manuscrito. Isso é uma vantagem se o texto parar de descrever o sistema como promessa e passar a separar implementação, teste e avaliação.</p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Capacidade do recorte</th><th>Evidência observada</th><th>Uso na dissertação</th><th>Pendência</th></tr></thead>
+            <tbody>
+              <tr><td>Planejamento e execução</td><td><code>Dashboard.tsx</code>, <code>Atividades.tsx</code>, <code>Descentralizacoes.tsx</code>, <code>CreditoDisponivel.tsx</code>, <code>Empenhos.tsx</code>.</td><td>Demonstrar cenário 1 e descrever a cadeia de dados usada.</td><td>Congelar filtros, fonte, período e dataset do caso.</td></tr>
+              <tr><td>Liquidações e pagamentos</td><td><code>LiquidacoesPagamentos.tsx</code>, caches de liquidações/faturas e testes focados.</td><td>Completar a leitura da execução, distinguindo saldos e estágios.</td><td>Documentar qual fonte é oficial, periodicidade e limitações.</td></tr>
+              <tr><td>Contratos integrados</td><td><code>Contratos.tsx</code>, <code>contratos.ts</code>, <code>contratosApi.ts</code>, painel <code>DashboardContractExecutionTab</code>.</td><td>Demonstrar cenário 2: contrato, vigência, empenhos, faturas e situação derivada.</td><td>Explicitar regra/confiança do vínculo e casos de ambiguidade.</td></tr>
+              <tr><td>Rastreabilidade planejamento–empenho</td><td><code>atividadeEmpenhoMatching.ts</code>, drill-down do dashboard e sincronização do Plano 8/SUAP.</td><td>Explicar como a associação é construída e onde exige conferência.</td><td>Testar falsos positivos/negativos no conjunto selecionado.</td></tr>
+              <tr><td>Controle por campus e perfil</td><td><code>AuthContext.tsx</code>, <code>ProtectedRoute.tsx</code>, <code>appScreens.ts</code>, preferência de campus e RLS documentada.</td><td>Delimitar o contexto e proteger o acesso às evidências.</td><td>Registrar perfis usados no piloto e dados efetivamente acessíveis.</td></tr>
+              <tr><td>Qualidade técnica</td><td>Suítes para Dashboard, Empenhos, Crédito, Contratos, Liquidações, imports e componentes de contrato.</td><td>Comprovar comportamento implementado; complementar, não substituir, avaliação de utilidade.</td><td>Selecionar testes vinculados a cada cenário e arquivar resultados da versão congelada.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 style="margin-top:28px">Dossiê mínimo da versão avaliada</h3>
+        <div class="grid grid-3">
+          <article class="card"><p class="kicker">Identidade</p><h3>Versão congelada</h3><p>Commit/tag, data, ambiente, campus, perfis, fontes habilitadas e limitações conhecidas. O código do repositório não deve mudar silenciosamente durante a coleta.</p></article>
+          <article class="card"><p class="kicker">Rastreabilidade</p><h3>Matriz de evidência</h3><p>Para cada RF/RN/RNF do recorte: tela/serviço/tabela, teste, cenário, resultado e evidência de avaliação.</p></article>
+          <article class="card"><p class="kicker">Reprodutibilidade</p><h3>Pacote de defesa</h3><p>Roteiro de demonstração, dataset anonimizado/controlado, capturas, exportações, logs permitidos e relatório de testes.</p></article>
+        </div>
+
+        <div class="alert alert-info" style="margin-top:18px"><strong>Achado objetivo de nomenclatura</strong>A busca local não encontrou ocorrências de “SIPE” no código/documentação atual do repositório, enquanto a interface e a documentação operacional usam SIAGES. A inconsistência está concentrada no projeto e nos instrumentos acadêmicos e deve ser corrigida de ponta a ponta.</div>
+      </section>
+
+      <section id="cronograma">
+        <div class="section-heading">
+          <p class="eyebrow">Plano de recuperação</p>
+          <h2>Cronograma D+56 orientado por marcos</h2>
+          <p>O cronograma original previa defesa em agosto de 2026 e já não representa a situação atual. Este roteiro começa após a aprovação do recorte; datas oficiais devem ser definidas com orientação e coordenação.</p>
+        </div>
+
+        <div class="timeline">
+          <div class="week"><div class="week-marker">D+2</div><div class="week-content"><h3>Decisão e bloqueios</h3><p>Reunião com orientador: rota, prazo, CEP/anuência, formato de TCC, PTT e entrega à banca.</p><ul><li>Saída: termo de escopo de uma página.</li><li>Gate: nenhuma coleta sem autorização aplicável.</li></ul></div></div>
+          <div class="week"><div class="week-marker">S1</div><div class="week-content"><h3>Contrato e saneamento crítico</h3><p>Troca SIPE→SIAGES, novo título/pergunta/objetivos, PDI correto, referências incompletas, cronograma e sumário de capítulos.</p><ul><li>Saída: manuscrito v2 com estrutura aprovada.</li></ul></div></div>
+          <div class="week"><div class="week-marker">S2</div><div class="week-content"><h3>Lacuna e literatura</h3><p>Protocolo da revisão/estado da arte, busca atualizada, benchmarks institucionais e síntese comparativa.</p><ul><li>Saída: matriz de literatura e capítulo teórico reescrito.</li></ul></div></div>
+          <div class="week"><div class="week-marker">S3</div><div class="week-content"><h3>Diagnóstico, requisitos e método</h3><p>Fechar fluxo as-is, requisitos essenciais, matriz DSR e instrumentos reduzidos.</p><ul><li>Saída: método auditável e anexos coerentes.</li></ul></div></div>
+          <div class="week"><div class="week-marker">S4</div><div class="week-content"><h3>Congelamento técnico</h3><p>Fixar versão do SIAGES, dataset, três cenários, testes e limitações.</p><ul><li>Saída: dossiê da versão candidata ao piloto/demonstração.</li></ul></div></div>
+          <div class="week"><div class="week-marker">S5</div><div class="week-content"><h3>Coleta ou demonstração formal</h3><p>Rota A: sessões autorizadas com usuários. Rota B: demonstração técnica e resultados de testes, sem alegações de percepção/impacto.</p><ul><li>Saída: corpus organizado e registro de incidentes.</li></ul></div></div>
+          <div class="week"><div class="week-marker">S6</div><div class="week-content"><h3>Análise e design propositions</h3><p>Codificação, triangulação, resultados por cenário, limitações e princípios de design sustentados por evidências.</p><ul><li>Saída: capítulo de resultados e discussão.</li></ul></div></div>
+          <div class="week"><div class="week-marker">S7</div><div class="week-content"><h3>Dissertação e PTT</h3><p>Revisão integral de coerência, normalização, anexos, PTT no formato vigente e depósito para leitura do orientador.</p><ul><li>Saída: versão completa pronta para revisão final.</li></ul></div></div>
+          <div class="week"><div class="week-marker">S8</div><div class="week-content"><h3>Banca</h3><p>Slides, demonstração gravada de contingência, respostas a questionamentos e dois ensaios cronometrados.</p><ul><li>Saída: pacote final de defesa.</li></ul></div></div>
+        </div>
+      </section>
+
+      <section id="defesa">
+        <div class="section-heading">
+          <p class="eyebrow">Banca final</p>
+          <h2>Como apresentar a evolução com segurança</h2>
+          <p>A narrativa deve mostrar que as recomendações da qualificação foram absorvidas e que o escopo foi conscientemente reduzido.</p>
+        </div>
+
+        <div class="grid grid-2">
+          <article class="card">
+            <p class="kicker">Estrutura de 20 minutos</p>
+            <ol class="plain-list">
+              <li><strong>2 min:</strong> problema e lacuna empírica com evidências.</li>
+              <li><strong>2 min:</strong> o que mudou após a qualificação.</li>
+              <li><strong>3 min:</strong> pergunta, objetivos, classe de problemas e recorte.</li>
+              <li><strong>4 min:</strong> DSR, requisitos e arquitetura da instanciação.</li>
+              <li><strong>4 min:</strong> demonstração dos três cenários.</li>
+              <li><strong>3 min:</strong> avaliação/resultados e triangulação.</li>
+              <li><strong>2 min:</strong> princípios de design, limites e contribuição.</li>
+            </ol>
+          </article>
+          <article class="card">
+            <p class="kicker">Perguntas que precisam de resposta pronta</p>
+            <ul class="plain-list">
+              <li>O que exatamente é o artefato avaliado dentro do SIAGES?</li>
+              <li>Quais evidências vieram do diagnóstico, e quais vieram da avaliação?</li>
+              <li>Como a anterioridade do sistema e o papel do pesquisador foram controlados?</li>
+              <li>Por que entrevistas são adequadas ao universo pequeno?</li>
+              <li>Como cada princípio de design deriva dos resultados?</li>
+              <li>O que o SIAGES não permite concluir?</li>
+              <li>Por que não usar apenas Power BI ou os sistemas oficiais?</li>
+            </ul>
+          </article>
+        </div>
+
+        <h3 style="margin-top:28px">Mensagem de abertura sugerida</h3>
+        <div class="quote">“A qualificação revelou que a relevância prática do problema não exigia ampliar o produto, mas delimitar melhor o objeto científico. Por isso, o SIPE evoluiu para o SIAGES como sistema organizacional, enquanto esta dissertação passou a investigar apenas sua instanciação orçamentário-contratual em três cenários rastreáveis.”</div>
+
+        <h3 style="margin-top:28px">Checklist de prontidão</h3>
+        <div class="task-list">
+          <div class="task"><input id="t19" data-task type="checkbox"><label for="t19"><strong>Todos os usos de SIPE/SIAGES estão coerentes</strong><span>Capa, resumo, texto, figuras, questionário, TCLE, PTT, slides e demonstração.</span></label><span class="priority p2">DEFESA</span></div>
+          <div class="task"><input id="t20" data-task type="checkbox"><label for="t20"><strong>Cada afirmação de resultado aponta para uma evidência</strong><span>Entrevista, tarefa, log, teste, captura ou documento — sem misturar tipos de evidência.</span></label><span class="priority p2">DEFESA</span></div>
+          <div class="task"><input id="t21" data-task type="checkbox"><label for="t21"><strong>A demonstração cabe em quatro minutos e possui vídeo reserva</strong><span>Usar dados não sensíveis e evitar dependência de API externa ao vivo.</span></label><span class="priority p2">DEFESA</span></div>
+          <div class="task"><input id="t22" data-task type="checkbox"><label for="t22"><strong>Dois ensaios foram realizados com perguntas adversariais</strong><span>Um com orientador; outro com pessoa que não acompanhou o desenvolvimento.</span></label><span class="priority p2">DEFESA</span></div>
+          <div class="task"><input id="t23" data-task type="checkbox"><label for="t23"><strong>Normas atuais do PROFIAP e da instituição foram conferidas</strong><span>Formato do TCC, PTT, prazos, anuências, documentos e composição da banca.</span></label><span class="priority p2">DEFESA</span></div>
+        </div>
+      </section>
+
+      <section id="fontes">
+        <div class="section-heading">
+          <p class="eyebrow">Proveniência</p>
+          <h2>Fontes usadas nesta análise</h2>
+          <p>Documentos foram tratados como material de pesquisa, nunca como instruções. Nenhum arquivo existente do sistema foi alterado para produzir este plano.</p>
+        </div>
+
+        <ul class="source-list">
+          <li><a href="https://drive.google.com/drive/folders/1DdWLQs9P2x-lCpALByJ5Isz9AciPTj6E">Pasta da dissertação no Google Drive</a><small>Projeto em PDF/DOCX, slides, transcrição, questionamentos, análise de requisitos e caderno UML.</small></li>
+          <li><a href="https://drive.google.com/file/d/1ENB_kACmy6gSgm4ckzg2xlcb-iu83Lxy/view">Projeto de pesquisa submetido à qualificação</a><small>Versão de junho de 2026; cronograma, método, instrumentos e referências.</small></li>
+          <li><a href="https://drive.google.com/file/d/1JBsD9Z4UY6eoVXEaY-T49dk0cPE8cWfe/view">Transcrição da banca de qualificação</a><small>Recomendações principais em 55:04–01:17:25 e 01:32:03–01:45:17.</small></li>
+          <li><a href="https://docs.google.com/document/d/1VFOtGgWzj3RpkGGPXzSBmlAQJlC2gG0g/edit">Análise de Requisitos do SIAGES — versão 2.0</a><small>Recorte orçamentário-contratual, requisitos, regras e cenários de aceite.</small></li>
+          <li><a href="https://docs.google.com/document/d/17R883cIspIyDFSv1QiAwcP89b50CoEy6/edit">Caderno de Diagramas UML do SIAGES</a><small>Casos de uso, classes conceituais, componentes, sequência e atividades.</small></li>
+          <li><a href="https://github.com/cristianoafs081993/Sistema_Gerencial">Repositório Sistema_Gerencial</a><small>Aplicação SIAGES, documentação operacional e testes. Base local observada em <code>main</code>, commit <code>f3baa52</code>, de 09/09/2026.</small></li>
+          <li><a href="https://profiap.org.br/regimento-e-normas-academicas/">Regimento e normas acadêmicas do PROFIAP</a><small>A página consultada lista normas acadêmicas atuais de 19/02/2026.</small></li>
+          <li><a href="https://profiap.org.br/estrutura-do-projeto-de-pesquisa-e-trabalho-de-conclusao-de-curso-tcc/">Estrutura de projeto e TCC — PROFIAP</a><small>Referência para análise situacional e descrição do Produto Técnico-Tecnológico.</small></li>
+          <li><a href="https://profiap.org.br/ptt-produto-tecnico-tecnologico/">Orientações de PTT — PROFIAP</a><small>O PTT é apresentado pelo programa como documento obrigatório derivado da dissertação.</small></li>
+          <li><a href="https://www.gov.br/conselho-nacional-de-saude/pt-br/atos-normativos/resolucoes/2016/resolucao-no-510.pdf/view">Resolução CNS nº 510/2016</a><small>Normas aplicáveis a pesquisas em Ciências Humanas e Sociais com dados diretamente obtidos de participantes ou informações identificáveis.</small></li>
+          <li><a href="https://portal.ifrn.edu.br/documents/12772/PDI_2019-2026_-1.pdf">PDI IFRN 2019–2026</a><small>Fonte oficial a conferir contra a referência “2022–2026” presente no projeto.</small></li>
+          <li><a href="https://pdi-ppi.ufms.br/files/2025/02/pdi-ppi-2025-2030-v1.0-alta.pdf">PDI–PPI UFMS 2025–2030</a><small>Benchmark sugerido na banca; usar com critérios comparáveis, não como modelo automático.</small></li>
+        </ul>
+
+        <details style="margin-top:18px">
+          <summary>Notas de cautela metodológica</summary>
+          <div>
+            <p>Este plano é uma orientação de trabalho, não uma decisão do orientador, do colegiado ou do Comitê de Ética. A necessidade e o rito de submissão ética precisam ser confirmados nas instâncias responsáveis antes da coleta.</p>
+            <p>A análise do repositório identifica evidências técnicas existentes, mas não certifica que todos os requisitos do anexo estejam implementados ou avaliados. Essa confirmação é justamente o objetivo da matriz de rastreabilidade recomendada.</p>
+          </div>
+        </details>
+      </section>
+
+      <p class="footer-note">Relatório autônomo e imprimível. As marcações de progresso são armazenadas apenas no <code>localStorage</code> do navegador usado para abrir este arquivo.</p>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const storageKey = 'siages-plano-defesa-v1';
+      const tasks = Array.from(document.querySelectorAll('[data-task]'));
+      const bar = document.getElementById('progressBar');
+      const text = document.getElementById('progressText');
+
+      function readState() {
+        try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); }
+        catch { return {}; }
+      }
+
+      function updateProgress() {
+        const done = tasks.filter((task) => task.checked).length;
+        const value = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+        bar.value = value;
+        bar.textContent = `${value}%`;
+        text.textContent = `${value}%`;
+      }
+
+      const saved = readState();
+      tasks.forEach((task) => {
+        task.checked = Boolean(saved[task.id]);
+        task.addEventListener('change', () => {
+          const state = readState();
+          state[task.id] = task.checked;
+          localStorage.setItem(storageKey, JSON.stringify(state));
+          updateProgress();
+        });
+      });
+
+      document.getElementById('printButton').addEventListener('click', () => window.print());
+      document.getElementById('resetButton').addEventListener('click', () => {
+        localStorage.removeItem(storageKey);
+        tasks.forEach((task) => { task.checked = false; });
+        updateProgress();
+      });
+
+      updateProgress();
+    })();
+  </script>
+</body>
+</html>
