@@ -11,6 +11,7 @@ import { DashboardScreen } from './src/screens/DashboardScreen';
 import { EmpenhosScreen } from './src/screens/EmpenhosScreen';
 import { ContratosScreen } from './src/screens/ContratosScreen';
 import { LicitacoesScreen } from './src/screens/LicitacoesScreen';
+import { InfraestruturaScreen } from './src/screens/InfraestruturaScreen';
 import { fetchNotifications } from './src/services/api';
 
 export default function App() {
@@ -83,6 +84,8 @@ export default function App() {
           )}
 
           {currentTab === 'licitacoes' && <LicitacoesScreen />}
+
+          {currentTab === 'infraestrutura' && <InfraestruturaScreen />}
         </View>
 
         {/* Bottom Navigation */}

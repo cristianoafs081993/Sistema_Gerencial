@@ -1,0 +1,469 @@
+{
+  "date": "2026-09-12",
+  "head": "f3baa52caac74304fe9ba18e1ce7505e78994f59",
+  "scope": "working tree inspected; not an exact clean HEAD snapshot",
+  "files": [
+    {
+      "path": "src/services/atividades.ts",
+      "sha256": "cf1c506689078bdeb0eebee930837306093b5c589bdbe6f0f7077dbd396b80ec"
+    },
+    {
+      "path": "src/services/creditosDisponiveisDetalhes.ts",
+      "sha256": "3db69a44c4a590ca417d398b7f57bc118155f592b2271b7a4348356ed4ab0aa8"
+    },
+    {
+      "path": "src/services/suapPlanParser.ts",
+      "sha256": "facc5e3a1143ba02f399749b6f1f8e8212d8a5e2471e7c253b4efc73df2ab43e"
+    },
+    {
+      "path": "src/services/descentralizacoes.ts",
+      "sha256": "6015d60dbe41827c2a95d3ca99de3c5b3ef69dc8ecc502f680bfb4a70990e39f"
+    },
+    {
+      "path": "src/utils/atividadeEmpenhoMatching.ts",
+      "sha256": "57d80c4b7b6218c8734597d87ae7dd5f1749f7328e98405d2cf5f57ca77b9d1e"
+    },
+    {
+      "path": "src/utils/planoInternoFilters.ts",
+      "sha256": "f6de267f823258638692ba079ab8f8eb879e2f4929bb209b1ae03748ca3b6f9e"
+    },
+    {
+      "path": "scripts/google-apps-script/gmailCsvIngress.gs",
+      "sha256": "671be8904d69ab57e256cf500f210fb81ee076f322c560d5921fe4d601444d7d"
+    },
+    {
+      "path": "SUAP-Atividades-Scraper-1.9/manifest.json",
+      "sha256": "6c2d49831f5509df205c06a99a998c254ceff992dd98e0f2d7807b16b9557080"
+    },
+    {
+      "path": "docs/data-import/README.md",
+      "sha256": "bce4ae56f3890a526a53bd2162da0a0c4b53ed08e92900e624ce227891cfc51b"
+    },
+    {
+      "path": "docs/data-import/PIPELINE_MATRIX.md",
+      "sha256": "af079227449b1548a32875a7ec6fca7d02b4067a27f3cd72936501a4b891a555"
+    },
+    {
+      "path": "docs/integrations/GMAIL_CSV_INGESTION.md",
+      "sha256": "d9e29104875bc007b39fb942f5ef27b4c57ed0360a0a7247aefce51732fcf961"
+    }
+  ],
+  "tests": {
+    "numTotalTestSuites": 18,
+    "numPassedTestSuites": 18,
+    "numFailedTestSuites": 0,
+    "numPendingTestSuites": 0,
+    "numTotalTests": 29,
+    "numPassedTests": 29,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "numTodoTests": 0,
+    "snapshot": {
+      "added": 0,
+      "failure": false,
+      "filesAdded": 0,
+      "filesRemoved": 0,
+      "filesRemovedList": [],
+      "filesUnmatched": 0,
+      "filesUpdated": 0,
+      "matched": 0,
+      "total": 0,
+      "unchecked": 0,
+      "uncheckedKeysByFile": [],
+      "unmatched": 0,
+      "updated": 0,
+      "didUpdate": false
+    },
+    "startTime": 1789233960119,
+    "success": true,
+    "testResults": [
+      {
+        "assertionResults": [
+          {
+            "ancestorTitles": [
+              "financeiroImportService"
+            ],
+            "fullName": "financeiroImportService faz parse do CSV financeiro localizando o cabecalho e convertendo valores monetarios",
+            "status": "passed",
+            "title": "faz parse do CSV financeiro localizando o cabecalho e convertendo valores monetarios",
+            "duration": 29.18919999999889,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "financeiroImportService"
+            ],
+            "fullName": "financeiroImportService agrega os cards por fonte e vinculacao somando os saldos",
+            "status": "passed",
+            "title": "agrega os cards por fonte e vinculacao somando os saldos",
+            "duration": 3.3857000000007247,
+            "failureMessages": [],
+            "meta": {}
+          }
+        ],
+        "startTime": 1789233971831,
+        "endTime": 1789233971864.3857,
+        "status": "passed",
+        "message": "",
+        "name": "C:/Users/crist/OneDrive/Desktop/Obsidian/01 - Projetos/Apps/Sistema_Gerencial/src/services/__tests__/financeiroImportService.test.ts"
+      },
+      {
+        "assertionResults": [
+          {
+            "ancestorTitles": [
+              "parseSuapPlanHtml"
+            ],
+            "fullName": "parseSuapPlanHtml associa cada tabela ao cabecalho de sua propria dimensao",
+            "status": "passed",
+            "title": "associa cada tabela ao cabecalho de sua propria dimensao",
+            "duration": 87.8768,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "parseSuapPlanHtml"
+            ],
+            "fullName": "parseSuapPlanHtml extrai linhas ocultas e normaliza valores brasileiros",
+            "status": "passed",
+            "title": "extrai linhas ocultas e normaliza valores brasileiros",
+            "duration": 31.133499999999913,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "parseSuapPlanHtml"
+            ],
+            "fullName": "parseSuapPlanHtml rejeita ids SUAP duplicados",
+            "status": "passed",
+            "title": "rejeita ids SUAP duplicados",
+            "duration": 22.178499999999985,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "parseSuapPlanHtml"
+            ],
+            "fullName": "parseSuapPlanHtml rejeita uma página sem tabelas de atividades",
+            "status": "passed",
+            "title": "rejeita uma página sem tabelas de atividades",
+            "duration": 10.691200000001118,
+            "failureMessages": [],
+            "meta": {}
+          }
+        ],
+        "startTime": 1789233970877,
+        "endTime": 1789233971029.6912,
+        "status": "passed",
+        "message": "",
+        "name": "C:/Users/crist/OneDrive/Desktop/Obsidian/01 - Projetos/Apps/Sistema_Gerencial/src/services/__tests__/suapPlanParser.test.ts"
+      },
+      {
+        "assertionResults": [
+          {
+            "ancestorTitles": [
+              "atividadeEmpenhoMatching",
+              "extractPlanoInternoCode"
+            ],
+            "fullName": "atividadeEmpenhoMatching extractPlanoInternoCode extrai o código de 11 caracteres de strings completas",
+            "status": "passed",
+            "title": "extrai o código de 11 caracteres de strings completas",
+            "duration": 3.09920000000011,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "atividadeEmpenhoMatching",
+              "extractProcessNumbers"
+            ],
+            "fullName": "atividadeEmpenhoMatching extractProcessNumbers extrai números de processos em diferentes formatos",
+            "status": "passed",
+            "title": "extrai números de processos em diferentes formatos",
+            "duration": 2.214300000000094,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "atividadeEmpenhoMatching",
+              "extractSiglas"
+            ],
+            "fullName": "atividadeEmpenhoMatching extractSiglas extrai siglas entre parênteses e siglas conhecidas",
+            "status": "passed",
+            "title": "extrai siglas entre parênteses e siglas conhecidas",
+            "duration": 7.700199999999768,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "atividadeEmpenhoMatching",
+              "matchEmpenhosToAtividades"
+            ],
+            "fullName": "atividadeEmpenhoMatching matchEmpenhosToAtividades correlaciona com sucesso os empenhos às atividades corretas da origem 231802",
+            "status": "passed",
+            "title": "correlaciona com sucesso os empenhos às atividades corretas da origem 231802",
+            "duration": 5.081499999999778,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "atividadeEmpenhoMatching",
+              "matchEmpenhosToAtividades"
+            ],
+            "fullName": "atividadeEmpenhoMatching matchEmpenhosToAtividades calcula saldos exatos evitando que o PAFE mostre valor total planejado de 110k",
+            "status": "passed",
+            "title": "calcula saldos exatos evitando que o PAFE mostre valor total planejado de 110k",
+            "duration": 2.0648999999998523,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "atividadeEmpenhoMatching",
+              "matchEmpenhosToAtividades"
+            ],
+            "fullName": "atividadeEmpenhoMatching matchEmpenhosToAtividades respeita vínculo manual explícito por atividadeId quando presente",
+            "status": "passed",
+            "title": "respeita vínculo manual explícito por atividadeId quando presente",
+            "duration": 0.5621999999998479,
+            "failureMessages": [],
+            "meta": {}
+          }
+        ],
+        "startTime": 1789233974513,
+        "endTime": 1789233974535.5623,
+        "status": "passed",
+        "message": "",
+        "name": "C:/Users/crist/OneDrive/Desktop/Obsidian/01 - Projetos/Apps/Sistema_Gerencial/src/utils/__tests__/atividadeEmpenhoMatching.test.ts"
+      },
+      {
+        "assertionResults": [
+          {
+            "ancestorTitles": [
+              "creditosDisponiveisDetalhes"
+            ],
+            "fullName": "creditosDisponiveisDetalhes le o layout detalhado com PI, descricao e valor em coluna sem cabecalho",
+            "status": "passed",
+            "title": "le o layout detalhado com PI, descricao e valor em coluna sem cabecalho",
+            "duration": 6.72609999999986,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "creditosDisponiveisDetalhes"
+            ],
+            "fullName": "creditosDisponiveisDetalhes continua aceitando o layout agregado anterior e soma por PTRES",
+            "status": "passed",
+            "title": "continua aceitando o layout agregado anterior e soma por PTRES",
+            "duration": 0.7022999999999229,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "creditosDisponiveisDetalhes"
+            ],
+            "fullName": "creditosDisponiveisDetalhes descarta linha sem valor parseavel sem descartar saldo zero",
+            "status": "passed",
+            "title": "descarta linha sem valor parseavel sem descartar saldo zero",
+            "duration": 0.40810000000010405,
+            "failureMessages": [],
+            "meta": {}
+          }
+        ],
+        "startTime": 1789233975404,
+        "endTime": 1789233975411.7024,
+        "status": "passed",
+        "message": "",
+        "name": "C:/Users/crist/OneDrive/Desktop/Obsidian/01 - Projetos/Apps/Sistema_Gerencial/src/utils/__tests__/creditosDisponiveisDetalhes.test.ts"
+      },
+      {
+        "assertionResults": [
+          {
+            "ancestorTitles": [
+              "descentralizacoesContaSaldos"
+            ],
+            "fullName": "descentralizacoesContaSaldos agrega o upload da conta por PTRES e aceita metrica com variacoes de chave",
+            "status": "passed",
+            "title": "agrega o upload da conta por PTRES e aceita metrica com variacoes de chave",
+            "duration": 63.181800000000294,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "descentralizacoesContaSaldos"
+            ],
+            "fullName": "descentralizacoesContaSaldos ignora linhas sem valor parseavel, mas preserva zero explicito",
+            "status": "passed",
+            "title": "ignora linhas sem valor parseavel, mas preserva zero explicito",
+            "duration": 1.0316000000002532,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "descentralizacoesContaSaldos"
+            ],
+            "fullName": "descentralizacoesContaSaldos aceita o CSV real da conta quando o valor vem na terceira coluna sem cabecalho",
+            "status": "passed",
+            "title": "aceita o CSV real da conta quando o valor vem na terceira coluna sem cabecalho",
+            "duration": 0.7793000000001484,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "descentralizacoesContaSaldos"
+            ],
+            "fullName": "descentralizacoesContaSaldos falha cedo quando o arquivo nao traz as colunas obrigatorias",
+            "status": "passed",
+            "title": "falha cedo quando o arquivo nao traz as colunas obrigatorias",
+            "duration": 2.1350000000002183,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "descentralizacoesContaSaldos"
+            ],
+            "fullName": "descentralizacoesContaSaldos usa o saldo da conta para o total por PTRES e reparte por dimensao conforme os lancamentos atuais",
+            "status": "passed",
+            "title": "usa o saldo da conta para o total por PTRES e reparte por dimensao conforme os lancamentos atuais",
+            "duration": 3.3497999999999593,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "descentralizacoesContaSaldos"
+            ],
+            "fullName": "descentralizacoesContaSaldos mantem o comportamento antigo quando nao houver saldo de conta importado",
+            "status": "passed",
+            "title": "mantem o comportamento antigo quando nao houver saldo de conta importado",
+            "duration": 2.1934000000001106,
+            "failureMessages": [],
+            "meta": {}
+          }
+        ],
+        "startTime": 1789233970948,
+        "endTime": 1789233971021.1934,
+        "status": "passed",
+        "message": "",
+        "name": "C:/Users/crist/OneDrive/Desktop/Obsidian/01 - Projetos/Apps/Sistema_Gerencial/src/utils/__tests__/descentralizacoesContaSaldos.test.ts"
+      },
+      {
+        "assertionResults": [
+          {
+            "ancestorTitles": [
+              "planoInternoFilters",
+              "normalizePlanoInterno"
+            ],
+            "fullName": "planoInternoFilters normalizePlanoInterno normaliza para maiúsculas e remove espaços das bordas",
+            "status": "passed",
+            "title": "normaliza para maiúsculas e remove espaços das bordas",
+            "duration": 5.73739999999998,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "planoInternoFilters",
+              "normalizePlanoInterno"
+            ],
+            "fullName": "planoInternoFilters normalizePlanoInterno retorna string vazia para valores nulos ou indefinidos",
+            "status": "passed",
+            "title": "retorna string vazia para valores nulos ou indefinidos",
+            "duration": 0.536200000000008,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "planoInternoFilters",
+              "matchesPlanoInternoFilter"
+            ],
+            "fullName": "planoInternoFilters matchesPlanoInternoFilter retorna true quando o filtro é \"all\" ou vazio",
+            "status": "passed",
+            "title": "retorna true quando o filtro é \"all\" ou vazio",
+            "duration": 0.8072999999999411,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "planoInternoFilters",
+              "matchesPlanoInternoFilter"
+            ],
+            "fullName": "planoInternoFilters matchesPlanoInternoFilter retorna false quando o registro não possui plano interno e o filtro está ativo",
+            "status": "passed",
+            "title": "retorna false quando o registro não possui plano interno e o filtro está ativo",
+            "duration": 0.428599999999733,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "planoInternoFilters",
+              "matchesPlanoInternoFilter"
+            ],
+            "fullName": "planoInternoFilters matchesPlanoInternoFilter faz match exato ignorando case",
+            "status": "passed",
+            "title": "faz match exato ignorando case",
+            "duration": 0.5150000000003274,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "planoInternoFilters",
+              "matchesPlanoInternoFilter"
+            ],
+            "fullName": "planoInternoFilters matchesPlanoInternoFilter faz match quando o registro possui descrição além do código PI",
+            "status": "passed",
+            "title": "faz match quando o registro possui descrição além do código PI",
+            "duration": 0.7766000000001441,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "planoInternoFilters",
+              "matchesPlanoInternoFilter"
+            ],
+            "fullName": "planoInternoFilters matchesPlanoInternoFilter faz match para variações alfanuméricas como \"PI-EN\" e \"PIEN\"",
+            "status": "passed",
+            "title": "faz match para variações alfanuméricas como \"PI-EN\" e \"PIEN\"",
+            "duration": 0.5115999999998166,
+            "failureMessages": [],
+            "meta": {}
+          },
+          {
+            "ancestorTitles": [
+              "planoInternoFilters",
+              "matchesPlanoInternoFilter"
+            ],
+            "fullName": "planoInternoFilters matchesPlanoInternoFilter retorna false para códigos distintos",
+            "status": "passed",
+            "title": "retorna false para códigos distintos",
+            "duration": 0.2908999999999651,
+            "failureMessages": [],
+            "meta": {}
+          }
+        ],
+        "startTime": 1789233974486,
+        "endTime": 1789233974497.291,
+        "status": "passed",
+        "message": "",
+        "name": "C:/Users/crist/OneDrive/Desktop/Obsidian/01 - Projetos/Apps/Sistema_Gerencial/src/utils/__tests__/planoInternoFilters.test.ts"
+      }
+    ]
+  }
+}

@@ -1,10 +1,80 @@
-export type TabType = 'dashboard' | 'empenhos' | 'contratos' | 'licitacoes';
+export type TabType = 'dashboard' | 'empenhos' | 'contratos' | 'licitacoes' | 'infraestrutura';
 
 export type EmpenhoFilter = 'all' | 'exercicio' | 'rap';
 export type ContratoFilter = 'all' | 'vigente' | 'vencer';
 export type LicitacaoSubTab = 'pregoes' | 'atas';
 export type PregaoFilter = 'all' | 'abertas' | 'encerradas' | 'srp';
 export type AtaFilter = 'all' | 'vigentes' | 'vencer' | 'campus';
+
+export type InfraSubTab = 'manutencao' | 'portaria' | 'energia';
+export type ManutencaoFilter = 'all' | 'pendente' | 'em_andamento' | 'resolvido';
+export type PortariaFilter = 'todos' | 'hoje' | 'futuros';
+export type EnergiaFilter = 'all' | 'cosern' | 'mercatto' | 'solar';
+
+export interface PortariaEventoItem {
+  id: string;
+  titulo: string;
+  descricao?: string | null;
+  local: string;
+  ambienteId?: string | null;
+  dataInicio: string;
+  dataFim?: string | null;
+  responsavelNome?: string | null;
+  responsavelContato?: string | null;
+  tipo: string;
+  status: string;
+  observacoesPortaria?: string | null;
+  totalParticipantes: number;
+  totalPresentes: number;
+}
+
+export interface PortariaParticipanteItem {
+  id: string;
+  eventoId: string;
+  nome: string;
+  documento?: string | null;
+  instituicao?: string | null;
+  tipo: string;
+  presente: boolean;
+  horarioEntrada?: string | null;
+  veiculoPlaca?: string | null;
+  observacao?: string | null;
+}
+
+export interface OcorrenciaItem {
+  id: string;
+  ambienteNome: string;
+  ambienteCodigo: string;
+  bloco: string | null;
+  status: 'pendente' | 'em_andamento' | 'resolvido' | 'arquivado';
+  avaliacao: number;
+  problemas: string[];
+  observacao: string | null;
+  fotoUrl?: string | null;
+  data: string;
+  resolvidoEm?: string | null;
+}
+
+export interface EnergiaFaturaItem {
+  id: string;
+  fonte: 'cosern' | 'mercatto';
+  competencia: string;
+  ano: number;
+  consumoKwh: number;
+  valor: number;
+  faturaNumero?: string;
+  fornecedor?: string;
+  leituraFim?: string;
+}
+
+export interface EnergiaSolarItem {
+  id: string;
+  ufvNome: string;
+  dataReferencia: string;
+  ano: number;
+  mes: number;
+  energiaGeradaKwh: number;
+}
 
 export interface PtresItem {
   code: string;

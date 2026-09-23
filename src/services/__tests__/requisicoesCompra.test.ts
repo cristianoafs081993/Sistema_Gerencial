@@ -122,4 +122,50 @@ describe('requisicoesCompraService', () => {
       { id: 'link-2', requisicaoCompraId: 'req-1', empenhoId: 'emp-2', empenhoNumero: '2026NE000012', sortOrder: 1 },
     ]);
   });
+
+  describe('deleteRequisicao', () => {
+    it('exclui requisição com sucesso quando id é encontrado', async () => {
+      const select = vi.fn().mockResolvedValue({
+        data: [{ id: 'req-1' }],
+        error: null,
+      });
+      const eq = vi.fn(() => ({ select }));
+      const deleteMock = vi.fn(() => ({ eq }));
+      supabaseMocks.from.mockReturnValue({ delete: deleteMock });
+
+      await expect(requisicoesCompraService.deleteRequisicao('req-1')).resolves.toBeUndefined();
+
+      expect(supabaseMocks.from).toHaveBeenCalledWith('requisicoes_compra');
+      expect(deleteMock).toHaveBeenCalled();
+      expect(eq).toHaveBeenCalledWith('id', 'req-1');
+      expect(select).toHaveBeenCalledWith('id');
+    });
+
+    it('lança erro amigável quando requisição não é retornada (sem permissão ou inexistente)', async () => {
+      const select = vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      const eq = vi.fn(() => ({ select }));
+      const deleteMock = vi.fn(() => ({ eq }));
+      supabaseMocks.from.mockReturnValue({ delete: deleteMock });
+
+      await expect(requisicoesCompraService.deleteRequisicao('req-1')).rejects.toThrow(
+        'A requisição não foi excluída. Ela pode não estar mais disponível ou não ter permissão para exclusão.',
+      );
+    });
+
+    it('repassa erro retornado pelo Supabase', async () => {
+      const dbError = new Error('RLS violation');
+      const select = vi.fn().mockResolvedValue({
+        data: null,
+        error: dbError,
+      });
+      const eq = vi.fn(() => ({ select }));
+      const deleteMock = vi.fn(() => ({ eq }));
+      supabaseMocks.from.mockReturnValue({ delete: deleteMock });
+
+      await expect(requisicoesCompraService.deleteRequisicao('req-1')).rejects.toThrow('RLS violation');
+    });
+  });
 });
