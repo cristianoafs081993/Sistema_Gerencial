@@ -159,9 +159,9 @@ Alguns services usam fallback para REST quando `supabase-js` falha ou retorna va
 
 Observacoes:
 
-- a configuracao da integracao fica no menu do usuario, em `Configurar integração com o SUAP`; nela o usuario cadastra manualmente as caixas e executa a sincronizacao
+- a configuracao da integracao fica no menu do usuario, em `Configurar integração com o SUAP`; nela o usuario cadastra caixas adicionais e executa sincronizacoes manuais
 - o fluxo e modular: o usuario pode sincronizar somente o inventario, baixar PDFs selecionados, executar somente a extracao por IA ou rodar o fluxo completo para processos escolhidos
-- a sincronizacao automatica obedece as caixas marcadas pelo usuario e executa o fluxo completo apenas para processos novos; cada inventario reconcilia somente as caixas lidas com sucesso, ocultando processos ausentes pela remocao do vinculo em `suap_processo_caixas` sem apagar dados, PDFs ou historico
+- a extensao cria como padrao as caixas do usuario SUAP 304806 e do setor 857, se ainda nao existirem, e sincroniza somente as que estiverem habilitadas em `sync_automatica`, nos dias uteis as 07h, 10h, 13h e 15h. O service worker MV3 le as listagens por `suap-proxy`, atualiza inventario/vinculos e abre abas inativas para processos novos ou ainda pendentes de PDF/IA; o comando `Sincronizar processos agora` na paleta SUAP executa o mesmo fluxo. Chrome aberto, sessao SIAGES da extensao e sessao SUAP valida sao necessarios. Cada inventario reconcilia somente caixas lidas com sucesso, removendo vinculos ausentes em `suap_processo_caixas` sem apagar processos, PDFs ou historico
 - antes da IA o frontend persiste apenas `suap_id`, `url`, `caixa` e `num_processo` quando o numero aparece na listagem do SUAP; a tabela continua exibindo os processos durante fila/processamento da IA, mas beneficiario, contrato, valores, dados bancarios, empenhos e retencoes ficam no detalhe aberto pelo ícone de olho e so aparecem depois de extraidos pela IA
 - a tela /suap filtra visualmente apenas entre processos em andamento e concluidos; etapa operacional, PDF, atualizacao e metadados extraidos pela IA aparecem na propria linha do processo
 - a tela permite gerar o `Despacho de Liquidacao` avulso pelo cabecalho, alem da geracao por processo ou em lote na tabela, sem sair de `/suap`; a fila da geracao fica em `sessionStorage` para sobreviver a atualizacoes acidentais da pagina
@@ -378,6 +378,8 @@ Observações:
 - O modal usa tokens `--comprasnet-*` derivados dos estilos computados do Comprasnet e não altera o `body` ou tokens `suape-*`.
 
 ## Extensao Suape 1.9
+
+Desde a versao 1.9.44, o service worker da extensao agenda as duas caixas padrao do SUAP em quatro horarios locais de segunda a sexta (07h, 10h, 13h e 15h), sem exigir que a pagina `/suap` do SIAGES esteja aberta. O Chrome precisa continuar aberto; a autenticacao do SIAGES fica na sessao privada da extensao e o cookie `sessionid` do SUAP e lido sob demanda, sem persistencia. O popup informa o proximo horario e o resultado recente. Em qualquer pagina do SUAP, a paleta `Ctrl+K` inclui `Sincronizar processos agora`, que inicia o mesmo trabalho imediatamente. A extensao respeita `sync_automatica` das caixas padrao, mantem caixas extras para uso manual, reconcilia apenas inventarios lidos com sucesso e encaminha processos pendentes pelo fluxo existente de PDF e extracao.
 
 Desde a versao 1.9.30, o login da extensao fica persistido em `chrome.storage.local` enquanto o Supabase aceitar o refresh token. O service worker centraliza e serializa a renovacao e e o unico contexto que conhece o `refresh_token`; popup e content scripts recebem somente `accessToken` e `expiresAt`. Os iframes do SIAGES usam um cliente Supabase descartavel, sem persistencia nem auto-refresh, autenticado pelo bearer token. Falhas temporarias nao removem a sessao; revogacao confirmada pelo Supabase ou `Sair` a encerram.
 

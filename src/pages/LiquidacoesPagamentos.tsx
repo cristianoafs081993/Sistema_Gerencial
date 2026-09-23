@@ -35,17 +35,28 @@ import { DocumentoDetalhesDialog } from '@/components/DocumentoDetalhesDialog';
 import { HeaderActions } from '@/components/HeaderParts';
 import { TablePagination } from '@/components/design-system/TablePagination';
 
+function getCondhDocumentFromHash() {
+    const value = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('condh') || '';
+    if (!/^[\d.\-/\s]+$/.test(value)) return '';
+    const digits = value.replace(/\D/g, '');
+    return /^(?:\d{11}|\d{14})$/.test(digits) ? digits : '';
+}
+
 export default function LiquidacoesPagamentos() {
     const queryClient = useQueryClient();
+    const [condhDocument] = useState(getCondhDocumentFromHash);
 
     // Filtros
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(() => condhDocument ? formatarDocumento(condhDocument) : '');
+    const isCondhSearch = Boolean(condhDocument)
+        && /^[\d.\-/\s]+$/.test(searchTerm)
+        && searchTerm.replace(/\D/g, '') === condhDocument;
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
     // Paginação e Ordenação
     const [page, setPage] = useState(1);
-    const [perPage, setPerPage] = useState(10);
+    const [perPage, setPerPage] = useState(() => condhDocument ? 20 : 10);
     const [sortColumn, setSortColumn] = useState('data_emissao');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
@@ -55,16 +66,20 @@ export default function LiquidacoesPagamentos() {
 
     // Query do Supabase
     const { data: queryData, isLoading } = useQuery({
-        queryKey: ['transparencia', startDate, endDate, searchTerm, page, perPage, sortColumn, sortDirection],
-        queryFn: () => transparenciaService.getDocumentos({
-            startDate: startDate ? new Date(startDate) : undefined,
-            endDate: endDate ? new Date(endDate) : undefined,
-            search: searchTerm,
-            page,
-            perPage,
-            orderBy: sortColumn,
-            orderDirection: sortDirection
-        }),
+        queryKey: isCondhSearch
+            ? ['transparencia-condh', condhDocument, page, perPage]
+            : ['transparencia', startDate, endDate, searchTerm, page, perPage, sortColumn, sortDirection],
+        queryFn: () => isCondhSearch
+            ? transparenciaService.getDocumentosPorFavorecido(condhDocument, { page, perPage })
+            : transparenciaService.getDocumentos({
+                startDate: startDate ? new Date(startDate) : undefined,
+                endDate: endDate ? new Date(endDate) : undefined,
+                search: searchTerm,
+                page,
+                perPage,
+                orderBy: sortColumn,
+                orderDirection: sortDirection
+            }),
         placeholderData: (previousData) => previousData,
     });
 
@@ -76,6 +91,13 @@ export default function LiquidacoesPagamentos() {
     useEffect(() => {
         setPage(1);
     }, [searchTerm, startDate, endDate, perPage, sortColumn, sortDirection]);
+
+    useEffect(() => {
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        if (hashParams.has('condh')) {
+            window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
+        }
+    }, []);
 
     const clearFilters = () => {
         setSearchTerm('');

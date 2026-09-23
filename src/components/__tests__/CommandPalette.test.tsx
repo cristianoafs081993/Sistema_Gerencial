@@ -4,7 +4,16 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { CommandPalette } from '@/components/CommandPalette';
 import { useAuth, useOptionalAuth } from '@/contexts/AuthContext';
-import type { Empenho, Contrato, Atividade } from '@/types';
+import type { Empenho, Contrato, Atividade, DocumentoDespesa } from '@/types';
+
+const transparenciaMock = vi.hoisted(() => ({
+  getDocumentosPorFavorecido: vi.fn(),
+  getDocumentoCompleto: vi.fn(),
+}));
+
+vi.mock('@/services/transparencia', () => ({
+  transparenciaService: transparenciaMock,
+}));
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: vi.fn(),
@@ -34,6 +43,22 @@ if (typeof window !== 'undefined') {
 
 const mockedUseAuth = vi.mocked(useAuth);
 const mockedUseOptionalAuth = vi.mocked(useOptionalAuth);
+
+function stubLocationAssign() {
+  const locationDescriptor = Object.getOwnPropertyDescriptor(window, 'location');
+  const assign = vi.fn();
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: { assign } as unknown as Location,
+  });
+
+  return {
+    assign,
+    restore: () => {
+      if (locationDescriptor) Object.defineProperty(window, 'location', locationDescriptor);
+    },
+  };
+}
 
 const mockEmpenhos: Empenho[] = [
   {
@@ -97,6 +122,9 @@ const mockContratos: Contrato[] = [
 
 describe('CommandPalette — Entity Search & Navigation', () => {
   beforeEach(() => {
+    queryClient.clear();
+    transparenciaMock.getDocumentosPorFavorecido.mockReset().mockResolvedValue({ data: [], total: 0 });
+    transparenciaMock.getDocumentoCompleto.mockReset().mockResolvedValue(null);
     mockedUseAuth.mockReturnValue({
       canAccessScreen: vi.fn(() => true),
       session: { user: { id: 'user-1', email: 'user@ifrn.edu.br' } } as never,
@@ -112,6 +140,177 @@ describe('CommandPalette — Entity Search & Navigation', () => {
         <MemoryRouter>{ui}</MemoryRouter>
       </QueryClientProvider>,
     );
+
+  it('busca o CPF/CNPJ pelo comando condh e abre os detalhes do documento NP', async () => {
+    const documento: DocumentoDespesa = {
+      id: '158366264352026NP000085',
+      valor_original: 1250.5,
+      valor_pago: 1250.5,
+      estado: 'REALIZADO',
+      processo: '23000.000085/2026-10',
+      favorecido_nome: 'FORNECEDOR EXEMPLO',
+      favorecido_documento: '07.805.649/0001-29',
+      data_emissao: '2026-02-03',
+      itens: [],
+      situacoes: [],
+    };
+    transparenciaMock.getDocumentosPorFavorecido.mockResolvedValue({ data: [documento], total: 1 });
+    transparenciaMock.getDocumentoCompleto.mockResolvedValue(documento);
+
+    renderWithProviders(
+      <CommandPalette open={true} onOpenChange={vi.fn()} empenhosList={[]} contratosList={[]} />,
+    );
+
+    const searchInput = screen.getByPlaceholderText(/digite um comando, ne, contrato/i);
+    fireEvent.change(searchInput, { target: { value: 'CONDH 07.805.649/0001-29' } });
+
+    expect(await screen.findByText('2026NP000085')).toBeInTheDocument();
+    expect(screen.getByText('REALIZADO')).toBeInTheDocument();
+    expect(transparenciaMock.getDocumentosPorFavorecido).toHaveBeenCalledWith('07805649000129', { page: 1, perPage: 20 });
+
+    fireEvent.click(screen.getByText('2026NP000085'));
+    expect(await screen.findByText('Detalhamento Financeiro')).toBeInTheDocument();
+    expect(transparenciaMock.getDocumentoCompleto).toHaveBeenCalledWith('158366264352026NP000085');
+  });
+
+  it('permite paginar os resultados condh em grupos de 20', async () => {
+    const makeDocumento = (index: number): DocumentoDespesa => ({
+      id: `158366264352026NP${String(index).padStart(6, '0')}`,
+      valor_original: 100,
+      valor_pago: 0,
+      estado: index === 21 ? 'PENDENTE DE REALIZAÇÃO' : 'REALIZADO',
+      processo: '',
+      favorecido_nome: `FORNECEDOR ${index}`,
+      favorecido_documento: '07805649000129',
+      data_emissao: `2026-01-${String(Math.min(index, 28)).padStart(2, '0')}`,
+    });
+    transparenciaMock.getDocumentosPorFavorecido.mockImplementation(
+      (_documento: string, options: { page: number }) => Promise.resolve({
+        data: options.page === 1
+          ? Array.from({ length: 20 }, (_, index) => makeDocumento(index + 1))
+          : [makeDocumento(21)],
+        total: 21,
+      }),
+    );
+
+    renderWithProviders(
+      <CommandPalette open={true} onOpenChange={vi.fn()} empenhosList={[]} contratosList={[]} />,
+    );
+
+    const searchInput = screen.getByPlaceholderText(/digite um comando, ne, contrato/i);
+    fireEvent.change(searchInput, { target: { value: 'condh 07805649000129' } });
+    expect(await screen.findByText('2026NP000001')).toBeInTheDocument();
+    expect(screen.getByText('Página 1 de 2')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Próxima' }));
+    expect(await screen.findByText('2026NP000021')).toBeInTheDocument();
+    expect(screen.getByText('PENDENTE DE REALIZAÇÃO')).toBeInTheDocument();
+    expect(transparenciaMock.getDocumentosPorFavorecido).toHaveBeenLastCalledWith('07805649000129', { page: 2, perPage: 20 });
+  });
+
+  it('respeita a permissão de acesso à tela de liquidações', async () => {
+    const canAccessScreen = vi.fn((screenId: string) => screenId !== 'liquidacoes-pagamentos');
+    mockedUseAuth.mockReturnValue({
+      canAccessScreen,
+      session: { user: { id: 'user-1', email: 'user@ifrn.edu.br' } } as never,
+    } as never);
+
+    renderWithProviders(
+      <CommandPalette open={true} onOpenChange={vi.fn()} empenhosList={[]} contratosList={[]} />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(/digite um comando, ne, contrato/i), {
+      target: { value: 'condh 07805649000129' },
+    });
+
+    expect(await screen.findByText(/você não tem acesso à tela liquidações e pagamentos/i)).toBeInTheDocument();
+    expect(transparenciaMock.getDocumentosPorFavorecido).not.toHaveBeenCalled();
+  });
+
+  it('orienta sobre o formato e informa quando nenhum RP/NP é encontrado', async () => {
+    renderWithProviders(
+      <CommandPalette open={true} onOpenChange={vi.fn()} empenhosList={[]} contratosList={[]} />,
+    );
+
+    const searchInput = screen.getByPlaceholderText(/digite um comando, ne, contrato/i);
+    fireEvent.change(searchInput, { target: { value: 'condh 12345' } });
+    expect(screen.getByText(/cpf com 11 dígitos ou um cnpj com 14 dígitos/i)).toBeInTheDocument();
+    expect(transparenciaMock.getDocumentosPorFavorecido).not.toHaveBeenCalled();
+
+    fireEvent.change(searchInput, { target: { value: 'condh 07805649000129' } });
+    expect(await screen.findByText(/nenhum documento rp ou np encontrado/i)).toBeInTheDocument();
+  });
+
+  it('exibe consultas de processos, alunos, documentos e contratos com URLs oficiais do SUAP', () => {
+    renderWithProviders(
+      <CommandPalette
+        open={true}
+        onOpenChange={vi.fn()}
+        empenhosList={[]}
+        contratosList={[]}
+      />,
+    );
+
+    const searchInput = screen.getByPlaceholderText(/digite um comando, ne, contrato/i);
+    fireEvent.change(searchInput, { target: { value: 'consulta exemplo' } });
+
+    const queryRows = Array.from(document.querySelectorAll<HTMLElement>('[data-suap-query-url]'));
+    expect(queryRows).toHaveLength(4);
+    expect(queryRows.map((row) => row.dataset.suapQueryUrl)).toEqual(expect.arrayContaining([
+      'https://suap.ifrn.edu.br/admin/processo_eletronico/processo/?q=consulta+exemplo',
+      'https://suap.ifrn.edu.br/edu/alunos/?q=consulta+exemplo',
+      'https://suap.ifrn.edu.br/admin/documento_eletronico/documentotexto/?opcao=1&q=consulta+exemplo',
+      'https://suap.ifrn.edu.br/admin/contratos/contrato/?campi=3&q=consulta+exemplo&tab=tab_ativos',
+    ]));
+  });
+
+  it('aceita prefixo de aluno e abre a consulta na aba atual com Enter', () => {
+    const location = stubLocationAssign();
+    try {
+      renderWithProviders(
+        <CommandPalette
+          open={true}
+          onOpenChange={vi.fn()}
+          empenhosList={[]}
+          contratosList={[]}
+        />,
+      );
+
+      const searchInput = screen.getByPlaceholderText(/digite um comando, ne, contrato/i);
+      fireEvent.change(searchInput, { target: { value: 'aluno: 20201234567890' } });
+      expect(document.querySelectorAll('[data-suap-query-url]')).toHaveLength(1);
+      expect(screen.getByText('Abrir Aluno #20201234567890')).toBeInTheDocument();
+
+      fireEvent.keyDown(searchInput, { key: 'Enter' });
+      expect(location.assign).toHaveBeenCalledWith('https://suap.ifrn.edu.br/edu/aluno/20201234567890/');
+    } finally {
+      location.restore();
+    }
+  });
+
+  it('abre uma consulta selecionada em nova aba com Ctrl+Enter', () => {
+    const openMock = vi.spyOn(window, 'open').mockImplementation(() => null);
+    renderWithProviders(
+      <CommandPalette
+        open={true}
+        onOpenChange={vi.fn()}
+        empenhosList={[]}
+        contratosList={[]}
+      />,
+    );
+
+    const searchInput = screen.getByPlaceholderText(/digite um comando, ne, contrato/i);
+    fireEvent.change(searchInput, { target: { value: 'proc: 23000.000123/2026-01' } });
+    const queryRow = document.querySelector<HTMLElement>('[data-suap-query-url]')!;
+    queryRow.setAttribute('aria-selected', 'true');
+
+    fireEvent.keyDown(searchInput, { key: 'Enter', ctrlKey: true });
+    expect(openMock).toHaveBeenCalledWith(
+      'https://suap.ifrn.edu.br/admin/processo_eletronico/processo/?q=23000.000123%2F2026-01',
+      '_blank',
+      'noopener,noreferrer',
+    );
+  });
 
   it('permite buscar e encontrar empenho pelo número com saldo em destaque', () => {
     renderWithProviders(

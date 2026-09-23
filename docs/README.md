@@ -35,6 +35,8 @@ Este indice organiza a documentacao operacional do repositorio por dominio.
 ## Integracoes e operacao
 
 - [API_CATALOG.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/API_CATALOG.md)
+- [Consultas SUAP pela paleta de comandos](integrations/SUAP_COMMAND_PALETTE.md)
+- [Busca de RP/NP por CPF/CNPJ (`condh`)](integrations/CONDH_COMMAND.md)
 - [GMAIL_CSV_INGESTION.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/GMAIL_CSV_INGESTION.md)
 - [NORMATIVOS_CONSULTOR_INGESTION.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/NORMATIVOS_CONSULTOR_INGESTION.md)
 - [ENVIRONMENT.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/ops/ENVIRONMENT.md)

@@ -14,6 +14,8 @@ vi.mock('@/components/HeaderParts', () => ({
 vi.mock('@/services/transparencia', () => ({
   transparenciaService: {
     getDocumentos: vi.fn(),
+    getDocumentosPorFavorecido: vi.fn(),
+    getDocumentoCompleto: vi.fn(),
   },
 }));
 
@@ -34,6 +36,7 @@ function renderPage() {
 describe('LiquidacoesPagamentos', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState(null, '', '/');
     mockedTransparenciaService.getDocumentos.mockResolvedValue({
       data: [
         {
@@ -52,6 +55,11 @@ describe('LiquidacoesPagamentos', () => {
       page: 1,
       perPage: 10,
     } as never);
+    mockedTransparenciaService.getDocumentosPorFavorecido.mockResolvedValue({
+      data: [],
+      total: 0,
+    });
+    mockedTransparenciaService.getDocumentoCompleto.mockResolvedValue(null as never);
   });
 
   it('renderiza a lista de documentos hábeis e cartões com sucesso sem erros de runtime', async () => {
@@ -71,5 +79,39 @@ describe('LiquidacoesPagamentos', () => {
     fireEvent.change(searchInput, { target: { value: 'Alpha' } });
 
     expect(searchInput).toHaveValue('Alpha');
+  });
+
+  it('abre a consulta condh recebida pela extensão e permite acessar os detalhes do documento', async () => {
+    const documento = {
+      id: '2026NP000085',
+      data_emissao: '2026-03-01T12:00:00',
+      favorecido_nome: 'Empresa Exemplo Ltda',
+      favorecido_documento: '07.805.649/0001-29',
+      estado: 'REALIZADO',
+      valor_original: 1250,
+      valor_pago: 1250,
+      itens: [],
+      obs: [],
+      situacoes: [],
+      fontes: [],
+    };
+    mockedTransparenciaService.getDocumentosPorFavorecido.mockResolvedValue({
+      data: [documento],
+      total: 1,
+    } as never);
+    mockedTransparenciaService.getDocumentoCompleto.mockResolvedValue(documento as never);
+    window.history.replaceState(null, '', '/liquidacoes-pagamentos#condh=07805649000129');
+
+    renderPage();
+
+    expect(screen.getByPlaceholderText('Buscar documento ou favorecido...'))
+      .toHaveValue('07.805.649/0001-29');
+    expect(await screen.findByText('2026NP000085')).toBeInTheDocument();
+    expect(mockedTransparenciaService.getDocumentosPorFavorecido)
+      .toHaveBeenCalledWith('07805649000129', { page: 1, perPage: 20 });
+
+    fireEvent.click(screen.getByText('2026NP000085'));
+    expect(await screen.findByText('Detalhamento Financeiro')).toBeInTheDocument();
+    expect(mockedTransparenciaService.getDocumentoCompleto).toHaveBeenCalledWith('2026NP000085');
   });
 });

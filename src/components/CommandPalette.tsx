@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -47,7 +48,8 @@ import {
   CommandShortcut,
 } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency, formatarDocumento } from '@/lib/utils';
+import { DocumentoDetalhesDialog } from '@/components/DocumentoDetalhesDialog';
+import { formatCurrency, formatarDocumento, formatDocumentoId } from '@/lib/utils';
 import { getEmpenhoAvailableBalance } from '@/utils/empenhoBalance';
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
 import { ContratoApiDetailsSheet } from '@/components/contratos/ContratoApiDetailsSheet';
@@ -55,7 +57,8 @@ import { contratosApiService, type ContratoApiDetails, type ContratoApiRow } fro
 import { isContratoApiCampusEmpenho } from '@/utils/contratosApiStatus';
 import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 import { normalizeContratoNumero, shouldIgnoreContratoNumero } from '@/utils/contratosSync';
-import type { Empenho, Contrato, Atividade } from '@/types';
+import { transparenciaService } from '@/services/transparencia';
+import type { Empenho, Contrato, Atividade, DocumentoDespesa } from '@/types';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -71,7 +74,53 @@ interface CommandPaletteProps {
   campusUasg?: string;
 }
 
-type SearchScope = 'all' | 'empenhos' | 'contratos' | 'screens' | 'actions';
+type SearchScope = 'all' | 'empenhos' | 'contratos' | 'screens' | 'actions' | 'suap-processos' | 'suap-alunos' | 'suap-documentos' | 'documentos-habeis';
+type SuapQueryKind = 'processos' | 'alunos' | 'documentos' | 'contratos';
+
+const SUAP_BASE_URL = 'https://suap.ifrn.edu.br';
+const CONDH_PAGE_SIZE = 20;
+
+function getSuapQueryUrl(kind: SuapQueryKind, query: string) {
+  const normalizedQuery = query.trim();
+  const params = new URLSearchParams();
+
+  if (kind === 'processos') {
+    params.set('q', normalizedQuery);
+    return new URL(`/admin/processo_eletronico/processo/?${params.toString()}`, SUAP_BASE_URL).href;
+  }
+
+  if (kind === 'alunos') {
+    if (/^\d+$/.test(normalizedQuery)) {
+      return new URL(`/edu/aluno/${normalizedQuery}/`, SUAP_BASE_URL).href;
+    }
+    params.set('q', normalizedQuery);
+    return new URL(`/edu/alunos/?${params.toString()}`, SUAP_BASE_URL).href;
+  }
+
+  if (kind === 'documentos') {
+    params.set('opcao', '1');
+    params.set('q', normalizedQuery);
+    return new URL(`/admin/documento_eletronico/documentotexto/?${params.toString()}`, SUAP_BASE_URL).href;
+  }
+
+  params.set('campi', '3');
+  params.set('q', normalizedQuery);
+  params.set('tab', 'tab_ativos');
+  return new URL(`/admin/contratos/contrato/?${params.toString()}`, SUAP_BASE_URL).href;
+}
+
+function getSuapQueryTitle(kind: SuapQueryKind, query: string) {
+  if (kind === 'alunos' && /^\d+$/.test(query.trim())) return `Abrir Aluno #${query.trim()}`;
+  const names: Record<SuapQueryKind, string> = {
+    processos: 'Processos',
+    alunos: 'Alunos',
+    documentos: 'Documentos',
+    contratos: 'Contratos',
+  };
+  return `Buscar "${query.trim()}" no SUAP ${names[kind]}`;
+}
+
+const suapQueryKinds: SuapQueryKind[] = ['processos', 'alunos', 'documentos', 'contratos'];
 
 const groupIconMap: Record<AppScreenGroupId, React.ComponentType<{ className?: string }>> = {
   orcamentario: LandmarkIcon,
@@ -325,6 +374,9 @@ export function CommandPalette({
   const [selectedContratoDetails, setSelectedContratoDetails] = useState<ContratoApiDetails | null>(null);
   const [isContratoDetailsOpen, setIsContratoDetailsOpen] = useState(false);
   const [isContratoDetailsLoading, setIsContratoDetailsLoading] = useState(false);
+  const [documentosPage, setDocumentosPage] = useState(1);
+  const [selectedDocumentoForDialog, setSelectedDocumentoForDialog] = useState<DocumentoDespesa | null>(null);
+  const [isDocumentoDetailsOpen, setIsDocumentoDetailsOpen] = useState(false);
 
   // Carrega apenas contratos ativos da API para enriquecer busca e detalhes com precisão
   useEffect(() => {
@@ -367,36 +419,104 @@ export function CommandPalette({
     }
   }, [open]);
 
-  // Detect scoped prefixes like "ne:", "empenho:", "contrato:", "tela:", "modulo:"
-  const { effectiveQuery, detectedScope } = useMemo(() => {
+  // Detect scoped prefixes, including the read-only SUAP searches.
+  const { effectiveQuery, detectedScope, explicitSuapScope } = useMemo(() => {
     const trimmed = searchValue.trim();
     const lower = trimmed.toLowerCase();
 
+    const condhMatch = trimmed.match(/^condh(?:[:\s]+(.*))?$/i);
+    if (condhMatch) {
+      return { effectiveQuery: (condhMatch[1] || '').trim(), detectedScope: 'documentos-habeis' as SearchScope, explicitSuapScope: null };
+    }
+
+    const processMatch = trimmed.match(/^(?:processos?|proc|p)[:\s]+(.+)$/i);
+    if (processMatch) {
+      return { effectiveQuery: processMatch[1].trim(), detectedScope: 'suap-processos' as SearchScope, explicitSuapScope: 'processos' as SuapQueryKind };
+    }
+
+    const studentMatch = trimmed.match(/^(?:alunos?|matricula|alu|mat|a)[:\s]+(.+)$/i);
+    if (studentMatch) {
+      return { effectiveQuery: studentMatch[1].trim(), detectedScope: 'suap-alunos' as SearchScope, explicitSuapScope: 'alunos' as SuapQueryKind };
+    }
+
+    const documentMatch = trimmed.match(/^(?:documentos?|docto|doc|d)[:\s]+(.+)$/i);
+    if (documentMatch) {
+      return { effectiveQuery: documentMatch[1].trim(), detectedScope: 'suap-documentos' as SearchScope, explicitSuapScope: 'documentos' as SuapQueryKind };
+    }
+
     if (lower.startsWith('ne ') || lower.startsWith('empenho ') || lower.startsWith('ne:') || lower.startsWith('empenho:')) {
       const query = trimmed.replace(/^(ne|empenho)[:\s]+/i, '').trim();
-      return { effectiveQuery: query, detectedScope: 'empenhos' as SearchScope };
+      return { effectiveQuery: query, detectedScope: 'empenhos' as SearchScope, explicitSuapScope: null };
     }
-    if (lower.startsWith('contrato ') || lower.startsWith('contrato:')) {
-      const query = trimmed.replace(/^contrato[:\s]+/i, '').trim();
-      return { effectiveQuery: query, detectedScope: 'contratos' as SearchScope };
+    if (/^(?:contratos?|con|c)[:\s]+/i.test(trimmed)) {
+      const query = trimmed.replace(/^(?:contratos?|con|c)[:\s]+/i, '').trim();
+      return { effectiveQuery: query, detectedScope: 'contratos' as SearchScope, explicitSuapScope: 'contratos' as SuapQueryKind };
     }
     if (lower.startsWith('tela ') || lower.startsWith('modulo ') || lower.startsWith('tela:') || lower.startsWith('modulo:')) {
       const query = trimmed.replace(/^(tela|modulo)[:\s]+/i, '').trim();
-      return { effectiveQuery: query, detectedScope: 'screens' as SearchScope };
+      return { effectiveQuery: query, detectedScope: 'screens' as SearchScope, explicitSuapScope: null };
     }
     if (lower.startsWith('acao ') || lower.startsWith('atalho ') || lower.startsWith('acao:') || lower.startsWith('atalho:')) {
       const query = trimmed.replace(/^(acao|atalho)[:\s]+/i, '').trim();
-      return { effectiveQuery: query, detectedScope: 'actions' as SearchScope };
+      return { effectiveQuery: query, detectedScope: 'actions' as SearchScope, explicitSuapScope: null };
     }
 
-    return { effectiveQuery: trimmed, detectedScope: activeScope };
+    return { effectiveQuery: trimmed, detectedScope: activeScope, explicitSuapScope: null };
   }, [searchValue, activeScope]);
 
   const currentScope = detectedScope !== 'all' ? detectedScope : activeScope;
 
+  const suapQueryActions = useMemo(() => {
+    if (!effectiveQuery) return [];
+
+    const kinds = explicitSuapScope
+      ? [explicitSuapScope]
+      : currentScope === 'all' || currentScope === 'actions'
+        ? suapQueryKinds
+        : currentScope === 'contratos'
+          ? ['contratos' as SuapQueryKind]
+          : [];
+
+    return kinds.map((kind) => ({
+      kind,
+      title: getSuapQueryTitle(kind, effectiveQuery),
+      url: getSuapQueryUrl(kind, effectiveQuery),
+    }));
+  }, [currentScope, effectiveQuery, explicitSuapScope]);
+
+  const isCondhScope = currentScope === 'documentos-habeis';
+  const condhDocumentNumber = isCondhScope ? effectiveQuery.replace(/\D/g, '') : '';
+  const isValidCondhDocument = /^\d{11}$|^\d{14}$/.test(condhDocumentNumber);
+  const canSearchCondh = canAccessScreen('liquidacoes-pagamentos');
+
+  useEffect(() => {
+    setDocumentosPage(1);
+  }, [condhDocumentNumber]);
+
+  const condhDocumentsQuery = useQuery({
+    queryKey: ['command-palette-condh', condhDocumentNumber, documentosPage],
+    queryFn: () => transparenciaService.getDocumentosPorFavorecido(condhDocumentNumber, {
+      page: documentosPage,
+      perPage: CONDH_PAGE_SIZE,
+    }),
+    enabled: open && isCondhScope && isValidCondhDocument && canSearchCondh,
+  });
+
+  const matchingDocumentos = canSearchCondh ? condhDocumentsQuery.data?.data || [] : [];
+  const totalDocumentos = canSearchCondh ? condhDocumentsQuery.data?.total || 0 : 0;
+
   const handleSelectScreen = (path: string) => {
     onOpenChange(false);
     navigate(path);
+  };
+
+  const handleSelectSuapQuery = (url: string, openInNewTab = false) => {
+    onOpenChange(false);
+    if (openInNewTab) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    window.location.assign(url);
   };
 
   const handleAction = (action: () => void) => {
@@ -407,6 +527,12 @@ export function CommandPalette({
   const handleSelectEmpenho = (empenho: Empenho) => {
     setSelectedEmpenhoForDialog(empenho);
     setIsEmpenhoDialogOpen(true);
+    onOpenChange(false);
+  };
+
+  const handleSelectDocumento = (documento: DocumentoDespesa) => {
+    setSelectedDocumentoForDialog(documento);
+    setIsDocumentoDetailsOpen(true);
     onOpenChange(false);
   };
 
@@ -629,6 +755,8 @@ export function CommandPalette({
   const totalResults =
     matchingEmpenhos.length +
     matchingContratos.length +
+    matchingDocumentos.length +
+    suapQueryActions.length +
     availableGroups.reduce((acc, g) => acc + g.screens.length, 0) +
     (showActions ? 3 : 0);
 
@@ -640,7 +768,16 @@ export function CommandPalette({
             <CommandInput
               value={searchValue}
               onValueChange={setSearchValue}
-              placeholder="Digite um comando, NE, contrato, fornecedor ou módulo..."
+              placeholder="Digite um comando, NE, contrato, condh, processo, aluno ou documento..."
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' || !event.ctrlKey) return;
+                const selectedItem = document.querySelector<HTMLElement>('[data-suap-query-url][aria-selected="true"]');
+                const url = selectedItem?.dataset.suapQueryUrl;
+                if (!url) return;
+                event.preventDefault();
+                event.stopPropagation();
+                handleSelectSuapQuery(url, true);
+              }}
             />
             {searchValue ? (
               <button
@@ -743,7 +880,7 @@ export function CommandPalette({
         </div>
 
         <CommandList className="max-h-[min(540px,78vh)] p-2 scrollbar-thin bg-card text-card-foreground">
-          {totalResults === 0 && effectiveQuery && (
+          {totalResults === 0 && effectiveQuery && !isCondhScope && (
             <CommandEmpty className="py-12 text-center text-sm text-muted-foreground">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted/60 text-muted-foreground/60 mb-3">
                 <Search className="h-6 w-6" />
@@ -886,10 +1023,175 @@ export function CommandPalette({
             </>
           )}
 
+          {isCondhScope && (
+            <>
+              {!canSearchCondh ? (
+                <CommandGroup heading="Consulta de RP/NP">
+                  <div className="px-3 py-4 text-sm text-muted-foreground">
+                    Você não tem acesso à tela Liquidações e Pagamentos.
+                  </div>
+                </CommandGroup>
+              ) : (
+                <CommandGroup
+                  heading={
+                    <div className="flex items-center justify-between font-bold text-xs uppercase tracking-wider text-muted-foreground mb-1">
+                      <span className="flex items-center gap-1.5 text-primary">
+                        <Banknote className="h-3.5 w-3.5" />
+                        Documentos RP/NP
+                      </span>
+                      {isValidCondhDocument && !condhDocumentsQuery.isError ? (
+                        <span className="text-[11px] font-medium text-muted-foreground">
+                          {totalDocumentos} resultado(s)
+                        </span>
+                      ) : null}
+                    </div>
+                  }
+                >
+                  {!effectiveQuery ? (
+                    <div className="px-3 py-4 text-sm text-muted-foreground">
+                      Digite `condh` seguido de um CPF ou CNPJ.
+                    </div>
+                  ) : !isValidCondhDocument ? (
+                    <div className="px-3 py-4 text-sm text-muted-foreground">
+                      Informe um CPF com 11 dígitos ou um CNPJ com 14 dígitos.
+                    </div>
+                  ) : condhDocumentsQuery.isLoading ? (
+                    <div role="status" className="px-3 py-4 text-sm text-muted-foreground">
+                      Consultando documentos...
+                    </div>
+                  ) : condhDocumentsQuery.isError ? (
+                    <div role="alert" className="px-3 py-4 text-sm text-destructive">
+                      Não foi possível consultar os documentos. Tente novamente.
+                    </div>
+                  ) : matchingDocumentos.length === 0 ? (
+                    <div className="px-3 py-4 text-sm text-muted-foreground">
+                      Nenhum documento RP ou NP encontrado para {formatarDocumento(condhDocumentNumber)}.
+                    </div>
+                  ) : (
+                    <>
+                      {matchingDocumentos.map((documento) => {
+                        const displayId = formatDocumentoId(documento.id);
+                        const tipo = displayId.match(/^\d{4}(NP|RP)/i)?.[1]?.toUpperCase() || 'RP/NP';
+
+                        return (
+                          <CommandItem
+                            key={documento.id}
+                            value={`condh ${condhDocumentNumber} ${displayId} ${documento.favorecido_nome}`}
+                            onSelect={() => handleSelectDocumento(documento)}
+                            className="group flex items-center justify-between gap-3.5 py-3 px-3.5 mb-1.5 rounded-xl border border-transparent transition-all cursor-pointer data-[selected=true]:bg-primary/8 data-[selected=true]:border-primary/25 hover:bg-muted/50"
+                          >
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                              <FileText className="h-4 w-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono font-bold text-foreground text-sm tracking-tight">
+                                  {displayId}
+                                </span>
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-bold">
+                                  {tipo}
+                                </Badge>
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                  {documento.estado}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground font-medium truncate mt-1">
+                                {documento.favorecido_nome || 'Favorecido não informado'}
+                                {documento.data_emissao ? ` • ${documento.data_emissao.slice(0, 10)}` : ''}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">Valor</span>
+                              <span className="font-mono font-bold text-sm text-foreground tabular-nums">
+                                {formatCurrency(documento.valor_original)}
+                              </span>
+                            </div>
+                            <CommandShortcut className="hidden sm:inline-flex opacity-0 group-data-[selected=true]:opacity-100 transition-opacity text-xs font-semibold text-primary">
+                              Detalhes ↵
+                            </CommandShortcut>
+                          </CommandItem>
+                        );
+                      })}
+                      {totalDocumentos > CONDH_PAGE_SIZE ? (
+                        <div className="flex items-center justify-between px-3 py-2 text-xs text-muted-foreground">
+                          <button
+                            type="button"
+                            disabled={documentosPage <= 1}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => setDocumentosPage((page) => Math.max(1, page - 1))}
+                            className="rounded px-2 py-1 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Anterior
+                          </button>
+                          <span>
+                            Página {documentosPage} de {Math.ceil(totalDocumentos / CONDH_PAGE_SIZE)}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={documentosPage * CONDH_PAGE_SIZE >= totalDocumentos}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => setDocumentosPage((page) => page + 1)}
+                            className="rounded px-2 py-1 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Próxima
+                          </button>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </CommandGroup>
+              )}
+            </>
+          )}
+
+          {/* Consultas oficiais do SUAP */}
+          {suapQueryActions.length > 0 && (
+            <>
+              {matchingEmpenhos.length > 0 || matchingContratos.length > 0 ? <CommandSeparator className="my-2" /> : null}
+              <CommandGroup
+                heading={
+                  <div className="flex items-center justify-between font-bold text-xs uppercase tracking-wider text-muted-foreground mb-1">
+                    <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Consultas SUAP
+                    </span>
+                    <span className="text-[11px] font-medium text-muted-foreground">{suapQueryActions.length} consulta(s)</span>
+                  </div>
+                }
+              >
+                {suapQueryActions.map((action) => (
+                  <CommandItem
+                    key={action.kind}
+                    value={`suap ${action.kind} ${effectiveQuery} ${action.title}`}
+                    data-suap-query-url={action.url}
+                    onSelect={() => handleSelectSuapQuery(action.url)}
+                    className="group flex items-center justify-between gap-3.5 py-2.5 px-3.5 mb-1 rounded-xl border border-transparent transition-all cursor-pointer data-[selected=true]:bg-emerald-500/8 data-[selected=true]:border-emerald-500/25 hover:bg-muted/50"
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+                      <Search className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-sm text-foreground">{action.title}</span>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold">
+                          SUAP Oficial
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground font-medium truncate mt-1">Abrir consulta no SUAP</p>
+                    </div>
+                    <CommandShortcut className="hidden sm:inline-flex opacity-0 group-data-[selected=true]:opacity-100 transition-opacity text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                      Enter · Ctrl+Enter nova aba
+                    </CommandShortcut>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          )}
+
           {/* Módulos do Sistema */}
           {availableGroups.length > 0 && (
             <>
-              {matchingEmpenhos.length > 0 || matchingContratos.length > 0 ? <CommandSeparator className="my-2" /> : null}
+              {matchingEmpenhos.length > 0 || matchingContratos.length > 0 || suapQueryActions.length > 0 ? <CommandSeparator className="my-2" /> : null}
               {availableGroups.map((group) => {
                 const GroupIcon = groupIconMap[group.id] || FileText;
 
@@ -1079,6 +1381,14 @@ export function CommandPalette({
           lastSyncRun={null}
           loading={isContratoDetailsLoading}
           campusUasg={campusUasg}
+        />
+      )}
+
+      {selectedDocumentoForDialog && (
+        <DocumentoDetalhesDialog
+          documento={selectedDocumentoForDialog}
+          open={isDocumentoDetailsOpen}
+          onOpenChange={setIsDocumentoDetailsOpen}
         />
       )}
     </>

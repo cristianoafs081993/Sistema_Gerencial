@@ -5,6 +5,7 @@
   const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
   const SIAGES_APP_URL = 'https://www.siages.com.br';
+  const SUAP_APP_URL = 'https://suap.ifrn.edu.br';
   const IS_SUAP_PAGE = window.location.hostname === 'suap.ifrn.edu.br';
 
   let empenhosCache = null;
@@ -108,6 +109,16 @@
 
   // Quick actions
   const systemActions = [
+    {
+      id: 'action-suap-sync-now',
+      title: 'Sincronizar processos agora',
+      subtitle: 'Ler as caixas configuradas e atualizar o SIAGES',
+      keywords: 'suap processos caixa sincronizar sincronizacao agora imediato atualizar',
+      path: '/',
+      icon: 'folderSync',
+      color: '#059669',
+      suapOnly: true,
+    },
     {
       id: 'action-requisicao',
       title: 'Nova Requisição de Compra',
@@ -810,7 +821,7 @@
   }
 
   function getSuapContractSearchUrl(query) {
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(IS_SUAP_PAGE ? window.location.search : '');
     const campi = urlParams.get('campi') || '3';
     const baseParams = new URLSearchParams();
     baseParams.set('campi', campi);
@@ -818,30 +829,34 @@
       baseParams.set('q', query.trim());
     }
     baseParams.set('tab', 'tab_ativos');
-    return `/admin/contratos/contrato/?${baseParams.toString()}`;
+    return new URL(`/admin/contratos/contrato/?${baseParams.toString()}`, SUAP_APP_URL).href;
   }
 
   function getSuapProcessSearchUrl(query) {
-    if (!query) return '/admin/processo_eletronico/processo/';
+    if (!query) return new URL('/admin/processo_eletronico/processo/', SUAP_APP_URL).href;
     const baseParams = new URLSearchParams();
     baseParams.set('q', query.trim());
-    return `/admin/processo_eletronico/processo/?${baseParams.toString()}`;
+    return new URL(`/admin/processo_eletronico/processo/?${baseParams.toString()}`, SUAP_APP_URL).href;
   }
 
   function getSuapStudentUrl(query) {
     const q = (query || '').trim();
     if (/^\d+$/.test(q)) {
-      return `/edu/aluno/${q}/`;
+      return new URL(`/edu/aluno/${q}/`, SUAP_APP_URL).href;
     }
-    return `/edu/alunos/?q=${encodeURIComponent(q)}`;
+    return new URL(`/edu/alunos/?q=${encodeURIComponent(q)}`, SUAP_APP_URL).href;
   }
 
   function getSuapDocumentSearchUrl(query) {
-    if (!query) return '/admin/documento_eletronico/documentotexto/?opcao=1';
+    if (!query) return new URL('/admin/documento_eletronico/documentotexto/?opcao=1', SUAP_APP_URL).href;
     const baseParams = new URLSearchParams();
     baseParams.set('opcao', '1');
     baseParams.set('q', query.trim());
-    return `/admin/documento_eletronico/documentotexto/?${baseParams.toString()}`;
+    return new URL(`/admin/documento_eletronico/documentotexto/?${baseParams.toString()}`, SUAP_APP_URL).href;
+  }
+
+  function getSiagesCondhSearchUrl(documento) {
+    return new URL(`/liquidacoes-pagamentos#condh=${documento}`, SIAGES_APP_URL).href;
   }
 
   // Search filter matching SIAGES logic
@@ -856,10 +871,15 @@
     let isExplicitProcessSearch = false;
     let isExplicitStudentSearch = false;
     let isExplicitDocumentSearch = false;
+    let isExplicitCondhSearch = false;
 
     if (query.toLowerCase().startsWith('ne ') || query.toLowerCase().startsWith('empenho ') || query.toLowerCase().startsWith('ne:') || query.toLowerCase().startsWith('empenho:')) {
       query = rawVal.replace(/^(ne|empenho)[:\s]+/i, '').trim();
       scope = 'empenhos';
+    } else if (/^condh(?:[:\s]|$)/i.test(query)) {
+      query = rawVal.replace(/^condh(?:[:\s]+)?/i, '').trim();
+      scope = 'condh';
+      isExplicitCondhSearch = true;
     } else if (
       query.toLowerCase().startsWith('contrato ') || query.toLowerCase().startsWith('contratos ') ||
       query.toLowerCase().startsWith('contrato:') || query.toLowerCase().startsWith('contratos:') ||
@@ -906,11 +926,23 @@
     }
 
     // Auto-detect format patterns
-    if (/^\d{5}\.\d{6}\.\d{4}-\d{2}$/.test(query) || /^230\d{2}\./.test(query)) {
+    if (!isExplicitCondhSearch && (/^\d{5}\.\d{6}\.\d{4}-\d{2}$/.test(query) || /^230\d{2}\./.test(query))) {
       isExplicitProcessSearch = true;
-    } else if (/^20\d{10,14}$/.test(query) || /^\d{13,15}$/.test(query)) {
+    } else if (!isExplicitCondhSearch && (/^20\d{10,14}$/.test(query) || /^\d{13,15}$/.test(query))) {
       isExplicitStudentSearch = true;
     }
+
+    const normalizedCondhDocument = query.replace(/\D/g, '');
+    const isValidCondhDocument = isExplicitCondhSearch && /^[\d.\-/\s]+$/.test(query) && /^(?:\d{11}|\d{14})$/.test(normalizedCondhDocument);
+    const siagesCondhSearchAction = isValidCondhDocument ? {
+      id: 'siages-search-condh',
+      title: `Buscar RP/NP para ${query}`,
+      subtitle: 'Abrir a consulta de Liquidações e Pagamentos no SIAGES',
+      url: getSiagesCondhSearchUrl(normalizedCondhDocument),
+      icon: 'search',
+      color: '#0d9488',
+      badge: 'SIAGES',
+    } : null;
 
     let matchingProcessActions = [];
     if (currentProcId && (scope === 'all' || scope === 'processo' || scope === 'actions')) {
@@ -923,7 +955,7 @@
     }
 
     let suapProcessSearchAction = null;
-    if (IS_SUAP_PAGE && query && (scope === 'all' || scope === 'processo' || isExplicitProcessSearch)) {
+    if (query && (scope === 'all' || scope === 'processo' || isExplicitProcessSearch)) {
       const processUrl = getSuapProcessSearchUrl(query);
       suapProcessSearchAction = {
         id: 'suap-search-processo',
@@ -937,7 +969,7 @@
     }
 
     let suapStudentAction = null;
-    if (IS_SUAP_PAGE && query && (scope === 'all' || isExplicitStudentSearch)) {
+    if (query && (scope === 'all' || isExplicitStudentSearch)) {
       const studentUrl = getSuapStudentUrl(query);
       const isMatricula = /^\d+$/.test(query.trim());
       suapStudentAction = {
@@ -952,7 +984,7 @@
     }
 
     let suapDocumentSearchAction = null;
-    if (IS_SUAP_PAGE && query && (scope === 'all' || isExplicitDocumentSearch)) {
+    if (query && (scope === 'all' || isExplicitDocumentSearch)) {
       const docUrl = getSuapDocumentSearchUrl(query);
       suapDocumentSearchAction = {
         id: 'suap-search-documento',
@@ -995,7 +1027,7 @@
     }
 
     let suapContractSearchAction = null;
-    if (IS_SUAP_PAGE && query && (scope === 'all' || scope === 'contratos')) {
+    if (query && (scope === 'all' || scope === 'contratos')) {
       const contractUrl = getSuapContractSearchUrl(query);
       suapContractSearchAction = {
         id: 'suap-search-contratos',
@@ -1033,6 +1065,7 @@
     if (scope === 'all' || scope === 'actions') {
       const qLower = query.toLowerCase();
       matchingActions = systemActions.filter((act) => {
+        if (act.suapOnly && !IS_SUAP_PAGE) return false;
         if (!qLower) return true;
         return act.title.toLowerCase().includes(qLower) || act.keywords.toLowerCase().includes(qLower) || act.subtitle.toLowerCase().includes(qLower);
       });
@@ -1046,6 +1079,8 @@
       isExplicitStudentSearch,
       suapDocumentSearchAction,
       isExplicitDocumentSearch,
+      siagesCondhSearchAction,
+      isExplicitCondhSearch,
       matchingEmpenhos,
       matchingContratos,
       suapContractSearchAction,
@@ -1081,6 +1116,8 @@
       isExplicitStudentSearch,
       suapDocumentSearchAction,
       isExplicitDocumentSearch,
+      siagesCondhSearchAction,
+      isExplicitCondhSearch,
       matchingEmpenhos,
       matchingContratos,
       suapContractSearchAction,
@@ -1097,6 +1134,9 @@
     });
 
     currentResults = [];
+    if (isExplicitCondhSearch && siagesCondhSearchAction) {
+      currentResults.push({ type: 'siages_condh_search', data: siagesCondhSearchAction });
+    }
     if (isExplicitStudentSearch && suapStudentAction) {
       currentResults.push({ type: 'suap_student_search', data: suapStudentAction });
     }
@@ -1172,7 +1212,7 @@
             ${ICONS.search}
           </div>
           <p class="suape-cp-empty-title">Nenhum resultado encontrado</p>
-          <p class="suape-cp-empty-desc">Não encontramos correspondências para "<strong>${escapeHtml(query)}</strong>". Tente matrícula do aluno (ex: "alu 2009..."), documento (ex: "doc texto"), processo ou contrato.</p>
+          <p class="suape-cp-empty-desc">${isExplicitCondhSearch ? 'Digite condh seguido de um CPF (11 dígitos) ou CNPJ (14 dígitos).' : `Não encontramos correspondências para "<strong>${escapeHtml(query)}</strong>". Tente matrícula do aluno (ex: "alu 2009..."), documento (ex: "doc texto"), processo ou contrato.`}</p>
         </div>
       `;
       return;
@@ -1247,6 +1287,30 @@
             </p>
           </div>
           <span class="suape-cp-item-action-hint">Pesquisar ↵</span>
+        </div>
+      `;
+      globalIndex++;
+      return block;
+    }
+
+    function renderCondhBlock() {
+      if (!siagesCondhSearchAction) return '';
+      if (html.length > 0) html += `<div class="suape-cp-divider"></div>`;
+      const isSel = globalIndex === selectedIndex;
+      const block = `
+        <div class="suape-cp-group-header">
+          <span class="suape-cp-group-title" style="color: #0d9488;">Consulta financeira</span>
+        </div>
+        <div class="suape-cp-item ${isSel ? 'suape-cp-item-selected' : ''}" data-index="${globalIndex}">
+          <div class="suape-cp-item-icon" style="color: #0d9488; background: #0d948815;">${ICONS.search}</div>
+          <div class="suape-cp-item-body">
+            <div class="suape-cp-item-title-row">
+              <span class="suape-cp-item-title-text">${escapeHtml(siagesCondhSearchAction.title)}</span>
+              <span class="suape-cp-badge badge-pago">SIAGES</span>
+            </div>
+            <p class="suape-cp-item-subtitle"><span class="suape-cp-subtitle-main">${escapeHtml(siagesCondhSearchAction.subtitle)}</span></p>
+          </div>
+          <span class="suape-cp-item-action-hint">Abrir ↵</span>
         </div>
       `;
       globalIndex++;
@@ -1356,6 +1420,8 @@
     if (isExplicitDocumentSearch) {
       html += renderDocumentBlock();
     }
+
+    html += renderCondhBlock();
 
     // Se houver atalho digitado de alta prioridade ou busca explícita de processo, exibe primeiro
     if (isExplicitProcessSearch || hasHighPriorityShortcut) {
@@ -1601,12 +1667,38 @@
 
   // Open Results Detail or Navigate
   async function openResultDetail(result, e) {
+    if (result.type === 'action' && result.data.id === 'action-suap-sync-now') {
+      closePalette();
+      const notice = showProcessSyncNotice('Solicitando sincronização das caixas do SUAP...');
+      try {
+        chrome.runtime.sendMessage(
+          { source: 'siages-extension-process-box-sync', type: 'sync-now' },
+          (response) => {
+            const runtimeError = chrome.runtime.lastError;
+            if (runtimeError) {
+              notice.textContent = 'Não foi possível acionar a sincronização. Recarregue a extensão e tente novamente.';
+              notice.dataset.error = 'true';
+              return;
+            }
+            notice.textContent = response?.ok
+              ? (response.message || 'Sincronização solicitada. Acompanhe o andamento no popup da extensão.')
+              : (response?.error || 'Não foi possível iniciar a sincronização.');
+            if (!response?.ok) notice.dataset.error = 'true';
+          },
+        );
+      } catch {
+        notice.textContent = 'Não foi possível acionar a sincronização. Recarregue a extensão e tente novamente.';
+        notice.dataset.error = 'true';
+      }
+      return;
+    }
     if (
       result.type === 'process_action' ||
       result.type === 'suap_contract_search' ||
       result.type === 'suap_process_search' ||
       result.type === 'suap_student_search' ||
-      result.type === 'suap_document_search'
+      result.type === 'suap_document_search' ||
+      result.type === 'siages_condh_search'
     ) {
       const url = result.data.url;
       closePalette();
@@ -1917,5 +2009,29 @@
     } else {
       setTimeout(() => loadData(false), 2000);
     }
+  }
+
+  function showProcessSyncNotice(message) {
+    document.getElementById('suape-process-sync-notice')?.remove();
+    const notice = document.createElement('div');
+    notice.id = 'suape-process-sync-notice';
+    notice.setAttribute('role', 'status');
+    notice.textContent = message;
+    Object.assign(notice.style, {
+      position: 'fixed',
+      zIndex: '2147483647',
+      right: '20px',
+      bottom: '20px',
+      maxWidth: 'min(420px, calc(100vw - 40px))',
+      padding: '12px 16px',
+      borderRadius: '10px',
+      background: '#064e3b',
+      color: '#ecfdf5',
+      boxShadow: '0 10px 30px rgba(15, 23, 42, .28)',
+      font: '500 13px/1.45 system-ui, sans-serif',
+    });
+    document.body.appendChild(notice);
+    window.setTimeout(() => notice.remove(), 7000);
+    return notice;
   }
 })();

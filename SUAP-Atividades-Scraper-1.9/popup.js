@@ -21,6 +21,7 @@ const extensionAuthPasswordInput = document.getElementById('extension-auth-passw
 const extensionAuthStatus = document.getElementById('extension-auth-status');
 const extensionSignInButton = document.getElementById('btn-extension-sign-in');
 const extensionSignOutButton = document.getElementById('btn-extension-sign-out');
+const processBoxSyncStatus = document.getElementById('process-box-sync-status');
 const siafiFavorecidosCard = document.getElementById('siafi-favorecidos-card');
 const siafiListSelect = document.getElementById('siafi-list-select');
 const siafiListInfo = document.getElementById('siafi-list-info');
@@ -62,6 +63,32 @@ async function updateExtensionAuthStatus() {
     setExtensionAuthStatus(error instanceof Error ? error.message : 'Não foi possível renovar a sessão agora. A sessão continua salva para uma nova tentativa.', true);
   }
 }
+
+function formatLocalScheduleDate(value) {
+  if (!value) return 'calculando...';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'calculando...';
+  return date.toLocaleString('pt-BR', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function updateProcessBoxSyncStatus() {
+  if (!processBoxSyncStatus || !chrome?.runtime?.sendMessage) return;
+  chrome.runtime.sendMessage(
+    { source: 'siages-extension-process-box-sync', type: 'get-status' },
+    (response) => {
+      if (chrome.runtime.lastError || !response?.ok) return;
+      const status = response.status || {};
+      const lines = [`Próxima execução: ${formatLocalScheduleDate(status.nextRunAt)} (dias úteis).`];
+      if (status.phase === 'inventory' || status.phase === 'processing') {
+        lines.push(status.message || 'Sincronização em andamento...');
+      } else if (status.finishedAt) {
+        lines.push(`${status.message || 'Última sincronização concluída.'} ${new Date(status.finishedAt).toLocaleString('pt-BR')}.`);
+      }
+      if (status.lastError) lines.push(`Último aviso: ${status.lastError}`);
+      processBoxSyncStatus.textContent = lines.join('\n');
+    },
+  );
+}
 async function signInExtension() {
   const email = extensionAuthEmailInput.value.trim();
   const password = extensionAuthPasswordInput.value;
@@ -99,6 +126,10 @@ extensionSignOutButton.addEventListener('click', async () => {
   }
 });
 void updateExtensionAuthStatus();
+updateProcessBoxSyncStatus();
+chrome?.storage?.onChanged?.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes['siages-process-box-sync-state']) updateProcessBoxSyncStatus();
+});
 
 automationSecretInput.value = localStorage.getItem(SECRET_STORAGE_KEY) || '';
 automationSecretInput.addEventListener('change', () => {

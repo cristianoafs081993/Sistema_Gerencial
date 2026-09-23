@@ -56,9 +56,6 @@ export function SuapSyncPanel() {
   const [newSyncAuto, setNewSyncAuto] = useState(true);
   const [isAddingBox, setIsAddingBox] = useState(false);
 
-  // Auto-sincronização
-  const [nextAutoSyncTime, setNextAutoSyncTime] = useState<string>('Aguardando...');
-  
   // Status de sync e terminal
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
@@ -90,32 +87,6 @@ export function SuapSyncPanel() {
       loadUserCaixas();
     }
   }, [session?.user?.id, suapSessionId]);
-
-  // Loop de Sincronização Automática (de hora em hora)
-  useEffect(() => {
-    if (!suapSessionId || !session?.user?.id || caixas.length === 0) return;
-
-    const checkAndRunAutoSync = async () => {
-      const lastSyncStr = localStorage.getItem('suap_last_auto_sync_time');
-      const now = Date.now();
-      const oneHourMs = 60 * 60 * 1000;
-      
-      const lastSyncTime = lastSyncStr ? Number(lastSyncStr) : 0;
-      const timeRemaining = oneHourMs - (now - lastSyncTime);
-
-      if (timeRemaining <= 0) {
-        addLog('Iniciando sincronização automática programada (de hora em hora)...');
-        await handleStartSync({ onlyAutoActive: true, fullFlow: true });
-      } else {
-        const minutesLeft = Math.ceil(timeRemaining / 60000);
-        setNextAutoSyncTime(`em ~${minutesLeft} min`);
-      }
-    };
-
-    checkAndRunAutoSync();
-    const interval = setInterval(checkAndRunAutoSync, 60000); // Checa a cada minuto
-    return () => clearInterval(interval);
-  }, [suapSessionId, caixas, session?.user?.id]);
 
   // Rolar logs para o final
   useEffect(() => {
@@ -271,7 +242,7 @@ export function SuapSyncPanel() {
   };
 
   // Sincronizacao Geral
-  const handleStartSync = async (options?: { onlyAutoActive?: boolean; fullFlow?: boolean }) => {
+  const handleStartSync = async (options?: { fullFlow?: boolean }) => {
     if (!suapSessionId) {
       toast.error('Sessao do SUAP nao conectada.');
       return;
@@ -282,17 +253,10 @@ export function SuapSyncPanel() {
       return;
     }
 
-    const boxesToSync = caixas.filter(b => {
-      if (options?.onlyAutoActive) {
-        return b.sync_automatica;
-      }
-      return selectedBoxIds.has(b.id);
-    });
+    const boxesToSync = caixas.filter(b => selectedBoxIds.has(b.id));
 
     if (boxesToSync.length === 0) {
-      if (!options?.onlyAutoActive) {
-        toast.warning('Selecione pelo menos uma caixa de processos para sincronizar.');
-      }
+      toast.warning('Selecione pelo menos uma caixa de processos para sincronizar.');
       return;
     }
 
@@ -390,8 +354,6 @@ export function SuapSyncPanel() {
       );
       setSyncStatus(errors === 0 ? 'success' : 'error');
 
-      localStorage.setItem('suap_last_auto_sync_time', String(Date.now()));
-
       if (errors === 0) {
         toast.success(fullFlow ? 'Fluxo completo concluido com sucesso!' : 'Inventario sincronizado com sucesso!');
       } else {
@@ -417,7 +379,7 @@ export function SuapSyncPanel() {
             Importador Nativo de Processos (SUAP)
           </CardTitle>
           <CardDescription className="text-xs text-text-secondary">
-            Gerencie caixas de processos e sincronize de forma manual ou automática (de hora em hora).
+            Gerencie caixas e sincronize manualmente. A extensão sincroniza as caixas padrão em dias úteis às 07h, 10h, 13h e 15h.
           </CardDescription>
         </div>
 
@@ -565,7 +527,7 @@ export function SuapSyncPanel() {
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                 <span className="text-emerald-800 font-semibold">Sessão conectada com o SUAP</span>
                 <span className="text-[10px] text-slate-500 font-normal">
-                  (Sync automática: <strong className="text-emerald-700">{nextAutoSyncTime}</strong>)
+                  (Extensão: dias úteis às <strong className="text-emerald-700">07h, 10h, 13h e 15h</strong>; Chrome aberto e sessões do SUAP/SIAGES ativas)
                 </span>
               </div>
               <div className="flex items-center gap-2">

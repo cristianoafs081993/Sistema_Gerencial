@@ -582,10 +582,13 @@ Consumidores no app:
 - [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx)
 - [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
 
-Observacao:
+Observacoes:
 
-- A extensao Chrome nao e necessaria para sincronizar caixas: essa etapa ocorre diretamente pelo componente `<SuapSyncPanel>`, aberto pelo menu do usuario em `Configurar integração com o SUAP`. As caixas sao cadastradas manualmente; nao ha auto-descoberta. A extensao permanece necessaria para o clone automatico e para gerar o despacho sem sair da pagina do processo no SUAP.
-- O usuario deve manter a aba ativa no navegador durante o download de PDFs em razao das requisicoes assincronas do Celery.
+- O componente `<SuapSyncPanel>` permite sincronizacao manual das caixas cadastradas. A extensao Chrome tambem inventaria, em segundo plano, as caixas de processos atribuidos ao usuario SUAP 304806 e do setor 857, nos dias uteis as 07h, 10h, 13h e 15h. Ela cria esses cadastros como caixas padrao por usuario quando necessario e respeita o campo `sync_automatica`; caixas adicionais continuam disponiveis para sincronizacao manual no painel.
+- O agendamento e executado pelo service worker MV3. O Chrome precisa estar aberto, a extensao autenticada no SIAGES e o SUAP com sessao valida. O cookie `sessionid` e lido do armazenamento de cookies apenas para a chamada ao `suap-proxy`; nao e persistido pela extensao.
+- O comando `Sincronizar processos agora`, na paleta `Ctrl+K` das paginas SUAP, inicia o mesmo inventario e fluxo de PDF/IA. O popup da extensao exibe o proximo horario e o estado da ultima execucao.
+- Processos novos ou ainda pendentes de PDF/extracao sao abertos em abas inativas do SUAP para reutilizar o fluxo existente da extensao (`process-info`, armazenamento em `suap-pdfs` e `process-pdf`). A reconciliacao remove somente vinculos de caixa ausentes em listagens lidas com sucesso; processos, PDFs e historico sao preservados.
+- Na sincronizacao manual iniciada pelo painel do SIAGES, a aba do aplicativo deve permanecer aberta durante o fluxo de PDF, pois as requisicoes assincronas do Celery sao acompanhadas pelo proprio fluxo.
 
 ## 12. Edge Function `record-automation-savings-event`
 

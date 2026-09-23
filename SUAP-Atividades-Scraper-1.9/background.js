@@ -1,9 +1,15 @@
+if (typeof importScripts === 'function') importScripts('scheduled-process-sync.js');
+
 const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
 const AUTH_MESSAGE_SOURCE = 'siages-extension-auth';
 const EXTENSION_SESSION_STORAGE_KEY = 'siages-extension-session';
 const SESSION_REFRESH_ALARM = 'siages-extension-session-refresh';
 const REFRESH_AHEAD_SECONDS = 20 * 60;
+const PROCESS_BOX_SYNC_SOURCE = 'siages-extension-process-box-sync';
+const PROCESS_BOX_SYNC_ALARM = 'siages-extension-process-box-sync';
+const PROCESS_BOX_SYNC_STORAGE_KEY = 'siages-process-box-sync-state';
+const PROCESS_BOX_SYNC = globalThis.SuapeScheduledProcessSync;
 
 let refreshInFlight = null;
 let sessionGeneration = 0;
@@ -330,6 +336,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Falha no registro de processos.' }));
     return true;
   }
+  if (message?.source === PROCESS_BOX_SYNC_SOURCE) {
+    void handleProcessBoxSyncMessage(message, sender)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Falha na sincronização das caixas do SUAP.' }));
+    return true;
+  }
   return undefined;
 });
 
@@ -383,14 +395,435 @@ async function ensureSessionRefreshAlarm() {
   if (!existingAlarm) chrome.alarms.create(SESSION_REFRESH_ALARM, { periodInMinutes: 15 });
 }
 
+function getProcessBoxSyncStatus(state = {}) {
+  const nextRunAt = PROCESS_BOX_SYNC?.getNextRunAt?.();
+  return {
+    phase: state.phase || 'idle',
+    startedAt: state.startedAt || null,
+    finishedAt: state.finishedAt || null,
+    nextRunAt: nextRunAt?.toISOString?.() || state.nextRunAt || null,
+    message: state.message || 'Sincronização programada para dias úteis às 07h, 10h, 13h e 15h.',
+    boxesRead: Number(state.boxesRead || 0),
+    processCount: Number(state.processCount || 0),
+    completedCount: Number(state.completedCount || 0),
+    errorCount: Number(state.errorCount || 0),
+    lastError: state.lastError || null,
+    currentProcess: state.currentProcess || null,
+  };
+}
+
+async function readProcessBoxSyncState() {
+  const stored = await chrome.storage.local.get(PROCESS_BOX_SYNC_STORAGE_KEY);
+  return stored?.[PROCESS_BOX_SYNC_STORAGE_KEY] || {};
+}
+
+async function writeProcessBoxSyncState(state) {
+  await chrome.storage.local.set({ [PROCESS_BOX_SYNC_STORAGE_KEY]: state });
+}
+
+async function ensureProcessBoxSyncAlarm() {
+  if (!PROCESS_BOX_SYNC?.getNextRunAt || !chrome?.alarms?.create) return;
+  const nextRunAt = PROCESS_BOX_SYNC.getNextRunAt();
+  if (!nextRunAt) return;
+  const existing = await chrome.alarms.get?.(PROCESS_BOX_SYNC_ALARM);
+  if (!existing || Math.abs(Number(existing.scheduledTime || 0) - nextRunAt.getTime()) > 60_000) {
+    chrome.alarms.create(PROCESS_BOX_SYNC_ALARM, { when: nextRunAt.getTime() });
+  }
+  const state = await readProcessBoxSyncState().catch(() => ({}));
+  await writeProcessBoxSyncState({ ...state, nextRunAt: nextRunAt.toISOString() });
+}
+
+function supabaseHeaders(accessToken, extra = {}) {
+  return {
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+    ...extra,
+  };
+}
+
+async function fetchSupabaseRest(path, accessToken, options = {}) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: supabaseHeaders(accessToken, options.headers || {}),
+  });
+  const body = await response.text().catch(() => '');
+  if (!response.ok) {
+    let detail = '';
+    try { detail = JSON.parse(body)?.message || ''; } catch { /* Resposta sem JSON. */ }
+    throw new Error(detail || `O SIAGES recusou a sincronização (HTTP ${response.status}).`);
+  }
+  if (!body) return null;
+  try { return JSON.parse(body); } catch { return body; }
+}
+
+function safeProcessSyncError(error, secrets = []) {
+  let message = error instanceof Error ? error.message : String(error || 'Falha ao sincronizar as caixas do SUAP.');
+  for (const secret of secrets) {
+    if (secret) message = message.split(secret).join('[oculto]');
+  }
+  return message.slice(0, 300);
+}
+
+async function getAuthenticatedTenant(accessToken) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error('Entre novamente na extensão para sincronizar as caixas do SUAP.');
+  const user = await response.json();
+  if (!user?.id) throw new Error('Não foi possível identificar o usuário do SIAGES.');
+  return user.id;
+}
+
+function normalizeProcessBoxIdentity(value) {
+  try {
+    const url = new URL(value);
+    const params = new URLSearchParams(url.search);
+    return `${url.origin}${url.pathname}?${[...params.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, val]) => `${key}=${val}`).join('&')}`;
+  } catch {
+    return String(value || '').trim();
+  }
+}
+
+async function loadOrCreateDefaultProcessBoxes(tenantId, accessToken) {
+  const defaults = PROCESS_BOX_SYNC?.DEFAULT_PROCESS_BOXES || [];
+  const existing = await fetchSupabaseRest(
+    `suap_caixas?select=id,nome,url,sync_automatica&tenant_id=eq.${encodeURIComponent(tenantId)}`,
+    accessToken,
+  );
+  const rows = Array.isArray(existing) ? existing : [];
+  const byIdentity = new Map(rows.map((box) => [normalizeProcessBoxIdentity(box.url), box]));
+
+  for (const box of defaults) {
+    const identity = normalizeProcessBoxIdentity(box.url);
+    if (byIdentity.has(identity)) continue;
+    const inserted = await fetchSupabaseRest('suap_caixas?select=id,nome,url,sync_automatica', accessToken, {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ tenant_id: tenantId, nome: box.name, url: box.url, sync_automatica: true }),
+    });
+    const row = Array.isArray(inserted) ? inserted[0] : null;
+    if (row) {
+      rows.push(row);
+      byIdentity.set(identity, row);
+    }
+  }
+  return defaults
+    .map((box) => byIdentity.get(normalizeProcessBoxIdentity(box.url)))
+    .filter((box) => box?.id && box.sync_automatica !== false);
+}
+
+async function getSuapSessionCookie() {
+  if (!chrome?.cookies?.get) throw new Error('Permissão para consultar a sessão do SUAP indisponível. Recarregue a extensão.');
+  const cookie = await chrome.cookies.get({ url: 'https://suap.ifrn.edu.br/', name: 'sessionid' });
+  if (!cookie?.value) throw new Error('Faça login no SUAP no Chrome para sincronizar as caixas.');
+  return cookie.value;
+}
+
+async function fetchProcessBoxHtml(url, sessionId, accessToken) {
+  const parsedUrl = new URL(url);
+  const path = `${parsedUrl.pathname}${parsedUrl.search}`;
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/suap-proxy`, {
+    method: 'POST',
+    headers: supabaseHeaders(accessToken),
+    body: JSON.stringify({ path, method: 'GET', suapSessionId: sessionId }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.error) throw new Error(payload?.error || `Falha ao ler uma caixa do SUAP (HTTP ${response.status}).`);
+  if (typeof payload?.text !== 'string') throw new Error('O SUAP não devolveu o conteúdo da caixa de processos.');
+  if (!payload.text.trim()) throw new Error('O SUAP devolveu uma caixa vazia; o inventário anterior foi preservado.');
+  return PROCESS_BOX_SYNC.parseProcessBoxHtml(payload.text);
+}
+
+async function fetchAllTenantProcesses(tenantId, accessToken) {
+  const all = [];
+  for (let offset = 0; ; offset += 1000) {
+    const page = await fetchSupabaseRest(
+      `processos?select=id,suap_id,status,num_processo,pdf_url&tenant_id=eq.${encodeURIComponent(tenantId)}&order=created_at.asc`,
+      accessToken,
+      { headers: { Range: `${offset}-${offset + 999}`, 'Range-Unit': 'items' } },
+    );
+    const rows = Array.isArray(page) ? page : [];
+    all.push(...rows);
+    if (rows.length < 1000) return all;
+  }
+}
+
+async function reconcileProcessBox(box, scraped, rowsBySuapId, tenantId, accessToken) {
+  const processIds = [...new Set(scraped.map((process) => rowsBySuapId.get(process.suapId)?.id).filter(Boolean))];
+  const encodedBoxId = encodeURIComponent(box.id);
+  const encodedTenantId = encodeURIComponent(tenantId);
+  const current = await fetchSupabaseRest(
+    `suap_processo_caixas?select=processo_id&tenant_id=eq.${encodedTenantId}&caixa_id=eq.${encodedBoxId}`,
+    accessToken,
+  );
+  const observed = new Set(processIds);
+  const stale = (Array.isArray(current) ? current : []).map((row) => row.processo_id).filter((id) => !observed.has(id));
+  for (let offset = 0; offset < stale.length; offset += 100) {
+    const staleBatch = stale.slice(offset, offset + 100);
+    await fetchSupabaseRest(
+      `suap_processo_caixas?tenant_id=eq.${encodedTenantId}&caixa_id=eq.${encodedBoxId}&processo_id=in.(${staleBatch.map(encodeURIComponent).join(',')})`,
+      accessToken,
+      { method: 'DELETE' },
+    );
+  }
+  if (processIds.length) {
+    const memberships = processIds.map((processo_id) => ({ processo_id, caixa_id: box.id, tenant_id: tenantId, last_seen_at: new Date().toISOString() }));
+    await fetchSupabaseRest(
+      'suap_processo_caixas?on_conflict=processo_id,caixa_id',
+      accessToken,
+      { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(memberships) },
+    );
+  }
+  await fetchSupabaseRest(`suap_caixas?id=eq.${encodedBoxId}&tenant_id=eq.${encodedTenantId}`, accessToken, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ last_sync_at: new Date().toISOString() }),
+  });
+}
+
+let processBoxSyncInFlight = null;
+let processQueueAdvanceInFlight = null;
+
+async function startNextQueuedProcess() {
+  if (processQueueAdvanceInFlight) return processQueueAdvanceInFlight;
+  processQueueAdvanceInFlight = (async () => {
+    let state = await readProcessBoxSyncState();
+    if (state.phase !== 'processing' || state.activeTabId != null) return;
+    const queue = Array.isArray(state.queue) ? state.queue : [];
+    while (Number(state.queueIndex || 0) < queue.length) {
+      const index = Number(state.queueIndex || 0);
+      const process = queue[index];
+      await writeProcessBoxSyncState({ ...state, currentProcess: process.numProcesso || `Processo ${process.suapId}`, message: `Processando ${process.numProcesso || process.suapId} (${index + 1}/${queue.length})...` });
+      try {
+        const tab = await chrome.tabs.create({ url: process.url, active: false });
+        await writeProcessBoxSyncState({ ...state, activeTabId: tab.id, activeSuapId: process.suapId, currentProcess: process.numProcesso || `Processo ${process.suapId}`, message: `Processando ${process.numProcesso || process.suapId} (${index + 1}/${queue.length})...` });
+        return;
+      } catch {
+        state = { ...state, queueIndex: index + 1, errorCount: Number(state.errorCount || 0) + 1, lastError: `Não foi possível abrir o processo ${process.suapId}.` };
+        await writeProcessBoxSyncState(state);
+      }
+    }
+
+    {
+      const finished = {
+        ...state,
+        phase: state.errorCount ? 'completed_with_errors' : 'completed',
+        finishedAt: new Date().toISOString(),
+        message: `Sincronização concluída: ${state.completedCount || 0} processo(s) processado(s), ${state.errorCount || 0} erro(s).`,
+        currentProcess: null,
+        queue: [],
+        queueIndex: 0,
+        activeTabId: null,
+      };
+      delete finished.lastError;
+      await writeProcessBoxSyncState(finished);
+    }
+  })().finally(() => { processQueueAdvanceInFlight = null; });
+  return processQueueAdvanceInFlight;
+}
+
+async function finishActiveQueuedProcess(status, sender) {
+  const state = await readProcessBoxSyncState();
+  if (state.phase !== 'processing' || state.activeTabId !== sender?.tab?.id || String(state.activeSuapId) !== String(status?.suapId)) return { accepted: false };
+  if (!['ready', 'error'].includes(status?.status)) return { accepted: true };
+
+  const updated = {
+    ...state,
+    activeTabId: null,
+    activeSuapId: null,
+    queueIndex: Number(state.queueIndex || 0) + 1,
+    completedCount: Number(state.completedCount || 0) + (status.status === 'ready' ? 1 : 0),
+    errorCount: Number(state.errorCount || 0) + (status.status === 'error' ? 1 : 0),
+    lastError: status.status === 'error' ? String(status.message || 'Falha no processamento do processo.').slice(0, 300) : state.lastError,
+    currentProcess: null,
+  };
+  await writeProcessBoxSyncState(updated);
+  chrome.tabs.remove(sender.tab.id, () => void chrome.runtime.lastError);
+  await startNextQueuedProcess();
+  return { accepted: true };
+}
+
+async function runProcessBoxSync(trigger = 'scheduled') {
+  if (processBoxSyncInFlight) return processBoxSyncInFlight;
+  processBoxSyncInFlight = (async () => {
+    const previous = await readProcessBoxSyncState();
+    if (previous.phase === 'processing') return { started: false, message: 'A sincronização já está em andamento.' };
+
+    const startedAt = new Date().toISOString();
+    let state = {
+      phase: 'inventory',
+      trigger,
+      startedAt,
+      finishedAt: null,
+      message: 'Lendo as caixas de processos do SUAP...',
+      boxesRead: 0,
+      processCount: 0,
+      completedCount: 0,
+      errorCount: 0,
+      queue: [],
+      queueIndex: 0,
+      activeTabId: null,
+      activeSuapId: null,
+      nextRunAt: PROCESS_BOX_SYNC?.getNextRunAt?.()?.toISOString?.() || null,
+    };
+    await writeProcessBoxSyncState(state);
+    const secrets = [];
+    try {
+      const session = await refreshSessionIfNeeded();
+      if (!session?.accessToken) throw new Error('Entre na extensão com a conta do SIAGES para sincronizar as caixas.');
+      secrets.push(session.accessToken);
+      const tenantId = await getAuthenticatedTenant(session.accessToken);
+      const boxes = await loadOrCreateDefaultProcessBoxes(tenantId, session.accessToken);
+      if (!boxes.length) throw new Error('Ative a sincronização automática em pelo menos uma das duas caixas padrão do SUAP.');
+      const suapSessionId = await getSuapSessionCookie();
+      secrets.push(suapSessionId);
+      const scrapedByBox = new Map();
+      let boxErrors = 0;
+
+      for (const box of boxes) {
+        try {
+          const scraped = await fetchProcessBoxHtml(box.url, suapSessionId, session.accessToken);
+          scrapedByBox.set(box.id, { box, processes: scraped.map((process) => ({ ...process, caixa: box.nome })) });
+          state = { ...state, boxesRead: state.boxesRead + 1, message: `Caixa lida: ${box.nome} (${scraped.length} processo(s)).` };
+          await writeProcessBoxSyncState(state);
+        } catch (error) {
+          boxErrors += 1;
+          state = { ...state, errorCount: boxErrors, lastError: safeProcessSyncError(error, secrets) };
+          await writeProcessBoxSyncState(state);
+        }
+      }
+      if (!scrapedByBox.size) throw new Error(state.lastError || 'Nenhuma das caixas padrão pôde ser lida.');
+
+      const allProcesses = [...scrapedByBox.values()].flatMap(({ processes }) => processes);
+      const uniqueProcesses = [...new Map(allProcesses.map((process) => [process.suapId, process])).values()];
+      const existingRows = await fetchAllTenantProcesses(tenantId, session.accessToken);
+      const rowsBySuapId = new Map(existingRows.map((row) => [String(row.suap_id), row]));
+      const missingProcesses = uniqueProcesses.filter((process) => !rowsBySuapId.has(process.suapId));
+      for (let offset = 0; offset < missingProcesses.length; offset += 100) {
+        const batch = missingProcesses.slice(offset, offset + 100);
+        const insertedPayload = batch.map((process) => ({
+          tenant_id: tenantId,
+          suap_id: process.suapId,
+          url: process.url,
+          status: 'pending_extraction',
+          updated_at: new Date().toISOString(),
+          ...(process.numProcesso ? { num_processo: process.numProcesso } : {}),
+          ...(process.caixa ? { caixa: process.caixa } : {}),
+        }));
+        try {
+          const insertedRows = await fetchSupabaseRest('processos?select=id,suap_id,status,num_processo,pdf_url', session.accessToken, {
+            method: 'POST',
+            headers: { Prefer: 'return=representation' },
+            body: JSON.stringify(insertedPayload),
+          });
+          for (const row of Array.isArray(insertedRows) ? insertedRows : []) rowsBySuapId.set(String(row.suap_id), row);
+          if (batch.some((process) => !rowsBySuapId.has(process.suapId))) {
+            throw new Error('O SIAGES não confirmou todos os processos novos.');
+          }
+        } catch (error) {
+          const refreshed = await fetchAllTenantProcesses(tenantId, session.accessToken);
+          for (const row of refreshed) rowsBySuapId.set(String(row.suap_id), row);
+          if (batch.some((process) => !rowsBySuapId.has(process.suapId))) throw error;
+        }
+      }
+      for (const { box, processes } of scrapedByBox.values()) {
+        await reconcileProcessBox(box, processes, rowsBySuapId, tenantId, session.accessToken);
+      }
+
+      const processQueue = uniqueProcesses
+        .map((process) => ({ process, row: rowsBySuapId.get(process.suapId) }))
+        .filter(({ row }) => ['pending_extraction', 'pdf_uploaded'].includes(row?.status))
+        .map(({ process, row }) => ({ suapId: process.suapId, numProcesso: process.numProcesso || row.num_processo || '', url: process.url }));
+      state = {
+        ...state,
+        phase: 'processing',
+        processCount: uniqueProcesses.length,
+        errorCount: boxErrors,
+        lastError: boxErrors ? state.lastError : null,
+        queue: processQueue,
+        queueIndex: 0,
+        activeTabId: null,
+        activeSuapId: null,
+        message: `${uniqueProcesses.length} processo(s) sincronizado(s); ${processQueue.length} pendente(s) de PDF/IA.`,
+      };
+      await writeProcessBoxSyncState(state);
+      await startNextQueuedProcess();
+      return { started: true };
+    } catch (error) {
+      const failed = {
+        ...state,
+        phase: 'error',
+        finishedAt: new Date().toISOString(),
+        message: safeProcessSyncError(error, secrets),
+        lastError: safeProcessSyncError(error, secrets),
+        queue: [],
+        activeTabId: null,
+        activeSuapId: null,
+      };
+      await writeProcessBoxSyncState(failed);
+      return { started: false, error: failed.message };
+    }
+  })().finally(() => { processBoxSyncInFlight = null; });
+  return processBoxSyncInFlight;
+}
+
+async function handleProcessBoxSyncMessage(message, sender) {
+  if (message.type === 'get-status') return { status: getProcessBoxSyncStatus(await readProcessBoxSyncState()) };
+  if (message.type === 'sync-now') {
+    void runProcessBoxSync('manual').catch(() => undefined);
+    return { started: true, message: 'Sincronização solicitada. Acompanhe o andamento no popup da extensão.' };
+  }
+  if (message.type === 'process-status') return finishActiveQueuedProcess(message.payload || {}, sender);
+  throw new Error('Operação de sincronização de caixas desconhecida.');
+}
+
+async function resumeQueuedProcessSync() {
+  const state = await readProcessBoxSyncState().catch(() => ({}));
+  if (state.phase !== 'processing') return;
+  if (state.activeTabId != null) {
+    try {
+      await chrome.tabs.get(state.activeTabId);
+      return;
+    } catch {
+      await writeProcessBoxSyncState({ ...state, activeTabId: null, activeSuapId: null, errorCount: Number(state.errorCount || 0) + 1, lastError: 'O Chrome encerrou uma aba durante o processamento; retomando a fila.' });
+    }
+  }
+  await startNextQueuedProcess();
+}
+
+if (chrome?.tabs?.onRemoved) {
+  chrome.tabs.onRemoved.addListener(async (tabId) => {
+    const state = await readProcessBoxSyncState().catch(() => ({}));
+    if (state.phase !== 'processing' || state.activeTabId !== tabId) return;
+    await writeProcessBoxSyncState({ ...state, activeTabId: null, activeSuapId: null, queueIndex: Number(state.queueIndex || 0) + 1, errorCount: Number(state.errorCount || 0) + 1, lastError: 'A aba de um processo foi fechada antes da conclusão.' });
+    await startNextQueuedProcess();
+  });
+}
+
+async function scheduleProcessBoxSync() {
+  await ensureProcessBoxSyncAlarm();
+  const state = await readProcessBoxSyncState().catch(() => ({}));
+  if (state.phase === 'inventory') {
+    void runProcessBoxSync('resume').catch(() => undefined);
+    return;
+  }
+  await resumeQueuedProcessSync();
+}
+
 function scheduleSessionRefresh() {
   void ensureSessionRefreshAlarm();
   void refreshSessionIfNeeded().catch(() => undefined);
 }
 
 void ensureSessionRefreshAlarm();
+void scheduleProcessBoxSync().catch(() => undefined);
 chrome.runtime.onInstalled.addListener(scheduleSessionRefresh);
 chrome.runtime.onStartup.addListener(scheduleSessionRefresh);
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === SESSION_REFRESH_ALARM) void refreshSessionIfNeeded().catch(() => undefined);
+  if (alarm.name === PROCESS_BOX_SYNC_ALARM) {
+    void ensureProcessBoxSyncAlarm().catch(() => undefined);
+    void runProcessBoxSync('scheduled').catch(() => undefined);
+  }
 });

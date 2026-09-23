@@ -95,6 +95,13 @@
       font-size: 12px;
       color: #b8c5d1;
     }
+    #process-box-sync-status {
+      margin: 8px 0 0;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #b8c5d1;
+      white-space: pre-line;
+    }
     #siafi-list-info,
     #siafi-fill-status {
       margin: 8px 0;
@@ -135,6 +142,10 @@
     <button id="btn-extension-sign-in" type="button">Entrar no banco</button>
     <button id="btn-extension-sign-out" type="button" class="secondary">Sair do banco</button>
     <p id="extension-auth-status" aria-live="polite">A extensão consulta o banco com as permissões do seu usuário.</p>
+  </section>
+  <section class="auth-card" aria-labelledby="process-box-sync-title">
+    <h3 id="process-box-sync-title">Sincronização das caixas do SUAP</h3>
+    <p id="process-box-sync-status" aria-live="polite">Agenda: dias úteis às 07h, 10h, 13h e 15h. Mantenha o Chrome aberto, com sessão ativa no SUAP e no SIAGES.</p>
   </section>
   <section id="siafi-favorecidos-card" class="auth-card" hidden aria-labelledby="siafi-favorecidos-title">
     <h3 id="siafi-favorecidos-title">Preencher favorecidos no SIAFI</h3>

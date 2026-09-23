@@ -6,6 +6,7 @@ import { extensionFixturePath } from '@/test/extensionFixtures';
 
 const SESSION_KEY = 'siages-extension-session';
 const AUTH_SOURCE = 'siages-extension-auth';
+const PROCESS_SYNC_SOURCE = 'siages-extension-process-box-sync';
 
 type StorageValues = Record<string, unknown>;
 
@@ -31,14 +32,16 @@ function loadBackground(values: StorageValues) {
     },
   };
   (window as typeof window & { chrome?: unknown }).chrome = chromeApi;
-  new Function('chrome', 'fetch', readFileSync(extensionFixturePath('background.js'), 'utf8'))(chromeApi, globalThis.fetch);
+  const syncContext: Record<string, unknown> = {};
+  new Function('globalThis', readFileSync(extensionFixturePath('scheduled-process-sync.js'), 'utf8'))(syncContext);
+  new Function('chrome', 'fetch', 'globalThis', readFileSync(extensionFixturePath('background.js'), 'utf8'))(chromeApi, globalThis.fetch, syncContext);
 
   return {
     storage,
     alarms: chromeApi.alarms,
-    send: (message: { type: string }) => new Promise<unknown>((resolve) => {
+    send: (message: { type: string }, source = AUTH_SOURCE) => new Promise<unknown>((resolve) => {
       const keepChannelOpen = messageListeners[0](
-        { source: AUTH_SOURCE, ...message },
+        { source, ...message },
         {},
         resolve,
       );
@@ -62,6 +65,22 @@ describe('autenticação persistente da extensão', () => {
 
     await background.send({ type: 'get-session' });
     expect(background.alarms.create).toHaveBeenCalledWith('siages-extension-session-refresh', { periodInMinutes: 15 });
+    await vi.waitFor(() => expect(background.alarms.create).toHaveBeenCalledWith(
+      'siages-extension-process-box-sync',
+      expect.objectContaining({ when: expect.any(Number) }),
+    ));
+  });
+
+  it('expõe estado do agendamento à extensão sem exigir autenticação na consulta', async () => {
+    const background = loadBackground({});
+
+    await expect(background.send({ type: 'get-status' }, PROCESS_SYNC_SOURCE)).resolves.toMatchObject({
+      ok: true,
+      status: {
+        phase: 'idle',
+        nextRunAt: expect.any(String),
+      },
+    });
   });
 
   it('serializa renovações concorrentes e salva o refresh token mais recente', async () => {

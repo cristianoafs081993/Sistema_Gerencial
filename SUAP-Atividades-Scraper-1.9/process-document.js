@@ -1377,7 +1377,20 @@
       const receive = async (event) => {
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-info-ready')) { postContext(); return; }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-snapshot')) { state.snapshot = event.data.payload; persistProcessState(); renderSummary(); return; }
-        if (isSiagesFrameMessage(event, frame, 'siages:suap-process-sync-status')) { state.syncStatus = event.data.payload; persistProcessState(); renderSummary(); if (state.syncStatus.stage === 'error' && !state.hasFinanceSummary) renderFinanceEmpty(state.syncStatus.message); return; }
+        if (isSiagesFrameMessage(event, frame, 'siages:suap-process-sync-status')) {
+          state.syncStatus = event.data.payload;
+          persistProcessState();
+          renderSummary();
+          if (state.syncStatus.stage === 'error' && !state.hasFinanceSummary) renderFinanceEmpty(state.syncStatus.message);
+          try {
+            chrome.runtime.sendMessage({
+              source: 'siages-extension-process-box-sync',
+              type: 'process-status',
+              payload: { ...state.syncStatus, suapId: getProcessId(), status: state.syncStatus.stage },
+            }, () => void chrome.runtime.lastError);
+          } catch { /* A extensão pode ter sido atualizada enquanto a aba estava aberta. */ }
+          return;
+        }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-flow')) {
           state.flow = event.data.payload;
           state.mappings = event.data.payload?.mappings || [];

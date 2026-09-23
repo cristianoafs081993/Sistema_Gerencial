@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.43');
+    expect(manifest.version).toBe('1.9.45');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms', 'cookies']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
@@ -65,7 +65,6 @@ describe('pacote da extensao Suape 1.9', () => {
       exclude_matches: [
         'https://www.siages.com.br/*',
         'https://suap.ifrn.edu.br/*',
-        'https://cnetmobile.estaleiro.serpro.gov.br/*',
       ],
       css: ['command-palette.css'],
       js: ['extension-auth-client.js', 'command-palette.js'],
@@ -109,6 +108,8 @@ describe('pacote da extensao Suape 1.9', () => {
   it('suporta pesquisa direta de contratos no SUAP via parâmetro q no command-palette (Ctrl+K)', () => {
     const cpScript = fs.readFileSync(extensionFixturePath('command-palette.js'), 'utf8');
 
+    expect(cpScript).toContain("const SUAP_APP_URL = 'https://suap.ifrn.edu.br';");
+    expect(cpScript).toContain('new URL(`/admin/contratos/contrato/?${baseParams.toString()}`, SUAP_APP_URL).href');
     expect(cpScript).toContain('getSuapContractSearchUrl');
     expect(cpScript).toContain('/admin/contratos/contrato/?');
     expect(cpScript).toContain("baseParams.set('campi', campi)");
@@ -121,6 +122,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('suporta pesquisa direta de processos eletrônicos no SUAP via parâmetro q no command-palette (Ctrl+K)', () => {
     const cpScript = fs.readFileSync(extensionFixturePath('command-palette.js'), 'utf8');
 
+    expect(cpScript).toContain('new URL(`/admin/processo_eletronico/processo/?${baseParams.toString()}`, SUAP_APP_URL).href');
     expect(cpScript).toContain('getSuapProcessSearchUrl');
     expect(cpScript).toContain('/admin/processo_eletronico/processo/?');
     expect(cpScript).toContain("baseParams.set('q', query.trim())");
@@ -150,6 +152,8 @@ describe('pacote da extensao Suape 1.9', () => {
     const processScript = fs.readFileSync(extensionFixturePath('process-document.js'), 'utf8');
     const planScript = fs.readFileSync(extensionFixturePath('plan-summary.js'), 'utf8');
     const backgroundScript = fs.readFileSync(extensionFixturePath('background.js'), 'utf8');
+    const scheduledSyncScript = fs.readFileSync(extensionFixturePath('scheduled-process-sync.js'), 'utf8');
+    const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
     expect(popup).toContain('id="extension-auth-email"');
     expect(popup).toContain('id="btn-extension-sign-in"');
@@ -185,6 +189,16 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(processScript).toContain("state.syncStatus.stage === 'error' && !state.hasFinanceSummary");
     expect(processScript).toContain('renderFinanceEmpty(state.syncStatus.message)');
     expect(backgroundScript).toContain('chrome.alarms.create');
+    expect(backgroundScript).toContain("message.type === 'sync-now'");
+    expect(backgroundScript).toContain("message.type === 'get-status'");
+    expect(backgroundScript).toContain("importScripts('scheduled-process-sync.js')");
+    expect(scheduledSyncScript).toContain('atribuido_para=304806');
+    expect(scheduledSyncScript).toContain('setor=857');
+    expect(scheduledSyncScript).toContain('getNextRunAt');
+    expect(processScript).toContain("type: 'process-status'");
+    expect(popup).toContain('id="process-box-sync-status"');
+    expect(popupScript).toContain("type: 'get-status'");
+    expect(manifest.background).toEqual({ service_worker: 'background.js' });
     expect(popup).toContain('id="siafi-list-select"');
     expect(popup).toContain('id="btn-siafi-fill"');
     expect(popupScript).toContain("siafi:fill-favorecidos");
@@ -197,6 +211,20 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(cpScript).toContain("const SIAGES_APP_URL = 'https://www.siages.com.br';");
     expect(cpScript).not.toContain("const SIAGES_APP_URL = 'http://localhost:5173';");
     expect(cpScript).toContain('if (IS_SUAP_PAGE)');
+    expect(cpScript).toContain("id: 'action-suap-sync-now'");
+    expect(cpScript).toContain("title: 'Sincronizar processos agora'");
+    expect(cpScript).toContain("type: 'sync-now'");
+    expect(cpScript).toContain('if (act.suapOnly && !IS_SUAP_PAGE) return false;');
+  });
+
+  it('injeta a paleta global no Comprasnet sem duplicar a paleta nativa do SIAGES', () => {
+    const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
+    const globalPalette = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('command-palette.js') && entry.matches.includes('<all_urls>'));
+
+    expect(globalPalette.exclude_matches).toContain('https://www.siages.com.br/*');
+    expect(globalPalette.exclude_matches).toContain('https://suap.ifrn.edu.br/*');
+    expect(globalPalette.exclude_matches).not.toContain('https://cnetmobile.estaleiro.serpro.gov.br/*');
+    expect(globalPalette.matches).toContain('<all_urls>');
   });
 
   it('inclui o modo global de atalhos mnemônicos sem permissões adicionais', () => {

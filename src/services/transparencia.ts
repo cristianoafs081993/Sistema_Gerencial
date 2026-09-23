@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { DocumentoDespesa, DocumentoDespesaAPI, OperacaoEmpenho, DocumentoItem, Retencao, CreditoDisponivel } from '@/types';
-import { parseCurrency } from '@/lib/utils';
+import { formatarDocumento, parseCurrency } from '@/lib/utils';
 import { addDays, format, isAfter, isBefore, parse } from 'date-fns';
 import { dominioService } from './dominio';
 import { creditosDisponiveisService } from './creditosDisponiveis';
@@ -498,6 +498,49 @@ export const transparenciaService = {
                 valor: Number(sit.valor || 0),
                 is_retencao: Boolean(sit.is_retencao)
             }))
+        }));
+
+        return { data: mappedData, total: count || 0 };
+    },
+
+    async getDocumentosPorFavorecido(
+        favorecidoDocumento: string,
+        options?: { page?: number; perPage?: number },
+    ): Promise<{ data: DocumentoDespesa[]; total: number }> {
+        const documentoNormalizado = favorecidoDocumento.replace(/\D/g, '');
+        if (!/^(?:\d{11}|\d{14})$/.test(documentoNormalizado)) {
+            return { data: [], total: 0 };
+        }
+
+        const page = Math.max(1, Math.floor(options?.page || 1));
+        const perPage = Math.max(1, Math.floor(options?.perPage || 20));
+        const from = (page - 1) * perPage;
+        const to = from + perPage - 1;
+        const documentoFormatado = formatarDocumento(documentoNormalizado);
+
+        const { data, error, count } = await supabase
+            .from('documentos_habeis')
+            .select(DOCUMENTOS_HABEIS_SELECT, { count: 'exact' })
+            .in('favorecido_documento', Array.from(new Set([documentoNormalizado, documentoFormatado])))
+            .or('id.ilike.%NP%,id.ilike.%RP%')
+            .order('data_emissao', { ascending: false })
+            .range(from, to);
+
+        if (error) throw error;
+
+        const mappedData: DocumentoDespesa[] = ((data || []) as Array<Record<string, unknown>>).map((doc) => ({
+            id: String(doc.id || ''),
+            valor_original: Number(doc.valor_original || 0),
+            valor_pago: Number(doc.valor_pago || 0),
+            estado: String(doc.estado || 'PENDENTE DE REALIZAÇÃO'),
+            processo: String(doc.processo || ''),
+            favorecido_nome: String(doc.favorecido_nome || ''),
+            favorecido_documento: String(doc.favorecido_documento || ''),
+            data_emissao: String(doc.data_emissao || ''),
+            fonte_sof: doc.fonte_sof ? String(doc.fonte_sof) : undefined,
+            empenho_numero: doc.empenho_numero ? String(doc.empenho_numero) : undefined,
+            itens: [],
+            situacoes: [],
         }));
 
         return { data: mappedData, total: count || 0 };
