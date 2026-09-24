@@ -19,6 +19,7 @@ interface JsonImportDialogProps {
   onImport: (data: Record<string, string>[]) => void | Promise<void>;
   title: string;
   expectedFields: string[];
+  recommendedFilename?: string;
   acceptCsv?: boolean;
   csvSeparator?: string;
 }
@@ -29,6 +30,7 @@ export function JsonImportDialog({
   onImport,
   title,
   expectedFields,
+  recommendedFilename,
   acceptCsv = false,
   csvSeparator = ';',
 }: JsonImportDialogProps) {
@@ -287,6 +289,11 @@ export function JsonImportDialog({
         <div className="p-6 space-y-6">
           {/* Expected fields info */}
           <div className="rounded-xl bg-muted/30 p-4 border border-border text-[11px]">
+            {recommendedFilename ? (
+              <p className="mb-3 text-xs text-foreground">
+                CSV recomendado: <code className="rounded bg-muted px-1.5 py-0.5 font-semibold">{recommendedFilename}</code>
+              </p>
+            ) : null}
             <p className="font-black uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-2">
               <Info className="w-3 h-3 text-primary" />
               Campos esperados no arquivo:

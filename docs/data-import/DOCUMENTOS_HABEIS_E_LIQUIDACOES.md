@@ -30,6 +30,8 @@ Campos esperados na UI:
 - `DH - Estado`
 - `DH - Credor`
 
+CSV recomendado no download SIAFI: `8 - Documentos Hábeis.csv` (tabulado). O importador reconhece os cabeçalhos oficiais `Documento Hábil`, `DH - Processo`, `DH - Estado` e `DH - Valor Doc.Origem`; valores da coluna sem título após `Métrica` são usados como valor da situação/item quando presentes.
+
 ### 2. Fonte SOF / Liquidacoes
 
 - entrada: JSON ou CSV tabulado
@@ -43,6 +45,8 @@ Campos esperados na UI:
 - `Documento Origem`
 - `Fonte SOF`
 - `Fonte`
+
+CSV recomendado: `9 - Liquidações.csv`. O cabeçalho oficial costuma começar na segunda linha e contém `Documento Origem`, `NE CCor` e `Fonte SOF`. O arquivo `1 - Documentos.csv` também contém campos semelhantes, mas não deve ser combinado sem comparar os vínculos: pode divergir do relatório de liquidações.
 
 ### 3. Ordens Bancarias / Pagos
 
@@ -59,6 +63,8 @@ Campos esperados na UI:
 - `DESPESAS PAGAS`
 - `RESTOS A PAGAR PAGOS`
 - `Dia Lancamento`
+
+CSV recomendado: `12 - Ordens Bancárias (5).csv`. O arquivo `20 - Ordens Bancárias (OP).csv` é de ordens de pagamento e não traz o documento de origem nem as colunas de valores pagos exigidas por este importador.
 
 Regras de data:
 
@@ -77,6 +83,8 @@ Campos esperados na UI:
 - `Documento Habil`
 - `DH - Situacao`
 - `DH - Valor Doc.Origem`
+
+CSV recomendado: `21 -Retenções por NP.csv`. O importador converte `Documento Hábil`, `DH - Situação` e `DH - Valor Doc.Origem` para os campos de situação persistidos no banco, em vez de enviar os cabeçalhos do relatório como nomes de coluna.
 
 ## Regras gerais do dialogo generico
 

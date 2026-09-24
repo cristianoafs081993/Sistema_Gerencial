@@ -665,7 +665,7 @@ export const transparenciaService = {
         return data ? new Date(`${data.data_emissao}T12:00:00`) : null;
     },
 
-    async importDocumentosHabeis(data: Record<string, string>[]): Promise<void> {
+    async importDocumentosHabeis(data: Record<string, string>[]): Promise<number> {
         const docsMap = new Map<string, DocumentoImportState>();
         
         for (const row of data) {
@@ -693,7 +693,7 @@ export const transparenciaService = {
                 docsMap.set(id, {
                     doc: {
                         id,
-                        valor_original: Number((row['dhvalordocorigem'] || row['valor'] || '0').replace(/[^\d.,]/g, '').replace(',', '.')),
+                        valor_original: parseCurrency(row['dhvalordocorigem'] || row['valor'] || '0'),
                         processo: row['dhprocesso'] || row['processo'] || '',
                         estado: row['dhestado'] || row['estado'] || 'PENDENTE',
                         favorecido_documento: row['dhcredor'] || row['credor'] || '',
@@ -710,7 +710,11 @@ export const transparenciaService = {
             if (!docData) continue;
 
             const situacaoCodigo = row['dhsituacao'] || '';
-            const valueSituacao = Number((row['metricavalor'] || row['dhvalordocorigem'] || row['valor'] || '0').replace(/[^\d.,]/g, '').replace(',', '.'));
+            const rowKeys = Object.keys(row);
+            const metricIndex = rowKeys.indexOf('metrica');
+            const unnamedMetricValueKey = metricIndex >= 0 ? rowKeys[metricIndex + 1] : undefined;
+            const metricValue = row['metricavalor'] || (unnamedMetricValueKey?.startsWith('empty_') ? row[unnamedMetricValueKey] : '');
+            const valueSituacao = parseCurrency(metricValue || row['dhvalordocorigem'] || row['valor'] || '0');
             
             if (situacaoCodigo && !['OB', 'NS', 'NC', 'DR', 'GR'].includes(situacaoCodigo)) {
                 const sitKey = `${situacaoCodigo}-${valueSituacao}`;
@@ -730,7 +734,7 @@ export const transparenciaService = {
             const itemId = normalizeDocId(itemIdRaw);
 
             if (['OB', 'NS', 'NC', 'DR', 'GR'].includes(itemTipo)) {
-                const itemValor = Number((row['dhvalordocorigem'] || row['valor'] || '0').replace(/[^\d.,]/g, '').replace(',', '.'));
+                const itemValor = parseCurrency(metricValue || row['dhvalordocorigem'] || row['valor'] || '0');
                 const finalItemId = itemId || `${id}-${itemTipo}-${itemValor}`;
                 
                 docData.itens.set(finalItemId, {
@@ -763,9 +767,10 @@ export const transparenciaService = {
             const { error: itemError } = await supabase.from('documentos_habeis_itens').insert(allItens);
             if (itemError) throw itemError;
         }
+        return allDocs.length;
     },
 
-    async importLiquidacoes(data: Record<string, string>[]): Promise<void> {
+    async importLiquidacoes(data: Record<string, string>[]): Promise<number> {
         const dhUpdates: Map<string, { empenho_numero?: string, fonte_sof?: string }> = new Map();
         const empenhoNumbers = new Set<string>();
 
@@ -807,12 +812,14 @@ export const transparenciaService = {
         for (const [id, update] of dhUpdates.entries()) {
             await supabase.from('documentos_habeis').update(update).eq('id', id);
         }
+        return dhUpdates.size;
     },
 
-    async importOrdensBancarias(data: Record<string, string>[]): Promise<void> {
+    async importOrdensBancarias(data: Record<string, string>[]): Promise<number> {
         const itemsMap: Map<string, { id: string; documento_habil_id: string; doc_tipo: string; valor: number; data_emissao: string; observacao: string }> = new Map();
         const parentUpdates: Map<string, { empenho_numero?: string, fonte_sof?: string }> = new Map();
         const empenhoNumbers = new Set<string>();
+        let importedItemsCount = 0;
 
         for (const row of data) {
             const rawId = row['documento'] || '';
@@ -867,6 +874,7 @@ export const transparenciaService = {
             const { data: validIds } = await supabase.from('documentos_habeis').select('id').in('id', uniqueDhIds);
             const existingIds = new Set(validIds?.map(v => v.id) || []);
             const filteredItems = items.filter(i => existingIds.has(i.documento_habil_id));
+            importedItemsCount = filteredItems.length;
 
             if (filteredItems.length > 0) {
                 const { error } = await supabase.from('documentos_habeis_itens').upsert(filteredItems, { onConflict: 'id' });
@@ -888,6 +896,7 @@ export const transparenciaService = {
                 }
             }
         }
+        return importedItemsCount;
     },
 
     async getCreditosDisponiveis(): Promise<CreditoDisponivel[]> {

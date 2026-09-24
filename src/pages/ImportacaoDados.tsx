@@ -981,7 +981,7 @@ export default function ImportacaoDados() {
     });
 
     try {
-      const count = await retencoesService.upsertSituacoesBatch(data as any);
+      const count = await retencoesService.importSituacoesDocumentosHabeis(data);
       await refreshData();
       await dataImportLogsService.recordImportRunSuccess(runId, {
         rowsDetected: data.length,
@@ -1752,7 +1752,8 @@ export default function ImportacaoDados() {
         onOpenChange={setIsDocHabeisOpen}
         onImport={handleDocHabeisImport}
         title="Importar Documentos Hábeis"
-        expectedFields={['documento', 'ug', 'emissao', 'valor']}
+        expectedFields={['documento_habil', 'dh_processo', 'dh_estado', 'dh_valor_doc_origem']}
+        recommendedFilename="8 - Documentos Hábeis.csv"
         acceptCsv={true}
       />
 
@@ -1761,7 +1762,8 @@ export default function ImportacaoDados() {
         onOpenChange={setIsLiquidacoesOpen}
         onImport={handleLiquidacoesImport}
         title="Importar Fonte SOF / Liquidações"
-        expectedFields={['documento', 'fonte', 'vinculacao']}
+        expectedFields={['documento_origem', 'ne_ccor', 'fonte_sof']}
+        recommendedFilename="9 - Liquidações.csv"
         acceptCsv={true}
       />
 
@@ -1770,7 +1772,8 @@ export default function ImportacaoDados() {
         onOpenChange={setIsOrdensBancariasOpen}
         onImport={handleOrdensBancariasImport}
         title="Importar Ordens Bancárias / Pagos"
-        expectedFields={['ob', 'documento', 'valor_pago']}
+        expectedFields={['documento', 'documento_origem', 'despesas_pagas', 'restos_a_pagar_pagos']}
+        recommendedFilename="12 - Ordens Bancárias (5).csv"
         acceptCsv={true}
       />
 
@@ -1779,7 +1782,8 @@ export default function ImportacaoDados() {
         onOpenChange={setIsSituacoesOpen}
         onImport={handleSituacoesImport}
         title="Importar Situações (Despesas/Retenções)"
-        expectedFields={['situacao', 'descricao', 'natureza']}
+        expectedFields={['documento_habil', 'dh_situacao', 'dh_valor_doc_origem']}
+        recommendedFilename="21 -Retenções por NP.csv"
         acceptCsv={true}
         csvSeparator="\t"
       />

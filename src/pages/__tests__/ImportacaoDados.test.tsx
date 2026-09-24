@@ -12,6 +12,7 @@ import { dataImportLogsService } from '@/services/dataImportLogsService';
 const testState = vi.hoisted(() => ({
   isSuperAdmin: true,
   importHandlers: new Map<string, (data: Record<string, string>[]) => void | Promise<void>>(),
+  importHints: new Map<string, { recommendedFilename?: string; expectedFields: string[] }>(),
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -127,11 +128,16 @@ vi.mock('@/components/JsonImportDialog', () => ({
   JsonImportDialog: ({
     title,
     onImport,
+    recommendedFilename,
+    expectedFields,
   }: {
     title: string;
     onImport: (data: Record<string, string>[]) => void | Promise<void>;
+    recommendedFilename?: string;
+    expectedFields: string[];
   }) => {
     testState.importHandlers.set(title, onImport);
+    testState.importHints.set(title, { recommendedFilename, expectedFields });
     return null;
   },
 }));
@@ -162,6 +168,7 @@ describe('ImportacaoDados', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     testState.importHandlers.clear();
+    testState.importHints.clear();
     mockedUseData.mockReturnValue({
       atividades: [],
       empenhos: [],
@@ -198,6 +205,21 @@ describe('ImportacaoDados', () => {
     expect(screen.getAllByText('Módulo Orçamentário').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Módulo Financeiro').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Contratos e Gestão Operacional').length).toBeGreaterThan(0);
+  });
+
+  it('indica os CSVs oficiais esperados nos importadores de Liquidações e Pagamentos', () => {
+    renderPage();
+
+    expect(testState.importHints.get('Importar Documentos Hábeis')?.recommendedFilename)
+      .toBe('8 - Documentos Hábeis.csv');
+    expect(testState.importHints.get('Importar Fonte SOF / Liquidações')?.recommendedFilename)
+      .toBe('9 - Liquidações.csv');
+    expect(testState.importHints.get('Importar Ordens Bancárias / Pagos')?.recommendedFilename)
+      .toBe('12 - Ordens Bancárias (5).csv');
+    expect(testState.importHints.get('Importar Situações (Despesas/Retenções)')?.recommendedFilename)
+      .toBe('21 -Retenções por NP.csv');
+    expect(testState.importHints.get('Importar Ordens Bancárias / Pagos')?.expectedFields)
+      .toContain('documento_origem');
   });
 
   it('renderiza a central de observabilidade com matriz de bases e tabela de logs', async () => {
