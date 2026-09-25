@@ -9,6 +9,7 @@ import SuapExtensionProcessInfo from '@/pages/SuapExtensionProcessInfo';
 import { suapProcessFinanceService } from '@/services/suapProcessFinance';
 import { suapProcessosService } from '@/services/suapProcessos';
 import { suapScraperService } from '@/services/suapScraperService';
+import { DEFAULT_BOLSA_PROCESS_MAPPING } from '@/data/defaultProcessMapping';
 
 const extensionMocks = vi.hoisted(() => ({ extensionClient: { from: vi.fn(), functions: { invoke: vi.fn() } } }));
 const extensionClient = extensionMocks.extensionClient;
@@ -38,9 +39,16 @@ vi.mock('@/services/suapScraperService', () => ({
 
 import { DEFAULT_PROCESS_MAPPINGS } from '@/data/defaultProcessMapping';
 
-vi.mock('@/services/processMappings', () => ({
-  processMappingsService: { listPublished: vi.fn().mockImplementation(() => Promise.resolve(DEFAULT_PROCESS_MAPPINGS)) },
-}));
+vi.mock('@/services/processMappings', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/processMappings')>();
+  return {
+    ...actual,
+    processMappingsService: {
+      ...actual.processMappingsService,
+      listPublished: vi.fn().mockImplementation(() => Promise.resolve(DEFAULT_PROCESS_MAPPINGS)),
+    },
+  };
+});
 
 const processContext = {
   source: 'siages-suap-extension',
@@ -293,6 +301,58 @@ describe('SuapExtensionProcessInfo', () => {
         }),
       }),
     }), SUAP_EXTENSION_ORIGIN));
+
+    postMessage.mockRestore();
+  });
+  it('aplica customMappings enviados no contexto e reflete a automacao customizada no resumo', async () => {
+    const postMessage = vi.spyOn(window.parent, 'postMessage');
+    const customMapping = {
+      ...DEFAULT_BOLSA_PROCESS_MAPPING,
+      title: 'Mapeamento Customizado de Bolsas',
+      updatedAt: '2026-09-25T16:00:00.000Z',
+      nodes: DEFAULT_BOLSA_PROCESS_MAPPING.nodes.map((n) =>
+        n.id === 'bolsa-step-1'
+          ? {
+              ...n,
+              title: 'Anexar documentacao personalizada',
+              automation: {
+                enabled: true,
+                title: 'Upload customizado no SUAP',
+                action: 'suap_upload_document',
+                tipoConferencia: 'Cópia Autenticada Administrativamente',
+                tipoDocumento: 'Nota Fiscal',
+                assunto: 'Nota Fiscal Customizada',
+              },
+            }
+          : n
+      ),
+    };
+
+    const contextWithCustom: SuapExtensionProcessContextMessage = {
+      ...processContext,
+      payload: {
+        ...processContext.payload,
+        route: {
+          events: [],
+          selectedMappingId: 'liquidacao-pagamento-bolsas',
+          manualCurrentStepNodeId: 'bolsa-step-1',
+          customMappings: [customMapping],
+        },
+      },
+    };
+
+    render(<SuapExtensionProcessInfo />);
+    await sendContext(contextWithCustom);
+
+    await waitFor(() => {
+      const flowCalls = postMessage.mock.calls.filter((call) => (call[0] as { type?: string })?.type === 'siages:suap-process-flow');
+      expect(flowCalls.length).toBeGreaterThan(0);
+      const payload = (flowCalls[0][0] as any).payload;
+      const step1 = payload.summary.steps.find((s: any) => s.nodeId === 'bolsa-step-1');
+      expect(step1?.title).toBe('Anexar documentacao personalizada');
+      expect(step1?.automation?.tipoConferencia).toBe('Cópia Autenticada Administrativamente');
+      expect(step1?.automation?.tipoDocumento).toBe('Nota Fiscal');
+    });
 
     postMessage.mockRestore();
   });

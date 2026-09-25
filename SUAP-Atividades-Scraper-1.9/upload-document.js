@@ -159,6 +159,15 @@
       });
     }
 
+    if (!match && selectEl.options) {
+      const opt = document.createElement('option');
+      opt.value = targetText;
+      opt.textContent = targetText;
+      opt.selected = true;
+      selectEl.appendChild(opt);
+      match = opt;
+    }
+
     if (!match) return null;
 
     selectEl.value = match.value;
@@ -167,7 +176,7 @@
     return match;
   }
 
-  function injectMainWorldSelect2Update(selectId, optionValue) {
+  function injectMainWorldSelect2Update(selectId, optionValue, optionText) {
     try {
       const script = document.createElement('script');
       script.setAttribute('data-siages-upload-injected', 'true');
@@ -176,6 +185,7 @@
           try {
             var elId = ${JSON.stringify(selectId)};
             var val = ${JSON.stringify(optionValue)};
+            var text = ${JSON.stringify(optionText)};
             var targetEl = document.getElementById(elId);
             if (targetEl) {
               targetEl.value = val;
@@ -186,7 +196,14 @@
               var $ = window.jQuery || window.$;
               var $el = $('#' + elId);
               if ($el.length) {
+                if (typeof $el.select2 === 'function') {
+                  try { $el.select2('val', val); } catch (_) {}
+                }
                 $el.val(val).trigger('change');
+              }
+              var $chosen = $('#s2id_' + elId + ' .select2-chosen, #select2-' + elId + '-container');
+              if ($chosen.length && text) {
+                $chosen.text(text);
               }
             }
           } catch (_) {}
@@ -201,23 +218,26 @@
     if (!selectEl || !option) return;
 
     const selectId = selectEl.id;
+    const optionText = option.textContent.trim();
     const containers = [
       document.querySelector(`#select2-${selectId}-container`),
+      document.querySelector(`#s2id_${selectId} .select2-chosen`),
       document.querySelector(`.select2-container--default [aria-labelledby*="${selectId}"]`),
-      selectEl.closest('.form-row, div')?.querySelector('.select2-selection__rendered'),
+      selectEl.closest('.form-row, div')?.querySelector('.select2-selection__rendered, .select2-chosen'),
       document.querySelector('.select2-selection__rendered'),
+      document.querySelector('.select2-chosen'),
     ];
 
     for (const c of containers) {
       if (c) {
-        c.textContent = option.textContent.trim();
-        c.setAttribute('title', option.textContent.trim());
+        c.textContent = optionText;
+        c.setAttribute('title', optionText);
         break;
       }
     }
 
     if (selectId) {
-      injectMainWorldSelect2Update(selectId, option.value);
+      injectMainWorldSelect2Update(selectId, option.value, optionText);
     }
   }
 
@@ -371,6 +391,26 @@
       stripUploadAutomationHash();
     } else {
       payload = loadPendingUploadAutomation();
+    }
+
+    if (!payload && globalThis.chrome?.storage?.local) {
+      try {
+        const stored = await new Promise((resolve) => {
+          globalThis.chrome.storage.local.get(STORAGE_KEY, (res) => resolve(res?.[STORAGE_KEY]));
+        });
+        if (stored?.action === 'suap_upload_document') {
+          payload = {
+            source: 'siages',
+            version: 1,
+            action: 'suap_upload_document',
+            suapId: String(stored.suapId || ''),
+            ...(stored.processNumber ? { processNumber: String(stored.processNumber) } : {}),
+            tipoConferencia: cleanText(stored.tipoConferencia || 'Cópia Simples'),
+            tipoDocumento: cleanText(stored.tipoDocumento || 'Liquidação'),
+            assunto: cleanText(stored.assunto || 'Liquidação'),
+          };
+        }
+      } catch (_) {}
     }
 
     if (!payload) return;

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Suape - Canivete Suico do IFRN",
-  "version": "1.9.50",
+  "version": "1.9.51",
   "description": "Paleta Ctrl+K, resumo de processos, caminho BPMN, dados financeiros, atalhos e documentos com IA no SIAGES, SUAP e Comprasnet.",
   "permissions": [
     "activeTab",
@@ -177,6 +177,15 @@
       ],
       "js": [
         "siages-plan-sync.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.siages.com.br/*"
+      ],
+      "js": [
+        "siages-portal-sync.js"
       ],
       "run_at": "document_idle"
     },

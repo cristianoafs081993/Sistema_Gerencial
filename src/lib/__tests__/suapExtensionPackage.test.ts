@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.50');
+    expect(manifest.version).toBe('1.9.51');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms', 'cookies']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
@@ -29,6 +29,12 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(uploadDoc).toMatchObject({
       matches: ['https://suap.ifrn.edu.br/processo_eletronico/documento_upload/*'],
       js: ['upload-document.js'],
+      run_at: 'document_idle',
+    });
+    const portalSync = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('siages-portal-sync.js'));
+    expect(portalSync).toMatchObject({
+      matches: ['https://www.siages.com.br/*'],
+      js: ['siages-portal-sync.js'],
       run_at: 'document_idle',
     });
     expect(expander).toMatchObject({ matches: ['<all_urls>'], all_frames: true });

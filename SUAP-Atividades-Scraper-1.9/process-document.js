@@ -26,7 +26,7 @@
   const state = {
     activeTab: 'summary', theme: 'dark', collapsed: false, maximized: false, snapshot: null,
     syncStatus: { stage: 'checking', message: 'Preparando a consulta do processo...' },
-    financeSummary: null, hasFinanceSummary: false, flow: null, selectedMappingId: '', manualStepNodeId: '', mappings: [], snippets: { ...DEFAULT_SNIPPETS }, editingKey: null,
+    financeSummary: null, hasFinanceSummary: false, flow: null, selectedMappingId: '', manualStepNodeId: '', mappings: [], customMappings: [], snippets: { ...DEFAULT_SNIPPETS }, editingKey: null,
     collapsedSections: new Set(),
   };
   let documentAnalysisObserver = null;
@@ -314,6 +314,10 @@
       window.__siagesLatestFinanceSummary = persisted.financeSummary;
     }
     if (persisted.flow) { state.flow = persisted.flow; state.mappings = persisted.flow.mappings || []; }
+    const storedCustom = await storageGet('local', 'siages_custom_process_mappings', null);
+    if (Array.isArray(storedCustom) && storedCustom.length > 0) {
+      state.customMappings = storedCustom;
+    }
     return Boolean(state.snapshot || state.hasFinanceSummary);
   }
   function storageGet(area, key, fallback) {
@@ -406,13 +410,48 @@
       toast.classList.remove('suape-toast-visible');
     }, 3500);
   }
+    function openTabSafe(rawUrl) {
+    let fullUrl = rawUrl;
+    try {
+      fullUrl = new URL(rawUrl, window.location.origin).href;
+    } catch (_) {}
+
+    if (globalThis.chrome?.runtime?.sendMessage) {
+      try {
+        chrome.runtime.sendMessage({
+          source: 'suape-process-document',
+          type: 'open-tab',
+          url: fullUrl,
+        }, (response) => {
+          if (chrome.runtime.lastError || !response?.ok) {
+            try {
+              window.open(fullUrl, '_blank', 'noopener,noreferrer');
+            } catch (_) {}
+          }
+        });
+        return;
+      } catch (_) {}
+    }
+
+    try {
+      window.open(fullUrl, '_blank', 'noopener,noreferrer');
+    } catch (_) {}
+  }
   async function triggerStepAutomation(step, summary, button) {
     if (button) {
       button.classList.add('suape-flow-step-check-active');
       setTimeout(() => button.classList.remove('suape-flow-step-check-active'), 800);
     }
 
-    const automation = step.automation;
+        let automation = step.automation;
+    if (!automation && Array.isArray(state.customMappings)) {
+      const activeMappingId = summary?.mappingId || state.selectedMappingId || 'liquidacao-pagamento-bolsas';
+      const foundMapping = state.customMappings.find((m) => m.id === activeMappingId || m.code === activeMappingId);
+      const foundNode = foundMapping?.nodes?.find((n) => n.id === step.nodeId || n.code === step.code);
+      if (foundNode?.automation) {
+        automation = foundNode.automation;
+      }
+    }
     const process = state.snapshot?.process;
     const fallback = state.snapshot?.fallback;
     const full = process?.dadosCompletos || {};
@@ -465,7 +504,7 @@
 
     if (!automation || !automation.enabled) {
       const advanced = advanceToNextStep();
-      showAutomationFeedback(advanced ? `Etapa "${step.title}" concluída. Avançado para a próxima etapa.` : `Etapa final "${step.title}" concluída!`);
+      showAutomationFeedback(advanced ? `Etapa "${step.title}" concluída (sem automação vinculada). Avançado para a próxima etapa.` : `Etapa final "${step.title}" concluída (sem automação vinculada)!`, false);
       return;
     }
 
@@ -482,7 +521,7 @@
     } else if (action === 'open_url') {
       const targetUrl = replacePlaceholders(automation.targetUrl);
       if (targetUrl) {
-        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+        openTabSafe(targetUrl);
       }
       if (automation.autoAdvanceStep !== false) {
         advanceToNextStep();
@@ -501,7 +540,7 @@
       const docType = cleanText(automation.documentType || 'despacho').toLowerCase();
       const subject = encodeURIComponent(replacePlaceholders(automation.title || `Documento - ${step.title}`));
       const createUrl = `/documento_eletronico/adicionar_documento/?tipo=${encodeURIComponent(docType)}&assunto=${subject}`;
-      window.open(createUrl, '_blank', 'noopener,noreferrer');
+      openTabSafe(createUrl);
       if (automation.autoAdvanceStep) {
         advanceToNextStep();
       }
@@ -535,11 +574,16 @@
         }
       } catch (_) {}
 
-      const uploadUrl = `/processo_eletronico/documento_upload/${encodeURIComponent(suapId)}/#siagesUpload=${hashPayload}`;
+      const relativeUploadUrl = `/processo_eletronico/documento_upload/${encodeURIComponent(suapId)}/#siagesUpload=${hashPayload}`;
+      let fullUploadUrl = relativeUploadUrl;
+      try {
+        fullUploadUrl = new URL(relativeUploadUrl, window.location.origin).href;
+      } catch (_) {}
+
       if (typeof window.__siagesSuapUploadTestNavigate === 'function') {
-        window.__siagesSuapUploadTestNavigate(uploadUrl, uploadPayload);
+        window.__siagesSuapUploadTestNavigate(fullUploadUrl, uploadPayload);
       } else {
-        window.open(uploadUrl, '_blank', 'noopener,noreferrer');
+        openTabSafe(fullUploadUrl);
       }
       if (automation.autoAdvanceStep !== false) {
         advanceToNextStep();
@@ -1349,7 +1393,13 @@
     frame.allow = 'clipboard-read; clipboard-write';
     Object.assign(frame.style, { width: '100%', height: '100%', border: '0' });
     let pdfInFlight = false;
-    const postContext = () => frame.contentWindow?.postMessage(context, SIAGES_ORIGIN);
+    const postContext = async () => {
+        if (!state.customMappings?.length) {
+          const custom = await storageGet('local', 'siages_custom_process_mappings', null);
+          if (Array.isArray(custom)) state.customMappings = custom;
+        }
+        frame.contentWindow?.postMessage(buildContext(session), SIAGES_ORIGIN);
+      };
     const cleanup = () => {
       window.removeEventListener('message', receive);
       frame.removeEventListener('load', postContext);

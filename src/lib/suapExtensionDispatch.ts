@@ -19,6 +19,7 @@ export type SuapExtensionProcessContext = {
     expiresAt?: number;
   };
   route?: SuapProcessRouteSnapshot;
+  customMappings?: ProcessMappingRecord[];
 };
 
 export type SuapExtensionProcessContextMessage = {

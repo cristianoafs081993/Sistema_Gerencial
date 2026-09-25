@@ -325,7 +325,10 @@ async function handleProcessRegistryMessage(message, sender) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.source === CLICK_HINTS_SOURCE && message.type === 'open-new-tab') {
+  if (
+    (message?.source === 'suape-process-document' || message?.source === CLICK_HINTS_SOURCE || message?.source === 'siages-upload') &&
+    (message.type === 'open-new-tab' || message.type === 'open-tab')
+  ) {
     let url;
     try {
       url = new URL(String(message.url || ''));
@@ -338,7 +341,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return undefined;
     }
     void chrome.tabs.create({ url: url.href, active: true })
-      .then(() => sendResponse({ ok: true }))
+      .then((tab) => sendResponse({ ok: true, tabId: tab?.id }))
       .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Não foi possível abrir a nova aba.' }));
     return true;
   }

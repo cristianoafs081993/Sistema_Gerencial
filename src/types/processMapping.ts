@@ -129,6 +129,7 @@ export interface SuapProcessRouteSnapshot {
   selectedMappingId?: string;
   assunto?: string;
   manualCurrentStepNodeId?: string;
+  customMappings?: ProcessMappingRecord[];
 }
 
 export type SuapProcessFlowStepStatus = 'completed' | 'current' | 'next' | 'pending' | 'not_confirmed';

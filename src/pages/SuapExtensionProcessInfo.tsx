@@ -18,7 +18,7 @@ import {
 import { suapProcessFinanceService, type SuapProcessFinanceSummary } from '@/services/suapProcessFinance';
 import { suapProcessosService } from '@/services/suapProcessos';
 import { suapScraperService } from '@/services/suapScraperService';
-import { processMappingsService } from '@/services/processMappings';
+import { mergePublishedMappings, processMappingsService } from '@/services/processMappings';
 import { buildSuapProcessFlowSummary, selectSuapProcessMapping } from '@/lib/suapProcessFlow';
 import { authenticateExtensionAccessToken } from '@/lib/extensionSupabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -89,7 +89,13 @@ async function postProcessFlow(context: SuapExtensionProcessContext, process: Su
       // Ignora falha de autenticação e usa fallback local
     }
   }
-  const mappings = await processMappingsService.listPublished(activeClient);
+  const publishedMappings = await processMappingsService.listPublished(activeClient);
+  const customMappings = (Array.isArray(context.route?.customMappings)
+    ? context.route.customMappings
+    : (Array.isArray(context.customMappings) ? context.customMappings : [])) as any[];
+  const mappings = customMappings.length > 0
+    ? mergePublishedMappings(publishedMappings, customMappings)
+    : publishedMappings;
   const resolvedAssunto = process?.assunto?.trim() || context.route?.assunto?.trim() || context.assunto?.trim();
   const mapping = selectSuapProcessMapping(mappings, {
     selectedMappingId: context.route?.selectedMappingId,

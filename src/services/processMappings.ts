@@ -48,6 +48,7 @@ export function saveLocalStoredMappings(processes: ProcessMappingRecord[]): void
   if (typeof window === 'undefined' || !window.localStorage) return;
   try {
     window.localStorage.setItem(PROCESS_MAPPINGS_STORAGE_KEY, JSON.stringify(processes));
+    window.dispatchEvent(new CustomEvent('siages:process-mappings-updated', { detail: processes }));
   } catch {
     // ignore
   }
@@ -231,6 +232,9 @@ export const processMappingsService = {
           updated_at: record.updatedAt || now,
           published_at: record.publishedAt || (record.publicationStatus === 'published' ? now : null),
         };
+        if (record.orgId) {
+          payload.org_id = record.orgId;
+        }
         if (idIsUuid) {
           payload.id = record.id;
         }
