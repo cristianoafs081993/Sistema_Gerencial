@@ -485,21 +485,29 @@ export function CommandPalette({
   }, [currentScope, effectiveQuery, explicitSuapScope]);
 
   const isCondhScope = currentScope === 'documentos-habeis';
-  const condhDocumentNumber = isCondhScope ? effectiveQuery.replace(/\D/g, '') : '';
-  const isValidCondhDocument = /^\d{11}$|^\d{14}$/.test(condhDocumentNumber);
+  const condhQuery = isCondhScope ? effectiveQuery.trim() : '';
+  const condhDocumentNumber = condhQuery.replace(/\D/g, '');
+  const normalizedCondhNumber = condhQuery.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const isValidCondhDocument = /^[\d.\-/\s]+$/.test(condhQuery) && /^(?:\d{11}|\d{14})$/.test(condhDocumentNumber);
+  const isValidCondhDocumentNumber = /^\d{4,}(?:NP|RP)\d+$/.test(normalizedCondhNumber);
+  const isValidCondhPartialNumber = /^\d+$/.test(condhQuery) && !isValidCondhDocument;
+  const isValidCondhSearch = isValidCondhDocument || isValidCondhDocumentNumber || isValidCondhPartialNumber;
+  const condhSearchLabel = isValidCondhDocument
+    ? formatarDocumento(condhDocumentNumber)
+    : isValidCondhPartialNumber ? `final ${condhQuery}` : normalizedCondhNumber;
   const canSearchCondh = canAccessScreen('liquidacoes-pagamentos');
 
   useEffect(() => {
     setDocumentosPage(1);
-  }, [condhDocumentNumber]);
+  }, [condhQuery]);
 
   const condhDocumentsQuery = useQuery({
-    queryKey: ['command-palette-condh', condhDocumentNumber, documentosPage],
-    queryFn: () => transparenciaService.getDocumentosPorFavorecido(condhDocumentNumber, {
+    queryKey: ['command-palette-condh', normalizedCondhNumber, documentosPage],
+    queryFn: () => transparenciaService.getDocumentosPorFavorecido(condhQuery, {
       page: documentosPage,
       perPage: CONDH_PAGE_SIZE,
     }),
-    enabled: open && isCondhScope && isValidCondhDocument && canSearchCondh,
+    enabled: open && isCondhScope && isValidCondhSearch && canSearchCondh,
   });
 
   const matchingDocumentos = canSearchCondh ? condhDocumentsQuery.data?.data || [] : [];
@@ -1039,7 +1047,7 @@ export function CommandPalette({
                         <Banknote className="h-3.5 w-3.5" />
                         Documentos RP/NP
                       </span>
-                      {isValidCondhDocument && !condhDocumentsQuery.isError ? (
+                      {isValidCondhSearch && !condhDocumentsQuery.isError ? (
                         <span className="text-[11px] font-medium text-muted-foreground">
                           {totalDocumentos} resultado(s)
                         </span>
@@ -1049,11 +1057,11 @@ export function CommandPalette({
                 >
                   {!effectiveQuery ? (
                     <div className="px-3 py-4 text-sm text-muted-foreground">
-                      Digite `condh` seguido de um CPF ou CNPJ.
+                      Digite `condh` seguido de um CPF/CNPJ ou número de RP/NP.
                     </div>
-                  ) : !isValidCondhDocument ? (
+                  ) : !isValidCondhSearch ? (
                     <div className="px-3 py-4 text-sm text-muted-foreground">
-                      Informe um CPF com 11 dígitos ou um CNPJ com 14 dígitos.
+                      Informe um CPF/CNPJ com 11 ou 14 dígitos, o número de uma RP/NP (ex.: 2026NP000085) ou apenas seu sufixo numérico (ex.: 82).
                     </div>
                   ) : condhDocumentsQuery.isLoading ? (
                     <div role="status" className="px-3 py-4 text-sm text-muted-foreground">
@@ -1065,7 +1073,7 @@ export function CommandPalette({
                     </div>
                   ) : matchingDocumentos.length === 0 ? (
                     <div className="px-3 py-4 text-sm text-muted-foreground">
-                      Nenhum documento RP ou NP encontrado para {formatarDocumento(condhDocumentNumber)}.
+                      Nenhum documento RP ou NP encontrado para {condhSearchLabel}.
                     </div>
                   ) : (
                     <>
@@ -1076,7 +1084,7 @@ export function CommandPalette({
                         return (
                           <CommandItem
                             key={documento.id}
-                            value={`condh ${condhDocumentNumber} ${displayId} ${documento.favorecido_nome}`}
+                            value={`condh ${condhQuery} ${displayId} ${documento.favorecido_nome}`}
                             onSelect={() => handleSelectDocumento(documento)}
                             className="group flex items-center justify-between gap-3.5 py-3 px-3.5 mb-1.5 rounded-xl border border-transparent transition-all cursor-pointer data-[selected=true]:bg-primary/8 data-[selected=true]:border-primary/25 hover:bg-muted/50"
                           >

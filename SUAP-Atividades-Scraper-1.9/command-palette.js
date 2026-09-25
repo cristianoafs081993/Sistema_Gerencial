@@ -14,6 +14,10 @@
   let activeScope = 'all'; // 'all' | 'empenhos' | 'contratos' | 'screens' | 'actions'
   let currentResults = [];
   let selectedIndex = 0;
+  let condhSearchState = { key: '', status: 'idle', data: [], total: 0, page: 1, error: '' };
+  let condhRequestSequence = 0;
+  let condhPermissionToken = '';
+  let condhPermissionPromise = null;
 
   // DOM Elements
   let overlayEl = null;
@@ -493,6 +497,225 @@
     return response.json();
   }
 
+  function encodeRestQuery(values) {
+    const params = new URLSearchParams();
+    Object.entries(values).forEach(([key, value]) => params.set(key, String(value)));
+    return params.toString();
+  }
+
+  async function fetchAuthenticatedFromSupabase(table, queryParams, accessToken, extraHeaders = {}) {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${queryParams}`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        ...extraHeaders,
+      },
+    });
+
+    if (!response.ok) throw new Error(`Não foi possível consultar os dados financeiros (${response.status}).`);
+    return response;
+  }
+
+  function decodeAccessToken(accessToken) {
+    try {
+      const payload = accessToken.split('.')[1];
+      if (!payload) return null;
+      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+      const bytes = Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
+      return JSON.parse(new TextDecoder().decode(bytes));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function fetchAuthenticatedRows(table, query, accessToken) {
+    const response = await fetchAuthenticatedFromSupabase(table, encodeRestQuery(query), accessToken);
+    return response.json();
+  }
+
+  function normalizeTerceirizadoMatricula(value) {
+    return String(value || '').trim().replace(/[^0-9A-Za-z]/g, '').toLowerCase();
+  }
+
+  async function isAuthenticatedUserTerceirizado(user, accessToken, groups) {
+    if (groups.some((group) => group.slug === 'terceirizado')) return true;
+
+    const linkedRows = await fetchAuthenticatedRows('terceirizados', {
+      select: 'tipo', user_id: `eq.${user.sub}`, limit: 1,
+    }, accessToken);
+    if (linkedRows.length > 0) return true;
+
+    const metadata = user.user_metadata || user.raw_user_meta_data || {};
+    const matricula = normalizeTerceirizadoMatricula(metadata.matricula || metadata.username || metadata.identificacao);
+    if (matricula) {
+      const exactRows = await fetchAuthenticatedRows('terceirizados', {
+        select: 'tipo', matricula: `eq.${matricula}`, limit: 1,
+      }, accessToken);
+      if (exactRows.length > 0) return true;
+
+      const candidates = await fetchAuthenticatedRows('terceirizados', {
+        select: 'tipo,matricula', limit: 100,
+      }, accessToken);
+      if (candidates.some((candidate) => normalizeTerceirizadoMatricula(candidate.matricula) === matricula)) return true;
+    }
+
+    if (user.email) {
+      const emailRows = await fetchAuthenticatedRows('terceirizados', {
+        select: 'tipo', email: `eq.${user.email}`, limit: 1,
+      }, accessToken);
+      if (emailRows.length > 0) return true;
+    }
+    return false;
+  }
+
+  async function checkCondhScreenPermission(accessToken) {
+    const user = decodeAccessToken(accessToken);
+    if (!user?.sub) throw new Error('Não foi possível identificar a sessão da extensão. Entre novamente no SIAGES.');
+
+    const isSuperAdmin = String(user.email || '').trim().toLowerCase() === 'cristiano.cnrn@gmail.com' ||
+      user.app_metadata?.role === 'superadmin' || user.app_metadata?.is_superadmin === true;
+    if (isSuperAdmin) return true;
+
+    const memberships = await fetchAuthenticatedRows('user_group_memberships', {
+      select: 'group_id,user_groups(slug)', user_id: `eq.${user.sub}`,
+    }, accessToken);
+    const groupIds = memberships.map((membership) => membership.group_id).filter(Boolean);
+    const groups = memberships.flatMap((membership) => {
+      const relation = membership.user_groups;
+      return (Array.isArray(relation) ? relation : relation ? [relation] : []).filter(Boolean);
+    });
+
+    if (await isAuthenticatedUserTerceirizado(user, accessToken, groups)) return false;
+    if (groupIds.length === 0) return false;
+
+    const groupPermissions = await fetchAuthenticatedRows('user_group_screen_permissions', {
+      select: 'screen_id', group_id: `in.(${groupIds.join(',')})`,
+      screen_id: 'eq.liquidacoes-pagamentos', can_access: 'eq.true', limit: 1,
+    }, accessToken);
+    if (groupPermissions.length === 0) return false;
+
+    const orgUsers = await fetchAuthenticatedRows('org_users', {
+      select: 'org_id', user_id: `eq.${user.sub}`, limit: 1,
+    }, accessToken);
+    const orgId = orgUsers[0]?.org_id;
+    if (!orgId) return true;
+
+    const orgPermissions = await fetchAuthenticatedRows('org_module_permissions', {
+      select: 'screen_id', org_id: `eq.${orgId}`,
+      screen_id: 'eq.liquidacoes-pagamentos', can_access: 'eq.true', limit: 1,
+    }, accessToken);
+    return orgPermissions.length > 0;
+  }
+
+  async function getCondhAuthorizedSession() {
+    if (!globalThis.SiagesExtensionAuth?.getSession) {
+      throw new Error('Autentique-se na extensão Suape para consultar RP/NP.');
+    }
+    const session = await globalThis.SiagesExtensionAuth.getSession();
+    const accessToken = session?.accessToken;
+    if (!accessToken) throw new Error('Autentique-se na extensão Suape para consultar RP/NP.');
+
+    if (condhPermissionToken !== accessToken) {
+      condhPermissionToken = accessToken;
+      condhPermissionPromise = checkCondhScreenPermission(accessToken);
+    }
+    if (!condhPermissionPromise) condhPermissionPromise = checkCondhScreenPermission(accessToken);
+    let hasPermission;
+    try {
+      hasPermission = await condhPermissionPromise;
+    } catch (error) {
+      condhPermissionToken = '';
+      condhPermissionPromise = null;
+      throw error;
+    }
+    if (!hasPermission) throw new Error('Sua conta não tem acesso à tela Liquidações e Pagamentos.');
+    return accessToken;
+  }
+
+  function formatCondhDocument(digits) {
+    if (digits.length === 11) return digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+    if (digits.length === 14) return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+    return digits;
+  }
+
+  function parseCondhQuery(query) {
+    const raw = String(query || '').trim();
+    const digits = raw.replace(/\D/g, '');
+    if (/^[\d.\-/\s]+$/.test(raw) && /^(?:\d{11}|\d{14})$/.test(digits)) {
+      return { kind: 'favorecido', value: digits, label: formatCondhDocument(digits) };
+    }
+
+    const number = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (/^\d{4,}(?:NP|RP)\d+$/.test(number)) {
+      return { kind: 'numero', value: number, label: getCondhDisplayNumber(number) };
+    }
+    if (/^\d+$/.test(raw)) {
+      return { kind: 'numero-parcial', value: raw, label: `número final ${raw}` };
+    }
+    return null;
+  }
+
+  function getCondhDisplayNumber(id) {
+    const match = String(id || '').match(/20\d{2}(?:NP|RP)\d+/i);
+    return match ? match[0].toUpperCase() : String(id || '').toUpperCase();
+  }
+
+  function resetCondhSearch() {
+    condhRequestSequence += 1;
+    condhSearchState = { key: '', status: 'idle', data: [], total: 0, page: 1, error: '' };
+  }
+
+  async function loadCondhPage(query, page) {
+    const requestId = ++condhRequestSequence;
+    const key = `${query.kind}:${query.value}`;
+    condhSearchState = { ...condhSearchState, key, status: 'loading', data: [], page, error: '' };
+    renderResults();
+
+    try {
+      const accessToken = await getCondhAuthorizedSession();
+      const filters = {
+        select: 'id,valor_original,valor_pago,estado,processo,favorecido_nome,favorecido_documento,data_emissao,fonte_sof,empenho_numero',
+        order: 'data_emissao.desc.nullslast,id.desc',
+      };
+      if (query.kind === 'favorecido') {
+        const formatted = formatCondhDocument(query.value);
+        filters.favorecido_documento = `in.(${query.value},${formatted})`;
+        filters.or = '(id.ilike.*NP*,id.ilike.*RP*)';
+      } else {
+        filters.id = `ilike.*${query.value}`;
+        filters.or = '(id.ilike.*NP*,id.ilike.*RP*)';
+      }
+      const start = (page - 1) * 20;
+      const response = await fetchAuthenticatedFromSupabase(
+        'documentos_habeis', encodeRestQuery(filters), accessToken,
+        { Prefer: 'count=exact', 'Range-Unit': 'items', Range: `${start}-${start + 19}` },
+      );
+      const data = (await response.json()).filter((documento) => /20\d{2}(?:NP|RP)\d+$/i.test(String(documento.id || '')));
+      const contentRange = response.headers?.get('content-range') || '';
+      const totalMatch = contentRange.match(/\/(\d+)$/);
+      const total = totalMatch ? Number(totalMatch[1]) : (data.length === 20 ? start + 20 : start + data.length);
+
+      if (requestId !== condhRequestSequence) return;
+      condhSearchState = { key, status: 'success', data, total, page, error: '' };
+    } catch (error) {
+      if (requestId !== condhRequestSequence) return;
+      if (error?.message?.includes('Não foi possível consultar os dados financeiros')) {
+        condhPermissionToken = '';
+        condhPermissionPromise = null;
+      }
+      condhSearchState = { key, status: 'error', data: [], total: 0, page, error: error?.message || 'Não foi possível consultar RP/NP.' };
+    }
+    renderResults();
+  }
+
+  function ensureCondhSearch(query) {
+    const key = `${query.kind}:${query.value}`;
+    if (condhSearchState.key === key && ['loading', 'success', 'error'].includes(condhSearchState.status)) return;
+    void loadCondhPage(query, 1);
+  }
+
   // Load Data
   async function loadData(force = false) {
     if (isFetching) return;
@@ -855,10 +1078,6 @@
     return new URL(`/admin/documento_eletronico/documentotexto/?${baseParams.toString()}`, SUAP_APP_URL).href;
   }
 
-  function getSiagesCondhSearchUrl(documento) {
-    return new URL(`/liquidacoes-pagamentos#condh=${documento}`, SIAGES_APP_URL).href;
-  }
-
   // Search filter matching SIAGES logic
   function getFilteredResults() {
     const rawVal = (inputEl?.value || '').trim();
@@ -931,18 +1150,6 @@
     } else if (!isExplicitCondhSearch && (/^20\d{10,14}$/.test(query) || /^\d{13,15}$/.test(query))) {
       isExplicitStudentSearch = true;
     }
-
-    const normalizedCondhDocument = query.replace(/\D/g, '');
-    const isValidCondhDocument = isExplicitCondhSearch && /^[\d.\-/\s]+$/.test(query) && /^(?:\d{11}|\d{14})$/.test(normalizedCondhDocument);
-    const siagesCondhSearchAction = isValidCondhDocument ? {
-      id: 'siages-search-condh',
-      title: `Buscar RP/NP para ${query}`,
-      subtitle: 'Abrir a consulta de Liquidações e Pagamentos no SIAGES',
-      url: getSiagesCondhSearchUrl(normalizedCondhDocument),
-      icon: 'search',
-      color: '#0d9488',
-      badge: 'SIAGES',
-    } : null;
 
     let matchingProcessActions = [];
     if (currentProcId && (scope === 'all' || scope === 'processo' || scope === 'actions')) {
@@ -1079,7 +1286,6 @@
       isExplicitStudentSearch,
       suapDocumentSearchAction,
       isExplicitDocumentSearch,
-      siagesCondhSearchAction,
       isExplicitCondhSearch,
       matchingEmpenhos,
       matchingContratos,
@@ -1092,21 +1298,125 @@
     };
   }
 
+  function renderCondhMessage(title, description, showSpinner = false) {
+    currentResults = [];
+    listEl.innerHTML = `
+      <div class="suape-cp-empty">
+        ${showSpinner ? '<div class="suape-cp-spinner"></div>' : `<div class="suape-cp-empty-icon">${ICONS.search}</div>`}
+        <p class="suape-cp-empty-title">${escapeHtml(title)}</p>
+        <p class="suape-cp-empty-desc">${escapeHtml(description)}</p>
+      </div>
+    `;
+  }
+
+  function renderCondhResults(queryText) {
+    const query = parseCondhQuery(queryText);
+    if (!query) {
+      renderCondhMessage(
+        'Buscar RP/NP',
+        'Digite um CPF/CNPJ (11 ou 14 dígitos) ou o número de uma RP/NP, como 2026NP000085.',
+      );
+      return;
+    }
+
+    ensureCondhSearch(query);
+    const state = condhSearchState;
+    const allCount = overlayEl?.querySelector('#suape-cp-count-all');
+    const empenhosCount = overlayEl?.querySelector('#suape-cp-count-empenhos');
+    const contratosCount = overlayEl?.querySelector('#suape-cp-count-contratos');
+    const processosCount = overlayEl?.querySelector('#suape-cp-count-processo');
+    if (allCount) {
+      allCount.textContent = state.status === 'success' ? String(state.total) : '0';
+      allCount.style.display = state.status === 'success' && state.total > 0 ? 'inline-flex' : 'none';
+    }
+    [empenhosCount, contratosCount, processosCount].forEach((count) => {
+      if (count) {
+        count.textContent = '0';
+        count.style.display = 'none';
+      }
+    });
+    if (state.status === 'loading') {
+      renderCondhMessage('Consultando documentos hábeis...', `Busca por ${query.label}.`, true);
+      return;
+    }
+    if (state.status === 'error') {
+      renderCondhMessage('Não foi possível fazer a consulta', state.error || 'Verifique sua sessão e tente novamente.');
+      return;
+    }
+    if (state.status !== 'success' || state.data.length === 0) {
+      renderCondhMessage('Nenhuma RP ou NP encontrada', `Não há documentos correspondentes a ${query.label}.`);
+      return;
+    }
+
+    currentResults = state.data.map((documento) => ({ type: 'condh_document', data: documento }));
+    const totalPages = Math.max(1, Math.ceil(state.total / 20));
+    let html = `
+      <div class="suape-cp-group-header">
+        <span class="suape-cp-group-title" style="color: #0d9488;">RP/NP • ${escapeHtml(query.label)}</span>
+        <span class="suape-cp-group-count">${state.total} documento(s)</span>
+      </div>
+    `;
+
+    state.data.forEach((documento, index) => {
+      const id = getCondhDisplayNumber(documento.id);
+      const tipo = id.match(/(NP|RP)/i)?.[1]?.toUpperCase() || 'RP/NP';
+      const status = documento.estado || 'Situação não informada';
+      const isSelected = index === selectedIndex;
+      const amount = documento.valor_original ?? documento.valor_pago ?? 0;
+      html += `
+        <div class="suape-cp-item ${isSelected ? 'suape-cp-item-selected' : ''}" data-index="${index}">
+          <div class="suape-cp-item-icon" style="color: #0d9488; background: #0d948815;">${ICONS.fileText}</div>
+          <div class="suape-cp-item-body">
+            <div class="suape-cp-item-title-row">
+              <span class="suape-cp-item-title-text">${escapeHtml(id)}</span>
+              <span class="suape-cp-badge badge-pago">${tipo}</span>
+              <span class="suape-cp-badge">${escapeHtml(status)}</span>
+            </div>
+            <p class="suape-cp-item-subtitle">
+              <span class="suape-cp-subtitle-main">${escapeHtml(documento.favorecido_nome || 'Favorecido não informado')}</span>
+              <span class="suape-cp-subtitle-extra">• Emissão: ${formatDate(documento.data_emissao)}</span>
+              ${documento.empenho_numero ? `<span class="suape-cp-subtitle-extra">• NE: <span class="suape-cp-code">${escapeHtml(documento.empenho_numero)}</span></span>` : ''}
+            </p>
+          </div>
+          <div class="suape-cp-item-meta">
+            <span class="suape-cp-item-meta-label">Valor</span>
+            <span class="suape-cp-item-meta-value value-dark">${formatCurrency(amount)}</span>
+          </div>
+          <span class="suape-cp-item-action-hint">Detalhes ↵</span>
+        </div>
+      `;
+    });
+
+    html += `
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;padding:12px 8px 4px;color:var(--suape-cp-text-muted,#64748b);font-size:12px;">
+        <button type="button" class="suape-cp-condh-page-btn" data-page="${state.page - 1}" ${state.page <= 1 ? 'disabled' : ''}>Anterior</button>
+        <span>Página ${state.page} de ${totalPages}</span>
+        <button type="button" class="suape-cp-condh-page-btn" data-page="${state.page + 1}" ${state.page >= totalPages ? 'disabled' : ''}>Próxima</button>
+      </div>
+    `;
+    listEl.innerHTML = html;
+
+    listEl.querySelectorAll('.suape-cp-item').forEach((item) => {
+      item.addEventListener('click', () => {
+        const result = currentResults[Number(item.dataset.index)];
+        if (result) openResultDetail(result);
+      });
+      item.addEventListener('mouseenter', () => {
+        selectedIndex = Number(item.dataset.index);
+        updateSelectedVisual();
+      });
+    });
+    listEl.querySelectorAll('.suape-cp-condh-page-btn:not(:disabled)').forEach((button) => {
+      button.addEventListener('click', () => {
+        selectedIndex = 0;
+        void loadCondhPage(query, Number(button.dataset.page));
+      });
+    });
+  }
+
   // Render Results (Exact visual mirror of SIAGES)
   function renderResults() {
     if (!listEl) return;
-
-    if (isFetching && !empenhosCache && !contratosCache) {
-      listEl.innerHTML = `
-        <div class="suape-cp-empty">
-          <div class="suape-cp-spinner"></div>
-          <p class="suape-cp-empty-title">Carregando dados...</p>
-          <p class="suape-cp-empty-desc">Sincronizando dados com o SIAGES.</p>
-        </div>
-      `;
-      currentResults = [];
-      return;
-    }
 
     const {
       matchingProcessActions,
@@ -1116,7 +1426,6 @@
       isExplicitStudentSearch,
       suapDocumentSearchAction,
       isExplicitDocumentSearch,
-      siagesCondhSearchAction,
       isExplicitCondhSearch,
       matchingEmpenhos,
       matchingContratos,
@@ -1133,10 +1442,24 @@
       return p.shortcuts.some((s) => s.toLowerCase() === q || s.toLowerCase().startsWith(q)) || p.title.toLowerCase().startsWith(q);
     });
 
-    currentResults = [];
-    if (isExplicitCondhSearch && siagesCondhSearchAction) {
-      currentResults.push({ type: 'siages_condh_search', data: siagesCondhSearchAction });
+    if (isExplicitCondhSearch) {
+      renderCondhResults(query);
+      return;
     }
+
+    if (isFetching && !empenhosCache && !contratosCache) {
+      listEl.innerHTML = `
+        <div class="suape-cp-empty">
+          <div class="suape-cp-spinner"></div>
+          <p class="suape-cp-empty-title">Carregando dados...</p>
+          <p class="suape-cp-empty-desc">Sincronizando dados com o SIAGES.</p>
+        </div>
+      `;
+      currentResults = [];
+      return;
+    }
+
+    currentResults = [];
     if (isExplicitStudentSearch && suapStudentAction) {
       currentResults.push({ type: 'suap_student_search', data: suapStudentAction });
     }
@@ -1212,7 +1535,7 @@
             ${ICONS.search}
           </div>
           <p class="suape-cp-empty-title">Nenhum resultado encontrado</p>
-          <p class="suape-cp-empty-desc">${isExplicitCondhSearch ? 'Digite condh seguido de um CPF (11 dígitos) ou CNPJ (14 dígitos).' : `Não encontramos correspondências para "<strong>${escapeHtml(query)}</strong>". Tente matrícula do aluno (ex: "alu 2009..."), documento (ex: "doc texto"), processo ou contrato.`}</p>
+          <p class="suape-cp-empty-desc">Não encontramos correspondências para "<strong>${escapeHtml(query)}</strong>". Tente matrícula do aluno (ex: "alu 2009..."), documento (ex: "doc texto"), processo ou contrato.</p>
         </div>
       `;
       return;
@@ -1287,30 +1610,6 @@
             </p>
           </div>
           <span class="suape-cp-item-action-hint">Pesquisar ↵</span>
-        </div>
-      `;
-      globalIndex++;
-      return block;
-    }
-
-    function renderCondhBlock() {
-      if (!siagesCondhSearchAction) return '';
-      if (html.length > 0) html += `<div class="suape-cp-divider"></div>`;
-      const isSel = globalIndex === selectedIndex;
-      const block = `
-        <div class="suape-cp-group-header">
-          <span class="suape-cp-group-title" style="color: #0d9488;">Consulta financeira</span>
-        </div>
-        <div class="suape-cp-item ${isSel ? 'suape-cp-item-selected' : ''}" data-index="${globalIndex}">
-          <div class="suape-cp-item-icon" style="color: #0d9488; background: #0d948815;">${ICONS.search}</div>
-          <div class="suape-cp-item-body">
-            <div class="suape-cp-item-title-row">
-              <span class="suape-cp-item-title-text">${escapeHtml(siagesCondhSearchAction.title)}</span>
-              <span class="suape-cp-badge badge-pago">SIAGES</span>
-            </div>
-            <p class="suape-cp-item-subtitle"><span class="suape-cp-subtitle-main">${escapeHtml(siagesCondhSearchAction.subtitle)}</span></p>
-          </div>
-          <span class="suape-cp-item-action-hint">Abrir ↵</span>
         </div>
       `;
       globalIndex++;
@@ -1420,8 +1719,6 @@
     if (isExplicitDocumentSearch) {
       html += renderDocumentBlock();
     }
-
-    html += renderCondhBlock();
 
     // Se houver atalho digitado de alta prioridade ou busca explícita de processo, exibe primeiro
     if (isExplicitProcessSearch || hasHighPriorityShortcut) {
@@ -1697,8 +1994,7 @@
       result.type === 'suap_contract_search' ||
       result.type === 'suap_process_search' ||
       result.type === 'suap_student_search' ||
-      result.type === 'suap_document_search' ||
-      result.type === 'siages_condh_search'
+      result.type === 'suap_document_search'
     ) {
       const url = result.data.url;
       closePalette();
@@ -1711,6 +2007,8 @@
     }
     if (result.type === 'empenho') {
       openEmpenhoDetail(result.data);
+    } else if (result.type === 'condh_document') {
+      void openCondhDocumentDetail(result.data);
     } else if (result.type === 'contrato') {
       openContratoDetail(result.data);
     } else if (result.type === 'screen' || result.type === 'action') {
@@ -1793,6 +2091,96 @@
     `;
 
     detailOverlayEl.classList.add('suape-cp-visible');
+  }
+
+  async function openCondhDocumentDetail(documento) {
+    const body = detailDialogEl.querySelector('.suape-cp-detail-body');
+    const displayId = getCondhDisplayNumber(documento.id);
+    detailDialogEl.querySelector('.suape-cp-detail-title').textContent = `Documento hábil: ${displayId}`;
+    body.innerHTML = `
+      <div class="suape-cp-empty">
+        <div class="suape-cp-spinner"></div>
+        <p class="suape-cp-empty-title">Carregando detalhes de ${escapeHtml(displayId)}...</p>
+      </div>
+    `;
+    detailOverlayEl.classList.add('suape-cp-visible');
+
+    try {
+      const accessToken = await getCondhAuthorizedSession();
+      const [itemsResponse, situationsResponse] = await Promise.all([
+        fetchAuthenticatedFromSupabase('documentos_habeis_itens', encodeRestQuery({
+          select: 'id,doc_tipo,data_emissao,valor,observacao',
+          documento_habil_id: `eq.${documento.id}`,
+          order: 'data_emissao.desc,id.asc',
+        }), accessToken),
+        fetchAuthenticatedFromSupabase('documentos_habeis_situacoes', encodeRestQuery({
+          select: 'situacao_codigo,valor,is_retencao',
+          documento_habil_id: `eq.${documento.id}`,
+          order: 'situacao_codigo.asc',
+        }), accessToken),
+      ]);
+      const [items, situations] = await Promise.all([itemsResponse.json(), situationsResponse.json()]);
+      const tipo = displayId.match(/(NP|RP)/i)?.[1]?.toUpperCase() || 'RP/NP';
+      const original = documento.valor_original ?? 0;
+      const paid = documento.valor_pago ?? 0;
+
+      body.innerHTML = `
+        <div class="suape-cp-metric-grid">
+          <div class="suape-cp-metric-card">
+            <p class="suape-cp-metric-label">Valor original</p>
+            <p class="suape-cp-metric-value">${formatCurrency(original)}</p>
+          </div>
+          <div class="suape-cp-metric-card metric-highlight">
+            <p class="suape-cp-metric-label">Valor pago</p>
+            <p class="suape-cp-metric-value">${formatCurrency(paid)}</p>
+          </div>
+        </div>
+
+        <div class="suape-cp-info-card">
+          <div class="suape-cp-info-row"><span class="suape-cp-info-key">Tipo:</span><span class="suape-cp-info-val">${tipo}</span></div>
+          <div class="suape-cp-info-row"><span class="suape-cp-info-key">Situação:</span><span class="suape-cp-info-val">${escapeHtml(documento.estado || 'Não informada')}</span></div>
+          <div class="suape-cp-info-row"><span class="suape-cp-info-key">Favorecido:</span><span class="suape-cp-info-val">${escapeHtml(documento.favorecido_nome || 'Não informado')}</span></div>
+          <div class="suape-cp-info-row"><span class="suape-cp-info-key">CPF/CNPJ:</span><span class="suape-cp-info-val font-mono">${escapeHtml(documento.favorecido_documento || '—')}</span></div>
+          <div class="suape-cp-info-row"><span class="suape-cp-info-key">Emissão:</span><span class="suape-cp-info-val">${formatDate(documento.data_emissao)}</span></div>
+          ${documento.empenho_numero ? `<div class="suape-cp-info-row"><span class="suape-cp-info-key">Empenho:</span><span class="suape-cp-info-val font-mono">${escapeHtml(documento.empenho_numero)}</span></div>` : ''}
+          ${documento.processo ? `<div class="suape-cp-info-row"><span class="suape-cp-info-key">Processo:</span><span class="suape-cp-info-val font-mono">${escapeHtml(documento.processo)}</span></div>` : ''}
+          ${documento.fonte_sof ? `<div class="suape-cp-info-row"><span class="suape-cp-info-key">Fonte:</span><span class="suape-cp-info-val">${escapeHtml(documento.fonte_sof)}</span></div>` : ''}
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+          <div class="suape-cp-group-header"><span class="suape-cp-group-title">Situações (${situations.length})</span></div>
+          ${situations.length ? situations.map((situation) => `
+            <div class="suape-cp-entry-card">
+              <div class="suape-cp-entry-top">
+                <span class="suape-cp-entry-title">${escapeHtml(situation.situacao_codigo || 'Situação')}</span>
+                <span class="suape-cp-entry-value">${formatCurrency(situation.valor)}</span>
+              </div>
+              <p class="suape-cp-entry-desc">${situation.is_retencao ? 'Retenção' : 'Despesa'}</p>
+            </div>
+          `).join('') : '<p class="suape-cp-empty-desc">Nenhuma situação detalhada registrada.</p>'}
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+          <div class="suape-cp-group-header"><span class="suape-cp-group-title">Documentos relacionados (${items.length})</span></div>
+          ${items.length ? items.map((item) => `
+            <div class="suape-cp-entry-card">
+              <div class="suape-cp-entry-top">
+                <span class="suape-cp-entry-title">${escapeHtml(item.doc_tipo || 'Documento')} ${escapeHtml(item.id || '')}</span>
+                <span class="suape-cp-entry-value">${formatCurrency(item.valor)}</span>
+              </div>
+              <p class="suape-cp-entry-desc">Emissão: ${formatDate(item.data_emissao)}${item.observacao ? ` • ${escapeHtml(item.observacao)}` : ''}</p>
+            </div>
+          `).join('') : '<p class="suape-cp-empty-desc">Nenhum documento relacionado registrado.</p>'}
+        </div>
+      `;
+    } catch (error) {
+      body.innerHTML = `
+        <div class="suape-cp-empty">
+          <p class="suape-cp-empty-title">Não foi possível carregar os detalhes</p>
+          <p class="suape-cp-empty-desc">${escapeHtml(error?.message || 'Verifique sua sessão e tente novamente.')}</p>
+        </div>
+      `;
+    }
   }
 
   // Contrato Detail Modal
@@ -1938,6 +2326,7 @@
     applyPaletteTheme(currentPaletteTheme);
     updateProcessChip();
     overlayEl.classList.add('suape-cp-visible');
+    resetCondhSearch();
     inputEl.value = '';
     const procId = getCurrentProcessId();
     if (procId) {

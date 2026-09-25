@@ -134,6 +134,16 @@ export const DEFAULT_BOLSA_PROCESS_MAPPING: ProcessMappingRecord = {
       id: 'bolsa-step-4', code: '4', title: 'Registrar a liquidação', description: 'Registrar a liquidação da bolsa e encaminhar o processo à DG para autorização do pagamento.', type: 'task',
       laneId: 'lane-cofinc-bolsas', position: { x: 1180, y: 582 }, width: 220, height: 112, responsible: 'COFINC', routingAliases: ['COFINC'], slaDays: 2, color: '#059669',
       inputDocuments: ['Liquidação autorizada'], outputDocuments: ['Liquidação registrada'], systemName: 'SIAFI', systemUrl: 'https://www.gov.br/tesouronacional/pt-br/siafi/',
+      automation: {
+        enabled: true,
+        title: 'Fazer upload da liquidação no SUAP',
+        action: 'suap_upload_document',
+        tipoConferencia: 'Cópia Simples',
+        tipoDocumento: 'Liquidação',
+        assunto: 'Liquidação',
+        autoAdvanceStep: true,
+        feedbackMessage: 'Upload de liquidação aberto no SUAP com dados preenchidos!',
+      },
     },
     {
       id: 'bolsa-step-5', code: '5', title: 'Autorizar o pagamento', description: 'Autorizar o pagamento da bolsa e devolver o processo à COFINC para execução.', type: 'task',

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Suape - Canivete Suico do IFRN",
-  "version": "1.9.45",
+  "version": "1.9.50",
   "description": "Paleta Ctrl+K, resumo de processos, caminho BPMN, dados financeiros, atalhos e documentos com IA no SIAGES, SUAP e Comprasnet.",
   "permissions": [
     "activeTab",
@@ -117,7 +117,6 @@
       ],
       "run_at": "document_idle"
     },
-
     {
       "matches": [
         "https://suap.ifrn.edu.br/documento_eletronico/*"
@@ -134,6 +133,15 @@
       ],
       "js": [
         "clone-document.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://suap.ifrn.edu.br/processo_eletronico/documento_upload/*"
+      ],
+      "js": [
+        "upload-document.js"
       ],
       "run_at": "document_idle"
     },
@@ -182,6 +190,18 @@
       "js": [
         "extension-auth-client.js",
         "comprasnet-etp.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://contratos.comprasnet.gov.br/apropriacao/fatura-form/*"
+      ],
+      "css": [
+        "comprasnet-predoc-alert.css"
+      ],
+      "js": [
+        "comprasnet-predoc-alert.js"
       ],
       "run_at": "document_idle"
     }

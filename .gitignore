@@ -59,6 +59,4 @@ supabase/.temp/
 .tmp/
 *.docx
 .expo/
-
-
-
+local-backups/

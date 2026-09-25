@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import Dashboard, {
   buildContractExpenseAggregation,
   buildContractProjectionBullets,
+  calculateDashboardLiquidadoTotal,
   isOrigemRecursoIgnoradaNoEmpenhado,
 } from '@/pages/Dashboard';
 import { useData } from '@/contexts/DataContext';
@@ -1001,6 +1002,38 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('current-liquidado')).toHaveTextContent('370');
     expect(screen.getByTestId('current-pago')).toHaveTextContent('250');
     expect(screen.getByTestId('current-mensal-liquidado')).toHaveTextContent('0,0,0,0,0');
+  });
+
+  it('usa a liquidacao vinculada ao empenho para atualizar o card e preserva o fallback oficial', () => {
+    const empenhos = [
+      makeEmpenho({
+        numero: '2026NE000001',
+        valorLiquidadoOficial: 80,
+        valorLiquidado: 80,
+      }),
+      makeEmpenho({
+        id: 'empenho-sem-liquidacao-vinculada',
+        numero: '2026NE000002',
+        valorLiquidadoOficial: 20,
+        valorLiquidado: 20,
+      }),
+    ];
+
+    expect(
+      calculateDashboardLiquidadoTotal(
+        empenhos,
+        [
+          {
+            documentoHabil: '2026NP000001',
+            empenhoNumero: '158366264352026NE000001',
+            empenhoNumeroNormalizado: '2026NE000001',
+            dataEmissao: '2026-09-24',
+            valor: 125,
+          },
+        ],
+        [],
+      ),
+    ).toBe(145);
   });
 
   it('monta a evolucao mensal com empenhado pelo historico de operacoes e liquidado pelas NPs', () => {

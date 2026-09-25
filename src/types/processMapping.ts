@@ -25,6 +25,7 @@ export type ProcessMappingAutomationAction =
   | 'open_url'
   | 'copy_text'
   | 'suap_document'
+  | 'suap_upload_document'
   | 'custom_webhook';
 
 export interface ProcessMappingAutomation {
@@ -34,6 +35,9 @@ export interface ProcessMappingAutomation {
   targetUrl?: string;
   templateText?: string;
   documentType?: string;
+  tipoConferencia?: string;
+  tipoDocumento?: string;
+  assunto?: string;
   autoAdvanceStep?: boolean;
   feedbackMessage?: string;
 }

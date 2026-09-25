@@ -152,8 +152,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [metrics.saldoTotal]);
 
   const refreshData = useCallback(async () => {
+    const refreshableQueryKeys: readonly (readonly string[])[] = [
+      ...allDataQueryKeys,
+      ['dashboard-liquidacoes-por-empenho'],
+      ['dashboard-contratos-api-liquidacoes'],
+      ['dashboard-contratos-api-empenhos'],
+    ];
+
     await Promise.all(
-      allDataQueryKeys.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+      refreshableQueryKeys.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
     );
   }, [queryClient]);
 

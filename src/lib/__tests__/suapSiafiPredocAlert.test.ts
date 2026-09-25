@@ -28,7 +28,15 @@ function rowHtml(index: number, filled = false) {
   </tr>`;
 }
 
-function renderPage(rows = rowHtml(0), activeTab = 'Dados de Pagamento') {
+function deductionRowHtml(index: number, filled = false) {
+  return `<tr>
+    <td>Dedução</td>
+    <td><input id="form_manterDocumentoHabil:lista_Deducoes:${index}:btnPredoc" class="botaoPredoc${filled ? ' checked' : ''}" type="button" value="Pré-Doc" /></td>
+    ${filled ? '<td><input id="form_manterDocumentoHabil:lista_Deducoes:' + index + ':excluirPredoc_btn" type="button" title="Excluir Pré-doc" /></td>' : ''}
+  </tr>`;
+}
+
+function renderPage(rows = rowHtml(0), activeTab = 'Dados de Pagamento', deductionRows = '') {
   const isActive = (label: string) => (activeTab === label ? 'class="ui-tabs-selected ui-state-active" aria-selected="true"' : '');
   document.body.innerHTML = `
     <form id="form_manterDocumentoHabil">
@@ -41,6 +49,11 @@ function renderPage(rows = rowHtml(0), activeTab = 'Dados de Pagamento') {
       <div id="form_manterDocumentoHabil:lista_DPgtoOB_painel">
         <input id="form_manterDocumentoHabil:lista_DPgtoOB_painel_confirmar" type="button" value="Confirmar" />
         <input id="form_manterDocumentoHabil:lista_DPgtoOB_painel_cancelar" type="button" value="Descartar" />
+      </div>
+      <div id="form_manterDocumentoHabil:lista_Deducoes"><table><tbody>${deductionRows}</tbody></table></div>
+      <div id="form_manterDocumentoHabil:lista_Deducoes_painel">
+        <input id="form_manterDocumentoHabil:lista_Deducoes_painel_confirmar" type="button" value="Confirmar" />
+        <input id="form_manterDocumentoHabil:lista_Deducoes_painel_cancelar" type="button" value="Descartar" />
       </div>
       <input id="form_manterDocumentoHabil:btnRegistrarAlteracaoDocumentoHabil" type="button" value="Registrar Alterações" />
       <input id="form_manterDocumentoHabil:btnRegistrar" type="button" value="Registrar" />
@@ -98,6 +111,14 @@ describe('guardião de pré-doc do SIAFI', () => {
     const api = loadScript();
     expect(api.getPendingPredocCount()).toBe(0);
     expect(api.hasPendingPredocs()).toBe(false);
+  });
+
+  it('inclui pré-docs pendentes das deduções', () => {
+    renderPage(rowHtml(0, true), 'Dados de Pagamento', deductionRowHtml(0));
+    const api = loadScript();
+
+    expect(api.getPendingPredocCount()).toBe(1);
+    expect(api.hasPendingPredocs()).toBe(true);
   });
 
   it('bloqueia a troca de aba até a decisão do usuário', async () => {
@@ -159,6 +180,21 @@ describe('guardião de pré-doc do SIAFI', () => {
     expect(confirmHandler).toHaveBeenCalledTimes(1);
     expect(discardHandler).toHaveBeenCalledTimes(1);
     expect(document.getElementById('suape-siafi-predoc-overlay')).toHaveAttribute('hidden');
+  });
+
+  it('permite Confirmar e Descartar da edição das deduções', () => {
+    renderPage(rowHtml(0, true), 'Dados de Pagamento', deductionRowHtml(0));
+    const confirmHandler = vi.fn();
+    const discardHandler = vi.fn();
+    document.getElementById('form_manterDocumentoHabil:lista_Deducoes_painel_confirmar')?.addEventListener('click', confirmHandler);
+    document.getElementById('form_manterDocumentoHabil:lista_Deducoes_painel_cancelar')?.addEventListener('click', discardHandler);
+    loadScript();
+
+    clickById('form_manterDocumentoHabil:lista_Deducoes_painel_confirmar');
+    clickById('form_manterDocumentoHabil:lista_Deducoes_painel_cancelar');
+
+    expect(confirmHandler).toHaveBeenCalledTimes(1);
+    expect(discardHandler).toHaveBeenCalledTimes(1);
   });
 
   it('protege Registrar e Salvar Rascunho nos IDs atuais do SIAFI', () => {

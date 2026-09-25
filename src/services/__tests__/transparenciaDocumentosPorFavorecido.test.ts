@@ -16,14 +16,16 @@ describe('transparenciaService.getDocumentosPorFavorecido', () => {
   });
 
   function mockDocumentQuery(response: { data: unknown[]; error: unknown; count: number }) {
-    const builder: Record<'in' | 'or' | 'order' | 'range', ReturnType<typeof vi.fn>> = {
+    const builder: Record<'in' | 'or' | 'ilike' | 'order' | 'range', ReturnType<typeof vi.fn>> = {
       in: vi.fn(),
       or: vi.fn(),
+      ilike: vi.fn(),
       order: vi.fn(),
       range: vi.fn().mockResolvedValue(response),
     };
     builder.in.mockReturnValue(builder);
     builder.or.mockReturnValue(builder);
+    builder.ilike.mockReturnValue(builder);
     builder.order.mockReturnValue(builder);
 
     const select = vi.fn().mockReturnValue(builder);
@@ -71,7 +73,8 @@ describe('transparenciaService.getDocumentosPorFavorecido', () => {
     expect(builder.in).toHaveBeenCalledWith('favorecido_documento', ['07805649000129', '07.805.649/0001-29']);
     expect(builder.or).toHaveBeenCalledWith('id.ilike.%NP%,id.ilike.%RP%');
     expect(builder.or.mock.calls[0][0]).not.toMatch(/NS|OB/);
-    expect(builder.order).toHaveBeenCalledWith('data_emissao', { ascending: false });
+    expect(builder.order).toHaveBeenNthCalledWith(1, 'data_emissao', { ascending: false, nullsFirst: false });
+    expect(builder.order).toHaveBeenNthCalledWith(2, 'id', { ascending: false });
     expect(builder.range).toHaveBeenCalledWith(0, 19);
     expect(result).toEqual({
       total: 2,
@@ -107,7 +110,50 @@ describe('transparenciaService.getDocumentosPorFavorecido', () => {
     expect(result.total).toBe(45);
   });
 
-  it('não consulta o banco quando a entrada não tem 11 ou 14 dígitos', async () => {
+  it('busca pelo número da RP/NP, inclusive quando o ID completo tem prefixo', async () => {
+    const { builder } = mockDocumentQuery({
+      data: [{
+        id: '158366264352026NP000085',
+        valor_original: '1250.50',
+        valor_pago: '1250.50',
+        estado: 'REALIZADO',
+        favorecido_nome: 'FORNECEDOR EXEMPLO',
+        favorecido_documento: '07.805.649/0001-29',
+        data_emissao: '2026-02-03',
+      }],
+      error: null,
+      count: 1,
+    });
+
+    const result = await transparenciaService.getDocumentosPorFavorecido('2026NP000085');
+
+    expect(builder.ilike).toHaveBeenCalledWith('id', '%2026NP000085');
+    expect(builder.in).not.toHaveBeenCalled();
+    expect(builder.or).toHaveBeenCalledWith('id.ilike.%NP%,id.ilike.%RP%');
+    expect(result.data[0].id).toBe('158366264352026NP000085');
+  });
+
+  it('busca RP e NP pelo sufixo numérico informado', async () => {
+    const { builder } = mockDocumentQuery({
+      data: [
+        { id: '158366264352026NP000082', estado: 'REALIZADO' },
+        { id: '158366264352026RP000082', estado: 'PENDENTE DE REALIZAÇÃO' },
+      ],
+      error: null,
+      count: 2,
+    });
+
+    const result = await transparenciaService.getDocumentosPorFavorecido('82');
+
+    expect(builder.ilike).toHaveBeenCalledWith('id', '%82');
+    expect(builder.or).toHaveBeenCalledWith('id.ilike.%NP%,id.ilike.%RP%');
+    expect(result.data.map(({ id }) => id)).toEqual([
+      '158366264352026NP000082',
+      '158366264352026RP000082',
+    ]);
+  });
+
+  it('não consulta o banco quando a entrada não é CPF/CNPJ nem um número RP/NP', async () => {
     await expect(transparenciaService.getDocumentosPorFavorecido('123.456')).resolves.toEqual({ data: [], total: 0 });
     expect(supabaseMock.from).not.toHaveBeenCalled();
   });

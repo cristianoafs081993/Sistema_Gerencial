@@ -793,6 +793,18 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                       feedbackMessage: 'Automação de documento SUAP acionada!',
                     },
                   },
+                  {
+                    label: '📤 Upload de Liquidação',
+                    preset: {
+                      title: 'Upload de liquidação no SUAP',
+                      action: 'suap_upload_document' as ProcessMappingAutomationAction,
+                      tipoConferencia: 'Cópia Simples',
+                      tipoDocumento: 'Liquidação',
+                      assunto: 'Liquidação',
+                      autoAdvanceStep: true,
+                      feedbackMessage: 'Página de upload aberta e campos preenchidos!',
+                    },
+                  },
                 ].map((item) => (
                   <button
                     key={item.label}
@@ -836,6 +848,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                 className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium"
               >
                 <option value="advance_step">⚡ Concluir etapa e avançar para a próxima</option>
+                <option value="suap_upload_document">📄 Upload de documento externo no SUAP</option>
                 <option value="open_url">🔗 Abrir sistema ou link externo com dados do processo</option>
                 <option value="copy_text">📋 Copiar texto / minuta parametrizada para a área de transferência</option>
                 <option value="suap_document">📄 Gerar / clonar documento no SUAP</option>
@@ -844,6 +857,85 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
             </div>
 
             {/* Campos condicionais por ação */}
+            {formData.automation?.action === 'suap_upload_document' && (
+              <div className="space-y-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                <div className="flex items-center justify-between pb-1 border-b border-slate-200/60">
+                  <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-emerald-600" /> Parâmetros de Upload no SUAP
+                  </span>
+                  <span className="text-[10px] text-slate-400">Campos 100% editáveis</span>
+                </div>
+
+                {/* Campo 1: Tipo de Conferência */}
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-700">
+                    Tipo de Conferência
+                  </label>
+                  <select
+                    value={formData.automation?.tipoConferencia || 'Cópia Simples'}
+                    onChange={(e) => handleAutomationChange('tipoConferencia', e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                  >
+                    <option value="Cópia Simples">Cópia Simples</option>
+                    <option value="Cópia Autenticada Administrativamente">Cópia Autenticada Administrativamente</option>
+                    <option value="Cópia Autenticada por Cartório">Cópia Autenticada por Cartório</option>
+                    <option value="Documento Original">Documento Original</option>
+                    <option value="Documento Original e Cópia">Documento Original e Cópia</option>
+                    <option value="Documento Original e Cópia Autenticada Administrativamente">Documento Original e Cópia Autenticada Administrativamente</option>
+                    <option value="Mídia">Mídia</option>
+                  </select>
+                  <p className="text-[10px] text-slate-400">
+                    Seletor nativo do formulário de upload do SUAP.
+                  </p>
+                </div>
+
+                {/* Campo 2: Tipo do Documento */}
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-700">
+                    Tipo do Documento (Seletor com busca no SUAP)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Liquidação, Nota Fiscal, Termo..."
+                    value={formData.automation?.tipoDocumento || 'Liquidação'}
+                    onChange={(e) => handleAutomationChange('tipoDocumento', e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800"
+                  />
+                  <div className="flex flex-wrap gap-1 pt-0.5">
+                    {['Liquidação', 'Nota Fiscal', 'Recibo', 'Relatório', 'Termo', 'Despacho'].map((sug) => (
+                      <button
+                        key={sug}
+                        type="button"
+                        onClick={() => handleAutomationChange('tipoDocumento', sug)}
+                        className="px-1.5 py-0.5 rounded bg-slate-200/70 hover:bg-emerald-100 text-[10px] text-slate-700 hover:text-emerald-800 font-medium transition-colors"
+                      >
+                        {sug}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Preenche e seleciona automaticamente o item correspondente no Select2 do SUAP.
+                  </p>
+                </div>
+
+                {/* Campo 3: Assunto */}
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-700">
+                    Assunto do Documento
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Liquidação ou Liquidação - {beneficiario}"
+                    value={formData.automation?.assunto || 'Liquidação'}
+                    onChange={(e) => handleAutomationChange('assunto', e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    Suporta texto livre e variáveis dinâmicas (ex: &#123;processNumber&#125;, &#123;beneficiario&#125;).
+                  </p>
+                </div>
+              </div>
+            )}
             {(formData.automation?.action === 'open_url' || formData.automation?.action === 'custom_webhook') && (
               <div className="space-y-1 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
                 <label className="block text-[11px] font-bold text-slate-700">

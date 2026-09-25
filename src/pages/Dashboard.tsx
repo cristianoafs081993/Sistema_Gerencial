@@ -530,6 +530,50 @@ const buildDadosMensais = (
     });
 };
 
+export const calculateDashboardLiquidadoTotal = (
+  empenhosCorrente: Empenho[],
+  liquidacoesPorEmpenho: LiquidacaoPorEmpenho[],
+  liquidacoesApiPorEmpenho: ContratoApiPublicLiquidacaoRow[],
+) => {
+  const liquidacoesDhPorEmpenho = new Map<string, number>();
+  liquidacoesPorEmpenho.forEach((liquidacao) => {
+    const empenhoNumero = liquidacao.empenhoNumeroNormalizado || normalizeEmpenhoNumero(liquidacao.empenhoNumero);
+    if (!empenhoNumero) return;
+
+    liquidacoesDhPorEmpenho.set(
+      empenhoNumero,
+      (liquidacoesDhPorEmpenho.get(empenhoNumero) || 0) + (Number(liquidacao.valor) || 0),
+    );
+  });
+
+  const liquidacoesApiPorNumero = new Map<string, number>();
+  liquidacoesApiPorEmpenho.forEach((liquidacao) => {
+    const empenhoNumero = normalizeEmpenhoNumero(liquidacao.empenho_numero);
+    if (!empenhoNumero) return;
+
+    const valor = Number(liquidacao.valor_liquido ?? liquidacao.valor_bruto ?? 0) || 0;
+    liquidacoesApiPorNumero.set(empenhoNumero, (liquidacoesApiPorNumero.get(empenhoNumero) || 0) + valor);
+  });
+
+  return empenhosCorrente.reduce((total, empenho) => {
+    const empenhoNumero = normalizeEmpenhoNumero(empenho.numero);
+
+    if (liquidacoesDhPorEmpenho.has(empenhoNumero)) {
+      return total + (liquidacoesDhPorEmpenho.get(empenhoNumero) || 0);
+    }
+
+    if (empenho.valorLiquidadoOficial !== undefined && empenho.valorLiquidadoOficial !== null) {
+      return total + empenho.valorLiquidadoOficial;
+    }
+
+    if (liquidacoesApiPorNumero.has(empenhoNumero)) {
+      return total + (liquidacoesApiPorNumero.get(empenhoNumero) || 0);
+    }
+
+    return total + (empenho.valorLiquidado ?? 0);
+  }, 0);
+};
+
 export const buildContractExpenseAggregation = (
   contratos: ContratoApiRow[],
   faturas: ContratoApiFaturaRow[],
@@ -1185,10 +1229,6 @@ export default function Dashboard() {
   const totalEmpenhado = empenhosCorrenteParaSoma.reduce((total, empenho) => total + empenho.valor, 0);
   const aDescentralizar = totalPlanejado - totalDescentralizado;
   const percentualExecutado = totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0;
-  const totalLiquidado = filteredData.empenhosCorrente.reduce(
-    (total, empenho) => total + (empenho.valorLiquidadoOficial ?? empenho.valorLiquidado ?? 0),
-    0,
-  );
   const totalPago = filteredData.empenhosCorrente.reduce(
     (total, empenho) => total + (empenho.valorPagoOficial ?? empenho.valorPago ?? 0),
     0,
@@ -1293,6 +1333,11 @@ export default function Dashboard() {
     enabled: empenhoNumerosCorrente.length > 0,
     staleTime: 5 * 60 * 1000,
   });
+
+  const totalLiquidado = useMemo(
+    () => calculateDashboardLiquidadoTotal(filteredData.empenhosCorrente, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho),
+    [filteredData.empenhosCorrente, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho],
+  );
 
   const { data: contratosApiAtivos = EMPTY_ARRAY, isLoading: isContratosApiAtivosLoading = false } = useQuery({
     queryKey: ['dashboard-contratos-api-ativos', campusUasg],

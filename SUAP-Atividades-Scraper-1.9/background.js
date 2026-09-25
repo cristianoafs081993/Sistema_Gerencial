@@ -7,6 +7,7 @@ const EXTENSION_SESSION_STORAGE_KEY = 'siages-extension-session';
 const SESSION_REFRESH_ALARM = 'siages-extension-session-refresh';
 const REFRESH_AHEAD_SECONDS = 20 * 60;
 const PROCESS_BOX_SYNC_SOURCE = 'siages-extension-process-box-sync';
+const CLICK_HINTS_SOURCE = 'suape-click-hints';
 const PROCESS_BOX_SYNC_ALARM = 'siages-extension-process-box-sync';
 const PROCESS_BOX_SYNC_STORAGE_KEY = 'siages-process-box-sync-state';
 const PROCESS_BOX_SYNC = globalThis.SuapeScheduledProcessSync;
@@ -324,6 +325,23 @@ async function handleProcessRegistryMessage(message, sender) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.source === CLICK_HINTS_SOURCE && message.type === 'open-new-tab') {
+    let url;
+    try {
+      url = new URL(String(message.url || ''));
+    } catch {
+      sendResponse({ ok: false, error: 'URL inválida.' });
+      return undefined;
+    }
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      sendResponse({ ok: false, error: 'Apenas links HTTP/HTTPS podem ser abertos em nova aba.' });
+      return undefined;
+    }
+    void chrome.tabs.create({ url: url.href, active: true })
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Não foi possível abrir a nova aba.' }));
+    return true;
+  }
   if (message?.source === AUTH_MESSAGE_SOURCE) {
     void handleAuthMessage(message)
       .then((result) => sendResponse({ ok: true, ...result }))

@@ -11,8 +11,10 @@
   const SAVE_DRAFT_ID = `${FORM_ID}:salvarRascunho_botao`;
   const PAYMENT_PANEL_PREFIX = `${PAYMENT_TABLE_ID}_painel_`;
   const PAYMENT_TAB_LABEL = 'Dados de Pagamento';
+  const PREDOC_CONTROL_SELECTOR = '[id$=":btnPredoc"], .botaoPredoc';
+  const DEDUCTION_ID_PATTERN = /deduc/i;
   const OVERLAY_ID = 'suape-siafi-predoc-overlay';
-  const MESSAGE = 'Preencha o pré-doc antes de sair ou registrar as alterações.';
+  const MESSAGE = 'Preencha os pré-docs antes de sair ou registrar as alterações.';
 
   let mutationObserver = null;
   let refreshTimer = null;
@@ -85,10 +87,34 @@
     return Boolean(getForm() && document.getElementById(TABS_ID));
   }
 
-  function getPredocRows(table = getPaymentTable()) {
-    if (!table) return [];
-    return Array.from(table.querySelectorAll('tr')).filter((row) =>
-      row.querySelector('[id$=":btnPredoc"], .botaoPredoc'),
+  function hasAncestorWithId(element, pattern) {
+    let current = element;
+    while (current && current !== document.body) {
+      if (pattern.test(current.id || '')) return true;
+      current = current.parentElement;
+    }
+    return false;
+  }
+
+  function isPaymentSectionElement(element) {
+    const paymentTable = getPaymentTable();
+    return Boolean(
+      (paymentTable && paymentTable.contains(element)) ||
+      hasAncestorWithId(element, DEDUCTION_ID_PATTERN) ||
+      isVisible(element),
+    );
+  }
+
+  function getPredocRows(table = null) {
+    if (table) {
+      return Array.from(table.querySelectorAll('tr')).filter((row) => row.querySelector(PREDOC_CONTROL_SELECTOR));
+    }
+
+    const form = getForm();
+    if (!form || !isPaymentTabActive()) return [];
+
+    return Array.from(form.querySelectorAll('tr')).filter((row) =>
+      row.querySelector(PREDOC_CONTROL_SELECTOR) && isPaymentSectionElement(row),
     );
   }
 
@@ -111,8 +137,7 @@
       return;
     }
 
-    const table = getPaymentTable();
-    if (table) lastKnownPendingCount = getPendingPredocCount();
+    lastKnownPendingCount = getPendingPredocCount();
   }
 
   function hasPendingPredocs() {
@@ -130,7 +155,7 @@
   }
 
   function isPredocControl(element) {
-    return Boolean(element?.closest(`[id="${PAYMENT_TABLE_ID}"]`) && (
+    return Boolean(isPaymentSectionElement(element) && (
       element.id.endsWith(':btnPredoc') ||
       element.id.endsWith(':excluirPredoc_btn') ||
       element.title === 'Excluir Pré-doc'
@@ -138,7 +163,11 @@
   }
 
   function isPredocWorkflowControl(element) {
-    return Boolean(element?.id?.startsWith(PAYMENT_PANEL_PREFIX) || element?.closest(`[id^="${PAYMENT_PANEL_PREFIX}"]`));
+    if (element?.id?.startsWith(PAYMENT_PANEL_PREFIX) || element?.closest(`[id^="${PAYMENT_PANEL_PREFIX}"]`)) return true;
+    return Boolean(
+      hasAncestorWithId(element, DEDUCTION_ID_PATTERN) &&
+      hasAncestorWithId(element, /painel/i),
+    );
   }
 
   function isSafeControl(element) {
@@ -193,7 +222,9 @@
     if (!overlay) return;
     refreshState();
     const count = lastKnownPendingCount;
-    const countLabel = count === 1 ? 'Há 1 favorecido sem pré-doc preenchido.' : `Há ${count} favorecidos sem pré-doc preenchido.`;
+    const countLabel = count === 1
+      ? 'Há 1 favorecido ou dedução sem pré-doc preenchido.'
+      : `Há ${count} favorecidos ou deduções sem pré-doc preenchido.`;
     const message = dialog?.querySelector('[data-role="message"]');
     if (message) message.textContent = `${countLabel} ${MESSAGE}`;
     overlay.hidden = false;

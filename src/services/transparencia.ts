@@ -504,11 +504,17 @@ export const transparenciaService = {
     },
 
     async getDocumentosPorFavorecido(
-        favorecidoDocumento: string,
+        favorecidoDocumentoOuNumero: string,
         options?: { page?: number; perPage?: number },
     ): Promise<{ data: DocumentoDespesa[]; total: number }> {
-        const documentoNormalizado = favorecidoDocumento.replace(/\D/g, '');
-        if (!/^(?:\d{11}|\d{14})$/.test(documentoNormalizado)) {
+        const consulta = favorecidoDocumentoOuNumero.trim();
+        const documentoNormalizado = consulta.replace(/\D/g, '');
+        const numeroDocumento = consulta.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const isBuscaPorDocumento = /^[\d.\-/\s]+$/.test(consulta) && /^(?:\d{11}|\d{14})$/.test(documentoNormalizado);
+        const isBuscaPorNumeroCompleto = /^\d{4,}(?:NP|RP)\d+$/.test(numeroDocumento);
+        const isBuscaPorNumeroParcial = /^\d+$/.test(consulta) && !isBuscaPorDocumento;
+        const isBuscaPorNumero = isBuscaPorNumeroCompleto || isBuscaPorNumeroParcial;
+        if (!isBuscaPorDocumento && !isBuscaPorNumero) {
             return { data: [], total: 0 };
         }
 
@@ -516,14 +522,25 @@ export const transparenciaService = {
         const perPage = Math.max(1, Math.floor(options?.perPage || 20));
         const from = (page - 1) * perPage;
         const to = from + perPage - 1;
-        const documentoFormatado = formatarDocumento(documentoNormalizado);
-
-        const { data, error, count } = await supabase
+        let query = supabase
             .from('documentos_habeis')
-            .select(DOCUMENTOS_HABEIS_SELECT, { count: 'exact' })
-            .in('favorecido_documento', Array.from(new Set([documentoNormalizado, documentoFormatado])))
-            .or('id.ilike.%NP%,id.ilike.%RP%')
-            .order('data_emissao', { ascending: false })
+            .select(DOCUMENTOS_HABEIS_SELECT, { count: 'exact' });
+
+        if (isBuscaPorDocumento) {
+            const documentoFormatado = formatarDocumento(documentoNormalizado);
+            query = query
+                .in('favorecido_documento', Array.from(new Set([documentoNormalizado, documentoFormatado])))
+                .or('id.ilike.%NP%,id.ilike.%RP%');
+        } else {
+            const sufixo = isBuscaPorNumeroCompleto ? numeroDocumento : consulta;
+            query = query
+                .ilike('id', `%${sufixo}`)
+                .or('id.ilike.%NP%,id.ilike.%RP%');
+        }
+
+        const { data, error, count } = await query
+            .order('data_emissao', { ascending: false, nullsFirst: false })
+            .order('id', { ascending: false })
             .range(from, to);
 
         if (error) throw error;

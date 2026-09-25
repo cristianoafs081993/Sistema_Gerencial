@@ -108,4 +108,39 @@ describe('modo de atalhos mnemônicos da extensão Suape', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(root.hidden).toBe(true);
   });
+
+  it('abre links em uma nova aba com Ctrl+Enter e mantém Enter na aba atual', () => {
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', () => undefined);
+    installGeometry();
+
+    document.body.innerHTML = '<a id="details" href="https://example.com/detalhes">Detalhes</a>';
+    const link = document.getElementById('details')!;
+    setRect(link, 20, 20);
+    const onClick = vi.fn();
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      onClick();
+    });
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(window);
+
+    window.eval(contentScript);
+    fireEvent.keyDown(document, { key: ';', code: 'Semicolon', ctrlKey: true });
+    fireEvent.keyDown(document, { key: 'd' });
+    fireEvent.keyDown(document, { key: 'e' });
+    fireEvent.keyDown(document, { key: 'Enter', ctrlKey: true });
+
+    expect(openSpy).toHaveBeenCalledWith('https://example.com/detalhes', '_blank', 'noopener,noreferrer');
+    expect(onClick).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(document, { key: ';', code: 'Semicolon', ctrlKey: true });
+    fireEvent.keyDown(document, { key: 'd' });
+    fireEvent.keyDown(document, { key: 'e' });
+    fireEvent.keyDown(document, { key: 'Enter' });
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
 });

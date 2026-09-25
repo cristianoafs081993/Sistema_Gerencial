@@ -506,6 +506,45 @@
         advanceToNextStep();
       }
       if (!feedback) feedback = 'Iniciada a criação do documento no SUAP.';
+    } else if (action === 'suap_upload_document') {
+      const tipoConferencia = cleanText(automation.tipoConferencia || 'Cópia Simples');
+      const tipoDocumento = cleanText(automation.tipoDocumento || 'Liquidação');
+      const assuntoFilled = cleanText(replacePlaceholders(automation.assunto || 'Liquidação'));
+      const uploadPayload = {
+        source: 'siages',
+        version: 1,
+        action: 'suap_upload_document',
+        suapId,
+        processNumber,
+        tipoConferencia,
+        tipoDocumento,
+        assunto: assuntoFilled,
+      };
+      const hashPayload = encodeURIComponent(JSON.stringify(uploadPayload));
+      try {
+        sessionStorage.setItem('siagesUploadPendingV1', JSON.stringify({
+          payload: uploadPayload,
+          createdAt: Date.now(),
+        }));
+        localStorage.setItem('siagesUploadPendingV1', JSON.stringify({
+          payload: uploadPayload,
+          createdAt: Date.now(),
+        }));
+        if (globalThis.chrome?.storage?.local) {
+          globalThis.chrome.storage.local.set({ siagesUploadPendingV1: uploadPayload });
+        }
+      } catch (_) {}
+
+      const uploadUrl = `/processo_eletronico/documento_upload/${encodeURIComponent(suapId)}/#siagesUpload=${hashPayload}`;
+      if (typeof window.__siagesSuapUploadTestNavigate === 'function') {
+        window.__siagesSuapUploadTestNavigate(uploadUrl, uploadPayload);
+      } else {
+        window.open(uploadUrl, '_blank', 'noopener,noreferrer');
+      }
+      if (automation.autoAdvanceStep !== false) {
+        advanceToNextStep();
+      }
+      if (!feedback) feedback = 'Página de upload aberta e campos preparados no SUAP!';
     } else if (action === 'custom_webhook') {
       const webhookUrl = replacePlaceholders(automation.targetUrl);
       if (webhookUrl) {

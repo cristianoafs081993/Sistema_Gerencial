@@ -166,11 +166,60 @@ describe('CommandPalette — Entity Search & Navigation', () => {
 
     expect(await screen.findByText('2026NP000085')).toBeInTheDocument();
     expect(screen.getByText('REALIZADO')).toBeInTheDocument();
-    expect(transparenciaMock.getDocumentosPorFavorecido).toHaveBeenCalledWith('07805649000129', { page: 1, perPage: 20 });
+    expect(transparenciaMock.getDocumentosPorFavorecido).toHaveBeenCalledWith('07.805.649/0001-29', { page: 1, perPage: 20 });
 
     fireEvent.click(screen.getByText('2026NP000085'));
     expect(await screen.findByText('Detalhamento Financeiro')).toBeInTheDocument();
     expect(transparenciaMock.getDocumentoCompleto).toHaveBeenCalledWith('158366264352026NP000085');
+  });
+
+  it('busca RP/NP pelo próprio número no comando condh', async () => {
+    const documento: DocumentoDespesa = {
+      id: '158366264352026NP000085',
+      valor_original: 1250.5,
+      valor_pago: 1250.5,
+      estado: 'REALIZADO',
+      processo: '',
+      favorecido_nome: 'FORNECEDOR EXEMPLO',
+      favorecido_documento: '07.805.649/0001-29',
+      data_emissao: '2026-02-03',
+    };
+    transparenciaMock.getDocumentosPorFavorecido.mockResolvedValue({ data: [documento], total: 1 });
+
+    renderWithProviders(
+      <CommandPalette open={true} onOpenChange={vi.fn()} empenhosList={[]} contratosList={[]} />,
+    );
+    fireEvent.change(screen.getByPlaceholderText(/digite um comando, ne, contrato/i), {
+      target: { value: 'condh 2026NP000085' },
+    });
+
+    expect(await screen.findByText('2026NP000085')).toBeInTheDocument();
+    expect(transparenciaMock.getDocumentosPorFavorecido).toHaveBeenCalledWith('2026NP000085', { page: 1, perPage: 20 });
+  });
+
+  it('busca RP e NP pelo sufixo numérico no comando condh', async () => {
+    const documentos: DocumentoDespesa[] = ['NP', 'RP'].map((tipo) => ({
+      id: `158366264352026${tipo}000082`,
+      valor_original: 100,
+      valor_pago: 0,
+      estado: tipo === 'NP' ? 'REALIZADO' : 'PENDENTE DE REALIZAÇÃO',
+      processo: '',
+      favorecido_nome: `FORNECEDOR ${tipo}`,
+      favorecido_documento: '07805649000129',
+      data_emissao: '2026-02-03',
+    }));
+    transparenciaMock.getDocumentosPorFavorecido.mockResolvedValue({ data: documentos, total: 2 });
+
+    renderWithProviders(
+      <CommandPalette open={true} onOpenChange={vi.fn()} empenhosList={[]} contratosList={[]} />,
+    );
+    fireEvent.change(screen.getByPlaceholderText(/digite um comando, ne, contrato/i), {
+      target: { value: 'condh 82' },
+    });
+
+    expect(await screen.findByText('2026NP000082')).toBeInTheDocument();
+    expect(screen.getByText('2026RP000082')).toBeInTheDocument();
+    expect(transparenciaMock.getDocumentosPorFavorecido).toHaveBeenCalledWith('82', { page: 1, perPage: 20 });
   });
 
   it('permite paginar os resultados condh em grupos de 20', async () => {
@@ -233,8 +282,8 @@ describe('CommandPalette — Entity Search & Navigation', () => {
     );
 
     const searchInput = screen.getByPlaceholderText(/digite um comando, ne, contrato/i);
-    fireEvent.change(searchInput, { target: { value: 'condh 12345' } });
-    expect(screen.getByText(/cpf com 11 dígitos ou um cnpj com 14 dígitos/i)).toBeInTheDocument();
+    fireEvent.change(searchInput, { target: { value: 'condh abc' } });
+    expect(screen.getByText(/cpf\/cnpj com 11 ou 14 dígitos, o número de uma rp\/np.*sufixo numérico/i)).toBeInTheDocument();
     expect(transparenciaMock.getDocumentosPorFavorecido).not.toHaveBeenCalled();
 
     fireEvent.change(searchInput, { target: { value: 'condh 07805649000129' } });

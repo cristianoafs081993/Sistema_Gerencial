@@ -807,4 +807,76 @@ describe('process-document 1.9', () => {
     expect(toast).toBeTruthy();
     expect(toast?.textContent).toBe('Solicitação concluída!');
   });
+
+  it('dispara a automação suap_upload_document pelo botão de check discreto e abre a tela de upload preenchendo os dados', async () => {
+    let navigatedUrl = '';
+    let navigatedPayload: any = null;
+    (window as any).__siagesSuapUploadTestNavigate = (url: string, payload: any) => {
+      navigatedUrl = url;
+      navigatedPayload = payload;
+    };
+
+    const api = loadProcessScript();
+    await api.installToolkit();
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-flow', version: 1, payload: {
+        summary: {
+          mappingId: 'bolsas', mappingTitle: 'Bolsas', mappingVersion: '1.0', fullPagePath: '/processos/bolsas',
+          observedEvents: [], steps: [
+            {
+              nodeId: 'step-upload',
+              code: '04',
+              title: 'Registrar a liquidação',
+              responsible: 'COFINC',
+              status: 'current',
+              automation: {
+                enabled: true,
+                title: 'Fazer upload da liquidação no SUAP',
+                action: 'suap_upload_document',
+                tipoConferencia: 'Cópia Simples',
+                tipoDocumento: 'Liquidação',
+                assunto: 'Liquidação de Bolsa',
+                autoAdvanceStep: true,
+                feedbackMessage: 'Upload aberto!',
+              },
+            },
+            {
+              nodeId: 'step-next',
+              code: '05',
+              title: 'Autorizar o pagamento',
+              responsible: 'DG',
+              status: 'next',
+            },
+          ],
+        },
+      } },
+    }));
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-node-id="step-upload"] .suape-flow-step-check')).toBeTruthy();
+    });
+
+    const checkBtn = document.querySelector('[data-node-id="step-upload"] .suape-flow-step-check') as HTMLButtonElement;
+    checkBtn.click();
+
+    await waitFor(() => {
+      expect(navigatedUrl).toContain('/processo_eletronico/documento_upload/321/');
+      expect(navigatedUrl).toContain('#siagesUpload=');
+    });
+
+    expect(navigatedPayload).toMatchObject({
+      action: 'suap_upload_document',
+      tipoConferencia: 'Cópia Simples',
+      tipoDocumento: 'Liquidação',
+      assunto: 'Liquidação de Bolsa',
+    });
+
+    const root = document.getElementById('siages-suap-toolkit')!;
+    const toast = root.querySelector('.suape-automation-toast');
+    expect(toast?.textContent).toBe('Upload aberto!');
+  });
 });

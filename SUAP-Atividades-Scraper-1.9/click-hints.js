@@ -3,6 +3,7 @@
   window.__suapeClickHintsLoaded = true;
 
   const ROOT_ID = 'suape-click-hints-root';
+  const CLICK_HINTS_SOURCE = 'suape-click-hints';
   const INTERACTIVE_ROLES = new Set([
     'button', 'checkbox', 'combobox', 'link', 'menuitem', 'menuitemcheckbox', 'menuitemradio',
     'option', 'radio', 'searchbox', 'slider', 'spinbutton', 'switch', 'tab', 'textbox', 'treeitem',
@@ -270,7 +271,9 @@
       labelsEl.appendChild(label);
     });
 
-    queryEl.textContent = query ? `${query} · Enter para abrir` : 'Digite o atalho · Esc para sair';
+    queryEl.textContent = query
+      ? `${query} · Enter abrir · Ctrl+Enter nova aba`
+      : 'Digite o atalho · Enter abrir · Ctrl+Enter nova aba · Esc sair';
     if (query) {
       announce(matchingCount === 1 ? `Atalho ${query}. Um ponto correspondente.` : `Atalho ${query}. ${matchingCount} pontos correspondentes.`);
     } else {
@@ -344,8 +347,30 @@
     else openHints();
   }
 
-  function activateHint(hint) {
+  function openLinkInNewTab(element) {
+    if (!(element instanceof HTMLAnchorElement) || !element.href) return false;
+    const url = element.href;
+    const fallback = () => window.open(url, '_blank', 'noopener,noreferrer');
+
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      try {
+        chrome.runtime.sendMessage({ source: CLICK_HINTS_SOURCE, type: 'open-new-tab', url }, (response) => {
+          if (chrome.runtime.lastError || response?.ok === false) fallback();
+        });
+        return true;
+      } catch {
+        fallback();
+        return true;
+      }
+    }
+
+    fallback();
+    return true;
+  }
+
+  function activateHint(hint, openInNewTab = false) {
     closeHints(`Atalho ${hint.code} selecionado.`);
+    if (openInNewTab && openLinkInNewTab(hint.element)) return;
     window.requestAnimationFrame(() => {
       if (!hint.element.isConnected) return;
       const inputType = hint.element instanceof HTMLInputElement ? hint.element.type : '';
@@ -382,7 +407,7 @@
       const matches = hints.filter(matchesQuery);
       const exactMatches = matches.filter((hint) => hint.code === query);
       const selected = exactMatches.length === 1 ? exactMatches[0] : matches.length === 1 ? matches[0] : null;
-      if (selected) activateHint(selected);
+      if (selected) activateHint(selected, event.ctrlKey || event.metaKey);
       else announce(query ? `Atalho ${query} ainda não identifica um único ponto.` : 'Digite um atalho antes de confirmar.');
       return;
     }

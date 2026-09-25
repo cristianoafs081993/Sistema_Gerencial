@@ -8,15 +8,17 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.45');
+    expect(manifest.version).toBe('1.9.50');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms', 'cookies']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
 
     const expander = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('text-expander.js'));
     const process = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('process-document.js'));
+    const uploadDoc = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('upload-document.js'));
     const plan = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('plan-summary.js'));
     const comprasnet = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('comprasnet-etp.js'));
+    const comprasnetPredocAlert = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('comprasnet-predoc-alert.js'));
     const siafi = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('siafi-favorecidos.js'));
     const siafiPredocAlert = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('siafi-predoc-alert.js'));
     const commandPalettes = manifest.content_scripts.filter((entry: { js: string[] }) => entry.js.includes('command-palette.js'));
@@ -24,6 +26,11 @@ describe('pacote da extensao Suape 1.9', () => {
     const suapCommandPalette = commandPalettes.find((entry: { matches: string[] }) => entry.matches.includes('https://suap.ifrn.edu.br/*'));
     const globalCommandPalette = commandPalettes.find((entry: { matches: string[] }) => entry.matches.includes('<all_urls>'));
 
+    expect(uploadDoc).toMatchObject({
+      matches: ['https://suap.ifrn.edu.br/processo_eletronico/documento_upload/*'],
+      js: ['upload-document.js'],
+      run_at: 'document_idle',
+    });
     expect(expander).toMatchObject({ matches: ['<all_urls>'], all_frames: true });
     expect(process.matches).toEqual([
       'https://suap.ifrn.edu.br/processo_eletronico/processo/*',
@@ -58,6 +65,12 @@ describe('pacote da extensao Suape 1.9', () => {
       matches: ['https://siafi.tesouro.gov.br/*'],
       css: ['siafi-predoc-alert.css'],
       js: ['siafi-predoc-alert.js'],
+      run_at: 'document_idle',
+    });
+    expect(comprasnetPredocAlert).toMatchObject({
+      matches: ['https://contratos.comprasnet.gov.br/apropriacao/fatura-form/*'],
+      css: ['comprasnet-predoc-alert.css'],
+      js: ['comprasnet-predoc-alert.js'],
       run_at: 'document_idle',
     });
     expect(globalCommandPalette).toMatchObject({
@@ -191,6 +204,8 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(backgroundScript).toContain('chrome.alarms.create');
     expect(backgroundScript).toContain("message.type === 'sync-now'");
     expect(backgroundScript).toContain("message.type === 'get-status'");
+    expect(backgroundScript).toContain("const CLICK_HINTS_SOURCE = 'suape-click-hints'");
+    expect(backgroundScript).toContain('chrome.tabs.create({ url: url.href, active: true })');
     expect(backgroundScript).toContain("importScripts('scheduled-process-sync.js')");
     expect(scheduledSyncScript).toContain('atribuido_para=304806');
     expect(scheduledSyncScript).toContain('setor=857');
@@ -236,6 +251,7 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(clickHints).toContain("event.code === 'Semicolon'");
     expect(clickHints).toContain("event.key === 'Enter'");
     expect(clickHints).toContain('mnemonicFromLabel');
+    expect(clickHints).toContain("type: 'open-new-tab'");
     expect(clickHints).toContain('assignInitialCodes');
     expect(clickHintsCss).toContain('#suape-click-hints-root');
   });
