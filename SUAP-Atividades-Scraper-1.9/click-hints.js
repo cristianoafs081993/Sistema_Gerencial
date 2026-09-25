@@ -89,6 +89,12 @@
     const placeholder = element.getAttribute('placeholder');
     if (placeholder) return placeholder;
 
+    const childWithLabel = element.querySelector?.('[aria-label], [title], img[alt]');
+    if (childWithLabel) {
+      const childText = childWithLabel.getAttribute('aria-label') || childWithLabel.getAttribute('title') || childWithLabel.getAttribute('alt');
+      if (childText) return childText;
+    }
+
     return element.getAttribute('aria-label') || element.getAttribute('title') || '';
   }
 
@@ -151,12 +157,20 @@
   function getDocumentCandidates() {
     const elements = new Set(document.querySelectorAll(CANDIDATE_SELECTOR));
     document.querySelectorAll('*').forEach((element) => {
-      if (element instanceof HTMLElement && hasPointerCursor(element)) elements.add(element);
+      if (element instanceof HTMLElement && hasPointerCursor(element)) {
+        if (!element.parentElement?.closest('a[href], button, summary, select, textarea')) {
+          elements.add(element);
+        }
+      }
     });
 
     const candidates = Array.from(elements)
       .filter((element) => isCandidate(element))
-      .filter((element, _, all) => !hasMoreSpecificDescendant(element, all));
+      .filter((element, _, all) => !hasMoreSpecificDescendant(element, all))
+      .filter((element) => {
+        const parentControl = element.parentElement?.closest('a[href], button, summary');
+        return !parentControl || parentControl === element;
+      });
 
     return candidates.map((element, order) => {
       const label = getVisibleLabel(element);
@@ -347,15 +361,70 @@
     else openHints();
   }
 
+  function findLinkUrl(element) {
+    if (!element || !(element instanceof Element)) return null;
+
+    const anchor = element.closest('a[href]')
+      || (element.tagName === 'A' && element.hasAttribute('href') ? element : null)
+      || element.querySelector('a[href]');
+
+    if (anchor) {
+      const rawHref = anchor.getAttribute('href') || anchor.href;
+      if (rawHref && !rawHref.startsWith('#') && !rawHref.toLowerCase().startsWith('javascript:')) {
+        try {
+          return new URL(rawHref, window.location.href).href;
+        } catch {
+          if (anchor.href && !anchor.href.toLowerCase().startsWith('javascript:')) {
+            return anchor.href;
+          }
+        }
+      }
+    }
+
+    const datasetElement = element.closest('[data-href], [data-url]') || element;
+    const dataUrl = datasetElement.getAttribute('data-href') || datasetElement.getAttribute('data-url');
+    if (dataUrl && !dataUrl.startsWith('#') && !dataUrl.toLowerCase().startsWith('javascript:')) {
+      try {
+        return new URL(dataUrl, window.location.href).href;
+      } catch {
+        // ignore
+      }
+    }
+
+    const onclick = element.getAttribute('onclick') || '';
+    if (onclick) {
+      const match = onclick.match(/(?:window\.open|location\.href\s*=)\s*['"]([^'"]+)['"]/);
+      if (match && match[1] && !match[1].startsWith('#') && !match[1].toLowerCase().startsWith('javascript:')) {
+        try {
+          return new URL(match[1], window.location.href).href;
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    return null;
+  }
+
   function openLinkInNewTab(element) {
-    if (!(element instanceof HTMLAnchorElement) || !element.href) return false;
-    const url = element.href;
-    const fallback = () => window.open(url, '_blank', 'noopener,noreferrer');
+    const url = findLinkUrl(element);
+    if (!url) return false;
+
+    const fallback = () => {
+      try {
+        const opened = window.open(url, '_blank', 'noopener,noreferrer');
+        return Boolean(opened);
+      } catch {
+        return false;
+      }
+    };
 
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       try {
         chrome.runtime.sendMessage({ source: CLICK_HINTS_SOURCE, type: 'open-new-tab', url }, (response) => {
-          if (chrome.runtime.lastError || response?.ok === false) fallback();
+          if (chrome.runtime.lastError || response?.ok === false) {
+            fallback();
+          }
         });
         return true;
       } catch {
@@ -371,6 +440,7 @@
   function activateHint(hint, openInNewTab = false) {
     closeHints(`Atalho ${hint.code} selecionado.`);
     if (openInNewTab && openLinkInNewTab(hint.element)) return;
+
     window.requestAnimationFrame(() => {
       if (!hint.element.isConnected) return;
       const inputType = hint.element instanceof HTMLInputElement ? hint.element.type : '';
@@ -382,6 +452,20 @@
           hint.element.focus();
         }
       } else {
+        if (openInNewTab) {
+          try {
+            const clickEvent = new MouseEvent('click', {
+              bubbles: true,
+              cancelable: true,
+              ctrlKey: true,
+              metaKey: true,
+            });
+            hint.element.dispatchEvent(clickEvent);
+            return;
+          } catch {
+            // fallback to click()
+          }
+        }
         hint.element.click();
       }
     });
@@ -401,17 +485,18 @@
       renderHints();
       return;
     }
-    if (event.key === 'Enter') {
+    const isEnter = event.key === 'Enter' || event.key === 'Return' || event.code === 'Enter' || event.code === 'NumpadEnter';
+    if (isEnter) {
       event.preventDefault();
       event.stopPropagation();
       const matches = hints.filter(matchesQuery);
       const exactMatches = matches.filter((hint) => hint.code === query);
       const selected = exactMatches.length === 1 ? exactMatches[0] : matches.length === 1 ? matches[0] : null;
-      if (selected) activateHint(selected, event.ctrlKey || event.metaKey);
+      if (selected) activateHint(selected, Boolean(event.ctrlKey || event.metaKey));
       else announce(query ? `Atalho ${query} ainda não identifica um único ponto.` : 'Digite um atalho antes de confirmar.');
       return;
     }
-    if (event.ctrlKey || event.metaKey || event.altKey || event.key.length !== 1) return;
+    if (event.altKey || event.key.length !== 1) return;
 
     const typed = normalizeText(event.key).replace(/\s+/g, '');
     if (!typed) return;
@@ -421,7 +506,10 @@
     renderHints();
   }
 
-  document.addEventListener('keydown', (event) => {
+  if (window.__suapeClickHintsKeydownHandler) {
+    document.removeEventListener('keydown', window.__suapeClickHintsKeydownHandler, true);
+  }
+  const handleDocumentKeydown = (event) => {
     const isToggle = (event.ctrlKey || event.metaKey) && !event.altKey
       && (event.key === ';' || event.code === 'Semicolon');
     if (isToggle) {
@@ -431,5 +519,7 @@
       return;
     }
     if (active) handleActiveKeydown(event);
-  }, true);
+  };
+  window.__suapeClickHintsKeydownHandler = handleDocumentKeydown;
+  document.addEventListener('keydown', handleDocumentKeydown, true);
 })();

@@ -32,6 +32,11 @@ function installGeometry() {
 afterEach(() => {
   document.body.innerHTML = '';
   document.getElementById('suape-click-hints-root')?.remove();
+  if ((window as any).__suapeClickHintsKeydownHandler) {
+    document.removeEventListener('keydown', (window as any).__suapeClickHintsKeydownHandler, true);
+    delete (window as any).__suapeClickHintsKeydownHandler;
+  }
+  delete (window as any).__suapeClickHintsLoaded;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -142,5 +147,70 @@ describe('modo de atalhos mnemônicos da extensão Suape', () => {
     fireEvent.keyDown(document, { key: 'Enter' });
 
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('abre links com elementos filhos e atalho digitado mantendo Ctrl pressionado em nova aba', () => {
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', () => undefined);
+    installGeometry();
+
+    document.body.innerHTML = `
+      <a id="process-link" href="/processo_eletronico/processo/498930/">
+        <i class="icon" style="cursor: pointer;"></i>
+        <span class="label" style="cursor: pointer;">Processo</span>
+      </a>
+      <button id="action-btn">Executar</button>
+    `;
+
+    const link = document.getElementById('process-link')!;
+    setRect(link, 20, 20);
+    const btn = document.getElementById('action-btn')!;
+    setRect(btn, 20, 80);
+
+    const sendMessageMock = vi.fn((_message: any, callback?: (response: any) => void) => {
+      callback?.({ ok: true, tabId: 101 });
+    });
+    vi.stubGlobal('chrome', {
+      runtime: {
+        sendMessage: sendMessageMock,
+      },
+    });
+
+    window.eval(contentScript);
+
+    // Usuário abre com Ctrl+;
+    fireEvent.keyDown(document, { key: ';', code: 'Semicolon', ctrlKey: true });
+
+    // Digita "PR" mesmo mantendo o Ctrl pressionado!
+    fireEvent.keyDown(document, { key: 'p', ctrlKey: true });
+    fireEvent.keyDown(document, { key: 'r', ctrlKey: true });
+
+    // Pressiona Ctrl+Enter
+    fireEvent.keyDown(document, { key: 'Enter', code: 'Enter', ctrlKey: true });
+
+    expect(sendMessageMock).toHaveBeenCalledWith(
+      {
+        source: 'suape-click-hints',
+        type: 'open-new-tab',
+        url: expect.stringMatching(/\/processo_eletronico\/processo\/498930\/$/),
+      },
+      expect.any(Function),
+    );
+
+    // Agora testa botão com Ctrl+Enter disparando MouseEvent com ctrlKey: true
+    let clickedCtrlKey = false;
+    btn.addEventListener('click', (event: MouseEvent) => {
+      clickedCtrlKey = event.ctrlKey;
+    });
+
+    fireEvent.keyDown(document, { key: ';', code: 'Semicolon', ctrlKey: true });
+    fireEvent.keyDown(document, { key: 'e', ctrlKey: true });
+    fireEvent.keyDown(document, { key: 'x', ctrlKey: true });
+    fireEvent.keyDown(document, { key: 'Enter', code: 'Enter', ctrlKey: true });
+
+    expect(clickedCtrlKey).toBe(true);
   });
 });

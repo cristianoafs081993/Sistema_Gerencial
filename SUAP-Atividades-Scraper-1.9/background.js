@@ -331,7 +331,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   ) {
     let url;
     try {
-      url = new URL(String(message.url || ''));
+      url = new URL(String(message.url || ''), sender?.tab?.url || 'https://suap.ifrn.edu.br');
     } catch {
       sendResponse({ ok: false, error: 'URL inválida.' });
       return undefined;

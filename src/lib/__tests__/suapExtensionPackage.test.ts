@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.51');
+    expect(manifest.version).toBe('1.9.52');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms', 'cookies']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
