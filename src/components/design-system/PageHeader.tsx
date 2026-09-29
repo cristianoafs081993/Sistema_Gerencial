@@ -14,6 +14,11 @@ interface PageHeaderProps {
   actions?: ReactNode;
   /** Barra secundária abaixo do título (abas, filtros rápidos, chips). */
   toolbar?: ReactNode;
+  /**
+   * Modo compacto: sem eyebrow, título visível nem descrição. Exibe só a barra secundária
+   * (`toolbar`) e as `actions` na mesma linha. O título continua no DOM (sr-only) para acessibilidade.
+   */
+  compact?: boolean;
   className?: string;
 }
 
@@ -64,6 +69,7 @@ function PageHeaderView({
   description,
   actions,
   toolbar,
+  compact,
   className,
   pathname,
 }: PageHeaderProps & { pathname?: string }) {
@@ -71,6 +77,19 @@ function PageHeaderView({
   const group = screen ? appScreenGroups.find((item) => item.id === screen.groupId) : undefined;
   const resolvedTitle = title ?? screen?.name;
   const resolvedEyebrow = eyebrow ?? group?.name;
+
+  if (compact) {
+    return (
+      <header
+        className={cn('mb-6 flex flex-wrap items-center justify-between gap-3', className)}
+        data-testid="page-header"
+      >
+        {resolvedTitle ? <h1 className="sr-only">{resolvedTitle}</h1> : null}
+        <div className="flex flex-wrap items-center gap-2">{toolbar}</div>
+        {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+      </header>
+    );
+  }
 
   return (
     <header className={cn('mb-6 space-y-4', className)} data-testid="page-header">
@@ -87,9 +106,16 @@ function PageHeaderView({
   );
 }
 
+/** Grupos cujas telas não exibem título visível: o módulo já aparece na navegação e o topo da página fica para seletor de visão e filtros. */
+const COMPACT_HEADER_GROUPS: string[] = ['orcamentario'];
+
 /** Cabeçalho automático do Layout para telas que não declaram `PageHeader` próprio. */
 export function AutoPageHeader() {
   const { pathname } = useLocation();
-  if (!findScreenForPath(pathname)) return null;
+  const screen = findScreenForPath(pathname);
+  if (!screen) return null;
+  if (COMPACT_HEADER_GROUPS.includes(screen.groupId)) {
+    return <h1 className="sr-only">{screen.name}</h1>;
+  }
   return <PageHeaderView pathname={pathname} />;
 }

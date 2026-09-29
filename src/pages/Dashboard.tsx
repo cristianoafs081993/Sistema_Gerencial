@@ -1787,12 +1787,8 @@ export default function Dashboard() {
         onValueChange={(value) => setActiveTab(value as 'corrente' | 'contratos' | 'rap')}
       >
         <PageHeader
+          compact
           title="Painel de execução"
-          description={{
-                corrente: 'Execução orçamentária do exercício: planejado, descentralizado, empenhado e pago.',
-                rap: 'Restos a pagar inscritos e reinscritos, com liquidação no ano e saldo atual.',
-                contratos: 'Despesas mensais dos contratos ativos e projeção de consumo.',
-              }[activeTab]}
           actions={
             <DashboardFiltersSheet
               buttonClassName="relative h-9 gap-2 border-border bg-card text-sm text-foreground shadow-xs hover:bg-muted"

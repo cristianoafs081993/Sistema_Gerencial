@@ -32,7 +32,7 @@ Design system Céu (base Paretto):
 
 - `src/__tests__/designSystemTokens.test.ts` garante tema único (sem `data-suap-theme` nem `SuapThemeSwitcher`), a paleta clara azul-céu no `:root` (navy restrito ao painel do login), Manrope + IBM Plex Mono em `index.css`, `tailwind.config.ts` e `index.html`, botões com `rounded-lg` e ação principal em `primary`, e a ausência do mascote do Paretto.
 - `src/components/__tests__/Layout.test.tsx` confirma que o menu do usuário não oferece mais seletor de temas.
-- `src/components/__tests__/Layout.test.tsx` também cobre o cabeçalho automático (`AutoPageHeader`: módulo + título da rota) e a supressão dele quando a página declara `PageHeader`; `DashboardCurrentTab.test.tsx` cobre a linha única de indicadores e o card Liquidado / Pago; `Dashboard.test.tsx` garante que as visões Orçamento, RAP e Contratos aparecem uma única vez.
+- `src/components/__tests__/Layout.test.tsx` também cobre o cabeçalho automático (`AutoPageHeader`: módulo + título da rota), a supressão dele quando a página declara `PageHeader` e a ausência de título visível nas telas do módulo Orçamentário; `DashboardCurrentTab.test.tsx` cobre a linha única de indicadores e o card Liquidado / Pago; `Dashboard.test.tsx` garante que as visões Orçamento, RAP e Contratos aparecem uma única vez.
 
 Requisições de Compra:
 

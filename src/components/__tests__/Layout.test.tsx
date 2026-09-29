@@ -427,7 +427,7 @@ describe('Layout', () => {
 
   it('exibe o cabeçalho padrão da tela (módulo e título) quando a página não declara o próprio', () => {
     renderWithProviders(
-      <MemoryRouter initialEntries={['/empenhos']}>
+      <MemoryRouter initialEntries={['/contratos']}>
         <Layout>
           <div>conteudo</div>
         </Layout>
@@ -435,8 +435,22 @@ describe('Layout', () => {
     );
 
     const header = screen.getByTestId('page-header');
-    expect(header).toHaveTextContent('Orçamentário');
-    expect(header.querySelector('h1')).toHaveTextContent('Empenhos');
+    expect(header).toHaveTextContent('Contratos');
+    expect(header.querySelector('h1')).toHaveTextContent('Contratos');
+  });
+
+  it('não exibe título visível nas telas do módulo Orçamentário (só h1 acessível)', () => {
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/empenhos']}>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByTestId('page-header')).not.toBeInTheDocument();
+    const heading = screen.getByRole('heading', { level: 1, name: 'Empenhos' });
+    expect(heading).toHaveClass('sr-only');
   });
 
   it('não duplica o cabeçalho quando a página declara PageHeader', () => {

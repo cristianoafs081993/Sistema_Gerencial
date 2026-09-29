@@ -8,7 +8,7 @@ Esta documentacao foi atualizada porque a mudanca altera comportamento visual re
 
 ### `PageHeader`
 
-Cabeçalho padrão de página: eyebrow (módulo), título `h1`, descrição, `actions` e `toolbar`. Sem `title`/`eyebrow`, usa o nome da tela e do grupo de `appScreens` para a rota atual. Ao ser montado dentro do `Layout`, registra-se para suprimir o `AutoPageHeader`.
+Cabeçalho padrão de página: eyebrow (módulo), título `h1`, descrição, `actions` e `toolbar`. Sem `title`/`eyebrow`, usa o nome da tela e do grupo de `appScreens` para a rota atual. Com `compact`, omite eyebrow, título visível e descrição e mostra `toolbar` e `actions` numa única linha (título `sr-only`). Ao ser montado dentro do `Layout`, registra-se para suprimir o `AutoPageHeader`.
 
 ### `SegmentedControl`
 

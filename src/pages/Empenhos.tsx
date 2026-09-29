@@ -273,8 +273,8 @@ export default function Empenhos() {
     <div className="space-y-space-6 pb-space-10">
       <div hidden={isDialogOpen} className="space-y-6">
       <PageHeader
+        compact
         title="Empenhos"
-        description="Notas de empenho do campus: saldo a liquidar, pagamentos e restos a pagar."
         toolbar={
           <SegmentedControl
             aria-label="Tipo de empenho"
