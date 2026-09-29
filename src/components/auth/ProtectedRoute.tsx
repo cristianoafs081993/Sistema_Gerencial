@@ -1,3 +1,4 @@
+import { ShieldCheck } from 'lucide-react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
 import { AppSplash } from '@/components/design-system/AppSplash';
@@ -34,9 +35,9 @@ export function ProtectedRoute() {
 
   if (accessError) {
     return (
-      <div className="min-h-screen bg-white px-4 py-10">
+      <div className="min-h-screen bg-background px-4 py-10">
         <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-xl items-center justify-center">
-          <div className="w-full rounded-xl border border-border-default bg-white px-8 py-10 text-center shadow-sm">
+          <div className="w-full rounded-xl border border-border bg-card px-8 py-10 text-center shadow-lg">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
               <ShieldCheck className="h-5 w-5" />
             </div>
@@ -60,10 +61,10 @@ export function ProtectedRoute() {
     }
 
     return (
-      <div className="min-h-screen bg-white px-4 py-10">
+      <div className="min-h-screen bg-background px-4 py-10">
         <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-xl items-center justify-center">
-          <div className="w-full rounded-xl border border-border-default bg-white px-8 py-10 text-center shadow-sm">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+          <div className="w-full rounded-xl border border-border bg-card px-8 py-10 text-center shadow-lg">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-warning/10 text-warning">
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div className="mt-5 space-y-2">
