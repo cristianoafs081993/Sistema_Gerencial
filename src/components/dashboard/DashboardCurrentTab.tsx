@@ -255,6 +255,7 @@ export function DashboardCurrentTab({
         <ChartPanel
           className="h-full lg:col-span-2"
           title="Evolução da execução"
+          description="Acumulado mensal de planejado, empenhado e liquidado"
           loading={isLoading}
           actions={
             <div className="flex flex-wrap gap-3 text-xs font-semibold text-muted-foreground">
@@ -308,7 +309,7 @@ export function DashboardCurrentTab({
           </div>
         </ChartPanel>
 
-        <ChartPanel title="Funil de execução" loading={isLoading} className="h-full">
+        <ChartPanel title="Funil de execução" description="Quanto do planejado avançou em cada etapa" loading={isLoading} className="h-full">
           <ol className="space-y-4" aria-label="Funil de execução">
             {funnelSteps.map((step) => (
               <li key={step.label}>
@@ -332,6 +333,7 @@ export function DashboardCurrentTab({
       <div className="grid gap-6 lg:grid-cols-2">
         <ChartPanel
           title="Descentralizações"
+          description="Volume distribuído por dimensão"
           loading={isLoading}
           heightClassName="h-[350px]"
         >
@@ -360,6 +362,7 @@ export function DashboardCurrentTab({
 
         <ChartPanel
           title="Top naturezas"
+          description="Valor empenhado por natureza de despesa"
           loading={isLoading}
           heightClassName="h-[350px]"
         >
