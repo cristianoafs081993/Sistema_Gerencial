@@ -17,6 +17,11 @@
   const PROCESS_STEP_KEY_PREFIX = 'siages-process-step:';
   const DOCUMENT_REVIEW_MAX_BYTES = 20 * 1024 * 1024;
   const DOCUMENT_VIEWER_PATH = /^\/documento_eletronico\/visualizar_documento(?:_digitalizado)?\/(\d+)\/?$/;
+  const SCANNED_DOCUMENT_PATH = /^\/documento_eletronico\/visualizar_documento_digitalizado\/\d+\/?$/;
+
+  function isScannedDocumentPage() {
+    return SCANNED_DOCUMENT_PATH.test(location.pathname);
+  }
   const DEFAULT_SNIPPETS = {
     '/ifrn': 'Instituto Federal de Educação, Ciência e Tecnologia do Rio Grande do Norte',
     '/cn': 'Currais Novos',
@@ -731,6 +736,8 @@
     root.dataset.collapsed = String(state.collapsed);
     root.dataset.maximized = String(state.maximized);
     root.setAttribute('aria-label', 'Suape - ferramentas do processo');
+    const collapseLabel = state.collapsed ? 'Expandir painel' : 'Minimizar painel';
+    const collapseIcon = state.collapsed ? '+' : '−';
     root.innerHTML = `
       <div class="suape-shell">
         <header class="suape-header">
@@ -738,7 +745,7 @@
             <div class="suape-brand-row">
               <strong class="suape-brand-title">SIAGES</strong>
               <div class="suape-header-actions">
-                <button type="button" class="suape-icon-button" data-action="collapse" aria-label="Minimizar painel" title="Minimizar painel">−</button>
+                <button type="button" class="suape-icon-button" data-action="collapse" aria-label="${collapseLabel}" title="${collapseLabel}">${collapseIcon}</button>
                 <button type="button" class="suape-icon-button" data-action="maximize" aria-label="Maximizar painel" title="Maximizar painel">⛶</button>
               </div>
             </div>
@@ -801,7 +808,9 @@
         maxButton.setAttribute('title', state.maximized ? 'Restaurar tamanho' : 'Maximizar painel');
       }
     }
-    await storageSet('local', { [COLLAPSED_KEY]: state.collapsed });
+    if (!isScannedDocumentPage()) {
+      await storageSet('local', { [COLLAPSED_KEY]: state.collapsed });
+    }
   }
   function toggleMaximized() {
     state.maximized = !state.maximized;
@@ -896,59 +905,59 @@
     appendSection(container, 'Processo', (section) => {
       appendCopyRow(section, 'Processo', process?.numProcesso || fallback.processNumber, true);
       appendCopyRow(section, 'SUAP ID', process?.suapId || fallback.suapId, true);
-      appendCopyRow(section, 'Caixa', process?.caixa);
     });
-    renderProcessFlow(container);
-    if (!process) return;
-    const full = process.dadosCompletos || {}; const bank = full.dados_bancarios || {}; const taxes = full.retencoes_tributarias || {};
-    const invoices = Array.isArray(full.notas_fiscais)
-      ? full.notas_fiscais
-        .filter((invoice) => invoice && typeof invoice === 'object')
-        .map((invoice) => ({
-          numero: cleanText(invoice.numero),
-          data_emissao: cleanText(invoice.data_emissao),
-          valor: cleanText(invoice.valor),
-        }))
-        .filter((invoice) => invoice.numero || invoice.data_emissao || invoice.valor)
-      : [];
-    const hasMultipleInvoices = invoices.length > 1;
-    const workflow = full.workflow || {};
-    appendSection(container, 'Beneficiário', (section) => {
-      appendCopyRow(section, 'Nome', process.beneficiario);
-      appendCopyRow(section, 'CPF/CNPJ', process.cpfCnpj, true);
-      appendCopyRow(section, 'Assunto', process.assunto);
-    });
-    appendSection(container, 'Documento e pagamento', (section) => {
-      appendCopyRow(section, 'Valor', full.val_nf);
-      appendCopyRow(section, 'NS', workflow.nsNumero || full.ns_numero, true);
-      appendCopyRow(section, 'Contrato', process.contrato || full.contrato_numero, true);
-      invoices.forEach((invoice, index) => {
-        const suffix = invoices.length > 1 ? ` ${index + 1}` : '';
-        appendCopyRow(section, `Nota fiscal${suffix}`, invoice.numero, true);
-        appendCopyRow(section, `Emissão${suffix}`, invoice.data_emissao);
-        appendCopyRow(section, `Valor NF${suffix}`, invoice.valor);
+    if (process) {
+      const full = process.dadosCompletos || {}; const bank = full.dados_bancarios || {}; const taxes = full.retencoes_tributarias || {};
+      const invoices = Array.isArray(full.notas_fiscais)
+        ? full.notas_fiscais
+          .filter((invoice) => invoice && typeof invoice === 'object')
+          .map((invoice) => ({
+            numero: cleanText(invoice.numero),
+            data_emissao: cleanText(invoice.data_emissao),
+            valor: cleanText(invoice.valor),
+          }))
+          .filter((invoice) => invoice.numero || invoice.data_emissao || invoice.valor)
+        : [];
+      const hasMultipleInvoices = invoices.length > 1;
+      const workflow = full.workflow || {};
+      appendSection(container, 'Beneficiário', (section) => {
+        appendCopyRow(section, 'Nome', process.beneficiario);
+        appendCopyRow(section, 'CPF/CNPJ', process.cpfCnpj, true);
+        appendCopyRow(section, 'Assunto', process.assunto);
       });
-    });
-    appendSection(container, 'Dados bancários', (section) => {
-      appendCopyRow(section, 'Banco', bank.banco);
-      appendCopyRow(section, 'Agência', bank.agencia, true);
-      appendCopyRow(section, 'Conta', bank.conta, true);
-    });
-    const empenhos = normalizeEmpenhos(full.empenhos);
-    appendSection(container, hasMultipleInvoices ? 'Empenhos' : 'Retenções e empenhos', (section) => {
-      if (!hasMultipleInvoices) {
-        if (taxes.optante_simples_nacional) appendCopyRow(section, 'Regime', 'Optante pelo Simples Nacional');
-        [['ISS', taxes.iss], ['INSS', taxes.inss], ['IR', taxes.ir], ['CSLL', taxes.csll], ['COFINS', taxes.cofins], ['PIS/PASEP', taxes.pis_pasep]].forEach(([label, value]) => appendCopyRow(section, label, value));
-      }
-      empenhos.forEach((value, index) => appendCopyRow(section, `Empenho ${index + 1}`, value, true));
-      if (empenhos.length > 1) appendCopyRow(section, 'Todos', empenhos.join(', '), true);
-    });
-    if (workflow.concluido) appendSection(container, 'Conclusão', (section) => {
-      appendCopyRow(section, 'NS registrada', workflow.nsNumero || full.ns_numero, true);
-      appendCopyRow(section, 'Concluído em', workflow.concluidoEm ? formatDate(workflow.concluidoEm) : '');
-      appendCopyRow(section, 'Concluído por', workflow.concluidoPor);
-      appendCopyRow(section, 'Análise', workflow.analiseLiquidacao?.resumo);
-    });
+      appendSection(container, 'Documento e pagamento', (section) => {
+        appendCopyRow(section, 'Valor', full.val_nf);
+        appendCopyRow(section, 'NS', workflow.nsNumero || full.ns_numero, true);
+        appendCopyRow(section, 'Contrato', process.contrato || full.contrato_numero, true);
+        invoices.forEach((invoice, index) => {
+          const suffix = invoices.length > 1 ? ` ${index + 1}` : '';
+          appendCopyRow(section, `Nota fiscal${suffix}`, invoice.numero, true);
+          appendCopyRow(section, `Emissão${suffix}`, invoice.data_emissao);
+          appendCopyRow(section, `Valor NF${suffix}`, invoice.valor);
+        });
+      });
+      appendSection(container, 'Dados bancários', (section) => {
+        appendCopyRow(section, 'Banco', bank.banco);
+        appendCopyRow(section, 'Agência', bank.agencia, true);
+        appendCopyRow(section, 'Conta', bank.conta, true);
+      });
+      const empenhos = normalizeEmpenhos(full.empenhos);
+      appendSection(container, hasMultipleInvoices ? 'Empenhos' : 'Retenções e empenhos', (section) => {
+        if (!hasMultipleInvoices) {
+          if (taxes.optante_simples_nacional) appendCopyRow(section, 'Regime', 'Optante pelo Simples Nacional');
+          [['ISS', taxes.iss], ['INSS', taxes.inss], ['IR', taxes.ir], ['CSLL', taxes.csll], ['COFINS', taxes.cofins], ['PIS/PASEP', taxes.pis_pasep]].forEach(([label, value]) => appendCopyRow(section, label, value));
+        }
+        empenhos.forEach((value, index) => appendCopyRow(section, `Empenho ${index + 1}`, value, true));
+        if (empenhos.length > 1) appendCopyRow(section, 'Todos', empenhos.join(', '), true);
+      });
+      if (workflow.concluido) appendSection(container, 'Conclusão', (section) => {
+        appendCopyRow(section, 'NS registrada', workflow.nsNumero || full.ns_numero, true);
+        appendCopyRow(section, 'Concluído em', workflow.concluidoEm ? formatDate(workflow.concluidoEm) : '');
+        appendCopyRow(section, 'Concluído por', workflow.concluidoPor);
+        appendCopyRow(section, 'Análise', workflow.analiseLiquidacao?.resumo);
+      });
+    }
+    renderProcessFlow(container);
   }
 
   function renderProcessFlow(container) {
@@ -1159,10 +1168,13 @@
   }
 
   function renderAiPanel() {
-    const container = panel('ai'); container.innerHTML = '';
-    const section = createElement('section', 'suape-section'); section.appendChild(createElement('h3', 'suape-section-title', 'Gerador de documentos com IA'));
-    const body = createElement('div', 'suape-form'); body.style.padding = '11px'; body.appendChild(createElement('p', 'suape-help', 'Abra o gerador completo para revisar, editar, copiar ou clonar o despacho no SUAP.'));
-    const button = createElement('button', 'suape-button suape-full', 'Gerar documento'); button.type = 'button'; button.addEventListener('click', openModal); body.appendChild(button); section.appendChild(body); container.appendChild(section);
+    const container = panel('ai');
+    if (!container) return;
+    container.innerHTML = '';
+    const button = createElement('button', 'suape-button suape-full', 'Gerar documento');
+    button.type = 'button';
+    button.addEventListener('click', openModal);
+    container.appendChild(button);
   }
   function renderShortcuts(filter = '') {
     const container = panel('shortcuts'); container.innerHTML = '';
@@ -1551,7 +1563,7 @@
     ]);
     const hasPersistedProcessState = await restorePersistedProcessState();
     state.theme = theme === 'light' ? 'light' : 'dark';
-    state.collapsed = Boolean(collapsed);
+    state.collapsed = isScannedDocumentPage() ? true : Boolean(collapsed);
     state.selectedMappingId = typeof selectedMappingId === 'string' ? selectedMappingId : '';
     state.snippets = storedSnippets && Object.keys(storedSnippets).length ? storedSnippets : { ...DEFAULT_SNIPPETS };
     if (Array.isArray(storedCollapsedSections) && storedCollapsedSections.length && !state.collapsedSections?.size) {
@@ -1589,6 +1601,6 @@
     }
     return undefined;
   });
-  window.__siagesSuapProcessDocument = { getProcessId, getProcessNumber, buildContext, parseProcessRoute, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, openModal, closeModal, openDocumentAnalysisModal, closeDocumentAnalysisModal, scanDocumentCards, installDocumentAnalysis, disposeDocumentAnalysis, classifyDocumentForAnalysis, downloadProcessPdfFromSuap, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed, syncProcessToRegistry };
+  window.__siagesSuapProcessDocument = { isScannedDocumentPage, getProcessId, getProcessNumber, buildContext, parseProcessRoute, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, renderAiPanel, openModal, closeModal, openDocumentAnalysisModal, closeDocumentAnalysisModal, scanDocumentCards, installDocumentAnalysis, disposeDocumentAnalysis, classifyDocumentForAnalysis, downloadProcessPdfFromSuap, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed, syncProcessToRegistry };
   if (!window.__SIAGES_SUAP_PROCESS_TEST__) void installToolkit();
 })();

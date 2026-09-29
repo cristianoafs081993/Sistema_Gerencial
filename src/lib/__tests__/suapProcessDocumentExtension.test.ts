@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { extensionFixturePath } from '@/test/extensionFixtures';
 
 type ExtensionApi = {
+  isScannedDocumentPage?: () => boolean;
   getProcessId: () => string | null;
   getProcessNumber: () => string;
   buildContext: (session?: unknown) => { payload: { suapId: string; processNumber: string } } | null;
@@ -878,5 +879,116 @@ describe('process-document 1.9', () => {
     const root = document.getElementById('siages-suap-toolkit')!;
     const toast = root.querySelector('.suape-automation-toast');
     expect(toast?.textContent).toBe('Upload aberto!');
+  });
+  it('remove o item Caixa e posiciona Caminho do processo como ultima secao do resumo', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-snapshot', version: 1, payload: {
+        fallback: { suapId: '321', processNumber: '23035.000001.2026-11' },
+        process: {
+          suapId: '321', numProcesso: '23035.000001.2026-11', status: 'success',
+          beneficiario: 'Fornecedor Alfa', caixa: 'DIAD',
+          dadosCompletos: { val_nf: 'R$ 1.500,00' },
+        },
+      } },
+    }));
+
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-flow', version: 1, payload: {
+        summary: {
+          mappingId: 'map-1', mappingTitle: 'Liquidação e pagamento', mappingVersion: '1.0', fullPagePath: '/mapeamentos/map-1?suapId=321',
+          steps: [{ nodeId: 'step-1', code: '1', title: 'Conferir documentos', responsible: 'DIAD/CN', status: 'current' }],
+        },
+      } },
+    }));
+
+    const summaryPanel = document.querySelector('[data-panel="summary"]')!;
+    expect(summaryPanel).toBeTruthy();
+    expect(summaryPanel).not.toHaveTextContent('Caixa');
+    const processSection = summaryPanel.querySelector('.suape-section');
+    expect(processSection).toBeTruthy();
+    expect(processSection).not.toHaveTextContent('Caixa');
+    expect(processSection).not.toHaveTextContent('DIAD');
+    expect(summaryPanel).toHaveTextContent('23035.000001.2026-11');
+    expect(summaryPanel).toHaveTextContent('Fornecedor Alfa');
+
+    const sections = summaryPanel.querySelectorAll('section');
+    expect(sections.length).toBeGreaterThan(1);
+    const lastSection = sections[sections.length - 1];
+    expect(lastSection.classList.contains('suape-flow-card')).toBe(true);
+  });
+
+  it('inicializa a extensao minimizada por padrao ao abrir pdfs digitalizados', async () => {
+    localValues['siages-toolkit-collapsed'] = false;
+    document.body.innerHTML = `
+      <main>
+        <div id="breadcrumbs">
+          <a href="/processo_eletronico/processo/321/">Processo 23035.000001.2026-11</a>
+        </div>
+        <p>Visualizador de documento digitalizado</p>
+      </main>
+    `;
+    window.history.replaceState(null, '', '/documento_eletronico/visualizar_documento_digitalizado/2693291/');
+    delete (window as typeof window & Record<string, unknown>).__siagesSuapProcessDocument;
+
+    const api = loadProcessScript();
+    expect(api.isScannedDocumentPage?.()).toBe(true);
+    expect(api.getProcessId()).toBe('321');
+
+    await api.installToolkit();
+
+    const root = document.getElementById('siages-suap-toolkit')!;
+    expect(root).toBeTruthy();
+    expect(root.dataset.collapsed).toBe('true');
+
+    const collapseButton = root.querySelector('[data-action="collapse"]') as HTMLButtonElement;
+    expect(collapseButton).toBeTruthy();
+    expect(collapseButton.textContent).toBe('+');
+    expect(collapseButton.getAttribute('aria-label')).toBe('Expandir painel');
+    expect(collapseButton.getAttribute('title')).toBe('Expandir painel');
+
+    // Ao clicar para expandir temporariamente na tela de pdf digitalizado, não altera a preferência global persistida
+    collapseButton.click();
+    expect(root.dataset.collapsed).toBe('false');
+    expect(collapseButton.textContent).toBe('−');
+    expect(collapseButton.getAttribute('aria-label')).toBe('Minimizar painel');
+    expect(localValues['siages-toolkit-collapsed']).toBe(false);
+  });
+
+  it('renderiza apenas o botao na aba de IA do toolkit', async () => {
+    document.body.innerHTML = `
+      <main>
+        <div id="breadcrumbs">
+          <a href="/processo_eletronico/processo/321/">Processo 23035.000001.2026-11</a>
+        </div>
+      </main>
+    `;
+    window.history.replaceState(null, '', '/processo_eletronico/processo/321/');
+    delete (window as typeof window & Record<string, unknown>).__siagesSuapProcessDocument;
+
+    const api = loadProcessScript();
+    await api.installToolkit();
+    api.selectTab('ai');
+
+    const aiPanel = document.querySelector('[data-panel="ai"]')!;
+    expect(aiPanel).toBeTruthy();
+    expect(aiPanel).not.toHaveTextContent('Gerador de documentos com IA');
+    expect(aiPanel).not.toHaveTextContent('Abra o gerador completo para revisar');
+    expect(aiPanel.querySelector('.suape-section')).toBeNull();
+
+    const button = aiPanel.querySelector('button') as HTMLButtonElement;
+    expect(button).toBeTruthy();
+    expect(button.textContent).toBe('Gerar documento');
+    expect(button.className).toContain('suape-button');
+    expect(button.className).toContain('suape-full');
+
+    button.click();
+    expect(document.getElementById('siages-suap-dispatch-modal')).toBeTruthy();
   });
 });

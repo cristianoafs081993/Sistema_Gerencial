@@ -86,7 +86,7 @@ export default function SuapExtensionDispatch() {
         });
       })
       .catch(() => {
-        if (active) setError('Nao foi possivel consultar este processo no espelho SUAP. Tente novamente.');
+        if (active) setError('Não foi possível consultar este processo no espelho SUAP. Tente novamente.');
       });
 
     return () => {

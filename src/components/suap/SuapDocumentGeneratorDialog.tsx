@@ -132,7 +132,7 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
     const url = buildSuapCloneUrl({ documentType: 'despacho', html: currentItem.html, mode: 'review' });
     window.open(url, '_blank', 'noopener,noreferrer');
     onQueueChange(updateCurrentItem(queue, { status: 'cloned' }));
-    toast.success('Clone aberto para revisao no SUAP.');
+    toast.success('Clone aberto para revisão no SUAP.');
   };
 
   const skipCurrent = () => {
@@ -147,7 +147,7 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen || pendingCount === 0 || window.confirm('Ha documentos pendentes nesta fila. Deseja descartar o trabalho?')) {
+    if (nextOpen || pendingCount === 0 || window.confirm('Há documentos pendentes nesta fila. Deseja descartar o trabalho?')) {
       onOpenChange(nextOpen);
     }
   };
@@ -160,7 +160,7 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
             <div className="min-w-0">
               <DialogTitle className="flex items-center gap-2 font-ui text-lg text-text-primary">
                 <FileText className="h-5 w-5 text-emerald-600" />
-                Despacho de Liquidacao
+                Despacho de Liquidação
               </DialogTitle>
               <DialogDescription className="mt-1 text-xs">
                 {queue ? `${queue.currentIndex + 1} de ${queue.items.length} documento(s)` : 'Preparando fila'}
@@ -170,7 +170,7 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
               <div className="text-right">
                 <p className="font-mono text-xs font-semibold text-text-primary">{processo.numProcesso || `SUAP ${processo.suapId}`}</p>
                 <Badge variant="outline" className="mt-1 text-[10px]">
-                  {isAssisted ? 'Dados extraidos por IA' : 'Preenchimento manual'}
+                  {isAssisted ? 'Dados extraídos por IA' : 'Preenchimento manual'}
                 </Badge>
               </div>
             ) : null}
@@ -185,7 +185,7 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
             </div>
           ) : isResolving ? (
             <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-text-secondary">
-              <Loader2 className="h-4 w-4 animate-spin" /> Montando despacho com os dados extraidos...
+              <Loader2 className="h-4 w-4 animate-spin" /> Montando despacho com os dados extraídos...
             </div>
           ) : (
             <div className="grid gap-5 lg:grid-cols-[330px_minmax(0,1fr)]">
@@ -200,7 +200,7 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
                   <div className="space-y-4">
                     <div className="space-y-2 text-xs text-text-secondary">
                       <p className="font-semibold text-text-primary">Minuta assistida</p>
-                      <p>A IA ja preencheu os dados encontrados. Marcadores no texto indicam campos pendentes.</p>
+                      <p>A IA já preencheu os dados encontrados. Marcadores no texto indicam campos pendentes.</p>
                     </div>
                     {manualFields ? (
                       <ManualDespachoForm
@@ -230,7 +230,7 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
                   />
                 ) : (
                   <div className="flex min-h-[520px] items-center justify-center text-sm text-text-muted">
-                    Preencha os campos e gere a previa do despacho.
+                    Preencha os campos e gere a prévia do despacho.
                   </div>
                 )}
               </section>
@@ -287,10 +287,10 @@ function ManualDespachoForm({
         <p className="flex items-center gap-2 text-xs font-semibold text-text-primary"><Sparkles className="h-4 w-4 text-amber-600" /> {title}</p>
         {description ? <p className="text-xs leading-5 text-text-secondary">{description}</p> : null}
       </div>
-      <div className="space-y-1"><Label>Finalidade</Label><Select value={fields.finalidade} onValueChange={(value) => onChange('finalidade', value as ManualDespachoFields['finalidade'])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="servico">Servi&ccedil;o</SelectItem><SelectItem value="aquisicao">Aquisi&ccedil;&atilde;o</SelectItem><SelectItem value="projeto">Projeto</SelectItem><SelectItem value="bolsa-sem-projeto">Bolsa sem projeto</SelectItem><SelectItem value="auxilio-transporte">Auxilio transporte</SelectItem><SelectItem value="pafe">PAFE</SelectItem><SelectItem value="auxilio-moradia">Auxilio moradia</SelectItem></SelectContent></Select></div>
+      <div className="space-y-1"><Label>Finalidade</Label><Select value={fields.finalidade} onValueChange={(value) => onChange('finalidade', value as ManualDespachoFields['finalidade'])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="servico">Servi&ccedil;o</SelectItem><SelectItem value="aquisicao">Aquisi&ccedil;&atilde;o</SelectItem><SelectItem value="projeto">Projeto</SelectItem><SelectItem value="bolsa-sem-projeto">Bolsa sem projeto</SelectItem><SelectItem value="auxilio-transporte">Auxílio-transporte</SelectItem><SelectItem value="pafe">PAFE</SelectItem><SelectItem value="auxilio-moradia">Auxílio-moradia</SelectItem></SelectContent></Select></div>
       <div className="space-y-1"><Label>Processo (opcional)</Label><Input value={fields.processo} onChange={(event) => onChange('processo', event.target.value)} /></div>
       {!noFavorecido ? <div className="space-y-1"><Label>Favorecido</Label><Input value={fields.favorecido} onChange={(event) => onChange('favorecido', event.target.value)} /></div> : null}
-      {fields.finalidade === 'servico' || fields.finalidade === 'aquisicao' ? <div className="space-y-1"><Label>Descricao</Label><Textarea value={fields.descricao} onChange={(event) => onChange('descricao', event.target.value)} /></div> : null}
+      {fields.finalidade === 'servico' || fields.finalidade === 'aquisicao' ? <div className="space-y-1"><Label>Descrição</Label><Textarea value={fields.descricao} onChange={(event) => onChange('descricao', event.target.value)} /></div> : null}
       {fields.finalidade === 'projeto' ? <><div className="space-y-1"><Label>Projeto</Label><Input value={fields.projeto} onChange={(event) => onChange('projeto', event.target.value)} /></div><div className="space-y-1"><Label>Edital</Label><Input value={fields.edital} onChange={(event) => onChange('edital', event.target.value)} /></div></> : null}
       <div className="space-y-1"><Label>Valor (R$)</Label><Input value={fields.valor} onChange={(event) => onChange('valor', event.target.value)} /></div>
       <div className="space-y-1"><Label>Empenho(s)</Label><Input value={fields.empenho} onChange={(event) => onChange('empenho', event.target.value)} /></div>

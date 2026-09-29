@@ -145,7 +145,7 @@ describe('SUAP process PDF AI extraction flow', () => {
     expect(pageSource).toContain('startDispatchGeneration(selectedProcesses)');
     expect(pageSource).toContain('startDispatchGeneration([processo])');
     expect(pageSource).toContain('FilePenLine');
-    expect(dialogSource).toContain('Despacho de Liquidacao');
+    expect(dialogSource).toContain('Despacho de Liquidação');
     expect(dialogSource).toContain('buildSuapCloneUrl');
     expect(dialogSource).toContain('copySuapDocumentToClipboard');
   });
