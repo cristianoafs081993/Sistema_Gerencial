@@ -1,3 +1,4 @@
+import { LoadingState } from '@/components/design-system/LoadingState';
 import { PageHeader } from '@/components/design-system/PageHeader';
 import { useEffect, useMemo, useState } from 'react';
 import { KeyRound, Loader2, MailPlus, Plus, RefreshCw, Save, Trash2, UserPlus } from 'lucide-react';
@@ -305,10 +306,7 @@ export default function ControleUsuarios() {
 
       {isLoading && !state ? (
         <SectionPanel>
-          <div className="flex items-center justify-center gap-3 py-12 text-sm text-slate-500">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Carregando usuários e permissões...
-          </div>
+          <LoadingState label="Carregando usuários e permissões..." />
         </SectionPanel>
       ) : null}
 

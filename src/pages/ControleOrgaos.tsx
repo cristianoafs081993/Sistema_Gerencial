@@ -1,3 +1,4 @@
+import { LoadingState } from '@/components/design-system/LoadingState';
 import { PageHeader } from '@/components/design-system/PageHeader';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -284,10 +285,7 @@ export default function ControleOrgaos() {
 
       {isLoading && !orgsState ? (
         <SectionPanel>
-          <div className="flex items-center justify-center gap-3 py-12 text-sm text-slate-500">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Carregando órgãos...
-          </div>
+          <LoadingState label="Carregando órgãos..." />
         </SectionPanel>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">

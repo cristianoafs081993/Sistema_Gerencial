@@ -389,6 +389,44 @@
 }
 
 /* ============================================================
+   4b. ESTADOS DE CARREGAMENTO
+   ============================================================ */
+
+@layer components {
+  /* Esqueleto com brilho suave azul-céu (sem pulsar o bloco inteiro) */
+  .skeleton {
+    background-color: hsl(var(--muted));
+    background-image: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--accent)) 45%,
+      hsl(var(--muted)) 90%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+
+  /* Barra de progresso indeterminada da tela de abertura */
+  .loading-bar {
+    @apply relative h-[3px] w-40 overflow-hidden rounded-full bg-muted;
+  }
+  .loading-bar::after {
+    content: '';
+    @apply absolute inset-y-0 left-0 w-1/3 rounded-full bg-primary;
+    animation: loading-bar 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  @keyframes loading-bar {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton { animation: none; }
+    .loading-bar::after { animation: none; width: 100%; opacity: 0.5; }
+  }
+}
+
+/* ============================================================
    5. UTILITY LAYER — Micro-interações
    ============================================================ */
 

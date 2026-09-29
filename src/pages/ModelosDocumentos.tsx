@@ -1,3 +1,4 @@
+import { LoadingState } from '@/components/design-system/LoadingState';
 import { PageHeader } from '@/components/design-system/PageHeader';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Loader2, RefreshCw, Upload } from 'lucide-react';
@@ -263,10 +264,7 @@ export default function ModelosDocumentos() {
 
         <SectionPanel title="Modelo ativo" description="Versao usada hoje pelo editor.">
           {isLoading ? (
-            <div className="flex items-center gap-2 py-8 text-sm text-text-secondary">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Carregando modelos...
-            </div>
+            <LoadingState label="Carregando modelos..." className="py-8" />
           ) : activeTemplate ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">

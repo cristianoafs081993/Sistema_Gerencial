@@ -1,3 +1,4 @@
+import { LoadingState } from '@/components/design-system/LoadingState';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -349,11 +350,8 @@ export default function SuapProcessMappingPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-[600px] items-center justify-center bg-[#f8fafc] font-ui">
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600 shadow-sm">
-          <Loader2 className="h-5 w-5 animate-spin text-brand-600" />
-          Carregando mapeamento de processos...
-        </div>
+      <main className="flex min-h-[600px] items-center justify-center bg-background font-ui">
+        <LoadingState label="Carregando mapeamento de processos..." />
       </main>
     );
   }

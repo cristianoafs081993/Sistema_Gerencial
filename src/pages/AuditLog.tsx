@@ -1,3 +1,4 @@
+import { LoadingState } from '@/components/design-system/LoadingState';
 import { PageHeader } from '@/components/design-system/PageHeader';
 import { useCallback, useEffect, useState } from 'react';
 import { FileSearch, Loader2, RefreshCw } from 'lucide-react';
@@ -212,10 +213,7 @@ export default function AuditLog() {
         }
       >
         {isLoading ? (
-          <div className="flex items-center justify-center gap-3 py-12 text-sm text-slate-500">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Carregando registros...
-          </div>
+          <LoadingState label="Carregando registros..." />
         ) : entries.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-12 text-sm text-slate-400">
             <FileSearch className="h-8 w-8" />

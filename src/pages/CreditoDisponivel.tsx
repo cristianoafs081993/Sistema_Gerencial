@@ -1,3 +1,4 @@
+import { TableSkeletonRows } from '@/components/design-system/TableSkeletonRows';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Eye, Loader2, RefreshCw, Search } from 'lucide-react';
@@ -151,14 +152,7 @@ export default function CreditoDisponivel() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={5}>
-                  <div className="flex items-center justify-center gap-2 py-10 text-sm text-text-secondary">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Carregando crédito disponível...
-                  </div>
-                </TableCell>
-              </TableRow>
+              <TableSkeletonRows columns={5} rows={6} widths={["w-20", "w-48", "w-28", "w-24", "w-24"]} />
             ) : paginatedRows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5}>

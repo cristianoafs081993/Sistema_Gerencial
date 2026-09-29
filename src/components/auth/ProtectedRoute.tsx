@@ -1,6 +1,6 @@
-import { Loader2, ShieldCheck } from 'lucide-react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
+import { AppSplash } from '@/components/design-system/AppSplash';
 import { useAuth } from '@/contexts/AuthContext';
 import { appScreens } from '@/lib/appScreens';
 import { buildAuthRoute } from '@/lib/auth';
@@ -21,25 +21,10 @@ export function ProtectedRoute() {
 
   if (isLoading || (isAuthenticated && isAccessLoading)) {
     return (
-      <div className="min-h-screen bg-background px-4 py-10">
-        <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-xl items-center justify-center">
-          <div className="w-full rounded-xl border border-border bg-card px-8 py-12 text-center shadow-lg">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-            <div className="mt-5 space-y-2">
-              <p className="text-lg font-bold text-foreground">Validando sessão</p>
-              <p className="text-sm leading-6 text-muted-foreground">
-                O {APP_BRAND.name} está confirmando sua autenticação e permissões.
-              </p>
-            </div>
-            <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-primary/10 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Sessão persistente habilitada
-            </div>
-          </div>
-        </div>
-      </div>
+      <AppSplash
+        label="Validando sessão"
+        description={`O ${APP_BRAND.name} está confirmando sua autenticação e permissões.`}
+      />
     );
   }
 

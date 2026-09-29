@@ -1,3 +1,6 @@
+import { AppSplash } from '@/components/design-system/AppSplash';
+import { LoadingState } from '@/components/design-system/LoadingState';
+import { PageLoadingSkeleton } from '@/components/design-system/PageLoadingSkeleton';
 import { useState, type ComponentType } from 'react';
 import RichTextEditor from '@/components/Editor/RichTextEditor';
 import { StatCard } from '@/components/StatCard';
@@ -1487,6 +1490,36 @@ function ThemePanel({ mode }: { mode: 'light' | 'dark' }) {
   );
 }
 
+function LoadingStatesConcept() {
+  return (
+    <div className="border border-border-default rounded-radius-lg bg-surface-card p-4 space-y-4">
+      <p className="font-[Public_Sans] text-xs uppercase tracking-[0.12em] font-semibold text-text-muted">
+        Estados de carregamento (produção)
+      </p>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+        <div className="rounded-radius-md border border-border-default p-3 space-y-2">
+          <p className="font-[Public_Sans] text-xs font-semibold text-text-secondary">
+            Abertura / validação de sessão (AppSplash)
+          </p>
+          <AppSplash className="min-h-0 py-10" label="Validando sessão" description="Confirmando autenticação e permissões." />
+        </div>
+        <div className="rounded-radius-md border border-border-default p-3 space-y-2">
+          <p className="font-[Public_Sans] text-xs font-semibold text-text-secondary">
+            Dentro do painel (LoadingState)
+          </p>
+          <LoadingState label="Carregando registros..." />
+        </div>
+        <div className="rounded-radius-md border border-border-default p-3 space-y-2 xl:col-span-2">
+          <p className="font-[Public_Sans] text-xs font-semibold text-text-secondary">
+            Troca de rota dentro do shell (PageLoadingSkeleton)
+          </p>
+          <PageLoadingSkeleton className="min-h-0" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DesignSystemPreview() {
   return (
     <div className="space-y-6 pb-10">
@@ -1507,6 +1540,7 @@ export default function DesignSystemPreview() {
 
       <EditorAndAIConcept />
       <SkeletonGalleryConcept />
+      <LoadingStatesConcept />
       <CoverageMatrixConcept />
     </div>
   );
