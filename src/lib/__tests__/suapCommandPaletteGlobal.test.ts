@@ -316,4 +316,134 @@ describe('paleta global da extensao Suape', () => {
     fireEvent.keyDown(contractInput, { key: 'Enter' });
     expect(assignedUrl).toBe('https://suap.ifrn.edu.br/admin/contratos/contrato/?campi=3&q=12%2F2024&tab=tab_ativos');
   });
+
+  it('permite usar atalhos de processo com ID explícito (up, enc, etc.) mesmo fora da página do processo', async () => {
+    vi.useFakeTimers();
+    const { fetchMock } = createFetchMock();
+    let assignedUrl = '';
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        hostname: 'example.com',
+        pathname: '/',
+        search: '',
+        set href(url: string) { assignedUrl = url; },
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    window.eval(contentScript);
+    const input = openPalette();
+    await flushMicrotasks();
+
+    // 1. Atalho 'up 498930' (aciona automação com payload no hash e no storage)
+    fireEvent.input(input, { target: { value: 'up 498930' } });
+    expect(document.body.textContent).toContain('Fazer Upload de Documento');
+    expect(document.body.textContent).toContain('#498930');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(assignedUrl).toContain('https://suap.ifrn.edu.br/processo_eletronico/documento_upload/498930/#siagesUpload=');
+    const hashPart = assignedUrl.split('#siagesUpload=')[1];
+    expect(hashPart).toBeDefined();
+    const parsedPayload = JSON.parse(decodeURIComponent(hashPart));
+    expect(parsedPayload).toEqual({
+      source: 'siages',
+      version: 1,
+      action: 'suap_upload_document',
+      suapId: '498930',
+      tipoConferencia: 'Cópia Simples',
+      tipoDocumento: 'Liquidação',
+      assunto: 'Liquidação',
+    });
+    const stored = JSON.parse(sessionStorage.getItem('siagesUploadPendingV1') || '{}');
+    expect(stored.payload).toEqual(parsedPayload);
+
+    // 2. Atalho 'enc 498930'
+    fireEvent.keyDown(document, { key: 'k', code: 'KeyK', ctrlKey: true });
+    const encInput = document.querySelector<HTMLInputElement>('.suape-cp-input')!;
+    fireEvent.input(encInput, { target: { value: 'enc 498930' } });
+    expect(document.body.textContent).toContain('Encaminhar Processo');
+    fireEvent.keyDown(encInput, { key: 'Enter' });
+    expect(assignedUrl).toBe('https://suap.ifrn.edu.br/processo_eletronico/processo/encaminhar/498930/');
+
+    // 3. Ordem invertida '498930 encs'
+    fireEvent.keyDown(document, { key: 'k', code: 'KeyK', ctrlKey: true });
+    const encsInput = document.querySelector<HTMLInputElement>('.suape-cp-input')!;
+    fireEvent.input(encsInput, { target: { value: '498930 encs' } });
+    expect(document.body.textContent).toContain('Encaminhar Sem Despacho');
+    fireEvent.keyDown(encsInput, { key: 'Enter' });
+    expect(assignedUrl).toBe('https://suap.ifrn.edu.br/processo_eletronico/processo/encaminhar_sem_despacho/498930/');
+
+    // 4. Apenas o ID '498930' lista todas as ações do processo
+    fireEvent.keyDown(document, { key: 'k', code: 'KeyK', ctrlKey: true });
+    const idInput = document.querySelector<HTMLInputElement>('.suape-cp-input')!;
+    fireEvent.input(idInput, { target: { value: '498930' } });
+    expect(document.body.textContent).toContain('Ações do Processo #498930');
+    expect(document.body.textContent).toContain('Fazer Upload de Documento');
+    expect(document.body.textContent).toContain('Encaminhar Processo');
+    expect(document.body.textContent).toContain('Ver Capa do Processo');
+  });
+
+  it('injeta badges com ID do processo na tela de caixas de processos com clique para copiar', async () => {
+    vi.useFakeTimers();
+    let assignedUrl = '';
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        hostname: 'suap.ifrn.edu.br',
+        pathname: '/processo_eletronico/caixa_processos/',
+        search: '',
+        set href(url: string) { assignedUrl = url; },
+      },
+    });
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>2</td>
+      <td>
+        <a href="/processo_eletronico/processo/498930/">23035.002761.2026-41 - Auxílio Financeiro</a>
+      </td>
+    `;
+    document.body.appendChild(row);
+
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
+    window.eval(contentScript);
+
+    const initBadges = (window as unknown as { __suapeInitProcessBoxIdBadges?: () => void }).__suapeInitProcessBoxIdBadges;
+    expect(typeof initBadges).toBe('function');
+    initBadges?.();
+
+    const badge = row.querySelector<HTMLElement>('.suape-process-id-badge');
+    expect(badge).not.toBeNull();
+    expect(badge?.textContent).toContain('#498930');
+    expect(badge?.dataset.processId).toBe('498930');
+
+    // Clique simples deve copiar o ID
+    fireEvent.click(badge!);
+    await flushMicrotasks();
+    expect(writeTextMock).toHaveBeenCalledWith('498930');
+    expect(badge?.textContent).toContain('Copiado!');
+
+    // Alt+Clique deve navegar direto para upload com automação
+    fireEvent.click(badge!, { altKey: true });
+    expect(assignedUrl).toContain('/processo_eletronico/documento_upload/498930/#siagesUpload=');
+    const badgeHashPart = assignedUrl.split('#siagesUpload=')[1];
+    const badgePayload = JSON.parse(decodeURIComponent(badgeHashPart));
+    expect(badgePayload).toEqual({
+      source: 'siages',
+      version: 1,
+      action: 'suap_upload_document',
+      suapId: '498930',
+      tipoConferencia: 'Cópia Simples',
+      tipoDocumento: 'Liquidação',
+      assunto: 'Liquidação',
+    });
+    const storedFromBadge = JSON.parse(sessionStorage.getItem('siagesUploadPendingV1') || '{}');
+    expect(storedFromBadge.payload).toEqual(badgePayload);
+  });
 });

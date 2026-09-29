@@ -183,15 +183,48 @@
     return null;
   }
 
+  function buildUploadAutomationData(processId) {
+    const payload = {
+      source: 'siages',
+      version: 1,
+      action: 'suap_upload_document',
+      suapId: String(processId),
+      tipoConferencia: 'Cópia Simples',
+      tipoDocumento: 'Liquidação',
+      assunto: 'Liquidação',
+    };
+    const hashPayload = encodeURIComponent(JSON.stringify(payload));
+    return {
+      payload,
+      url: `/processo_eletronico/documento_upload/${processId}/#siagesUpload=${hashPayload}`,
+    };
+  }
+
+  function persistUploadAutomation(payload) {
+    try {
+      const record = JSON.stringify({
+        payload,
+        createdAt: Date.now(),
+      });
+      sessionStorage.setItem('siagesUploadPendingV1', record);
+      localStorage.setItem('siagesUploadPendingV1', record);
+      if (globalThis.chrome?.storage?.local) {
+        globalThis.chrome.storage.local.set({ siagesUploadPendingV1: payload });
+      }
+    } catch (_) {}
+  }
+
   function getProcessActions(processId) {
     if (!processId) return [];
+    const uploadData = buildUploadAutomationData(processId);
     return [
       {
         id: 'proc-upload',
+        processId: String(processId),
         title: 'Fazer Upload de Documento',
         subtitle: `Anexar arquivo digitalizado ao processo #${processId}`,
         shortcuts: ['up', 'upload', 'doc', 'upld', 'anexar'],
-        url: `/processo_eletronico/documento_upload/${processId}/`,
+        url: uploadData.url,
         icon: 'upload',
         color: '#0A7F70',
         badge: 'up',
@@ -1078,12 +1111,58 @@
     return new URL(`/admin/documento_eletronico/documentotexto/?${baseParams.toString()}`, SUAP_APP_URL).href;
   }
 
+  function parseExplicitProcessQuery(rawVal) {
+    const text = String(rawVal || '').trim();
+    if (!text) return null;
+
+    // Pattern 1: <cmd> <id> or <cmd>:<id> or <cmd> #<id>
+    const matchCmdFirst = text.match(/^([a-zA-Z]+)[:\s]+#?(\d{4,8})$/);
+    // Pattern 2: <id> <cmd> or #<id> <cmd>
+    const matchIdFirst = text.match(/^#?(\d{4,8})[:\s]+([a-zA-Z]+)$/);
+    // Pattern 3: proc <id> / processo <id> / p <id>
+    const matchProcId = text.match(/^(?:processos|processo|proc|p)[:\s]+#?(\d{4,8})$/i);
+    // Pattern 4: just <id> or #<id>
+    const matchJustId = text.match(/^#?(\d{4,8})$/);
+
+    const PROCESS_SHORTCUTS = new Set([
+      'up', 'upload', 'doc', 'upld', 'anexar',
+      'enc', 'encaminhar', 'despacho', 'tramitar',
+      'encs', 'semdespacho', 'encsem', 'tramitarsem', 'sem',
+      'capa', 'proc', 'processo', 'p', 'home',
+      'vis', 'docs', 'arvore', 'timeline',
+      'desp', 'add', 'novo', 'texto',
+      'cie', 'ciencia', 'notificar',
+    ]);
+
+    if (matchCmdFirst) {
+      const cmd = matchCmdFirst[1].toLowerCase();
+      const pid = matchCmdFirst[2];
+      if (PROCESS_SHORTCUTS.has(cmd)) {
+        return { processId: pid, actionCommand: cmd, isExplicitProcessId: true };
+      }
+    } else if (matchIdFirst) {
+      const pid = matchIdFirst[1];
+      const cmd = matchIdFirst[2].toLowerCase();
+      if (PROCESS_SHORTCUTS.has(cmd)) {
+        return { processId: pid, actionCommand: cmd, isExplicitProcessId: true };
+      }
+    } else if (matchProcId) {
+      return { processId: matchProcId[1], actionCommand: 'proc', isExplicitProcessId: true };
+    } else if (matchJustId) {
+      return { processId: matchJustId[1], actionCommand: '', isExplicitProcessId: true };
+    }
+
+    return null;
+  }
+
   // Search filter matching SIAGES logic
   function getFilteredResults() {
     const rawVal = (inputEl?.value || '').trim();
     let query = rawVal;
     let scope = activeScope;
     const currentProcId = getCurrentProcessId();
+    const explicitProcess = parseExplicitProcessQuery(rawVal);
+    const targetProcId = explicitProcess ? explicitProcess.processId : currentProcId;
 
     // Detect prefix
     let isExplicitContractSearch = false;
@@ -1092,7 +1171,12 @@
     let isExplicitDocumentSearch = false;
     let isExplicitCondhSearch = false;
 
-    if (query.toLowerCase().startsWith('ne ') || query.toLowerCase().startsWith('empenho ') || query.toLowerCase().startsWith('ne:') || query.toLowerCase().startsWith('empenho:')) {
+    if (explicitProcess) {
+      scope = 'processo';
+      if (!explicitProcess.actionCommand) {
+        isExplicitProcessSearch = true;
+      }
+    } else if (query.toLowerCase().startsWith('ne ') || query.toLowerCase().startsWith('empenho ') || query.toLowerCase().startsWith('ne:') || query.toLowerCase().startsWith('empenho:')) {
       query = rawVal.replace(/^(ne|empenho)[:\s]+/i, '').trim();
       scope = 'empenhos';
     } else if (/^condh(?:[:\s]|$)/i.test(query)) {
@@ -1152,17 +1236,70 @@
     }
 
     let matchingProcessActions = [];
-    if (currentProcId && (scope === 'all' || scope === 'processo' || scope === 'actions')) {
+    if (explicitProcess) {
+      const allProcActions = getProcessActions(explicitProcess.processId);
+      if (explicitProcess.actionCommand) {
+        const cmd = explicitProcess.actionCommand;
+        matchingProcessActions = allProcActions
+          .map((act) => ({ act, score: scoreProcessAction(act, cmd) }))
+          .filter((item) => item.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .map((item) => item.act);
+        const exactMatches = matchingProcessActions.filter((act) =>
+          act.shortcuts.some((s) => s.toLowerCase() === cmd || s.toLowerCase().startsWith(cmd))
+        );
+        if (exactMatches.length > 0) {
+          matchingProcessActions = exactMatches;
+        }
+      } else {
+        matchingProcessActions = allProcActions;
+      }
+    } else if (currentProcId && (scope === 'all' || scope === 'processo' || scope === 'actions')) {
       const allProcActions = getProcessActions(currentProcId);
       matchingProcessActions = allProcActions
         .map((act) => ({ act, score: scoreProcessAction(act, query) }))
         .filter((item) => item.score > 0)
         .sort((a, b) => b.score - a.score)
         .map((item) => item.act);
+    } else if (!targetProcId && (scope === 'all' || scope === 'actions' || scope === 'processo')) {
+      const q = query.trim().toLowerCase();
+      const shortcutGuides = [
+        { shortcut: 'up', title: 'Fazer Upload de Documento', example: 'up 498930', desc: 'Digite "up <id_processo>" para abrir o upload direto' },
+        { shortcut: 'enc', title: 'Encaminhar Processo', example: 'enc 498930', desc: 'Digite "enc <id_processo>" para tramitar com despacho' },
+        { shortcut: 'encs', title: 'Encaminhar Sem Despacho', example: 'encs 498930', desc: 'Digite "encs <id_processo>" para tramitar direto' },
+        { shortcut: 'capa', title: 'Ver Capa do Processo', example: 'capa 498930', desc: 'Digite "capa <id_processo>" para abrir a página principal' },
+        { shortcut: 'vis', title: 'Visualizar Árvore de Documentos', example: 'vis 498930', desc: 'Digite "vis <id_processo>" para ver a timeline e documentos' },
+        { shortcut: 'desp', title: 'Adicionar Despacho / Documento', example: 'desp 498930', desc: 'Digite "desp <id_processo>" para criar novo documento' },
+        { shortcut: 'cie', title: 'Solicitar Ciência', example: 'cie 498930', desc: 'Digite "cie <id_processo>" para notificar interessados' },
+      ];
+      const matchedGuide = shortcutGuides.find((g) => g.shortcut === q);
+      if (matchedGuide) {
+        matchingProcessActions.push({
+          id: `proc-guide-${matchedGuide.shortcut}`,
+          title: `${matchedGuide.title} (digite: ${matchedGuide.example})`,
+          subtitle: matchedGuide.desc,
+          shortcuts: [matchedGuide.shortcut],
+          url: `/processo_eletronico/caixa_processos/`,
+          icon: matchedGuide.shortcut === 'up' ? 'upload' : (matchedGuide.shortcut.startsWith('enc') ? 'send' : 'folder'),
+          color: '#0A7F70',
+          badge: matchedGuide.shortcut,
+        });
+      }
     }
 
     let suapProcessSearchAction = null;
-    if (query && (scope === 'all' || scope === 'processo' || isExplicitProcessSearch)) {
+    if (explicitProcess && !explicitProcess.actionCommand) {
+      const processUrl = getSuapProcessSearchUrl(explicitProcess.processId);
+      suapProcessSearchAction = {
+        id: 'suap-search-processo',
+        title: `Buscar "${explicitProcess.processId}" no SUAP Processos`,
+        subtitle: `Abrir consulta oficial de processos eletrônicos (${processUrl})`,
+        url: processUrl,
+        icon: 'search',
+        color: '#0d9488',
+        badge: 'suap',
+      };
+    } else if (!explicitProcess && query && (scope === 'all' || scope === 'processo' || isExplicitProcessSearch)) {
       const processUrl = getSuapProcessSearchUrl(query);
       suapProcessSearchAction = {
         id: 'suap-search-processo',
@@ -1282,6 +1419,9 @@
       matchingProcessActions,
       suapProcessSearchAction,
       isExplicitProcessSearch,
+      isExplicitProcessId: !!explicitProcess,
+      explicitProcessId: explicitProcess ? explicitProcess.processId : null,
+      targetProcId,
       suapStudentAction,
       isExplicitStudentSearch,
       suapDocumentSearchAction,
@@ -1422,6 +1562,9 @@
       matchingProcessActions,
       suapProcessSearchAction,
       isExplicitProcessSearch,
+      isExplicitProcessId,
+      explicitProcessId,
+      targetProcId,
       suapStudentAction,
       isExplicitStudentSearch,
       suapDocumentSearchAction,
@@ -1437,10 +1580,10 @@
       currentProcId,
     } = getFilteredResults();
 
-    const hasHighPriorityShortcut = query && matchingProcessActions.some((p) => {
+    const hasHighPriorityShortcut = (query && matchingProcessActions.some((p) => {
       const q = query.trim().toLowerCase();
       return p.shortcuts.some((s) => s.toLowerCase() === q || s.toLowerCase().startsWith(q)) || p.title.toLowerCase().startsWith(q);
-    });
+    })) || (isExplicitProcessId && matchingProcessActions.length > 0);
 
     if (isExplicitCondhSearch) {
       renderCondhResults(query);
@@ -1466,11 +1609,14 @@
     if (isExplicitDocumentSearch && suapDocumentSearchAction) {
       currentResults.push({ type: 'suap_document_search', data: suapDocumentSearchAction });
     }
-    if (isExplicitProcessSearch && suapProcessSearchAction) {
+    if (isExplicitProcessSearch && suapProcessSearchAction && !isExplicitProcessId) {
       currentResults.push({ type: 'suap_process_search', data: suapProcessSearchAction });
     }
     if (hasHighPriorityShortcut) {
-      matchingProcessActions.forEach((p) => currentResults.push({ type: 'process_action', data: p, processId: currentProcId }));
+      matchingProcessActions.forEach((p) => currentResults.push({ type: 'process_action', data: p, processId: targetProcId }));
+    }
+    if (isExplicitProcessId && suapProcessSearchAction) {
+      currentResults.push({ type: 'suap_process_search', data: suapProcessSearchAction });
     }
     matchingEmpenhos.forEach((e) => currentResults.push({ type: 'empenho', data: e }));
 
@@ -1489,9 +1635,9 @@
     matchingActions.forEach((a) => currentResults.push({ type: 'action', data: a }));
 
     if (!hasHighPriorityShortcut && matchingProcessActions && matchingProcessActions.length > 0) {
-      matchingProcessActions.forEach((p) => currentResults.push({ type: 'process_action', data: p, processId: currentProcId }));
+      matchingProcessActions.forEach((p) => currentResults.push({ type: 'process_action', data: p, processId: targetProcId }));
     }
-    if (!isExplicitProcessSearch && suapProcessSearchAction && ((matchingProcessActions && matchingProcessActions.length > 0) || activeScope === 'processo')) {
+    if (!isExplicitProcessSearch && !isExplicitProcessId && suapProcessSearchAction && ((matchingProcessActions && matchingProcessActions.length > 0) || activeScope === 'processo')) {
       currentResults.push({ type: 'suap_process_search', data: suapProcessSearchAction });
     }
 
@@ -1629,13 +1775,13 @@
         <div class="suape-cp-group-header">
           <span class="suape-cp-group-title process-group">
             ${ICONS.folder}
-            ${currentProcId ? `Ações do Processo #${escapeHtml(currentProcId)}` : 'Processos Eletrônicos'}
+            ${targetProcId ? `Ações do Processo #${escapeHtml(targetProcId)}` : (currentProcId ? `Ações do Processo #${escapeHtml(currentProcId)}` : 'Processos Eletrônicos')}
           </span>
           <span class="suape-cp-group-count">${totalCount} resultado(s)</span>
         </div>
       `;
 
-      if (isExplicitProcessSearch && suapProcessSearchAction) {
+      if (!isExplicitProcessId && isExplicitProcessSearch && suapProcessSearchAction) {
         const isSel = globalIndex === selectedIndex;
         block += `
           <div class="suape-cp-item ${isSel ? 'suape-cp-item-selected' : ''}" data-index="${globalIndex}">
@@ -1687,7 +1833,7 @@
         });
       }
 
-      if (!isExplicitProcessSearch && showProcSearch) {
+      if ((!isExplicitProcessSearch || isExplicitProcessId) && showProcSearch) {
         const isSel = globalIndex === selectedIndex;
         block += `
           <div class="suape-cp-item ${isSel ? 'suape-cp-item-selected' : ''}" data-index="${globalIndex}">
@@ -1996,7 +2142,17 @@
       result.type === 'suap_student_search' ||
       result.type === 'suap_document_search'
     ) {
-      const url = result.data.url;
+      if (result.type === 'process_action' && (result.data?.id === 'proc-upload' || result.data?.url?.includes('/documento_upload/'))) {
+        const uploadPid = result.data?.processId || result.processId || result.data?.url?.match(/\/documento_upload\/(\d+)\//)?.[1];
+        if (uploadPid) {
+          const uploadData = buildUploadAutomationData(uploadPid);
+          persistUploadAutomation(uploadData.payload);
+        }
+      }
+      let url = result.data.url;
+      if (url.startsWith('/')) {
+        url = `${SUAP_APP_URL}${url}`;
+      }
       closePalette();
       if (e && (e.ctrlKey || e.metaKey)) {
         window.open(url, '_blank');
@@ -2390,14 +2546,153 @@
     true
   );
 
+  function initProcessBoxIdBadges() {
+    if (!IS_SUAP_PAGE) return;
+
+    function injectBadges() {
+      const processLinks = document.querySelectorAll('a[href*="/processo_eletronico/processo/"]');
+      processLinks.forEach((link) => {
+        const href = link.getAttribute('href') || '';
+        const match = href.match(/\/processo_eletronico\/processo\/(\d+)\/?(?:[?#]|$)/);
+        if (!match) return;
+
+        const processId = match[1];
+
+        if (link.dataset.suapeBadgeInjected) return;
+        if (link.parentElement && link.parentElement.querySelector(`.suape-process-id-badge[data-process-id="${processId}"]`)) {
+          link.dataset.suapeBadgeInjected = 'true';
+          return;
+        }
+        link.dataset.suapeBadgeInjected = 'true';
+
+        const badge = document.createElement('span');
+        badge.className = 'suape-process-id-badge';
+        badge.dataset.processId = processId;
+        badge.setAttribute('role', 'button');
+        badge.setAttribute('tabindex', '0');
+        badge.title = `ID SUAP: ${processId}\n• Clique para copiar\n• Alt+Clique para Upload com automação\n• Use "up ${processId}" ou "enc ${processId}" no Ctrl+K`;
+        badge.innerHTML = `<span class="suape-badge-hash">#</span><span class="suape-badge-num">${processId}</span>`;
+
+        badge.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (e.altKey) {
+            const uploadData = buildUploadAutomationData(processId);
+            persistUploadAutomation(uploadData.payload);
+            const targetUrl = uploadData.url;
+            if (e.ctrlKey || e.metaKey) {
+              const fullUrl = targetUrl.startsWith('/') ? `${SUAP_APP_URL}${targetUrl}` : targetUrl;
+              window.open(fullUrl, '_blank');
+            } else {
+              window.location.href = targetUrl;
+            }
+            return;
+          }
+
+          let copied = false;
+          try {
+            if (navigator?.clipboard?.writeText) {
+              await navigator.clipboard.writeText(processId);
+              copied = true;
+            }
+          } catch (_) {}
+
+          if (!copied) {
+            try {
+              const ta = document.createElement('textarea');
+              ta.value = processId;
+              ta.style.position = 'fixed';
+              ta.style.opacity = '0';
+              document.body.appendChild(ta);
+              ta.select();
+              document.execCommand('copy');
+              document.body.removeChild(ta);
+              copied = true;
+            } catch (_) {}
+          }
+
+          const prevHtml = badge.innerHTML;
+          badge.innerHTML = `<span class="suape-badge-copied-icon">✓</span> Copiado!`;
+          badge.classList.add('suape-badge-copied');
+          setTimeout(() => {
+            badge.innerHTML = prevHtml;
+            badge.classList.remove('suape-badge-copied');
+          }, 1400);
+        });
+
+        badge.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            badge.click();
+          }
+        });
+
+        link.insertAdjacentElement('beforebegin', badge);
+      });
+    }
+
+    injectBadges();
+
+    try {
+      if (typeof chrome !== 'undefined' && chrome?.storage?.local?.get) {
+        chrome.storage.local.get(['suape_active_processes', 'suape_recent_processes'], (stored) => {
+          const active = stored?.suape_active_processes || {};
+          const recent = stored?.suape_recent_processes || [];
+          const syncedIds = new Set();
+          Object.values(active).forEach((p) => { if (p?.suapId) syncedIds.add(String(p.suapId)); });
+          recent.forEach((p) => { if (p?.suapId) syncedIds.add(String(p.suapId)); });
+
+          document.querySelectorAll('.suape-process-id-badge').forEach((b) => {
+            const id = b.dataset.processId;
+            if (syncedIds.has(id)) {
+              b.classList.add('suape-badge-synced');
+              if (!b.title.includes('SIAGES')) {
+                b.title += '\n• Processo sincronizado com o SIAGES';
+              }
+            }
+          });
+        });
+      }
+    } catch (_) {}
+
+    let debounceTimer = null;
+    const observer = new MutationObserver(() => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(injectBadges, 200);
+    });
+    if (document.body) {
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
+  }
+
   // No SUAP a consulta antecipada preserva a resposta imediata da paleta atual.
   // Em sites comuns, os dados do SIAGES so sao carregados quando o usuario abre a paleta.
   if (IS_SUAP_PAGE) {
     if (typeof requestIdleCallback !== 'undefined') {
-      requestIdleCallback(() => loadData(false));
+      requestIdleCallback(() => {
+        loadData(false);
+        initProcessBoxIdBadges();
+      });
     } else {
-      setTimeout(() => loadData(false), 2000);
+      setTimeout(() => {
+        loadData(false);
+        initProcessBoxIdBadges();
+      }, 500);
     }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initProcessBoxIdBadges);
+    } else {
+      initProcessBoxIdBadges();
+    }
+  }
+
+  // Expor utilitários para testes unitários
+  if (typeof window !== 'undefined') {
+    window.__suapeInitProcessBoxIdBadges = initProcessBoxIdBadges;
+    window.__suapeParseExplicitProcessQuery = parseExplicitProcessQuery;
+    window.__suapeBuildUploadAutomationData = buildUploadAutomationData;
+    window.__suapePersistUploadAutomation = persistUploadAutomation;
   }
 
   function showProcessSyncNotice(message) {
