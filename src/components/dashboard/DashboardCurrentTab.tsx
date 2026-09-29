@@ -177,7 +177,6 @@ export function DashboardCurrentTab({
           icon={Wallet}
           stitchColor="vibrant-blue"
           progress={100}
-          progressLabel="base"
           isLoading={isLoading}
         />
         <StatCard
