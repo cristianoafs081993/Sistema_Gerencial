@@ -1,8 +1,8 @@
 /* ============================================================
-   PARETTO INSTITUCIONAL — Sistema Gerencial (SIAGES)
-   Derivado do design system do Paretto Concursos com viés
-   institucional: navy + teal, Manrope, superfícies claras e
-   acento lima usado apenas em pequenos destaques.
+   SIAGES — Design system "Céu"
+   Base tipográfica e de componentes derivada do Paretto Concursos,
+   com paleta clara e moderna: azul-céu como ação, superfícies
+   brancas com leve tom azulado e ciano como realce.
    ============================================================ */
 
 /* 1. TYPOGRAPHY - Manrope (Interface) + IBM Plex Mono (Dados)
@@ -19,79 +19,78 @@
 @layer base {
   :root {
     /* === BASE / SURFACES === */
-    --background: 210 29% 97%;          /* #F6F8FA */
-    --foreground: 207 56% 16%;          /* #122B40 */
+    --background: 214 64% 98%;          /* #F6F9FD */
+    --foreground: 209 36% 17%;          /* #1B2B3A */
 
     --card: 0 0% 100%;                  /* #FFFFFF */
-    --card-foreground: 207 56% 16%;
+    --card-foreground: 209 36% 17%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 207 56% 16%;
+    --popover-foreground: 209 36% 17%;
 
-    --border: 204 27% 89%;              /* #DCE5EB */
-    --input: 204 27% 89%;
-    --ring: 187 100% 28%;               /* Teal #007F91 */
+    --border: 212 39% 90%;              /* #DDE6F0 */
+    --input: 212 39% 90%;
+    --ring: 208 79% 51%;                /* Azul-céu #1E88E5 */
 
-    --muted: 203 31% 95%;               /* #EEF3F6 */
-    --muted-foreground: 206 17% 44%;    /* #5D7282 (5:1 sobre branco) */
+    --muted: 213 48% 95%;               /* #EEF3F9 */
+    --muted-foreground: 210 15% 42%;    /* #5B6B7B (5,5:1 sobre branco) */
 
-    --secondary: 203 31% 95%;           /* #EEF3F6 */
-    --secondary-foreground: 207 56% 16%;
+    --secondary: 213 48% 95%;           /* #EEF3F9 */
+    --secondary-foreground: 209 36% 17%;
 
     /* === AÇÃO / MARCA === */
-    --primary: 187 100% 28%;            /* Teal #007F91 */
+    --primary: 210 79% 46%;             /* #1976D2 — botões e links (4,6:1 com branco) */
     --primary-foreground: 0 0% 100%;
 
-    --accent: 180 40% 94%;              /* #EAF6F6 — hover e seleção suaves */
-    --accent-foreground: 186 100% 24%;  /* #006C79 */
+    --accent: 212 83% 95%;              /* #EAF3FD — hover e seleção suaves */
+    --accent-foreground: 212 80% 42%;   /* #1565C0 */
 
-    --brand-navy: 209 72% 16%;          /* #0B2945 — ação principal e superfícies de marca */
+    --brand-sky: 208 79% 51%;           /* #1E88E5 — barras, indicadores e gráficos */
+    --brand-cyan: 190 100% 43%;         /* #00B7DC — realce secundário */
+    --brand-navy: 209 72% 16%;          /* #0B2945 — somente superfícies escuras (painel do login) */
     --brand-navy-foreground: 0 0% 100%;
-    --brand-cyan: 190 100% 43%;         /* #00B7DC — gráficos e realces */
-    --brand-lime: 77 85% 67%;           /* #C9F263 — acento discreto: sobre navy ou como ponto */
-    --brand-lime-foreground: 209 72% 16%;
 
     /* === FEEDBACK SEMÂNTICO === */
-    --destructive: 357 67% 45%;         /* #C0262D */
+    --destructive: 0 63% 50%;           /* #D03434 */
     --destructive-foreground: 0 0% 100%;
     --success: 150 59% 30%;             /* #1F7A4D */
     --success-foreground: 0 0% 100%;
-    --warning: 39 100% 27%;             /* #8A5A00 */
+    --warning: 36 100% 30%;             /* #9A5C00 */
     --warning-foreground: 0 0% 100%;
     --info: 197 100% 33%;               /* #0079A8 */
     --info-foreground: 0 0% 100%;
 
-    /* Raio base (Paretto: 8–12px) */
+    /* Raio base (8–12px) */
     --radius: 0.625rem;
 
     /* === SIDEBAR === */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 206 17% 44%;
-    --sidebar-primary: 187 100% 28%;
+    --sidebar-foreground: 210 15% 42%;
+    --sidebar-primary: 210 79% 46%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 180 40% 94%;      /* #EAF6F6 */
-    --sidebar-accent-foreground: 186 100% 24%;
-    --sidebar-border: 210 27% 91%;      /* #E3E9EF */
-    --sidebar-ring: 187 100% 28%;
+    --sidebar-accent: 212 83% 95%;      /* #EAF3FD */
+    --sidebar-accent-foreground: 212 80% 42%;
+    --sidebar-border: 212 43% 93%;      /* #E6EDF5 */
+    --sidebar-ring: 208 79% 51%;
 
-    /* === SOMBRAS (tingidas de navy, discretas) === */
-    --shadow-xs: 0 1px 2px 0 rgba(11, 41, 69, 0.04);
-    --shadow-sm: 0 1px 3px 0 rgba(11, 41, 69, 0.06), 0 1px 2px -1px rgba(11, 41, 69, 0.04);
-    --shadow-md: 0 6px 16px -8px rgba(11, 41, 69, 0.16), 0 2px 4px -2px rgba(11, 41, 69, 0.05);
-    --shadow-lg: 0 12px 24px -12px rgba(11, 41, 69, 0.20), 0 4px 8px -4px rgba(11, 41, 69, 0.06);
-    --shadow-xl: 0 20px 32px -16px rgba(11, 41, 69, 0.24);
-    --shadow-primary: 0 7px 20px -8px rgba(4, 26, 48, 0.35);
+    /* === SOMBRAS (azuladas e leves) === */
+    --shadow-xs: 0 1px 2px 0 rgba(30, 80, 140, 0.04);
+    --shadow-sm: 0 1px 3px 0 rgba(30, 80, 140, 0.06), 0 1px 2px -1px rgba(30, 80, 140, 0.04);
+    --shadow-md: 0 8px 20px -10px rgba(30, 80, 140, 0.18), 0 2px 4px -2px rgba(30, 80, 140, 0.05);
+    --shadow-lg: 0 14px 28px -14px rgba(30, 80, 140, 0.22), 0 4px 8px -4px rgba(30, 80, 140, 0.06);
+    --shadow-xl: 0 22px 36px -18px rgba(30, 80, 140, 0.26);
+    --shadow-primary: 0 8px 20px -10px rgba(25, 118, 210, 0.55);
 
     /* Superfícies translúcidas */
-    --glass-border: rgba(11, 41, 69, 0.08);
+    --glass-border: rgba(30, 80, 140, 0.08);
     --glass-bg: rgba(255, 255, 255, 0.96);
     --glass-highlight: rgba(255, 255, 255, 0.85);
 
     /* Gradientes */
-    --gradient-primary: linear-gradient(135deg, #0B2945 0%, #0F3B5E 100%);
-    --gradient-accent:  linear-gradient(135deg, #007F91 0%, #0B5566 100%);
-    --gradient-warning: linear-gradient(135deg, #B07A0E 0%, #8A5A00 100%);
-    --gradient-card:    linear-gradient(180deg, #FFFFFF 0%, #F7FBFD 100%);
+    --gradient-primary: linear-gradient(135deg, #1976D2 0%, #1E88E5 100%);
+    --gradient-accent:  linear-gradient(135deg, #1E88E5 0%, #00B7DC 100%);
+    --gradient-warning: linear-gradient(135deg, #D08A1A 0%, #9A5C00 100%);
+    --gradient-card:    linear-gradient(180deg, #FFFFFF 0%, #F6F9FD 100%);
   }
 }
 
@@ -176,8 +175,8 @@
 
   /* === BOTÕES (.btn-*) — navy sólido, cantos de 8px === */
   .btn-primary {
-    @apply bg-brand-navy text-brand-navy-foreground rounded-lg shadow-sm
-           hover:bg-brand-navy/90 active:scale-[0.98]
+    @apply bg-primary text-primary-foreground rounded-lg shadow-sm
+           hover:bg-primary/90 active:scale-[0.98]
            transition-all duration-150 px-4 py-2 font-bold text-sm
            disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2;
   }
@@ -189,7 +188,7 @@
   }
 
   .btn-strong {
-    @apply bg-brand-navy text-brand-navy-foreground rounded-lg shadow-md
+    @apply bg-primary text-primary-foreground rounded-lg shadow-md
            hover:opacity-90 active:scale-[0.98] transition-all duration-150 px-6 py-2.5
            font-bold text-base inline-flex items-center justify-center gap-2;
   }
@@ -213,7 +212,7 @@
 
   .stat-card-primary {
     background: var(--gradient-primary);
-    @apply text-brand-navy-foreground rounded-xl p-5 relative overflow-hidden;
+    @apply text-primary-foreground rounded-xl p-5 relative overflow-hidden;
     box-shadow: var(--shadow-primary);
   }
   .stat-card-accent {

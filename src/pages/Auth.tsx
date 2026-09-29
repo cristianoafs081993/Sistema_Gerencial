@@ -87,7 +87,7 @@ export default function Auth() {
           <LogoIcon size={34} />
           <div>
             <h1 className="font-bold text-lg tracking-tight leading-none text-white flex items-center gap-1.5 m-0">
-              SIAGES <span className="text-[9px] tracking-[0.08em] uppercase bg-brand-lime text-brand-lime-foreground px-1.5 py-0.5 rounded-md font-bold">Beta</span>
+              SIAGES <span className="text-[9px] tracking-[0.08em] uppercase bg-brand-cyan text-brand-navy px-1.5 py-0.5 rounded-md font-bold">Beta</span>
             </h1>
             <p className="text-[10px] text-slate-300 tracking-wider m-0 mt-0.5">Sistema Integrado de Administração e Gestão Estratégica</p>
           </div>
@@ -147,7 +147,7 @@ export default function Auth() {
             <LogoIcon size={38} />
             <div>
               <h1 className="font-bold text-xl tracking-tight leading-none text-foreground flex items-center gap-1.5 m-0">
-                SIAGES <span className="text-[9px] tracking-[0.08em] uppercase bg-brand-navy text-brand-lime px-1.5 py-0.5 rounded-md font-bold">Beta</span>
+                SIAGES <span className="text-[9px] tracking-[0.08em] uppercase bg-accent text-accent-foreground px-1.5 py-0.5 rounded-md font-bold">Beta</span>
               </h1>
               <p className="text-[10px] text-muted-foreground tracking-wider m-0 mt-0.5">Sistema Integrado de Administração e Gestão Estratégica</p>
             </div>

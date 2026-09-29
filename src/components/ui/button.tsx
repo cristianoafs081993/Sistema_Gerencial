@@ -27,9 +27,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Primary — navy institucional sólido
+        // Primary — azul-céu (#1976D2, contraste AA com texto branco)
         default:
-          "bg-brand-navy text-brand-navy-foreground shadow-sm hover:bg-brand-navy/90 hover:shadow-primary",
+          "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-primary",
 
         // Destructive SUAP — vermelho semântico
         destructive:
@@ -51,17 +51,13 @@ const buttonVariants = cva(
         link:
           "text-primary underline-offset-4 hover:underline p-0 h-auto shadow-none",
 
-        // Alias legado do antigo pill SUAP — mantém a ação principal navy
+        // Alias legado do antigo pill SUAP — mesma ação principal
         suap:
-          "bg-brand-navy text-brand-navy-foreground hover:bg-brand-navy/90 shadow-sm",
-
-        // Brand — teal de destaque
-        brand:
           "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
 
-        // Lime — acento discreto (usar com parcimônia, ex.: CTA único em superfície navy)
-        lime:
-          "bg-brand-lime text-brand-lime-foreground hover:bg-brand-lime/90 shadow-sm",
+        // Brand — ação principal (alias)
+        brand:
+          "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
 
         // Gold / Alerta
         gold:

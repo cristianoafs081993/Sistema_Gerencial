@@ -48,6 +48,7 @@ import { SuapSyncPanel } from '@/components/suap/SuapSyncPanel';
 import { CommandPalette } from '@/components/CommandPalette';
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import { LogoIcon } from './Logo';
+import { AutoPageHeader, usePageHeaderRegistry } from '@/components/design-system/PageHeader';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -156,6 +157,7 @@ export function Layout({ children }: LayoutProps) {
     userGroups = [],
   } = useAuth();
   const dataContext = useOptionalData();
+  const { hasPageHeader, registry: pageHeaderRegistry, Provider: PageHeaderProvider } = usePageHeaderRegistry();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
@@ -374,7 +376,7 @@ export function Layout({ children }: LayoutProps) {
               {!isSidebarCollapsed && (
                 <div className="min-w-0 flex-1">
                   <h1 className="font-extrabold text-lg tracking-[-0.04em] leading-none text-foreground flex items-center gap-1.5 m-0">
-                    SIAGES <span className="text-[9px] tracking-[0.08em] uppercase bg-brand-navy text-brand-lime px-1.5 py-0.5 rounded-md font-bold">Beta</span>
+                    SIAGES <span className="text-[9px] tracking-[0.08em] uppercase bg-accent text-accent-foreground px-1.5 py-0.5 rounded-md font-bold">Beta</span>
                   </h1>
                   <p className="text-[9px] font-semibold uppercase text-muted-foreground tracking-[0.2em] m-0 mt-1 truncate">Administração e Gestão Estratégica</p>
                 </div>
@@ -690,7 +692,7 @@ export function Layout({ children }: LayoutProps) {
                       className="flex items-center gap-2 rounded-lg border-l border-border py-1 pl-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:gap-2.5 md:pl-3"
                       aria-label="Abrir configurações do usuário"
                     >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-navy text-xs font-bold text-brand-navy-foreground select-none">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground select-none">
                         {userEmail ? userEmail.substring(0, 1).toUpperCase() : 'U'}
                       </div>
                       <div className="hidden flex-col text-right sm:flex">
@@ -779,7 +781,10 @@ export function Layout({ children }: LayoutProps) {
                 isFullScreenPage ? 'max-w-none flex-1 flex flex-col min-h-0' : 'max-w-[1600px]'
               )}
             >
-              {children}
+              <PageHeaderProvider value={pageHeaderRegistry}>
+                {!isFullScreenPage && !hasPageHeader ? <AutoPageHeader /> : null}
+                {children}
+              </PageHeaderProvider>
             </div>
           </main>
         </div>

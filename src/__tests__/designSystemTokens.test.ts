@@ -7,7 +7,7 @@ import { buttonVariants } from '@/components/ui/button';
 const root = resolve(__dirname, '..', '..');
 const read = (relativePath: string) => readFileSync(resolve(root, relativePath), 'utf8');
 
-describe('design system Paretto Institucional', () => {
+describe('design system Céu (base Paretto)', () => {
   const css = read('src/index.css');
   const tailwindConfig = read('tailwind.config.ts');
   const html = read('index.html');
@@ -20,11 +20,11 @@ describe('design system Paretto Institucional', () => {
     expect(read('src/components/Layout.tsx')).not.toMatch(/SuapTheme/);
   });
 
-  it('declara a paleta navy/teal/lima e as cores semânticas no :root', () => {
+  it('declara a paleta clara azul-céu e as cores semânticas no :root', () => {
     for (const token of [
-      '--primary: 187 100% 28%',
-      '--brand-navy: 209 72% 16%',
-      '--brand-lime: 77 85% 67%',
+      '--background: 214 64% 98%',
+      '--primary: 210 79% 46%',
+      '--brand-sky: 208 79% 51%',
       '--brand-cyan: 190 100% 43%',
       '--success:',
       '--warning:',
@@ -33,8 +33,8 @@ describe('design system Paretto Institucional', () => {
     ]) {
       expect(css).toContain(token);
     }
-    expect(tailwindConfig).toContain('"brand-navy"');
-    expect(tailwindConfig).toContain('"brand-lime"');
+    expect(tailwindConfig).toContain('"brand-sky"');
+    expect(tailwindConfig).not.toContain('"brand-lime"');
     expect(tailwindConfig).not.toMatch(/suap-(teal|aurora|dunas|govbr|luna)/);
   });
 
@@ -47,12 +47,19 @@ describe('design system Paretto Institucional', () => {
     expect(html).not.toContain('Figtree');
   });
 
-  it('mantém botões com cantos de 8px e ação principal em navy', () => {
+  it('mantém botões com cantos de 8px e ação principal em azul-céu', () => {
     const primary = buttonVariants();
     expect(primary).toContain('rounded-lg');
-    expect(primary).toContain('bg-brand-navy');
+    expect(primary).toContain('bg-primary');
+    expect(primary).not.toContain('brand-navy');
     expect(primary).not.toContain('rounded-full');
-    expect(buttonVariants({ variant: 'suap' })).toContain('bg-brand-navy');
+    expect(buttonVariants({ variant: 'suap' })).toContain('bg-primary');
+  });
+
+  it('restringe o navy ao painel escuro do login', () => {
+    const layout = read('src/components/Layout.tsx');
+    expect(layout).not.toContain('brand-navy');
+    expect(read('src/pages/Auth.tsx')).toContain('bg-brand-navy');
   });
 
   it('não usa o mascote do Paretto', () => {

@@ -38,7 +38,7 @@ export function StatCard({
 
     const iconColorMap = {
       'vibrant-blue': 'text-primary',
-      'purple': 'text-brand-navy',
+      'purple': 'text-brand-sky',
       'amber': 'text-warning',
       'emerald-green': 'text-success',
       'red-500': 'text-destructive',
@@ -46,7 +46,7 @@ export function StatCard({
 
     const progressBgMap = {
       'vibrant-blue': 'bg-primary',
-      'purple': 'bg-brand-navy',
+      'purple': 'bg-brand-sky',
       'amber': 'bg-warning',
       'emerald-green': 'bg-success',
       'red-500': 'bg-destructive',

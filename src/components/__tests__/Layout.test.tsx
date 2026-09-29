@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/design-system/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 
 const queryClient = new QueryClient({
@@ -313,7 +314,7 @@ describe('Layout', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByText('Orçamentário'));
+    fireEvent.click(screen.getByRole('button', { name: 'Orçamentário' }));
 
     expect(screen.getByText('Crédito disponível')).toBeInTheDocument();
   });
@@ -422,6 +423,33 @@ describe('Layout', () => {
     expect(screen.getByText('Refeitório')).toBeInTheDocument();
     expect(screen.getByText('Requisição de Compra')).toBeInTheDocument();
     expect(screen.getAllByText('Dashboard').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('exibe o cabeçalho padrão da tela (módulo e título) quando a página não declara o próprio', () => {
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/empenhos']}>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    const header = screen.getByTestId('page-header');
+    expect(header).toHaveTextContent('Orçamentário');
+    expect(header.querySelector('h1')).toHaveTextContent('Empenhos');
+  });
+
+  it('não duplica o cabeçalho quando a página declara PageHeader', () => {
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/empenhos']}>
+        <Layout>
+          <PageHeader title="Título próprio" description="Descrição da página" />
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByTestId('page-header')).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: 'Título próprio' })).toBeInTheDocument();
   });
 });
 

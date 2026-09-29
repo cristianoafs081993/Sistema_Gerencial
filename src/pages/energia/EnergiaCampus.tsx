@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/design-system/PageHeader';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
@@ -731,19 +732,18 @@ export default function EnergiaCampus() {
       </HeaderSubtitle>
       <HeaderActions>{commonActions}</HeaderActions>
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-normal text-text-primary">{title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Painel consolidado de consumo, custos, geração solar e indicadores ESG do campus.
-          </p>
-        </div>
-        {data.latestRun ? (
-          <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs">
-            Base: {data.latestRun.sourceFile} · {formatDate(data.latestRun.importedAt.slice(0, 10))}
-          </Badge>
-        ) : null}
-      </div>
+      <PageHeader
+        title={title}
+        description="Painel consolidado de consumo, custos, geração solar e indicadores ESG do campus."
+        className="mb-0"
+        actions={
+          data.latestRun ? (
+            <Badge variant="secondary" className="px-3 py-1 text-xs">
+              Base: {data.latestRun.sourceFile} · {formatDate(data.latestRun.importedAt.slice(0, 10))}
+            </Badge>
+          ) : null
+        }
+      />
 
       {!data.latestRun && !isLoading ? (
         <Alert>

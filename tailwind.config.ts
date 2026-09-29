@@ -22,21 +22,17 @@ export default {
         data: ["IBM Plex Mono", "Monaco", "Consolas", "ui-monospace", "monospace"],
       },
       colors: {
-        // --- MARCA (Paretto Institucional) ---
+        // --- MARCA (design system Céu) ---
         "brand-navy": {
           DEFAULT:    "hsl(var(--brand-navy))",
           foreground: "hsl(var(--brand-navy-foreground))",
         },
-        "brand-teal": "hsl(var(--primary))",
+        "brand-sky":  "hsl(var(--brand-sky))",
         "brand-cyan": "hsl(var(--brand-cyan))",
-        "brand-lime": {
-          DEFAULT:    "hsl(var(--brand-lime))",
-          foreground: "hsl(var(--brand-lime-foreground))",
-        },
         // Aliases legados mapeados para a paleta atual
         "ifrn-green": "#1F7A4D",
         "sebrae-blue": "hsl(var(--primary))",
-        "sebrae-navy": "hsl(var(--brand-navy))",
+        "sebrae-navy": "hsl(var(--accent-foreground))",
         "sebrae-gold": "#B07A0E",
         "app-bg": "hsl(var(--background))",
         "ink-legacy": "hsl(var(--foreground))",

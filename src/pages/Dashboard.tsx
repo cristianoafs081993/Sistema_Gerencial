@@ -5,7 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { HeaderActions } from '@/components/HeaderParts';
+import { PageHeader } from '@/components/design-system/PageHeader';
 import { DashboardContractExecutionTab } from '@/components/dashboard/DashboardContractExecutionTab';
 import { CampusDataUnavailable } from '@/components/CampusDataUnavailable';
 import { DashboardCurrentTab } from '@/components/dashboard/DashboardCurrentTab';
@@ -1786,31 +1786,16 @@ export default function Dashboard() {
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as 'corrente' | 'contratos' | 'rap')}
       >
-        <HeaderActions>
-          <div className="hidden h-9 items-center gap-2 md:flex">
-            <TabsList className="h-8 rounded-lg border border-border-default/60 bg-surface-card p-0.5 shadow-sm sm:h-9">
-              <TabsTrigger
-                value="corrente"
-                className="h-7 rounded-md px-3 text-[11px] font-semibold text-slate-600 transition-all data-[state=active]:bg-brand-navy data-[state=active]:text-white sm:h-8 sm:px-4 sm:text-xs"
-              >
-                Orçamento
-              </TabsTrigger>
-              <TabsTrigger
-                value="rap"
-                className="h-7 rounded-md px-3 text-[11px] font-semibold text-slate-600 transition-all data-[state=active]:bg-brand-navy data-[state=active]:text-white sm:h-8 sm:px-4 sm:text-xs"
-              >
-                RAP
-              </TabsTrigger>
-              <TabsTrigger
-                value="contratos"
-                className="h-7 rounded-md px-3 text-[11px] font-semibold text-slate-600 transition-all data-[state=active]:bg-brand-navy data-[state=active]:text-white sm:h-8 sm:px-4 sm:text-xs"
-              >
-                Contratos
-              </TabsTrigger>
-            </TabsList>
-
+        <PageHeader
+          title="Painel de execução"
+          description={{
+                corrente: 'Execução orçamentária do exercício: planejado, descentralizado, empenhado e pago.',
+                rap: 'Restos a pagar inscritos e reinscritos, com liquidação no ano e saldo atual.',
+                contratos: 'Despesas mensais dos contratos ativos e projeção de consumo.',
+              }[activeTab]}
+          actions={
             <DashboardFiltersSheet
-              buttonClassName="relative h-8 gap-2 border-border-default bg-surface-card text-xs text-text-primary shadow-sm transition-all hover:bg-surface-subtle sm:h-9 sm:text-sm"
+              buttonClassName="relative h-9 gap-2 border-border bg-card text-sm text-foreground shadow-xs hover:bg-muted"
               filterOrigem={filterOrigem}
               filterPlanoInterno={filterPlanoInterno}
               dateStart={dateStart}
@@ -1825,65 +1810,29 @@ export default function Dashboard() {
               onDateEndChange={setDateEnd}
               onClearFilters={clearFilters}
             />
-          </div>
-        </HeaderActions>
-
-        <div className="mb-2 flex flex-col items-start gap-4 md:hidden sm:flex-row sm:items-center sm:justify-between">
-          <TabsList className="h-auto flex-wrap rounded-lg bg-slate-100 p-1">
-            <TabsTrigger
-              value="corrente"
-              className="rounded-md px-6 py-2 text-sm font-semibold text-slate-500 transition-all hover:text-slate-900 data-[state=active]:bg-brand-navy data-[state=active]:text-white data-[state=active]:shadow-sm"
-            >
-              Orçamento
-            </TabsTrigger>
-            <TabsTrigger
-              value="rap"
-              className="rounded-md px-6 py-2 text-sm font-semibold text-slate-500 transition-all hover:text-slate-900 data-[state=active]:bg-brand-navy data-[state=active]:text-white data-[state=active]:shadow-sm"
-            >
-              RAP
-            </TabsTrigger>
-            <TabsTrigger
-              value="contratos"
-              className="rounded-md px-6 py-2 text-sm font-semibold text-slate-500 transition-all hover:text-slate-900 data-[state=active]:bg-brand-navy data-[state=active]:text-white data-[state=active]:shadow-sm"
-            >
-              Contratos
-            </TabsTrigger>
-          </TabsList>
-
-          <DashboardFiltersSheet
-            buttonClassName="relative gap-2 border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
-            filterOrigem={filterOrigem}
-            filterPlanoInterno={filterPlanoInterno}
-            dateStart={dateStart}
-            dateEnd={dateEnd}
-            origensDisponiveis={origensDisponiveis}
-            planosInternosDisponiveis={planosInternosDisponiveis}
-            hasActiveFilters={hasActiveFilters}
-            activeFiltersCount={activeFiltersCount}
-            onFilterOrigemChange={setFilterOrigem}
-            onFilterPlanoInternoChange={setFilterPlanoInterno}
-            onDateStartChange={setDateStart}
-            onDateEndChange={setDateEnd}
-            onClearFilters={clearFilters}
-          />
-        </div>
+          }
+          toolbar={
+            <TabsList aria-label="Visões do painel">
+              <TabsTrigger value="corrente">Orçamento</TabsTrigger>
+              <TabsTrigger value="rap">RAP</TabsTrigger>
+              <TabsTrigger value="contratos">Contratos</TabsTrigger>
+            </TabsList>
+          }
+        />
 
         {activeTab !== 'contratos' && filterPlanoInterno !== 'all' ? (
           <div className="mb-6 flex items-center gap-3">
-            <Badge
-              variant="secondary"
-              className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-ui text-xs font-semibold text-primary"
-            >
+            <Badge variant="brand" className="px-3 py-1">
               Plano Interno ativo: {filterPlanoInterno}
             </Badge>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-8 px-2 text-xs text-text-muted hover:text-text-primary"
+              className="h-8 px-2 text-xs"
               onClick={() => setFilterPlanoInterno('all')}
             >
-              Limpar selecao
+              Limpar seleção
             </Button>
           </div>
         ) : null}

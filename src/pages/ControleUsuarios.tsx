@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/design-system/PageHeader';
 import { useEffect, useMemo, useState } from 'react';
 import { KeyRound, Loader2, MailPlus, Plus, RefreshCw, Save, Trash2, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -297,13 +298,10 @@ export default function ControleUsuarios() {
         </Button>
       </HeaderActions>
 
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1a1a19]">Administração</p>
-        <h1 className="text-2xl font-bold tracking-[-0.02em] text-[#34322d]">Controle de usuários</h1>
-        <p className="max-w-3xl text-sm leading-6 text-[#858481]">
-          Crie usuários, envie convites e defina quais telas cada grupo pode acessar.
-        </p>
-      </div>
+      <PageHeader
+        title="Controle de usuários"
+        description="Crie usuários, envie convites e defina quais telas cada grupo pode acessar."
+      />
 
       {isLoading && !state ? (
         <SectionPanel>
@@ -362,7 +360,7 @@ export default function ControleUsuarios() {
                   }}
                 />
               </div>
-              <p className="mt-3 text-xs text-[#858481]">
+              <p className="mt-3 text-xs text-muted-foreground">
                 A senha inicial deve ter pelo menos 8 caracteres. O usuário poderá alterá-la depois de entrar.
               </p>
             </FilterPanel>

@@ -448,7 +448,7 @@ export function SuapSyncPanel() {
                     <Button 
                       type="submit"
                       disabled={isLoggingIn}
-                      className="w-full bg-brand-navy hover:bg-brand-navy/90 text-brand-navy-foreground font-bold h-9 text-xs shadow-sm gap-1"
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-9 text-xs shadow-sm gap-1"
                     >
                       {isLoggingIn ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : null}
                       Conectar
@@ -499,7 +499,7 @@ export function SuapSyncPanel() {
                     <Button 
                       type="submit"
                       disabled={isConnectingCookie}
-                      className="w-full bg-brand-navy hover:bg-brand-navy/90 text-brand-navy-foreground font-bold h-9 text-xs shadow-sm gap-1"
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-9 text-xs shadow-sm gap-1"
                     >
                       {isConnectingCookie ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : null}
                       Conectar Cookie

@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/design-system/PageHeader';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Loader2, RefreshCw, Upload } from 'lucide-react';
 import { toast } from 'sonner';
@@ -158,13 +159,10 @@ export default function ModelosDocumentos() {
         </Button>
       </HeaderActions>
 
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1a1a19]">Administracao</p>
-        <h1 className="text-2xl font-bold tracking-[-0.02em] text-[#34322d]">Modelos de documentos</h1>
-        <p className="max-w-3xl text-sm leading-6 text-[#858481]">
-          Publique os modelos DOCX ativos usados pela geracao assistida. O editor consome sempre a versao ativa de cada tipo.
-        </p>
-      </div>
+      <PageHeader
+        title="Modelos de documentos"
+        description="Publique os modelos DOCX ativos usados pela geracao assistida. O editor consome sempre a versao ativa de cada tipo."
+      />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
         <FilterPanel title="Publicar modelo DOCX">

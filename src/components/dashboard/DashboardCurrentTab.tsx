@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowDown, PiggyBank, Receipt, TrendingUp, Wallet } from 'lucide-react';
+import { PiggyBank, Receipt, TrendingUp, Wallet } from 'lucide-react';
 import {
   Area,
   Bar,
@@ -73,10 +73,13 @@ type BudgetTreemapNode = {
 };
 
 const EXECUTION_CHART_COLORS = {
-  planejado: '#2563eb',
-  empenhado: '#a855f7',
-  liquidado: '#f59e0b',
+  planejado: '#1565C0',
+  empenhado: '#1E88E5',
+  liquidado: '#00B7DC',
 } as const;
+
+// Paleta de séries do design system Céu (azul-céu, ciano, azul profundo, âmbar, verde, cinza-azulado)
+const SERIES_COLORS = ['#1E88E5', '#00B7DC', '#1565C0', '#F2A93B', '#2E9E6A', '#7C8DA6', '#90CAF9', '#D64545'];
 
 type DashboardCurrentTabProps = {
   isLoading: boolean;
@@ -133,220 +136,154 @@ export function DashboardCurrentTab({
     setIsModalOpen(true);
   };
 
+  const percent = (value: number, total: number) => (total > 0 ? (value / total) * 100 : 0);
+
+  const funnelSteps = [
+    {
+      label: 'Planejado',
+      value: totalPlanejado,
+      ratio: 100,
+      ratioLabel: `${filteredData.atividades.length} atividades`,
+      barClassName: 'bg-primary',
+    },
+    {
+      label: 'Empenhado',
+      value: totalEmpenhado,
+      ratio: percent(totalEmpenhado, totalPlanejado),
+      ratioLabel: `${percent(totalEmpenhado, totalPlanejado).toFixed(1)}% do planejado · ${percent(totalEmpenhado, totalDescentralizado).toFixed(1)}% do descentralizado`,
+      barClassName: 'bg-brand-sky',
+    },
+    {
+      label: 'Liquidado',
+      value: totalLiquidado,
+      ratio: percent(totalLiquidado, totalPlanejado),
+      ratioLabel: `${percent(totalLiquidado, totalEmpenhado).toFixed(1)}% do empenhado · ${percent(totalLiquidado, totalDescentralizado).toFixed(1)}% do descentralizado`,
+      barClassName: 'bg-brand-cyan',
+    },
+    {
+      label: 'Pago',
+      value: totalPago,
+      ratio: percent(totalPago, totalPlanejado),
+      ratioLabel: `${percent(totalPago, totalLiquidado).toFixed(1)}% do liquidado`,
+      barClassName: 'bg-success',
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 auto-rows-[minmax(130px,auto)] md:grid-cols-3">
-        <div
-          className={`
-            relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/8 via-primary/4 to-transparent p-6 shadow-[0_8px_30px_rgba(26,92,230,0.12)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(26,92,230,0.18)]
-            md:row-span-2
-          `}
-        >
-          <div className="absolute -bottom-12 -right-12 h-40 w-40 rounded-full bg-primary/15 blur-3xl pointer-events-none" />
-          <div className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
-
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-primary/60">Total Planejado</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {filteredData.atividades.length} atividades filtradas
-              </p>
-            </div>
-            <div className="shrink-0 rounded-xl bg-primary/10 p-2.5 text-primary">
-              <Wallet className="h-5 w-5" />
-            </div>
+      <section aria-label="Indicadores de execução" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          title="Total planejado"
+          value={formatCurrency(totalPlanejado)}
+          subtitle={`${percentualExecutado.toFixed(1)}% executado · ${formatCurrency(totalEmpenhado)} empenhados`}
+          icon={Wallet}
+          stitchColor="purple"
+          progress={percentualExecutado}
+          isLoading={isLoading}
+        />
+        <StatCard
+          title="Descentralizado"
+          value={formatCurrency(totalDescentralizado)}
+          subtitle={
+            aDescentralizar >= 0
+              ? `${formatCurrency(aDescentralizar)} a descentralizar`
+              : `${formatCurrency(Math.abs(aDescentralizar))} acima do orçamento`
+          }
+          icon={Receipt}
+          stitchColor={aDescentralizar >= 0 ? 'vibrant-blue' : 'red-500'}
+          progress={percent(totalDescentralizado, totalPlanejado)}
+          isLoading={isLoading}
+        />
+        <StatCard
+          title="Total empenhado"
+          value={formatCurrency(totalEmpenhado)}
+          subtitle={`${filteredData.empenhosCorrente.length} empenhos · ${percent(totalEmpenhado, totalDescentralizado).toFixed(1)}% do descentralizado`}
+          icon={TrendingUp}
+          stitchColor="vibrant-blue"
+          progress={percent(totalEmpenhado, totalPlanejado)}
+          isLoading={isLoading}
+        />
+        <div data-testid="liquidado-pago-card" className="rounded-xl border border-border bg-card p-5 shadow-xs transition-shadow duration-200 hover:shadow-md">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-muted-foreground">Liquidado / Pago</p>
+            <PiggyBank className="h-4 w-4 shrink-0 text-success" />
           </div>
-
-          <div>
-            {isLoading ? (
-              <div className="mt-2 h-10 w-4/5 animate-pulse rounded-lg bg-primary/10" />
-            ) : (
-              <p
-                className={`
-                  mt-2 mb-4 bg-gradient-to-br from-[#1a5ce6] to-[#3b82f6] bg-clip-text text-3xl font-black leading-none tracking-tighter text-transparent
-                  lg:text-4xl
-                `}
-              >
-                {formatCurrency(totalPlanejado)}
-              </p>
-            )}
-
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Execução orçamentária</span>
-                <span className="font-bold text-primary">{percentualExecutado.toFixed(1)}%</span>
+          <div className="space-y-3">
+            {[
+              { label: 'Liquidado', value: totalLiquidado, ratio: percent(totalLiquidado, totalEmpenhado), bar: 'bg-brand-cyan' },
+              { label: 'Pago', value: totalPago, ratio: percent(totalPago, totalLiquidado), bar: 'bg-success' },
+            ].map((item) => (
+              <div key={item.label}>
+                <div className="mb-1 flex items-baseline justify-between gap-2">
+                  <span className="text-xs text-muted-foreground">{item.label}</span>
+                  {isLoading ? (
+                    <span className="h-4 w-24 animate-pulse rounded bg-muted" />
+                  ) : (
+                    <span className="text-sm font-extrabold tracking-tight text-foreground">{formatCurrency(item.value)}</span>
+                  )}
+                </div>
+                <div className="h-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ease-spring ${item.bar}`}
+                    style={{ width: `${Math.min(item.ratio, 100)}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-primary/10">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-primary/70 to-primary transition-all duration-700 ease-spring"
-                  style={{ width: `${Math.min(percentualExecutado, 100)}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">{formatCurrency(totalEmpenhado)} empenhados</p>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <StatCard
-            title="Descentralizado"
-            value={formatCurrency(totalDescentralizado)}
-            subtitle={`${filteredData.descentralizacoes.length} descentralizações`}
-            icon={Receipt}
-            stitchColor="emerald-green"
-            progress={totalPlanejado > 0 ? (totalDescentralizado / totalPlanejado) * 100 : 0}
-            isLoading={isLoading}
-          />
-        </div>
-
-        <div>
-          <StatCard
-            title="Total Empenhado"
-            value={formatCurrency(totalEmpenhado)}
-            subtitle={`${filteredData.empenhosCorrente.length} empenhos filtrados`}
-            icon={TrendingUp}
-            stitchColor="purple"
-            progress={totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0}
-            isLoading={isLoading}
-          />
-        </div>
-
-        <div>
-          <StatCard
-            title="A Descentralizar"
-            value={formatCurrency(aDescentralizar)}
-            subtitle={aDescentralizar >= 0 ? 'Dentro do orçamento' : 'Acima do orçamento'}
-            icon={PiggyBank}
-            stitchColor="amber"
-            progress={totalPlanejado > 0 ? (Math.max(0, aDescentralizar) / totalPlanejado) * 100 : 0}
-            isLoading={isLoading}
-          />
-        </div>
-
-        <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-card p-5 shadow-soft transition-all duration-200 hover:-translate-y-[1px] hover:shadow-card">
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Liquidado / Pago</p>
-
-          <div className="mt-2 space-y-3">
-            <div>
-              <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Liquidado</span>
-                {isLoading ? (
-                  <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-                ) : (
-                  <span className="bg-gradient-to-r from-amber-600 to-amber-500 dark:from-amber-400 dark:to-yellow-300 bg-clip-text text-sm font-black tracking-tight text-transparent">
-                    {formatCurrency(totalLiquidado)}
-                  </span>
-                )}
-              </div>
-              <div className="h-1 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-500/70 to-amber-500 transition-all duration-700 ease-spring"
-                  style={{ width: totalEmpenhado > 0 ? `${Math.min((totalLiquidado / totalEmpenhado) * 100, 100)}%` : '0%' }}
-                />
-              </div>
-            </div>
-
-            <div className="h-px bg-border/60" />
-
-            <div>
-              <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Pago</span>
-                {isLoading ? (
-                  <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-                ) : (
-                  <span className="bg-gradient-to-r from-emerald-600 to-emerald-500 dark:from-emerald-400 dark:to-teal-300 bg-clip-text text-sm font-black tracking-tight text-transparent">
-                    {formatCurrency(totalPago)}
-                  </span>
-                )}
-              </div>
-              <div className="h-1 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-emerald-500/70 to-emerald-500 transition-all duration-700 ease-spring"
-                  style={{ width: totalLiquidado > 0 ? `${Math.min((totalPago / totalLiquidado) * 100, 100)}%` : '0%' }}
-                />
-              </div>
-            </div>
+            ))}
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="relative flex min-h-[226px] items-stretch justify-center overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card">
-          <div className="flex w-full max-w-[420px] flex-col items-center justify-between">
-            <p className="mb-1 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">Empenhado/Descentralizado</p>
-            <GaugeChart
-              value={totalEmpenhado}
-              total={totalDescentralizado}
-              label="Empenhado"
-              sublabel="sobre Descentralizado"
-              isLoading={isLoading}
-            />
+      <section aria-label="Velocímetros de execução" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {[
+          { title: 'Empenhado / Descentralizado', value: totalEmpenhado, label: 'Empenhado' },
+          { title: 'Liquidado / Descentralizado', value: totalLiquidado, label: 'Liquidado' },
+        ].map((gauge) => (
+          <div
+            key={gauge.title}
+            className="flex min-h-[226px] items-stretch justify-center rounded-xl border border-border bg-card p-5 shadow-xs transition-shadow duration-200 hover:shadow-md"
+          >
+            <div className="flex w-full max-w-[420px] flex-col items-center justify-between">
+              <p className="mb-1 text-center text-xs font-semibold text-muted-foreground">{gauge.title}</p>
+              <GaugeChart
+                value={gauge.value}
+                total={totalDescentralizado}
+                label={gauge.label}
+                sublabel="sobre Descentralizado"
+                isLoading={isLoading}
+              />
+            </div>
           </div>
-        </div>
+        ))}
+      </section>
 
-        <div className="relative flex min-h-[226px] items-stretch justify-center overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card">
-          <div className="flex w-full max-w-[420px] flex-col items-center justify-between">
-            <p className="mb-1 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">Liquidado/Descentralizado</p>
-            <GaugeChart
-              value={totalLiquidado}
-              total={totalDescentralizado}
-              label="Liquidado"
-              sublabel="sobre Descentralizado"
-              isLoading={isLoading}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3">
         <ChartPanel
-          className="h-full md:col-span-2"
-          title="Evolução da Execução"
+          className="h-full lg:col-span-2"
+          title="Evolução da execução"
+          description="Acumulado mensal de planejado, empenhado e liquidado"
           loading={isLoading}
+          actions={
+            <div className="flex flex-wrap gap-3 text-xs font-semibold text-muted-foreground">
+              {(['planejado', 'empenhado', 'liquidado'] as const).map((key) => (
+                <span key={key} className="inline-flex items-center gap-1.5 capitalize">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: EXECUTION_CHART_COLORS[key] }} />
+                  {key}
+                </span>
+              ))}
+            </div>
+          }
         >
-          <div className="mb-4 flex flex-wrap gap-2">
-            <span
-              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
-              style={{
-                backgroundColor: `${EXECUTION_CHART_COLORS.planejado}14`,
-                color: EXECUTION_CHART_COLORS.planejado,
-              }}
-            >
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: EXECUTION_CHART_COLORS.planejado }} />
-              Planejado
-            </span>
-            <span
-              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
-              style={{
-                backgroundColor: `${EXECUTION_CHART_COLORS.empenhado}14`,
-                color: EXECUTION_CHART_COLORS.empenhado,
-              }}
-            >
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: EXECUTION_CHART_COLORS.empenhado }} />
-              Empenhado
-            </span>
-            <span
-              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
-              style={{
-                backgroundColor: `${EXECUTION_CHART_COLORS.liquidado}14`,
-                color: EXECUTION_CHART_COLORS.liquidado,
-              }}
-            >
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: EXECUTION_CHART_COLORS.liquidado }} />
-              Liquidado
-            </span>
-          </div>
-
-          <div className="h-[300px] rounded-[22px] border border-border bg-card/50 p-3">
+          <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={dadosMensais} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorEmpenhado" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={EXECUTION_CHART_COLORS.empenhado} stopOpacity={0.28} />
+                    <stop offset="0%" stopColor={EXECUTION_CHART_COLORS.empenhado} stopOpacity={0.22} />
                     <stop offset="100%" stopColor={EXECUTION_CHART_COLORS.empenhado} stopOpacity={0.02} />
                   </linearGradient>
                   <linearGradient id="colorLiquidado" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={EXECUTION_CHART_COLORS.liquidado} stopOpacity={0.22} />
+                    <stop offset="0%" stopColor={EXECUTION_CHART_COLORS.liquidado} stopOpacity={0.2} />
                     <stop offset="100%" stopColor={EXECUTION_CHART_COLORS.liquidado} stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
@@ -378,65 +315,31 @@ export function DashboardCurrentTab({
           </div>
         </ChartPanel>
 
-        <Card className="card-system h-full overflow-visible border border-border-default/80 shadow-soft">
-          <CardHeader className="pb-2">
-            <CardTitle>Funil de Execução</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="relative flex min-h-[300px] flex-1 flex-col justify-center gap-4 py-4">
-              <div className="absolute left-1/2 top-0 bottom-0 z-0 hidden w-px -translate-x-1/2 bg-border md:block" />
-
-              <div className="relative z-10 flex flex-col items-center">
-                <div className="w-full max-w-[240px] rounded-lg bg-vibrant-blue px-4 py-3 text-center text-white shadow-sm">
-                  <p className="mb-1 text-xs font-medium uppercase tracking-wider text-white/85">Planejado</p>
-                  <p className="text-lg font-bold text-white">{formatCurrency(totalPlanejado)}</p>
+        <ChartPanel title="Funil de execução" description="Quanto do planejado avançou em cada etapa" loading={isLoading} className="h-full">
+          <ol className="space-y-4" aria-label="Funil de execução">
+            {funnelSteps.map((step) => (
+              <li key={step.label}>
+                <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                  <span className="text-sm font-bold text-foreground">{step.label}</span>
+                  <span className="font-mono text-sm font-semibold text-foreground">{formatCurrency(step.value)}</span>
                 </div>
-
-                <div className="flex h-6 items-center justify-center">
-                  <ArrowDown className="h-4 w-4 text-muted-foreground" />
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ease-spring ${step.barClassName}`}
+                    style={{ width: `${Math.min(step.ratio, 100)}%` }}
+                  />
                 </div>
-
-                <div className="relative w-11/12 max-w-[220px] rounded-lg bg-purple px-4 py-3 text-center text-white shadow-sm">
-                  <div className="absolute -right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-bold text-purple shadow-sm md:block">
-                    {totalPlanejado ? ((totalEmpenhado / totalPlanejado) * 100).toFixed(1) : '0'}%
-                  </div>
-                  <p className="mb-1 text-xs font-medium uppercase tracking-wider text-white/85">Empenhado</p>
-                  <p className="text-lg font-bold text-white">{formatCurrency(totalEmpenhado)}</p>
-                </div>
-
-                <div className="flex h-6 items-center justify-center">
-                  <ArrowDown className="h-4 w-4 text-muted-foreground" />
-                </div>
-
-                <div className="relative w-5/6 max-w-[200px] rounded-lg bg-amber px-4 py-3 text-center text-white shadow-sm">
-                  <div className="absolute -right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-bold text-amber shadow-sm md:block">
-                    {totalEmpenhado ? ((totalLiquidado / totalEmpenhado) * 100).toFixed(1) : '0'}%
-                  </div>
-                  <p className="mb-1 text-xs font-medium uppercase tracking-wider text-white/85">Liquidado</p>
-                  <p className="text-lg font-bold text-white">{formatCurrency(totalLiquidado)}</p>
-                </div>
-
-                <div className="flex h-6 items-center justify-center">
-                  <ArrowDown className="h-4 w-4 text-muted-foreground" />
-                </div>
-
-                <div className="relative w-4/5 max-w-[180px] rounded-lg bg-emerald-green px-4 py-3 text-center text-white shadow-sm">
-                  <div className="absolute -right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-bold text-emerald-green shadow-sm md:block">
-                    {totalLiquidado ? ((totalPago / totalLiquidado) * 100).toFixed(1) : '0'}%
-                  </div>
-                  <p className="mb-1 text-xs font-medium uppercase tracking-wider text-white/85">Pago</p>
-                  <p className="text-lg font-bold text-white">{formatCurrency(totalPago)}</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                <p className="mt-1 text-xs text-muted-foreground">{step.ratioLabel}</p>
+              </li>
+            ))}
+          </ol>
+        </ChartPanel>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         <ChartPanel
           title="Descentralizações"
-          description="Volume distribuído por Dimensão"
+          description="Volume distribuído por dimensão"
           loading={isLoading}
           heightClassName="h-[350px]"
         >
@@ -444,31 +347,28 @@ export function DashboardCurrentTab({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dadosDescentralizacao} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="hsl(var(--border))" />
-                <XAxis type="number" tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`} />
-                <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11 }} />
+                <XAxis type="number" tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`} tick={{ fill: 'currentColor', fontSize: 12 }} className="text-muted-foreground" />
+                <YAxis dataKey="name" type="category" width={120} tick={{ fill: 'currentColor', fontSize: 11 }} className="text-muted-foreground" />
                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 <Legend />
-                {uniqueOrigens.map((origem, index) => {
-                  const colors = ['#3b82f6', '#10b981', '#a855f7', '#f59e0b', '#ec4899', '#6366f1', '#14b8a6', '#f43f5e'];
-                  return (
-                    <Bar
-                      key={origem}
-                      dataKey={origem}
-                      stackId="a"
-                      fill={colors[index % colors.length]}
-                      radius={index === uniqueOrigens.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
-                      barSize={24}
-                    />
-                  );
-                })}
+                {uniqueOrigens.map((origem, index) => (
+                  <Bar
+                    key={origem}
+                    dataKey={origem}
+                    stackId="a"
+                    fill={SERIES_COLORS[index % SERIES_COLORS.length]}
+                    radius={index === uniqueOrigens.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
+                    barSize={24}
+                  />
+                ))}
               </BarChart>
             </ResponsiveContainer>
           </div>
         </ChartPanel>
 
         <ChartPanel
-          title="Top Naturezas"
-          description="Valor empenhado por Natureza de Despesa"
+          title="Top naturezas"
+          description="Valor empenhado por natureza de despesa"
           loading={isLoading}
           heightClassName="h-[350px]"
         >
@@ -476,10 +376,10 @@ export function DashboardCurrentTab({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dadosPorNatureza} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="hsl(var(--border))" />
-                <XAxis type="number" tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`} />
-                <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11 }} />
+                <XAxis type="number" tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`} tick={{ fill: 'currentColor', fontSize: 12 }} className="text-muted-foreground" />
+                <YAxis dataKey="name" type="category" width={80} tick={{ fill: 'currentColor', fontSize: 11 }} className="text-muted-foreground" />
                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Bar dataKey="value" fill="#10b981" name="Valor Gasto" radius={[0, 4, 4, 0]} barSize={20} />
+                <Bar dataKey="value" fill={SERIES_COLORS[0]} name="Valor gasto" radius={[0, 4, 4, 0]} barSize={20} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -487,16 +387,16 @@ export function DashboardCurrentTab({
       </div>
 
       <Card className="card-system overflow-hidden">
-        <CardHeader className="border-b border-border-default/50 px-6 py-4">
-          <CardTitle className="text-lg sm:text-xl font-bold text-text-primary">Detalhamento por Origem</CardTitle>
+        <CardHeader className="border-b border-border px-6 py-4">
+          <CardTitle>Detalhamento por origem</CardTitle>
           <CardDescription>
-            Execução financeira por fonte de recurso (clique na linha para ver as atividades com saldo)
+            Execução por fonte de recurso. Selecione uma linha para ver as atividades com saldo.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-muted/50">
+              <TableHeader className="bg-muted">
                 <TableRow className="border-b border-border-default/50 hover:bg-transparent">
                   <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-wider">Origem de Recurso</TableHead>
                   <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Planejado</TableHead>
@@ -516,7 +416,7 @@ export function DashboardCurrentTab({
                   dadosPorOrigem.map((item, index) => (
                     <TableRow
                       key={index}
-                      className="border-b transition-colors last:border-0 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 cursor-pointer group"
+                      className="border-b transition-colors last:border-0 row-hover cursor-pointer group focus-visible:outline-none focus-visible:bg-accent"
                       onClick={() => handleRowClick(item.origem)}
                       role="button"
                       tabIndex={0}
@@ -538,9 +438,9 @@ export function DashboardCurrentTab({
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="px-4 py-4 text-right text-sm">{formatCurrency(item.planejado)}</TableCell>
-                      <TableCell className="px-4 py-4 text-right text-sm">{formatCurrency(item.empenhado)}</TableCell>
-                      <TableCell className={`px-4 py-4 text-right text-sm font-medium ${item.saldo >= 0 ? 'text-status-success' : 'text-status-error'}`}>
+                      <TableCell className="px-4 py-4 text-right font-mono text-sm">{formatCurrency(item.planejado)}</TableCell>
+                      <TableCell className="px-4 py-4 text-right font-mono text-sm">{formatCurrency(item.empenhado)}</TableCell>
+                      <TableCell className={`px-4 py-4 text-right font-mono text-sm font-semibold ${item.saldo >= 0 ? 'text-status-success' : 'text-status-error'}`}>
                         {formatCurrency(item.saldo)}
                       </TableCell>
                       <TableCell className="px-6 py-4 text-right">
