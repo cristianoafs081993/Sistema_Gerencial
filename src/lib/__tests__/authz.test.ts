@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { SUPERADMIN_EMAIL, isSuperAdminEmail, isSuperAdminUser, normalizeEmail } from '@/lib/authz';
 
 describe('authz helpers', () => {

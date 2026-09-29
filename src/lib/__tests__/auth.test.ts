@@ -1,3 +1,4 @@
+// @vitest-environment node
 import {
   AUTH_INVITE_MODE,
   AUTH_RECOVERY_MODE,

@@ -42,6 +42,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
+import { somarEnviadoFornecedorPorEmpenho } from '@/lib/requisicaoCompraSaldo';
 import { getAuthUserMatricula, permissionMatchesAuthUser } from '@/lib/terceirizadoIdentity';
 import { formatCurrency, formatarDocumento } from '@/lib/utils';
 import { contratosApiService, LIQUIDACOES_CACHE_UPDATED_EVENT } from '@/services/contratosApi';
@@ -159,30 +160,10 @@ export default function RequisicaoCompraPage() {
 
 
   // Total retido / comprometido por empenho em requisições com status 'enviada_fornecedor' (excluindo requisição em edição)
-  const enviadoFornecedorTotalByEmpenhoId = useMemo(() => {
-    const map = new Map<string, number>();
-
-    requisicoes.forEach((req) => {
-      const isEnviada = req.status === 'enviada_fornecedor' || req.status === 'review' || req.status === 'approved';
-      if (!isEnviada) return;
-      if (editingRequisicaoId && req.id === editingRequisicaoId) return;
-
-      if (req.items && req.items.length > 0) {
-        req.items.forEach((item) => {
-          const empId = item.empenhoId || req.empenhoId;
-          if (empId) {
-            const current = map.get(empId) ?? 0;
-            map.set(empId, current + (item.quantity * item.unitPrice));
-          }
-        });
-      } else if (req.empenhoId && req.totalValue) {
-        const current = map.get(req.empenhoId) ?? 0;
-        map.set(req.empenhoId, current + req.totalValue);
-      }
-    });
-
-    return map;
-  }, [requisicoes, editingRequisicaoId]);
+  const enviadoFornecedorTotalByEmpenhoId = useMemo(
+    () => somarEnviadoFornecedorPorEmpenho(requisicoes, editingRequisicaoId),
+    [requisicoes, editingRequisicaoId],
+  );
 
   // Total retido / comprometido por item da NE em requisições com status 'enviada_fornecedor' (excluindo requisição em edição)
   const enviadoFornecedorTotalByItemKey = useMemo(() => {

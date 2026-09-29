@@ -87,6 +87,19 @@ Para a verificacao ampla do projeto:
 npm run check
 ```
 
+Testes de integracao (falam com servicos reais e dependem de dados vivos, por isso ficam fora de `npm test`) usam o sufixo `.integration.test.ts` e rodam a parte:
+
+```powershell
+npm run test:integration
+```
+
+### Manter a suite rapida
+
+- A suite completa (`npm test`) deve terminar em poucos minutos. Nunca deixe um teste travar: um laco infinito sincrono nao e interrompido pelo timeout do Vitest e bloqueia a suite inteira.
+- Prefira testar regras de negocio como funcoes puras (ex.: `src/lib/requisicaoCompraSaldo.ts`) em vez de exercitar a regra pela interface. Testes de interface ficam para o que so existe na tela.
+- Testes que nao usam DOM devem declarar `// @vitest-environment node` na primeira linha: iniciar o jsdom em cada arquivo e o maior custo cumulativo da suite.
+- Ao interromper uma execucao no meio, confira se nao sobraram processos `vitest` em segundo plano (eles disputam CPU e distorcem a medicao).
+
 ## Criterio de conclusao
 
 Antes de concluir uma correcao de bug ou nova funcionalidade:

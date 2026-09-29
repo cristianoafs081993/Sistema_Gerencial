@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { vi } from 'vitest';
 
 vi.mock('@/lib/supabase', () => ({

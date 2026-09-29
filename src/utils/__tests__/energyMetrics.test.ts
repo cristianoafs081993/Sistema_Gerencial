@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { buildEnergyMetrics, filterEnergyData } from '@/utils/energyMetrics';
 import type { EnergiaCampusData } from '@/services/energiaCampusService';
 

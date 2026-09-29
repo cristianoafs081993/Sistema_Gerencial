@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
 import { parseJsonResponse, repairJsonControlCharacters } from '../../../supabase/functions/_shared/json_response';

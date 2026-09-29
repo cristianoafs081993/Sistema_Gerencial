@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { loadAutomationSavingsSummary } from '@/services/automationSavingsService';
 
 const supabaseMocks = vi.hoisted(() => ({

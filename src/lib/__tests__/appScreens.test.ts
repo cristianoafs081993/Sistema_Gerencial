@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { ADMIN_USERS_SCREEN_ID, appScreens, expandScreenAccessIds, getScreenForPath, isProductionScreen } from '@/lib/appScreens';
 
 describe('app screen registry', () => {

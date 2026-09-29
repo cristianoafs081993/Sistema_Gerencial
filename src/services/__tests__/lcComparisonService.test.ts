@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { compararBolsistasComLC } from '@/services/lcComparisonService';
 import type { LCRegistro } from '@/services/lcImportService';

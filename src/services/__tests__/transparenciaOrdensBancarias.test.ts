@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { transparenciaService } from '@/services/transparencia';
 
 const supabaseMock = vi.hoisted(() => ({

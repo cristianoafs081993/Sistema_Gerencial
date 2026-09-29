@@ -149,7 +149,7 @@ describe('AIAssistantWidget', () => {
     fireEvent.click(screen.getByLabelText('Enviar pergunta'));
 
     await waitFor(() => {
-      expect(screen.getByText('Pesquisa de Preços Normativa (IN 65/2021)')).toBeInTheDocument();
+      expect(screen.getByText('Pesquisa de Preços — Prévia para revisão')).toBeInTheDocument();
     });
 
     expect(screen.getByText('Monitor 27 polegadas 4K')).toBeInTheDocument();

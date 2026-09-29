@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { vi } from 'vitest';
 
 const fromMock = vi.hoisted(() => vi.fn());

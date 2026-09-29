@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { decodeCsvBytes, parseEmailCsvImport } from '@/lib/emailCsvIngestion';
 
 describe('emailCsvIngestion', () => {
