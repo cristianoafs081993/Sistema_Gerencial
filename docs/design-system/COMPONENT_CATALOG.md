@@ -51,11 +51,20 @@ Arquivo: `src/components/design-system/TableSkeletonRows.tsx`
 
 Skeleton reutilizavel para linhas tabulares.
 
+### Estados de carregamento
+
+Três níveis, do mais amplo ao mais local:
+- `AppSplash`: tela de abertura (logotipo, nome, barra indeterminada e mensagem) para a carga inicial, a validação de sessão (`ProtectedRoute`) e rotas fora do `Layout`.
+- `PageLoadingSkeleton`: esqueleto de página (seletor/ações, 4 indicadores e painel de tabela) exibido dentro do `Layout` enquanto a rota lazy carrega, sem mover sidebar nem header.
+- `LoadingState` e `TableSkeletonRows`: carregamento dentro de painéis e tabelas já renderizados.
+
+O `Skeleton` usa a classe `.skeleton` (brilho suave azul-céu que percorre o bloco; sem animação com `prefers-reduced-motion`). Todos os estados usam `role="status"`, `aria-live="polite"` e `aria-busy`; os blocos decorativos ficam `aria-hidden` e a mensagem fica em texto (`sr-only` no esqueleto). A página `/design-system-preview` exibe os três estados.
+
 ### `RouteLoadingFallback`
 
 Arquivo: `src/components/design-system/RouteLoadingFallback.tsx`
 
-Fallback acessivel para rotas carregadas sob demanda. O modo `screen` ocupa a viewport em paginas publicas e o modo `content` preserva o shell global nas paginas autenticadas. Ambos exibem mensagem visivel e anunciam o carregamento com `role="status"`, `aria-live="polite"` e `aria-busy`.
+Fallback acessivel para rotas carregadas sob demanda. O modo `screen` renderiza o `AppSplash` em tela cheia (paginas publicas e fora do shell) e o modo `content` renderiza o `PageLoadingSkeleton`, preservando o shell global nas paginas autenticadas. Ambos anunciam o carregamento com `role="status"`, `aria-live="polite"` e `aria-busy`.
 
 ### `TablePagination`
 
@@ -113,7 +122,7 @@ Skeleton reutilizavel para linhas tabulares.
 
 Arquivo: `src/components/design-system/RouteLoadingFallback.tsx`
 
-Fallback acessivel para rotas carregadas sob demanda. O modo `screen` ocupa a viewport em paginas publicas e o modo `content` preserva o shell global nas paginas autenticadas. Ambos exibem mensagem visivel e anunciam o carregamento com `role="status"`, `aria-live="polite"` e `aria-busy`.
+Fallback acessivel para rotas carregadas sob demanda. O modo `screen` renderiza o `AppSplash` em tela cheia (paginas publicas e fora do shell) e o modo `content` renderiza o `PageLoadingSkeleton`, preservando o shell global nas paginas autenticadas. Ambos anunciam o carregamento com `role="status"`, `aria-live="polite"` e `aria-busy`.
 
 ### `TablePagination`
 
