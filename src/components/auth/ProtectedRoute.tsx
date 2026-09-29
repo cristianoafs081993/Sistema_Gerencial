@@ -4,7 +4,6 @@ import { AppSplash } from '@/components/design-system/AppSplash';
 import { useAuth } from '@/contexts/AuthContext';
 import { appScreens } from '@/lib/appScreens';
 import { buildAuthRoute } from '@/lib/auth';
-import { APP_BRAND } from '@/lib/brand';
 
 function getFirstAllowedPath(screenAccessIds: string[], userGroups: Array<{ slug: string }>) {
   if (userGroups.some((group) => group.slug === 'terceirizado')) {
@@ -23,7 +22,7 @@ export function ProtectedRoute() {
     return (
       <AppSplash
         label="Validando sessão"
-        description={`O ${APP_BRAND.name} está confirmando sua autenticação e permissões.`}
+        description="O SIAGES está confirmando sua autenticação e permissões."
       />
     );
   }
