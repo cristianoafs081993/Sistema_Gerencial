@@ -178,7 +178,7 @@ describe('Layout', () => {
     expect(screen.getByText('Painel de integração SUAP')).toBeInTheDocument();
   });
 
-  it('exibe a opção de padrão de design do SUAP dentro do menu do usuário', () => {
+  it('não oferece seletor de temas: o visual Paretto Institucional é único', () => {
     renderWithProviders(
       <MemoryRouter>
         <Layout>
@@ -187,13 +187,13 @@ describe('Layout', () => {
       </MemoryRouter>,
     );
 
-    // Não deve haver botão avulso de tema no header
     expect(screen.queryByTitle('Alternar Tema do SUAP Design System')).not.toBeInTheDocument();
 
-    // Abrir o menu de configurações do usuário
     fireEvent.keyDown(screen.getByRole('button', { name: 'Abrir configurações do usuário' }), { key: 'ArrowDown' });
 
-    expect(screen.getByText('Padrão de design (SUAP)')).toBeInTheDocument();
+    expect(screen.getByText('Alterar senha')).toBeInTheDocument();
+    expect(screen.queryByText('Padrão de design (SUAP)')).not.toBeInTheDocument();
+    expect(document.documentElement).not.toHaveAttribute('data-suap-theme');
   });
 
   it('permite alterar a senha pelo menu do usuário', async () => {

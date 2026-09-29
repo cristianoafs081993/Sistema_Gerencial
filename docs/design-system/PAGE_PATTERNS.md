@@ -6,12 +6,12 @@ Este documento resume as diretrizes de composição e padrões visuais de págin
 
 O shell principal em [Layout.tsx](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/components/Layout.tsx) usa a estrutura de sidebar e header:
 
-1. **Sidebar Responsiva (Expandida e Rail Mode)**: Fundo `bg-card`, borda divisória sutil, suporte a recolhimento compacto para modo ícones (`w-18`) com tooltips acessíveis e persistência em `localStorage`;
-2. **Identidade da Marca**: Logotipo oficial no topo com badge da versão e identificador do órgão vinculado;
+1. **Sidebar Responsiva (Expandida e Rail Mode)**: Fundo branco (`bg-sidebar`), borda divisória sutil, suporte a recolhimento compacto para modo ícones (`w-18`) com tooltips acessíveis e persistência em `localStorage`;
+2. **Identidade da Marca**: Logotipo institucional do SIAGES no topo com selo "Beta" navy/lima e legenda em caixa alta espaçada (padrão Paretto Institucional, sem mascote);
 3. **Busca e Command Palette Global (`Cmd+K` / `Ctrl+K`)**: Campo de pesquisa rápido no header com atalho de teclado `Ctrl K` que abre a Command Palette para navegação instantânea por telas, módulos e ações rápidas;
-4. **Header com Efeito de Vidro**: Barra superior com translucidez (`backdrop-blur-md bg-card/90`) e sombra suave;
+4. **Header**: Barra superior branca e sólida de 64px com borda inferior sutil;
 5. **Grupos de Módulos (Sidebar)**: Títulos em caixa alta/tamanho reduzido, ícone com cor de destaque ativa e chevrons dinâmicos que rotacionam suavemente;
-6. **Indicador Lateral Ativo**: Links de navegação ativa recebem indicador vertical destacado e fundo sutil `bg-primary/10`;
+6. **Item Ativo**: Links de navegação ativa recebem fundo `sidebar-accent`, texto `sidebar-accent-foreground` em negrito e um ponto teal à direita;
 7. **Submenus Expansivos**: Subitens com pontos discretos indicando a rota ativa com recuo visual;
 8. **Responsividade**: Drawer lateral acionado via botão hambúrguer para dispositivos móveis;
 9. **Scrollbars**: Rolagem fina com trilha invisível e cantos arredondados na navegação interna;

@@ -29,7 +29,7 @@ export function ChartPanel({
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <CardTitle className={cn('text-base font-semibold', titleClassName)}>{title}</CardTitle>
+            <CardTitle className={cn('text-[15px] font-bold', titleClassName)}>{title}</CardTitle>
             {description ? <CardDescription>{description}</CardDescription> : null}
           </div>
           {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}

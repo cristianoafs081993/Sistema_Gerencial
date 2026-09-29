@@ -20,10 +20,10 @@ export function Header({ title, icon: Icon, onRefresh, isRefreshing }: HeaderPro
     return (
         <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-primary/10 rounded-xl text-primary shadow-sm border border-primary/20">
+                <div className="p-2.5 bg-accent rounded-xl text-accent-foreground border border-primary/15">
                     <Icon className="w-6 h-6" />
                 </div>
-                <h1 className="text-3xl font-black tracking-tight text-[#1A2B66] dark:text-foreground">
+                <h1 className="text-[28px] font-extrabold tracking-[-0.02em] text-foreground">
                     {title}
                 </h1>
             </div>

@@ -13,10 +13,10 @@ import { cn } from "@/lib/utils";
  * 10. Micro-interações: transition suave, active:scale-[0.97]
  */
 const buttonVariants = cva(
-  // Base SUAP button styling — estilo pill arredondado e toque acessível
+  // Base Paretto Institucional — cantos de 8px, peso forte e toque acessível
   [
     "inline-flex items-center justify-center gap-2 whitespace-nowrap",
-    "font-ui rounded-full text-sm font-semibold",
+    "font-ui rounded-lg text-sm font-bold",
     "ring-offset-background transition-all duration-150",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
     "disabled:pointer-events-none disabled:opacity-40",
@@ -27,9 +27,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Primary SUAP — sólido na cor primária institucional com hover contrastado
+        // Primary — navy institucional sólido
         default:
-          "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-primary",
+          "bg-brand-navy text-brand-navy-foreground shadow-sm hover:bg-brand-navy/90 hover:shadow-primary",
 
         // Destructive SUAP — vermelho semântico
         destructive:
@@ -47,28 +47,32 @@ const buttonVariants = cva(
         ghost:
           "text-muted-foreground hover:bg-muted hover:text-foreground",
 
-        // Link — texto clicável no tom primário do SUAP
+        // Link — texto clicável no teal primário
         link:
           "text-primary underline-offset-4 hover:underline p-0 h-auto shadow-none",
 
-        // SUAP Pill oficial
+        // Alias legado do antigo pill SUAP — mantém a ação principal navy
         suap:
-          "bg-primary text-primary-foreground rounded-full hover:bg-primary/90 shadow-sm",
+          "bg-brand-navy text-brand-navy-foreground hover:bg-brand-navy/90 shadow-sm",
 
-        // Brand — cor de destaque
+        // Brand — teal de destaque
         brand:
           "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
+
+        // Lime — acento discreto (usar com parcimônia, ex.: CTA único em superfície navy)
+        lime:
+          "bg-brand-lime text-brand-lime-foreground hover:bg-brand-lime/90 shadow-sm",
 
         // Gold / Alerta
         gold:
           "bg-warning text-foreground hover:opacity-90 shadow-sm",
       },
       size: {
-        default: "h-9 px-4 py-2 text-sm",        // 36px altura padrão SUAP
-        sm:      "h-8 px-3 py-1 text-xs",        // 32px altura compacta SUAP
-        lg:      "h-10 px-6 py-2.5 text-base",   // 40px altura ampla
-        icon:    "h-9 w-9 p-0 rounded-full",
-        "icon-sm":"h-7 w-7 p-0 rounded-full text-xs",
+        default: "h-9 px-4 py-2 text-sm",        // 36px altura padrão
+        sm:      "h-8 px-3 py-1 text-xs",        // 32px altura compacta
+        lg:      "h-11 px-6 py-2.5 text-sm",     // 44px altura ampla (Paretto)
+        icon:    "h-9 w-9 p-0",
+        "icon-sm":"h-7 w-7 p-0 text-xs",
       },
     },
     defaultVariants: {

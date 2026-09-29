@@ -28,6 +28,11 @@ Pontos mais criticos devem ter cobertura preferencial:
 - integracoes, proxies, storage e Edge Functions
 - regras de encoding em textos de UI e documentacao
 
+Design system (Paretto Institucional):
+
+- `src/__tests__/designSystemTokens.test.ts` garante tema único (sem `data-suap-theme` nem `SuapThemeSwitcher`), a paleta navy/teal/lima no `:root`, Manrope + IBM Plex Mono em `index.css`, `tailwind.config.ts` e `index.html`, botões com `rounded-lg` e ação principal em navy, e a ausência do mascote do Paretto.
+- `src/components/__tests__/Layout.test.tsx` confirma que o menu do usuário não oferece mais seletor de temas.
+
 Requisições de Compra:
 
 - A RLS e os vínculos `requisicao_compra_itens`/`requisicao_compra_empenhos` devem permitir que usuários do grupo `fiscais-de-contratos` visualizem as requisições e seus detalhes; o slug legado `fiscal-contratos` também deve continuar funcionando.

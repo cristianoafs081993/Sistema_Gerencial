@@ -45,7 +45,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SuapSyncPanel } from '@/components/suap/SuapSyncPanel';
-import { SuapThemeSubMenu } from '@/components/suap/SuapThemeSwitcher';
 import { CommandPalette } from '@/components/CommandPalette';
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import { LogoIcon } from './Logo';
@@ -356,14 +355,14 @@ export function Layout({ children }: LayoutProps) {
 
         <aside
           className={cn(
-            'fixed inset-y-0 left-0 z-50 flex h-screen shrink-0 flex-col overflow-hidden border-r border-border bg-card transition-all duration-250 ease-out lg:relative lg:translate-x-0',
+            'fixed inset-y-0 left-0 z-50 flex h-screen shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-all duration-250 ease-out lg:relative lg:translate-x-0',
             isSidebarCollapsed ? 'w-18' : 'w-72',
             sidebarOpen ? 'translate-x-0' : '-translate-x-full',
           )}
         >
           {/* Brand Header */}
           <div className={cn(
-            'h-14 border-b border-border flex items-center transition-all duration-200 relative bg-muted/30',
+            'h-16 border-b border-sidebar-border flex items-center transition-all duration-200 relative bg-sidebar',
             isSidebarCollapsed ? 'px-3 justify-center' : 'px-4 justify-between'
           )}>
             <Link
@@ -374,10 +373,10 @@ export function Layout({ children }: LayoutProps) {
               <LogoIcon size={isSidebarCollapsed ? 28 : 32} />
               {!isSidebarCollapsed && (
                 <div className="min-w-0 flex-1">
-                  <h1 className="font-bold text-base tracking-tight leading-none text-foreground flex items-center gap-1.5 m-0">
-                    SIAGES <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">Beta</span>
+                  <h1 className="font-extrabold text-lg tracking-[-0.04em] leading-none text-foreground flex items-center gap-1.5 m-0">
+                    SIAGES <span className="text-[9px] tracking-[0.08em] uppercase bg-brand-navy text-brand-lime px-1.5 py-0.5 rounded-md font-bold">Beta</span>
                   </h1>
-                  <p className="text-[10px] text-muted-foreground tracking-wider m-0 mt-0.5 truncate">Administração e Gestão Estratégica</p>
+                  <p className="text-[9px] font-semibold uppercase text-muted-foreground tracking-[0.2em] m-0 mt-1 truncate">Administração e Gestão Estratégica</p>
                 </div>
               )}
             </Link>
@@ -397,7 +396,7 @@ export function Layout({ children }: LayoutProps) {
 
           {/* Navigation Section */}
           <nav className={cn(
-            'min-h-0 flex-1 overflow-y-auto scrollbar-thin bg-card',
+            'min-h-0 flex-1 overflow-y-auto scrollbar-thin bg-sidebar',
             isSidebarCollapsed ? 'px-2 py-3 space-y-3' : 'px-3.5 py-3 space-y-4'
           )}>
             {navigationSections.map((section) => {
@@ -419,17 +418,14 @@ export function Layout({ children }: LayoutProps) {
                               to={item.href}
                               onClick={() => setSidebarOpen(false)}
                               className={cn(
-                                'flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-150 relative group',
+                                'flex h-10 w-10 items-center justify-center rounded-[9px] transition-all duration-150 relative group',
                                 active
-                                  ? 'bg-primary text-primary-foreground shadow-xs font-bold'
-                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-bold'
+                                  : 'text-sidebar-foreground hover:bg-muted hover:text-foreground'
                               )}
                               aria-label={item.name}
                             >
                               <ItemIcon className="h-5 w-5 shrink-0" />
-                              {active && (
-                                <span className="absolute -left-2 top-2 bottom-2 w-1 bg-primary rounded-r" />
-                              )}
                             </Link>
                           </TooltipTrigger>
                           <TooltipContent side="right" sideOffset={12} className="flex flex-col gap-0.5">
@@ -449,13 +445,13 @@ export function Layout({ children }: LayoutProps) {
                   <button
                     type="button"
                     className={cn(
-                      'mb-1 flex w-full cursor-pointer select-none items-center justify-between rounded-md px-2.5 py-1 text-left text-[10px] font-bold tracking-widest text-muted-foreground uppercase transition-all duration-150 hover:bg-muted hover:text-foreground',
-                      sectionExpanded && 'text-foreground font-extrabold',
+                      'mb-1 flex w-full cursor-pointer select-none items-center justify-between rounded-md px-2.5 py-1 text-left text-[10px] font-bold tracking-[0.17em] text-muted-foreground uppercase transition-all duration-150 hover:bg-muted hover:text-foreground',
+                      sectionExpanded && 'text-foreground',
                     )}
                     onClick={() => toggleSection(section.title)}
                   >
                     <span className="flex min-w-0 items-center gap-2">
-                      <SectionIcon className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-all duration-150', sectionExpanded && 'text-primary scale-110')} />
+                      <SectionIcon className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-all duration-150', sectionExpanded && 'text-primary')} />
                       <span className="truncate">{section.title}</span>
                     </span>
                     <ChevronRight
@@ -486,21 +482,18 @@ export function Layout({ children }: LayoutProps) {
                             <button
                               type="button"
                               className={cn(
-                                'relative flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-foreground transition-all duration-150 hover:bg-muted group',
-                                parentDirectlyActive && 'bg-primary/10 text-primary font-bold pl-4',
+                                'relative flex w-full cursor-pointer items-center gap-2.5 rounded-[9px] px-3 py-2.5 text-left text-sm font-semibold text-sidebar-foreground transition-all duration-150 hover:bg-muted hover:text-foreground group',
+                                parentDirectlyActive && 'bg-sidebar-accent text-sidebar-accent-foreground font-bold',
                               )}
                               onClick={() => toggleSubmenu(item.screenId)}
                             >
-                              {parentDirectlyActive && (
-                                <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-primary rounded-r" />
-                              )}
                               {ItemIcon && (
                                 <ItemIcon
                                   className={cn(
                                     'h-4 w-4 shrink-0 transition-transform duration-150',
                                     parentDirectlyActive
-                                      ? 'text-primary scale-110'
-                                      : 'text-muted-foreground group-hover:text-foreground group-hover:scale-105'
+                                      ? 'text-sidebar-accent-foreground'
+                                      : 'text-sidebar-foreground group-hover:text-foreground'
                                   )}
                                 />
                               )}
@@ -515,7 +508,7 @@ export function Layout({ children }: LayoutProps) {
 
                             <div
                               className={cn(
-                                'overflow-hidden border-l border-border ml-[20px] pl-1.5 space-y-0.5 transition-[max-height,opacity] duration-200 ease-out',
+                                'overflow-hidden border-l border-sidebar-border ml-[20px] pl-1.5 space-y-0.5 transition-[max-height,opacity] duration-200 ease-out',
                                 submenuExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0',
                               )}
                             >
@@ -528,13 +521,10 @@ export function Layout({ children }: LayoutProps) {
                                     to={child.href}
                                     onClick={() => setSidebarOpen(false)}
                                     className={cn(
-                                      'relative flex items-center gap-2 rounded-md py-1 pl-3 pr-2 text-xs font-medium text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground',
-                                      childActive && 'bg-primary/10 font-bold text-primary pl-3.5',
+                                      'relative flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-xs font-semibold text-sidebar-foreground transition-all duration-150 hover:bg-muted hover:text-foreground',
+                                      childActive && 'bg-sidebar-accent font-bold text-sidebar-accent-foreground',
                                     )}
                                   >
-                                    {childActive && (
-                                      <span className="absolute left-0 top-1 bottom-1 w-[2px] bg-primary rounded-r" />
-                                    )}
                                     <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-border transition-colors duration-150', childActive && 'bg-primary')} />
                                     <span className="truncate">{child.name}</span>
                                   </Link>
@@ -551,24 +541,22 @@ export function Layout({ children }: LayoutProps) {
                           to={item.href}
                           onClick={() => setSidebarOpen(false)}
                           className={cn(
-                            'relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-foreground no-underline transition-all duration-150 hover:bg-muted group',
-                            active && 'bg-primary/10 text-primary font-bold pl-4',
+                            'relative flex items-center gap-2.5 rounded-[9px] px-3 py-2.5 text-sm font-semibold text-sidebar-foreground no-underline transition-all duration-150 hover:bg-muted hover:text-foreground group',
+                            active && 'bg-sidebar-accent text-sidebar-accent-foreground font-bold',
                           )}
                         >
-                          {active && (
-                            <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-primary rounded-r" />
-                          )}
                           {ItemIcon && (
                             <ItemIcon
                               className={cn(
                                 'h-4 w-4 shrink-0 transition-transform duration-150',
                                 active
-                                  ? 'text-primary scale-110'
-                                  : 'text-muted-foreground group-hover:text-foreground group-hover:scale-105'
+                                  ? 'text-sidebar-accent-foreground'
+                                  : 'text-sidebar-foreground group-hover:text-foreground'
                               )}
                             />
                           )}
                           <span className="truncate">{item.name}</span>
+                          {active && <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />}
                         </Link>
                       );
                     })}
@@ -580,7 +568,7 @@ export function Layout({ children }: LayoutProps) {
 
           {/* Sidebar Footer & Collapse Toggle */}
           <div className={cn(
-            'shrink-0 border-t border-border bg-muted/20 flex transition-all duration-200',
+            'shrink-0 border-t border-sidebar-border bg-sidebar flex transition-all duration-200',
             isSidebarCollapsed ? 'p-2 flex-col items-center gap-2' : 'p-3 flex-col gap-2'
           )}>
             <div className="flex items-center justify-between w-full">
@@ -619,7 +607,7 @@ export function Layout({ children }: LayoutProps) {
 
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Header */}
-          <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-border bg-card/90 px-4 backdrop-blur-md lg:px-6">
+          <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-sidebar-border bg-card px-4 lg:px-8">
             <div className="flex min-w-0 flex-1 items-center gap-3">
               {/* Mobile menu trigger */}
               <Button
@@ -634,7 +622,7 @@ export function Layout({ children }: LayoutProps) {
               </Button>
 
               {/* Search input with Command Palette Trigger */}
-              <label className="hidden min-w-[240px] max-w-[380px] flex-1 items-center justify-between gap-2 rounded-full border border-border bg-card/80 px-3.5 py-1.5 text-xs text-foreground sm:flex transition-all hover:bg-card hover:border-primary/50 focus-within:bg-card focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 cursor-pointer shadow-2xs">
+              <label className="hidden min-w-[240px] max-w-[380px] flex-1 items-center justify-between gap-2 rounded-lg border border-border bg-background px-3.5 py-2 text-xs text-foreground sm:flex transition-all hover:bg-card hover:border-primary/50 focus-within:bg-card focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 cursor-pointer shadow-2xs">
                 <span className="flex items-center gap-2 min-w-0 flex-1">
                   <Search className="h-3.5 w-3.5 shrink-0 text-foreground/70" />
                   <input
@@ -702,7 +690,7 @@ export function Layout({ children }: LayoutProps) {
                       className="flex items-center gap-2 rounded-lg border-l border-border py-1 pl-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:gap-2.5 md:pl-3"
                       aria-label="Abrir configurações do usuário"
                     >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-xs select-none">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-navy text-xs font-bold text-brand-navy-foreground select-none">
                         {userEmail ? userEmail.substring(0, 1).toUpperCase() : 'U'}
                       </div>
                       <div className="hidden flex-col text-right sm:flex">
@@ -757,10 +745,9 @@ export function Layout({ children }: LayoutProps) {
                       Buscar comandos (Ctrl+K)
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setIsSuapSettingsDialogOpen(true)} className="gap-2">
-                      <FolderSync className="h-4 w-4 text-emerald-600" />
+                      <FolderSync className="h-4 w-4 text-primary" />
                       Configurar integração com o SUAP
                     </DropdownMenuItem>
-                    <SuapThemeSubMenu />
                     <DropdownMenuItem onSelect={() => setIsPasswordDialogOpen(true)} className="gap-2">
                       <KeyRound className="h-4 w-4" />
                       Alterar senha
@@ -769,7 +756,7 @@ export function Layout({ children }: LayoutProps) {
                     <DropdownMenuItem
                       disabled={isSigningOut}
                       onSelect={() => void handleSignOut()}
-                      className="gap-2 text-red-600 focus:text-red-600"
+                      className="gap-2 text-destructive focus:text-destructive"
                     >
                       <LogOut className="h-4 w-4" />
                       Sair
@@ -818,7 +805,7 @@ export function Layout({ children }: LayoutProps) {
           <DialogContent className="flex h-[min(90vh,900px)] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0">
             <DialogHeader className="border-b border-border px-6 py-5">
               <DialogTitle className="flex items-center gap-2">
-                <FolderSync className="h-5 w-5 text-emerald-600" />
+                <FolderSync className="h-5 w-5 text-primary" />
                 Configurar integração com o SUAP
               </DialogTitle>
               <DialogDescription>

@@ -71,7 +71,7 @@ export function SetupPasswordPanel({
       </CardHeader>
       <CardContent className="space-y-4">
         {statusMessage ? (
-          <div className="rounded-2xl border border-[#2f9e41]/15 bg-[#2f9e41]/5 px-4 py-3 text-sm leading-6 text-[#2f9e41] font-medium">
+          <div className="rounded-2xl border border-primary/15 bg-accent px-4 py-3 text-sm leading-6 text-accent-foreground font-medium">
             {statusMessage}
           </div>
         ) : null}
