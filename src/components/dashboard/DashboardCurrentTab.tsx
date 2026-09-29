@@ -175,31 +175,24 @@ export function DashboardCurrentTab({
         <StatCard
           title="Total planejado"
           value={formatCurrency(totalPlanejado)}
-          subtitle={`${percentualExecutado.toFixed(1)}% executado · ${formatCurrency(totalEmpenhado)} empenhados`}
           icon={Wallet}
-          stitchColor="purple"
+          stitchColor="vibrant-blue"
           progress={percentualExecutado}
           isLoading={isLoading}
         />
         <StatCard
           title="Descentralizado"
           value={formatCurrency(totalDescentralizado)}
-          subtitle={
-            aDescentralizar >= 0
-              ? `${formatCurrency(aDescentralizar)} a descentralizar`
-              : `${formatCurrency(Math.abs(aDescentralizar))} acima do orçamento`
-          }
           icon={Receipt}
-          stitchColor={aDescentralizar >= 0 ? 'vibrant-blue' : 'red-500'}
+          stitchColor={aDescentralizar >= 0 ? 'emerald-green' : 'red-500'}
           progress={percent(totalDescentralizado, totalPlanejado)}
           isLoading={isLoading}
         />
         <StatCard
           title="Total empenhado"
           value={formatCurrency(totalEmpenhado)}
-          subtitle={`${filteredData.empenhosCorrente.length} empenhos · ${percent(totalEmpenhado, totalDescentralizado).toFixed(1)}% do descentralizado`}
           icon={TrendingUp}
-          stitchColor="vibrant-blue"
+          stitchColor="purple"
           progress={percent(totalEmpenhado, totalPlanejado)}
           isLoading={isLoading}
         />
@@ -210,8 +203,8 @@ export function DashboardCurrentTab({
           </div>
           <div className="space-y-3">
             {[
-              { label: 'Liquidado', value: totalLiquidado, ratio: percent(totalLiquidado, totalEmpenhado), bar: 'bg-brand-cyan' },
-              { label: 'Pago', value: totalPago, ratio: percent(totalPago, totalLiquidado), bar: 'bg-success' },
+              { label: 'Liquidado', value: totalLiquidado, ratio: percent(totalLiquidado, totalEmpenhado), bar: 'bg-brand-cyan', text: 'text-info' },
+              { label: 'Pago', value: totalPago, ratio: percent(totalPago, totalLiquidado), bar: 'bg-success', text: 'text-success' },
             ].map((item) => (
               <div key={item.label}>
                 <div className="mb-1 flex items-baseline justify-between gap-2">
@@ -219,7 +212,7 @@ export function DashboardCurrentTab({
                   {isLoading ? (
                     <span className="h-4 w-24 animate-pulse rounded bg-muted" />
                   ) : (
-                    <span className="text-sm font-extrabold tracking-tight text-foreground">{formatCurrency(item.value)}</span>
+                    <span className={`text-sm font-bold tracking-tight ${item.text}`}>{formatCurrency(item.value)}</span>
                   )}
                 </div>
                 <div className="h-1 overflow-hidden rounded-full bg-muted">

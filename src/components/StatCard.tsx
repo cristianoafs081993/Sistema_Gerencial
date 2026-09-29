@@ -33,10 +33,18 @@ export function StatCard({
     /* ── Layout "metric" (Paretto Institucional) ──
        - Card branco com borda sutil e cantos de 12px
        - Rótulo discreto + ícone neutro no topo
-       - Valor em navy com peso forte (sem gradiente)
+       - Valor em tom claro da cor do card (sem gradiente)
        - Barra de progresso fina na cor semântica */
 
     const iconColorMap = {
+      'vibrant-blue': 'text-primary',
+      'purple': 'text-brand-sky',
+      'amber': 'text-warning',
+      'emerald-green': 'text-success',
+      'red-500': 'text-destructive',
+    };
+
+    const valueColorMap = {
       'vibrant-blue': 'text-primary',
       'purple': 'text-brand-sky',
       'amber': 'text-warning',
@@ -71,7 +79,7 @@ export function StatCard({
         {isLoading ? (
           <Skeleton className="h-8 w-3/5 mt-1 mb-1" />
         ) : (
-          <h3 className="text-[26px] font-extrabold tracking-[-0.03em] leading-tight text-foreground">
+          <h3 className={cn("text-[26px] font-bold tracking-[-0.03em] leading-tight", valueColorMap[stitchColor])}>
             {value}
           </h3>
         )}
