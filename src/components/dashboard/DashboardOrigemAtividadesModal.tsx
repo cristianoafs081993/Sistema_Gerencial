@@ -201,7 +201,7 @@ export function DashboardOrigemAtividadesModal({
 
               <div className="rounded-lg border border-border-default/70 bg-slate-50/50 p-3 dark:bg-slate-900/30">
                 <div className="flex items-center justify-between text-xs text-text-muted">
-                  <span>Total Planejado</span>
+                  <span>Planejado</span>
                   <PiggyBank className="h-3.5 w-3.5 text-slate-500" />
                 </div>
                 <div className="mt-1 text-base font-semibold text-text-primary">
@@ -211,7 +211,7 @@ export function DashboardOrigemAtividadesModal({
 
               <div className="rounded-lg border border-border-default/70 bg-slate-50/50 p-3 dark:bg-slate-900/30">
                 <div className="flex items-center justify-between text-xs text-text-muted">
-                  <span>Total Empenhado</span>
+                  <span>Empenhado</span>
                   <TrendingUp className="h-3.5 w-3.5 text-slate-500" />
                 </div>
                 <div className="mt-1 text-base font-semibold text-text-primary">

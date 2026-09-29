@@ -165,7 +165,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       >
         <View style={styles.eyebrow}>
           <IconWallet size={17} color={colors.blueTextSubtle} />
-          <Text style={styles.eyebrowText}>Total Planejado</Text>
+          <Text style={styles.eyebrowText}>Planejado</Text>
         </View>
 
         <Text style={styles.moneyBig}>
