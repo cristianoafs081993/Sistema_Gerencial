@@ -45,19 +45,19 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
 
   // Dynamic border & elevation styling
   const getStatusBorder = () => {
-    if (isSelected) return 'border-2 border-blue-600 ring-4 ring-blue-100/80 shadow-md bg-white';
+    if (isSelected) return 'border-2 border-brand-600 ring-4 ring-brand-100/80 shadow-md bg-white';
     if (isConnectingSource) return 'border-2 border-amber-500 ring-4 ring-amber-100 shadow-md bg-white animate-pulse';
-    if (isCurrentSuap) return 'border-2 border-emerald-500 ring-4 ring-emerald-100 shadow-md bg-white animate-pulse';
+    if (isCurrentSuap) return 'border-2 border-brand-500 ring-4 ring-brand-100 shadow-md bg-white animate-pulse';
 
     switch (node.status) {
       case 'completed':
-        return 'border border-slate-300 bg-white hover:border-blue-400 shadow-xs';
+        return 'border border-slate-300 bg-white hover:border-brand-400 shadow-xs';
       case 'in_progress':
-        return 'border-2 border-blue-500 bg-white hover:border-blue-600 shadow-xs';
+        return 'border-2 border-brand-500 bg-white hover:border-brand-600 shadow-xs';
       case 'blocked':
         return 'border-2 border-rose-400 bg-rose-50/40 hover:border-rose-500 shadow-xs';
       default:
-        return 'border border-slate-300 bg-white hover:border-blue-400 shadow-xs';
+        return 'border border-slate-300 bg-white hover:border-brand-400 shadow-xs';
     }
   };
 
@@ -79,14 +79,14 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
         }}
         onMouseDown={(e) => onMouseDown(node, e)}
         className={cn(
-          'absolute cursor-pointer rounded-full flex flex-col items-center justify-center bg-emerald-50 border-2 border-emerald-600 shadow-xs transition-all hover:scale-105 select-none group z-10',
-          isSelected && 'ring-4 ring-emerald-100',
+          'absolute cursor-pointer rounded-full flex flex-col items-center justify-center bg-brand-50 border-2 border-brand-600 shadow-xs transition-all hover:scale-105 select-none group z-10',
+          isSelected && 'ring-4 ring-brand-100',
           dimOpacityClass
         )}
         title={`Início: ${node.title}`}
       >
-        <Play className="w-5 h-5 text-emerald-600 fill-emerald-600 ml-0.5" />
-        <span className="absolute -bottom-6 text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-white px-1.5 py-0.5 rounded shadow-xs border border-slate-200 whitespace-nowrap pointer-events-none">
+        <Play className="w-5 h-5 text-brand-600 fill-brand-600 ml-0.5" />
+        <span className="absolute -bottom-6 text-[10px] font-bold uppercase tracking-wider text-brand-800 bg-white px-1.5 py-0.5 rounded shadow-xs border border-slate-200 whitespace-nowrap pointer-events-none">
           {node.code || 'Início'}
         </span>
 
@@ -98,7 +98,7 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
             onStartConnect(node, e);
           }}
           title="Conectar a outra etapa"
-          className="absolute -right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs text-xs z-20 font-bold"
+          className="absolute -right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 bg-brand-600 hover:bg-brand-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs text-xs z-20 font-bold"
         >
           +
         </button>
@@ -179,7 +179,7 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
             onStartConnect(node, e);
           }}
           title="Conectar a outra etapa"
-          className="absolute -right-2 top-1/2 -translate-y-1/2 w-5 h-5 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs text-xs z-20 font-bold"
+          className="absolute -right-2 top-1/2 -translate-y-1/2 w-5 h-5 bg-brand-600 hover:bg-brand-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs text-xs z-20 font-bold"
         >
           +
         </button>
@@ -220,7 +220,7 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
         'absolute cursor-pointer rounded-lg p-3 flex flex-col justify-between transition-all select-none group z-10 text-left',
         getStatusBorder(),
         dimOpacityClass,
-        isSearchActive && isSearchMatch && 'ring-2 ring-emerald-500'
+        isSearchActive && isSearchMatch && 'ring-2 ring-brand-500'
       )}
     >
       {/* Step Header */}
@@ -228,7 +228,7 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
         <span
           className={cn(
             'text-[10px] font-bold tracking-tight',
-            isSelected || node.status === 'in_progress' ? 'text-blue-600' : 'text-slate-500'
+            isSelected || node.status === 'in_progress' ? 'text-brand-600' : 'text-slate-500'
           )}
         >
           {stepLabel}
@@ -236,14 +236,14 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
 
         <div className="flex items-center gap-1">
           {isCurrentSuap && (
-            <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
+            <span className="rounded-full bg-brand-100 px-1.5 py-0.5 text-[9px] font-bold text-brand-800">
               Etapa SUAP
             </span>
           )}
           {isCompleted ? (
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 fill-emerald-50" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-brand-600 fill-brand-50" />
           ) : node.status === 'in_progress' ? (
-            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-brand-600 animate-pulse" />
           ) : (
             <span className="w-2 h-2 rounded-full bg-slate-300" />
           )}
@@ -269,9 +269,9 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
             className={cn(
               'w-4 h-1 rounded-full',
               isCompleted
-                ? 'bg-emerald-500'
+                ? 'bg-brand-500'
                 : node.status === 'in_progress' || isSelected
-                ? 'bg-blue-600'
+                ? 'bg-brand-600'
                 : 'bg-slate-200'
             )}
           />
@@ -279,9 +279,9 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
             className={cn(
               'w-4 h-1 rounded-full',
               isCompleted
-                ? 'bg-emerald-500'
+                ? 'bg-brand-500'
                 : checklistDone > 0
-                ? 'bg-blue-600'
+                ? 'bg-brand-600'
                 : 'bg-slate-200'
             )}
           />
@@ -295,7 +295,7 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="text-blue-600 hover:text-blue-800 p-0.5 rounded hover:bg-blue-50"
+              className="text-brand-600 hover:text-brand-800 p-0.5 rounded hover:bg-brand-50"
               title={`Sistema: ${node.systemName || node.systemUrl}`}
             >
               <ExternalLink className="w-3 h-3" />
@@ -307,7 +307,7 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="text-emerald-600 hover:text-emerald-800 p-0.5 rounded hover:bg-emerald-50"
+              className="text-brand-600 hover:text-brand-800 p-0.5 rounded hover:bg-brand-50"
               title={`Modelo: ${node.templateName || node.templateUrl}`}
             >
               <FileText className="w-3 h-3" />
@@ -329,7 +329,7 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
           onStartConnect(node, e);
         }}
         title="Conectar com a próxima etapa"
-        className="absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-xs text-[10px] font-bold z-20"
+        className="absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-brand-600 hover:bg-brand-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-xs text-[10px] font-bold z-20"
       >
         +
       </button>

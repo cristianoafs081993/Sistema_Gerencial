@@ -57,7 +57,7 @@ export const ProcessMappingListView: React.FC<ProcessMappingListViewProps> = ({
       <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+            <span className="px-2 py-0.5 rounded-md bg-brand-50 text-brand-700 border border-brand-200 text-xs font-bold">
               {process.code}
             </span>
             <h2 className="text-base font-bold text-slate-900 tracking-tight">
@@ -73,7 +73,7 @@ export const ProcessMappingListView: React.FC<ProcessMappingListViewProps> = ({
           <button
             type="button"
             onClick={onAddNewNode}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold shadow-xs transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-md text-xs font-semibold shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>Adicionar Atividade</span>
@@ -103,7 +103,7 @@ export const ProcessMappingListView: React.FC<ProcessMappingListViewProps> = ({
               onClick={() => setFilterType('system')}
               className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
                 filterType === 'system'
-                  ? 'bg-white text-blue-700 shadow-xs font-bold'
+                  ? 'bg-white text-brand-700 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900 font-medium'
               }`}
             >
@@ -114,7 +114,7 @@ export const ProcessMappingListView: React.FC<ProcessMappingListViewProps> = ({
               onClick={() => setFilterType('template')}
               className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
                 filterType === 'template'
-                  ? 'bg-white text-emerald-700 shadow-xs font-bold'
+                  ? 'bg-white text-brand-700 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900 font-medium'
               }`}
             >
@@ -141,7 +141,7 @@ export const ProcessMappingListView: React.FC<ProcessMappingListViewProps> = ({
             placeholder="Buscar por nome, lei, sistema..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>
       </div>
@@ -173,7 +173,7 @@ export const ProcessMappingListView: React.FC<ProcessMappingListViewProps> = ({
                     <tr
                       key={task.id}
                       onClick={() => onSelectNode(task)}
-                      className="hover:bg-emerald-50/40 cursor-pointer transition-colors group"
+                      className="hover:bg-brand-50/40 cursor-pointer transition-colors group"
                     >
                       {/* Code Badge */}
                       <td className="py-3.5 px-4 text-center">
@@ -184,7 +184,7 @@ export const ProcessMappingListView: React.FC<ProcessMappingListViewProps> = ({
 
                       {/* Title & Description */}
                       <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-900 leading-snug group-hover:text-emerald-700 transition-colors">
+                        <div className="font-semibold text-slate-900 leading-snug group-hover:text-brand-700 transition-colors">
                           {task.title}
                         </div>
                         {task.description && (
@@ -216,9 +216,9 @@ export const ProcessMappingListView: React.FC<ProcessMappingListViewProps> = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold border border-blue-200 text-[11px] transition-colors max-w-[180px] truncate"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold border border-brand-200 text-[11px] transition-colors max-w-[180px] truncate"
                           >
-                            <ExternalLink className="w-3 h-3 shrink-0 text-blue-600" />
+                            <ExternalLink className="w-3 h-3 shrink-0 text-brand-600" />
                             <span className="truncate">{task.systemName || 'Acessar Sistema'}</span>
                           </a>
                         ) : (
@@ -234,9 +234,9 @@ export const ProcessMappingListView: React.FC<ProcessMappingListViewProps> = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold border border-emerald-200 text-[11px] transition-colors max-w-[180px] truncate"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold border border-brand-200 text-[11px] transition-colors max-w-[180px] truncate"
                           >
-                            <FileText className="w-3 h-3 shrink-0 text-emerald-600" />
+                            <FileText className="w-3 h-3 shrink-0 text-brand-600" />
                             <span className="truncate">{task.templateName || 'Baixar Modelo'}</span>
                           </a>
                         ) : (
@@ -257,12 +257,12 @@ export const ProcessMappingListView: React.FC<ProcessMappingListViewProps> = ({
                           <span
                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                               checklistDone === checklistTotal
-                                ? 'bg-emerald-100 text-emerald-800'
+                                ? 'bg-brand-100 text-brand-800'
                                 : 'bg-slate-100 text-slate-700'
                             }`}
                           >
                             {checklistDone === checklistTotal && (
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <CheckCircle2 className="w-3 h-3 text-brand-600" />
                             )}
                             {checklistDone}/{checklistTotal}
                           </span>
@@ -276,9 +276,9 @@ export const ProcessMappingListView: React.FC<ProcessMappingListViewProps> = ({
                         <span
                           className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                             task.status === 'completed'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              ? 'bg-brand-50 text-brand-700 border border-brand-200'
                               : task.status === 'in_progress'
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                              ? 'bg-brand-50 text-brand-700 border border-brand-200'
                               : task.status === 'blocked'
                               ? 'bg-rose-50 text-rose-700 border border-rose-200'
                               : 'bg-slate-100 text-slate-600 border border-slate-200'
@@ -302,7 +302,7 @@ export const ProcessMappingListView: React.FC<ProcessMappingListViewProps> = ({
                             e.stopPropagation();
                             onSelectNode(task);
                           }}
-                          className="px-2 py-1 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md font-semibold text-[11px] transition-colors"
+                          className="px-2 py-1 text-slate-600 hover:text-brand-700 hover:bg-brand-50 rounded-md font-semibold text-[11px] transition-colors"
                         >
                           Editar
                         </button>

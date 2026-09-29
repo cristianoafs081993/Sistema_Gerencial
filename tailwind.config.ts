@@ -27,6 +27,19 @@ export default {
           DEFAULT:    "hsl(var(--brand-navy))",
           foreground: "hsl(var(--brand-navy-foreground))",
         },
+        // Escala azul-céu completa (substitui o antigo verde-esmeralda nas telas de mapeamento)
+        brand: {
+          50:  "#EAF3FD",
+          100: "#D6E8FB",
+          200: "#B3D5F7",
+          300: "#8ABDF1",
+          400: "#4FA0EB",
+          500: "#1E88E5",
+          600: "#1976D2",
+          700: "#1565C0",
+          800: "#0F4F9A",
+          900: "#0B3B75",
+        },
         "brand-sky":  "hsl(var(--brand-sky))",
         "brand-cyan": "hsl(var(--brand-cyan))",
         // Tons claros para valores grandes/em negrito (>= 18px) — contraste >= 3:1

@@ -53,6 +53,10 @@ Estrutura:
 2. Informações e progresso de carregamento;
 3. Exibição de cards ou tabelas com estados de erro/sucesso explícitos.
 
+## Padrão: Mapeamento de Processos (tela cheia)
+
+`/mapeamentos` ocupa a área inteira do `Layout` (sem `PageHeader`). A barra própria (`ProcessMappingNavbar`) traz apenas seletor de processo, ferramentas do fluxograma (zoom, grade e criação de etapas), busca, alternador Fluxograma / Matriz / Guia e ações; o título fica `sr-only`, porque o módulo e a tela já aparecem no cabeçalho global e na navegação. Cores usam a escala `brand-*` (azul-céu) e `slate-*` neutros; âmbar e vermelho são reservados a decisões e fins de processo. As cores hexadecimais de conexões e modelos de processo são identificadores de dados e foram mantidas.
+
 ## Padrão 4: dashboard analítico
 
 Estrutura:

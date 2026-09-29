@@ -351,7 +351,7 @@ export default function SuapProcessMappingPage() {
     return (
       <main className="flex min-h-[600px] items-center justify-center bg-[#f8fafc] font-ui">
         <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600 shadow-sm">
-          <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
+          <Loader2 className="h-5 w-5 animate-spin text-brand-600" />
           Carregando mapeamento de processos...
         </div>
       </main>
@@ -367,7 +367,7 @@ export default function SuapProcessMappingPage() {
           <p className="mt-2 text-sm text-slate-500">
             {error || 'Não foi possível encontrar o mapeamento de processos solicitado.'}
           </p>
-          <Button asChild className="mt-5 bg-emerald-600 hover:bg-emerald-700">
+          <Button asChild className="mt-5 bg-brand-600 hover:bg-brand-700">
             <button type="button" onClick={() => handleSelectProcess(DEFAULT_PROCESS_MAPPINGS[0].id)}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Ver Mapeamento Padrão
@@ -379,7 +379,7 @@ export default function SuapProcessMappingPage() {
   }
 
   return (
-    <div className="h-full flex-1 flex flex-col min-h-0 bg-slate-100 font-ui text-slate-900 antialiased selection:bg-emerald-500 selection:text-white">
+    <div className="h-full flex-1 flex flex-col min-h-0 bg-slate-100 font-ui text-slate-900 antialiased selection:bg-brand-500 selection:text-white">
       {/* Top Navigation */}
       <ProcessMappingNavbar
         processes={processes}

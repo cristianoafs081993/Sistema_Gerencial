@@ -39,6 +39,8 @@ O sistema usa um **tema único**. Os antigos temas SUAP (Padrão, IFs, Aurora, D
 
 `#1E88E5` não é usado como fundo de texto branco (contraste 3,7:1, abaixo de AA); nesses casos use `primary`.
 
+Escala completa `brand-50` … `brand-900` (azul-céu, `brand-500` = `#1E88E5`, `brand-600` = `#1976D2`) disponível para telas com muitas variações de tom, como o Mapeamento de Processos; ela substituiu o antigo verde-esmeralda (`emerald-*`) e o `blue-*` avulso ali.
+
 Classes Tailwind de marca: `bg-brand-sky`, `text-brand-sky`, `bg-brand-cyan`, `bg-brand-navy` (login). Aliases legados (`ifrn-green`, `sebrae-blue`, `sebrae-navy`, `sebrae-gold`) continuam existindo, mapeados para a paleta atual. As cores `suap-*` e o acento lima foram removidos.
 
 ## Forma e elevação
