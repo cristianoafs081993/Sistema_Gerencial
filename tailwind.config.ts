@@ -29,6 +29,9 @@ export default {
         },
         "brand-sky":  "hsl(var(--brand-sky))",
         "brand-cyan": "hsl(var(--brand-cyan))",
+        // Tons claros para valores grandes/em negrito (>= 18px) — contraste >= 3:1
+        "brand-green": "#2E9E6A",
+        "brand-aqua":  "#0891B2",
         // Aliases legados mapeados para a paleta atual
         "ifrn-green": "#1F7A4D",
         "sebrae-blue": "hsl(var(--primary))",
@@ -96,6 +99,18 @@ export default {
         destructive: {
           DEFAULT:    "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
+        },
+        success: {
+          DEFAULT:    "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT:    "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        info: {
+          DEFAULT:    "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
         },
         muted: {
           DEFAULT:    "hsl(var(--muted))",

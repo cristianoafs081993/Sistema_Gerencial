@@ -40,7 +40,7 @@ export function StatCard({
       'vibrant-blue': 'text-primary',
       'purple': 'text-brand-sky',
       'amber': 'text-warning',
-      'emerald-green': 'text-success',
+      'emerald-green': 'text-brand-green',
       'red-500': 'text-destructive',
     };
 
@@ -48,7 +48,7 @@ export function StatCard({
       'vibrant-blue': 'text-primary',
       'purple': 'text-brand-sky',
       'amber': 'text-warning',
-      'emerald-green': 'text-success',
+      'emerald-green': 'text-brand-green',
       'red-500': 'text-destructive',
     };
 
@@ -56,7 +56,7 @@ export function StatCard({
       'vibrant-blue': 'bg-primary',
       'purple': 'bg-brand-sky',
       'amber': 'bg-warning',
-      'emerald-green': 'bg-success',
+      'emerald-green': 'bg-brand-green',
       'red-500': 'bg-destructive',
     };
 

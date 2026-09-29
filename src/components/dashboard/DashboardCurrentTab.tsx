@@ -165,7 +165,7 @@ export function DashboardCurrentTab({
       value: totalPago,
       ratio: percent(totalPago, totalPlanejado),
       ratioLabel: `${percent(totalPago, totalLiquidado).toFixed(1)}% do liquidado`,
-      barClassName: 'bg-success',
+      barClassName: 'bg-brand-green',
     },
   ];
 
@@ -203,8 +203,8 @@ export function DashboardCurrentTab({
           </div>
           <div className="space-y-3">
             {[
-              { label: 'Liquidado', value: totalLiquidado, ratio: percent(totalLiquidado, totalEmpenhado), bar: 'bg-brand-cyan', text: 'text-info' },
-              { label: 'Pago', value: totalPago, ratio: percent(totalPago, totalLiquidado), bar: 'bg-success', text: 'text-success' },
+              { label: 'Liquidado', value: totalLiquidado, ratio: percent(totalLiquidado, totalEmpenhado), bar: 'bg-brand-cyan', text: 'text-brand-aqua' },
+              { label: 'Pago', value: totalPago, ratio: percent(totalPago, totalLiquidado), bar: 'bg-brand-green', text: 'text-brand-green' },
             ].map((item) => (
               <div key={item.label}>
                 <div className="mb-1 flex items-baseline justify-between gap-2">
@@ -212,7 +212,7 @@ export function DashboardCurrentTab({
                   {isLoading ? (
                     <span className="h-4 w-24 animate-pulse rounded bg-muted" />
                   ) : (
-                    <span className={`text-sm font-bold tracking-tight ${item.text}`}>{formatCurrency(item.value)}</span>
+                    <span className={`text-lg font-bold tracking-tight ${item.text}`}>{formatCurrency(item.value)}</span>
                   )}
                 </div>
                 <div className="h-1 overflow-hidden rounded-full bg-muted">
