@@ -171,7 +171,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - Tabela: `DataTablePanel` + `TablePagination`.
 - Secao: `SectionPanel`.
 - Grafico: `ChartPanel`.
-- KPI: `StatCard` no padrão "metric" do Paretto (card branco, rótulo discreto, valor `700` colorido no tom do card, sem subtítulo quando a informação já aparece em outro ponto da tela; barra de progresso de 4px com percentual e base de cálculo ao lado via `progress` + `progressLabel`, ex.: "76,8% do planejado"); `stitchColor` define apenas a cor do ícone e da barra (azul, azul-céu, âmbar, verde ou vermelho semânticos).
+- KPI: `StatCard` no padrão "metric" do Paretto (card branco, rótulo discreto, valor `700` colorido no tom do card, sem subtítulo quando a informação já aparece em outro ponto da tela; barra de progresso de 4px com percentual e base de cálculo ao lado via `progress` + `progressLabel`, ex.: "76,8% do planejado"; o Total planejado usa barra cheia "100% base" para manter o padrão visual da linha); `stitchColor` define apenas a cor do ícone e da barra (azul, azul-céu, âmbar, verde ou vermelho semânticos).
 
 
 

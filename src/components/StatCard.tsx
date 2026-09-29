@@ -116,7 +116,7 @@ export function StatCard({
             </div>
             {!isLoading && (
               <span className="shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">
-                {progress.toFixed(1).replace(".", ",")}%{progressLabel ? ` ${progressLabel}` : ""}
+                {progress.toFixed(1).replace(".", ",").replace(",0", "")}%{progressLabel ? ` ${progressLabel}` : ""}
               </span>
             )}
           </div>
