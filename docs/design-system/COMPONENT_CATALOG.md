@@ -6,6 +6,14 @@ Esta documentacao foi atualizada porque a mudanca altera comportamento visual re
 
 ## Blocos de pagina
 
+### `PageHeader`
+
+Cabeçalho padrão de página: eyebrow (módulo), título `h1`, descrição, `actions` e `toolbar`. Sem `title`/`eyebrow`, usa o nome da tela e do grupo de `appScreens` para a rota atual. Com `compact`, omite eyebrow, título visível e descrição e mostra `toolbar` e `actions` numa única linha (título `sr-only`). Ao ser montado dentro do `Layout`, registra-se para suprimir o `AutoPageHeader`.
+
+### `SegmentedControl`
+
+Alternador segmentado com `aria-pressed` e contagem opcional por opção. Usado para trocar visões de uma mesma tabela (ex.: Empenhos: Execução × Restos a Pagar).
+
 ### `SectionPanel`
 
 Arquivo: `src/components/design-system/SectionPanel.tsx`
@@ -115,13 +123,12 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 
 ## Componentes base
 
-- `Button`: estilo *pill* arredondado (`rounded-full`), 36px de altura padrão, com variantes `default` (primária do tema SUAP), `secondary`, `destructive`, `outline`, `ghost`, `link` e `suap`.
+- `Button`: cantos de 8px (`rounded-lg`), peso `700`, 36px de altura padrão, com variantes `default` (azul-céu `primary`), `secondary`, `destructive`, `outline`, `ghost`, `link`, `suap` (alias legado do default), `brand` (alias de `primary`) e `gold`.
 - `Card`: superfície limpa (`bg-card`) com bordas sutis (`border-border`), raio de 12px e sombra suave.
-- `Input`, `Textarea`, `Select`: superfícies neutras, borda suave, foco na cor primária do tema ativo do SUAP (`ring-primary/20`).
-- `Badge`: padrão `span.status` do SUAP, formato pílula com borda de 1px, fundo translúcido e texto contrastado (`success`, `warning`, `danger`, `info`, `brand`).
-- `Tabs`: abas segmentadas com realce ativo na cor primária do tema SUAP.
+- `Input`, `Textarea`, `Select`: superfícies neutras, borda suave, foco no azul-céu (`ring-primary/20`).
+- `Badge`: padrão `span.status`, formato pílula com borda de 1px, fundo translúcido e texto contrastado (`success`, `warning`, `danger`, `info`, `brand`).
+- `Tabs`: abas segmentadas com realce ativo em card branco com texto escuro e sombra leve.
 - `Dialog`, `Sheet`, `Popover`, `DropdownMenu`: superfícies de alta legibilidade com elevação suave.
-- `SuapThemeSwitcher` / `SuapThemeSubMenu`: seletor de temas integrado ao menu de configurações do usuário que permite alternar instantaneamente entre os 8 temas oficiais do SUAP (Padrão, IFs, Aurora, Dunas, Gov.br, Luna Dark, Alto Contraste, Modo Daltonismo).
 - `RichTextEditor`: editor TipTap do fluxo de documentos; oferece negrito, itálico, sublinhado, listas, alinhamento, desfazer e refazer. Pode destacar marcadores `[CAMPO PENDENTE]` e, quando a página solicitar, placeholders entre colchetes com o token destrutivo.
 - `ArtefatosLicitacao`: pagina operacional que combina `SectionPanel`, `FilterPanel`, `DataTablePanel`, badges de tipo e botoes iconicos para abrir, copiar, baixar DOCX e excluir artefatos.
 - `LicitacoesPregoes`: pagina operacional que combina `FilterPanel` rotulado em grade responsiva com campos de UASG, objeto, item e busca geral, `DataTablePanel`, `TablePagination`, badges de prazo/status e modal centralizado de detalhe para compras PNCP; a UASG e opcional na consulta institucional e nao ha card de resumo acima dos filtros.
@@ -141,7 +148,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `RequisicaoCompra`: pagina operacional que apresenta "Gestão de Requisições de Compra" no header global por meio de `HeaderSubtitle`, sem repetir o titulo na area de conteudo. O formulario usa filtro separado de favorecido e `Empenho / Nota de Empenho` em `Popover + Command` com selecao multipla, relevancia para numero completo da NE e contador no trigger; os itens ficam agrupados por NE selecionada com saldo, detalhamento, botao de remocao do empenho no cabecalho do grupo e botao `Adicionar Item` em cada grupo, eliminando badges redundantes abaixo do combobox.
 - `CommandPalette`: central de comandos e busca instantânea acionada por `Ctrl+K` ou `Cmd+K` e pelo cabeçalho global. Suporta busca direta por entidades com preview de saldos: pesquisa de Empenhos por número (ex: `2026NE...`), credor, processo ou PI com exibição de saldo disponível em tempo real, omitindo empenhos com saldo zero, e abertura imediata do `EmpenhoDialog`; pesquisa de Contratos por número, fornecedor ou objeto com abertura imediata do modal centralizado `ContratoApiDetailsSheet`; atalhos por prefixo (`ne `, `empenho `, `contrato `, `tela `, `acao `) e chips de escopo; atalhos para todos os módulos permitidos e ações rápidas (Nova Requisição, Pesquisa de Preços, Sincronizar SUAP).
 - `ContratoApiDetailsSheet`: modal centralizado (`Dialog`) de alta performance e acessibilidade para exibição detalhada de contratos, contendo métricas gerais de valor acumulado e executado, vigência, objeto, unidade de origem, histórico de termos aditivos, detalhamento por item/fatura com agrupamento em abas e faturas vinculadas.
-- `Layout`: shell global com sidebar responsiva com suporte a modo expandido (`w-72`) e modo compacto (*Rail Mode* `w-18`) com persistência em `localStorage`, tooltips flutuantes nos ícones, campo de busca com atalho visual `Ctrl K`, seletor de temas do SUAP (`SuapThemeSubMenu`) no menu de configurações do usuário e drawer mobile.
+- `Layout`: shell global com sidebar responsiva com suporte a modo expandido (`w-72`) e modo compacto (*Rail Mode* `w-18`) com persistência em `localStorage`, tooltips flutuantes nos ícones, campo de busca com atalho visual `Ctrl K`, item ativo destacado em `sidebar-accent` com ponto azul, selo "Beta" em `accent` junto ao logotipo, header branco de 64px e drawer mobile. Não há seletor de temas: o design system Céu é único.
 - `NotificationCenter`: central de notificações ativa ancorada no cabeçalho global (`Layout`). Exibe menu suspenso (`Popover`) com indicador visual de novidades (badge com a contagem de notificações não lidas no ícone e badges informativos), feed unificado e limpo com os **últimos 20 eventos orçamentários** (empenhos emitidos e descentralizações de crédito consolidados cronologicamente na mesma lista pela data de criação `createdAt`), status de liquidação/pagamento, valores monetários formatados, inspeção direta de empenhos via `EmpenhoDialog` e ação de marcar todas como lidas.
 
 - `AIAssistantWidget`: widget flutuante global de chat com IA para consultas gerenciais em linguagem natural sobre contratos, empenhos, orçamento, energia e conciliação; inclui alternador de tamanho (expandir/recolher), sugestões dinâmicas de perguntas, fontes consultadas, histórico persistido localmente por usuário autenticado e suporte completo a markdown.
@@ -164,7 +171,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - Tabela: `DataTablePanel` + `TablePagination`.
 - Secao: `SectionPanel`.
 - Grafico: `ChartPanel`.
-- KPI: `StatCard` com `tone` ou `stitchColor` legado.
+- KPI: `StatCard` no padrão "metric" do Paretto (card branco, rótulo discreto, valor `700` colorido no tom do card, sem subtítulo quando a informação já aparece em outro ponto da tela; barra de progresso de 4px com percentual e base de cálculo ao lado via `progress` + `progressLabel`, ex.: "76,8% do planejado"; o Total planejado usa barra cheia "100%" para manter o padrão visual da linha); `stitchColor` define apenas a cor do ícone e da barra (azul, azul-céu, âmbar, verde ou vermelho semânticos).
 
 
 

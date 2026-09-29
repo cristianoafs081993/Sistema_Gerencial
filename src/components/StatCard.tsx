@@ -14,6 +14,8 @@ interface StatCardProps {
   };
   stitchColor?: 'vibrant-blue' | 'purple' | 'amber' | 'emerald-green' | 'red-500';
   progress?: number;
+  /** Texto curto ao lado da barra explicando o que ela mede (ex.: "do planejado"). */
+  progressLabel?: string;
   isLoading?: boolean;
 }
 
@@ -26,86 +28,61 @@ export function StatCard({
   trend,
   stitchColor,
   progress,
+  progressLabel,
   isLoading,
 }: StatCardProps) {
 
   if (stitchColor) {
-    /* ── "Stitch Color" layout — Aura Style ──
-       - Border-glow: borda luminosa sutil
-       - Barra lateral colorida como accent
-       - Valor com text-gradient baseado na cor
-       - Ícone com fundo glassmorphism leve
-       - Micro-interação: hover sobe 1px */
+    /* ── Layout "metric" (Paretto Institucional) ──
+       - Card branco com borda sutil e cantos de 12px
+       - Rótulo discreto + ícone neutro no topo
+       - Valor em tom claro da cor do card (sem gradiente)
+       - Barra de progresso fina na cor semântica */
 
-    const accentBarMap = {
-      'vibrant-blue': 'bg-[#3b82f6]',
-      'purple': 'bg-[#a855f7]',
-      'amber': 'bg-[#f59e0b]',
-      'emerald-green': 'bg-[#10b981]',
-      'red-500': 'bg-[#ef4444]',
+    const iconColorMap = {
+      'vibrant-blue': 'text-primary',
+      'purple': 'text-brand-sky',
+      'amber': 'text-warning',
+      'emerald-green': 'text-brand-green',
+      'red-500': 'text-destructive',
     };
 
-    const iconBgMap = {
-      'vibrant-blue': 'bg-[#3b82f6]/10 text-[#3b82f6]',
-      'purple': 'bg-[#a855f7]/10 text-[#a855f7]',
-      'amber': 'bg-[#f59e0b]/10 text-[#a16207]',
-      'emerald-green': 'bg-[#10b981]/10 text-[#10b981]',
-      'red-500': 'bg-[#ef4444]/10 text-[#ef4444]',
-    };
-
-    const valueGradientMap = {
-      'vibrant-blue': 'from-[#1a5ce6] to-[#3b82f6]',
-      'purple': 'from-[#7c3aed] to-[#a855f7]',
-      'amber': 'from-[#b45309] to-[#f59e0b]',
-      'emerald-green': 'from-[#047857] to-[#10b981]',
-      'red-500': 'from-[#dc2626] to-[#ef4444]',
+    const valueColorMap = {
+      'vibrant-blue': 'text-primary',
+      'purple': 'text-brand-sky',
+      'amber': 'text-warning',
+      'emerald-green': 'text-brand-green',
+      'red-500': 'text-destructive',
     };
 
     const progressBgMap = {
-      'vibrant-blue': 'bg-[#3b82f6]',
-      'purple': 'bg-[#a855f7]',
-      'amber': 'bg-[#f59e0b]',
-      'emerald-green': 'bg-[#10b981]',
-      'red-500': 'bg-[#ef4444]',
+      'vibrant-blue': 'bg-primary',
+      'purple': 'bg-brand-sky',
+      'amber': 'bg-warning',
+      'emerald-green': 'bg-brand-green',
+      'red-500': 'bg-destructive',
     };
 
     return (
       <div className={cn(
-        "relative overflow-hidden rounded-2xl",
+        "relative overflow-hidden rounded-xl",
         "bg-card border border-border",
-        "shadow-card hover:shadow-lifted hover:-translate-y-[2px]",
+        "shadow-xs hover:shadow-md hover:border-primary/25",
         "transition-all duration-200",
         "p-5",
         "group",
       )}>
-        {/* Barra lateral colorida — Aura Style accent indicator */}
-        <div className={cn("absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl", accentBarMap[stitchColor])} />
-
-        {/* Brilho de fundo sutil no canto superior direito */}
-        <div className={cn(
-          "absolute -top-10 -right-10 w-28 h-28 rounded-full opacity-5 blur-2xl",
-          accentBarMap[stitchColor]
-        )} />
-
-        <div className="flex items-start justify-between mb-3">
-          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="text-xs font-semibold text-muted-foreground">
             {title}
           </div>
-          {/* Ícone com glassmorphism leve */}
-          <div className={cn("p-2 rounded-xl", iconBgMap[stitchColor])}>
-            <Icon className="w-4 h-4" />
-          </div>
+          <Icon className={cn("w-4 h-4 shrink-0", iconColorMap[stitchColor])} />
         </div>
 
         {isLoading ? (
           <Skeleton className="h-8 w-3/5 mt-1 mb-1" />
         ) : (
-          /* Valor com text-gradient — Aura Style */
-          <h3 className={cn(
-            "text-2xl font-black tracking-tight",
-            "bg-gradient-to-br bg-clip-text text-transparent",
-            valueGradientMap[stitchColor]
-          )}>
+          <h3 className={cn("text-[26px] font-bold tracking-[-0.03em] leading-tight", valueColorMap[stitchColor])}>
             {value}
           </h3>
         )}
@@ -114,20 +91,33 @@ export function StatCard({
           <Skeleton className="h-3.5 w-3/4 mt-2" />
         ) : (
           subtitle && (
-            <p className="text-xs text-muted-foreground mt-1.5 leading-tight opacity-0 group-hover:opacity-100 transition-opacity duration-300">{subtitle}</p>
+            <p className="text-xs text-muted-foreground mt-1.5 leading-tight">{subtitle}</p>
           )
         )}
 
-        {/* Progress bar refinada */}
         {progress !== undefined && (
-          <div className="mt-4 w-full bg-muted rounded-full h-1 overflow-hidden">
-            {isLoading ? (
-              <div className="h-full w-full animate-shimmer rounded-full" />
-            ) : (
-              <div
-                className={cn("h-full rounded-full transition-all duration-700 ease-spring", progressBgMap[stitchColor])}
-                style={{ width: `${Math.min(progress, 100)}%` }}
-              />
+          <div className="mt-4 flex items-center gap-3">
+            <div
+              className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-label={progressLabel ?? "Progresso"}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(Math.min(progress, 100))}
+            >
+              {isLoading ? (
+                <div className="h-full w-full animate-shimmer rounded-full" />
+              ) : (
+                <div
+                  className={cn("h-full rounded-full transition-all duration-700 ease-spring", progressBgMap[stitchColor])}
+                  style={{ width: `${Math.min(progress, 100)}%` }}
+                />
+              )}
+            </div>
+            {!isLoading && (
+              <span className="shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">
+                {progress.toFixed(1).replace(".", ",").replace(",0", "")}%{progressLabel ? ` ${progressLabel}` : ""}
+              </span>
             )}
           </div>
         )}
@@ -144,7 +134,7 @@ export function StatCard({
   };
 
   const iconBgStyles = {
-    default: 'bg-primary/10 text-primary',
+    default: 'bg-accent text-accent-foreground',
     primary: 'bg-white/20 text-white',
     accent: 'bg-white/20 text-white',
     warning: 'bg-white/20 text-white',
@@ -169,8 +159,8 @@ export function StatCard({
           <Skeleton className="h-9 w-1/2 mt-2 mb-1" />
         ) : (
           <p className={cn(
-            "text-3xl font-bold mt-2 tracking-tight",
-            variant === 'default' ? 'text-gradient-dark' : 'text-white'
+            "text-3xl font-extrabold mt-2 tracking-[-0.03em]",
+            variant === 'default' ? 'text-foreground' : 'text-white'
           )}>
             {value}
           </p>
@@ -190,7 +180,7 @@ export function StatCard({
         {trend && (
           <div className={cn(
             "flex items-center gap-1 mt-2 text-sm",
-            trend.value >= 0 ? 'text-green-600' : 'text-red-600',
+            trend.value >= 0 ? 'text-success' : 'text-destructive',
             variant !== 'default' && (trend.value >= 0 ? 'text-green-300' : 'text-red-300')
           )}>
             <span className="font-medium">

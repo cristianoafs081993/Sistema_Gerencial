@@ -28,6 +28,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
+import { PageHeader } from '@/components/design-system/PageHeader';
+import { SegmentedControl } from '@/components/design-system/SegmentedControl';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { ActiveFilterChips, type ActiveFilterItem } from '@/components/design-system/ActiveFilterChips';
 import { TablePagination } from '@/components/design-system/TablePagination';
@@ -259,10 +261,34 @@ export default function Empenhos() {
     dataFim,
   ]);
 
+  const currentYear = new Date().getFullYear();
+  const empenhosExecucao = filteredEmpenhos.filter(
+    (e) => e.tipo === 'exercicio' || (!e.tipo && e.numero.includes(String(currentYear))),
+  );
+  const empenhosRestos = filteredEmpenhos.filter(
+    (e) => e.tipo === 'rap' || (!e.tipo && !e.numero.includes(String(currentYear))),
+  );
+
   return (
     <div className="space-y-space-6 pb-space-10">
       <div hidden={isDialogOpen} className="space-y-6">
-      <FilterPanel className="shadow-sm">
+      <PageHeader
+        compact
+        title="Empenhos"
+        toolbar={
+          <SegmentedControl
+            aria-label="Tipo de empenho"
+            value={activeTab}
+            onChange={setActiveTab}
+            options={[
+              { value: 'execucao', label: `Execução ${currentYear}`, count: empenhosExecucao.length },
+              { value: 'restos', label: 'Restos a Pagar', count: empenhosRestos.length },
+            ]}
+          />
+        }
+        className="mb-0"
+      />
+      <FilterPanel>
         <CardContent className="p-0">
           {/* Linha 1: Busca e Filtros Básicos */}
           <div className="flex flex-col sm:flex-row gap-4">
@@ -306,7 +332,7 @@ export default function Empenhos() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="inline-flex h-10 overflow-hidden rounded-xl border border-border-default bg-card shadow-sm">
+            <div className="inline-flex h-10 overflow-hidden rounded-lg border border-border bg-card">
               <Button
                 type="button"
                 variant={favoritesFilter === 'all' ? 'default' : 'ghost'}
@@ -328,16 +354,17 @@ export default function Empenhos() {
             <Button
               variant={showAdvancedFilters ? "secondary" : "outline"}
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className="gap-2 h-10 font-bold"
+              className="gap-2 h-10"
+              aria-expanded={showAdvancedFilters}
             >
               <Filter className="w-4 h-4" />
-              Opções
+              Mais filtros
             </Button>
           </div>
 
           {/* Linha 2: Filtros Avançados (Colapsável) */}
           {showAdvancedFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 mt-4 bg-muted/50 rounded-lg border border-border-default/50">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 mt-4 bg-muted rounded-lg border border-border">
               <div className="space-y-1">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Componente Funcional</label>
                 <Select value={filterComponente} onValueChange={setFilterComponente}>
@@ -416,7 +443,7 @@ export default function Empenhos() {
                       setSearchTerm('');
                       setFavoritesFilter('all');
                     }}
-                    className="h-10 w-10 hover:bg-red-50 hover:text-red-500 transition-colors"
+                    className="h-10 w-10 hover:bg-destructive/10 hover:text-destructive transition-colors"
                   >
                     <X className="w-4 h-4" />
                     <span className="sr-only">Limpar</span>
@@ -437,40 +464,11 @@ export default function Empenhos() {
       </FilterPanel>
 
 
-      {/* Container de Card Tab Integrado */}
-      <div className="relative mt-6">
-        {/* Tabs de Navegação - Layout Folder Tab */}
-        <div className="flex items-end justify-between px-0 relative -mb-[1px] z-10 w-full gap-4 flex-wrap sm:flex-nowrap">
-          <div className="flex space-x-1 overflow-x-auto">
-            <button
-              type="button"
-              className={`px-6 py-3 text-sm font-bold font-ui transition-all duration-200 border rounded-t-radius-lg whitespace-nowrap ${
-                activeTab === 'execucao'
-                  ? 'bg-surface-card border-border-default/80 border-b-surface-card text-sebrae-blue shadow-sm relative z-20 pb-[13px]'
-                  : 'bg-surface-subtle/30 text-text-muted hover:text-text-primary hover:bg-surface-subtle/60 border-transparent border-b-border-default/80 cursor-pointer relative z-10 pb-3'
-              }`}
-              onClick={() => setActiveTab('execucao')}
-            >
-              Execução {new Date().getFullYear()}
-            </button>
-            <button
-              type="button"
-              className={`px-6 py-3 text-sm font-bold font-ui transition-all duration-200 border rounded-t-radius-lg whitespace-nowrap ${
-                activeTab === 'restos'
-                  ? 'bg-surface-card border-border-default/80 border-b-surface-card text-sebrae-blue shadow-sm relative z-20 pb-[13px]'
-                  : 'bg-surface-subtle/30 text-text-muted hover:text-text-primary hover:bg-surface-subtle/60 border-transparent border-b-border-default/80 cursor-pointer relative z-10 pb-3'
-              }`}
-              onClick={() => setActiveTab('restos')}
-            >
-              Restos a Pagar
-            </button>
-          </div>
-        </div>
-
+      <div>
         {/* Card Principal de Conteúdo */}
         {activeTab === 'execucao' ? (
           <EmpenhosTable
-            empenhos={filteredEmpenhos.filter(e => e.tipo === 'exercicio' || (!e.tipo && e.numero.includes(String(new Date().getFullYear()))))}
+            empenhos={empenhosExecucao}
             type="execucao"
             handleOpenDialog={handleOpenDialog}
             isFavorite={isFavorite}
@@ -482,7 +480,7 @@ export default function Empenhos() {
           />
         ) : (
           <EmpenhosTable
-            empenhos={filteredEmpenhos.filter(e => e.tipo === 'rap' || (!e.tipo && !e.numero.includes(String(new Date().getFullYear()))))}
+            empenhos={empenhosRestos}
             type="restos"
             handleOpenDialog={handleOpenDialog}
             isFavorite={isFavorite}

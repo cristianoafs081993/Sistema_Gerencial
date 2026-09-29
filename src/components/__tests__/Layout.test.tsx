@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/design-system/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 
 const queryClient = new QueryClient({
@@ -178,7 +179,7 @@ describe('Layout', () => {
     expect(screen.getByText('Painel de integração SUAP')).toBeInTheDocument();
   });
 
-  it('exibe a opção de padrão de design do SUAP dentro do menu do usuário', () => {
+  it('não oferece seletor de temas: o visual Paretto Institucional é único', () => {
     renderWithProviders(
       <MemoryRouter>
         <Layout>
@@ -187,13 +188,13 @@ describe('Layout', () => {
       </MemoryRouter>,
     );
 
-    // Não deve haver botão avulso de tema no header
     expect(screen.queryByTitle('Alternar Tema do SUAP Design System')).not.toBeInTheDocument();
 
-    // Abrir o menu de configurações do usuário
     fireEvent.keyDown(screen.getByRole('button', { name: 'Abrir configurações do usuário' }), { key: 'ArrowDown' });
 
-    expect(screen.getByText('Padrão de design (SUAP)')).toBeInTheDocument();
+    expect(screen.getByText('Alterar senha')).toBeInTheDocument();
+    expect(screen.queryByText('Padrão de design (SUAP)')).not.toBeInTheDocument();
+    expect(document.documentElement).not.toHaveAttribute('data-suap-theme');
   });
 
   it('permite alterar a senha pelo menu do usuário', async () => {
@@ -313,7 +314,7 @@ describe('Layout', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByText('Orçamentário'));
+    fireEvent.click(screen.getByRole('button', { name: 'Orçamentário' }));
 
     expect(screen.getByText('Crédito disponível')).toBeInTheDocument();
   });
@@ -422,6 +423,47 @@ describe('Layout', () => {
     expect(screen.getByText('Refeitório')).toBeInTheDocument();
     expect(screen.getByText('Requisição de Compra')).toBeInTheDocument();
     expect(screen.getAllByText('Dashboard').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('exibe o cabeçalho padrão da tela (módulo e título) quando a página não declara o próprio', () => {
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/contratos']}>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    const header = screen.getByTestId('page-header');
+    expect(header).toHaveTextContent('Contratos');
+    expect(header.querySelector('h1')).toHaveTextContent('Contratos');
+  });
+
+  it('não exibe título visível nas telas do módulo Orçamentário (só h1 acessível)', () => {
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/empenhos']}>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByTestId('page-header')).not.toBeInTheDocument();
+    const heading = screen.getByRole('heading', { level: 1, name: 'Empenhos' });
+    expect(heading).toHaveClass('sr-only');
+  });
+
+  it('não duplica o cabeçalho quando a página declara PageHeader', () => {
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/empenhos']}>
+        <Layout>
+          <PageHeader title="Título próprio" description="Descrição da página" />
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByTestId('page-header')).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: 'Título próprio' })).toBeInTheDocument();
   });
 });
 

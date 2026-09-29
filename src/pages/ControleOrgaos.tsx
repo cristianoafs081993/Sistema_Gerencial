@@ -1,3 +1,5 @@
+import { LoadingState } from '@/components/design-system/LoadingState';
+import { PageHeader } from '@/components/design-system/PageHeader';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Building2,
@@ -234,14 +236,10 @@ export default function ControleOrgaos() {
         </Button>
       </HeaderActions>
 
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1a1a19]">Administração</p>
-        <h1 className="text-2xl font-bold tracking-[-0.02em] text-[#34322d]">Controle de Órgãos</h1>
-        <p className="max-w-3xl text-sm leading-6 text-[#858481]">
-          Gerencie os órgãos (tenants) do sistema. Defina quais módulos cada órgão pode acessar e quais usuários
-          pertencem a cada órgão. Os dados de cada órgão são completamente isolados.
-        </p>
-      </div>
+      <PageHeader
+        title="Controle de Órgãos"
+        description="Gerencie os órgãos (tenants) do sistema. Defina quais módulos cada órgão pode acessar e quais usuários pertencem a cada órgão. Os dados de cada órgão são completamente isolados."
+      />
 
       {/* Formulário de órgão */}
       {showOrgForm && (
@@ -287,10 +285,7 @@ export default function ControleOrgaos() {
 
       {isLoading && !orgsState ? (
         <SectionPanel>
-          <div className="flex items-center justify-center gap-3 py-12 text-sm text-slate-500">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Carregando órgãos...
-          </div>
+          <LoadingState label="Carregando órgãos..." />
         </SectionPanel>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">

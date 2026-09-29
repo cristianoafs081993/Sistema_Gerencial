@@ -121,7 +121,7 @@ export const ProcessMappingModalNew: React.FC<ProcessMappingModalNewProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-200">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center">
               <Plus className="w-5 h-5" />
             </div>
             <div>
@@ -150,7 +150,7 @@ export const ProcessMappingModalNew: React.FC<ProcessMappingModalNewProps> = ({
               placeholder="Ex: Contratação de Serviços de TI por Pregão Eletrônico"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
           </div>
 
@@ -162,7 +162,7 @@ export const ProcessMappingModalNew: React.FC<ProcessMappingModalNewProps> = ({
                 placeholder="Ex: PROC-TI-001"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
             </div>
 
@@ -171,7 +171,7 @@ export const ProcessMappingModalNew: React.FC<ProcessMappingModalNewProps> = ({
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500"
               >
                 <option value="Licitações e Contratos">Licitações e Contratos</option>
                 <option value="Financeiro">Financeiro</option>
@@ -189,7 +189,7 @@ export const ProcessMappingModalNew: React.FC<ProcessMappingModalNewProps> = ({
               placeholder="Descreva a finalidade, escopo e público do fluxo operacional..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 leading-relaxed"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 leading-relaxed"
             />
           </div>
 
@@ -207,7 +207,7 @@ export const ProcessMappingModalNew: React.FC<ProcessMappingModalNewProps> = ({
                   onClick={() => setSelectedTemplate(tpl.id as any)}
                   className={`p-2.5 rounded-xl border cursor-pointer transition-colors text-center ${
                     selectedTemplate === tpl.id
-                      ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-bold'
+                      ? 'border-brand-600 bg-brand-50 text-brand-900 font-bold'
                       : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
                   }`}
                 >
@@ -229,7 +229,7 @@ export const ProcessMappingModalNew: React.FC<ProcessMappingModalNewProps> = ({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition-colors"
+              className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-lg shadow-xs transition-colors"
             >
               Criar Mapeamento
             </button>

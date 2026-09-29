@@ -6,16 +6,18 @@ Este documento resume as diretrizes de composição e padrões visuais de págin
 
 O shell principal em [Layout.tsx](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/components/Layout.tsx) usa a estrutura de sidebar e header:
 
-1. **Sidebar Responsiva (Expandida e Rail Mode)**: Fundo `bg-card`, borda divisória sutil, suporte a recolhimento compacto para modo ícones (`w-18`) com tooltips acessíveis e persistência em `localStorage`;
-2. **Identidade da Marca**: Logotipo oficial no topo com badge da versão e identificador do órgão vinculado;
+1. **Sidebar Responsiva (Expandida e Rail Mode)**: Fundo branco (`bg-sidebar`), borda divisória sutil, suporte a recolhimento compacto para modo ícones (`w-18`) com tooltips acessíveis e persistência em `localStorage`;
+2. **Identidade da Marca**: Logotipo institucional do SIAGES no topo com selo "Beta" em `accent` e legenda em caixa alta espaçada (design system Céu, sem mascote);
 3. **Busca e Command Palette Global (`Cmd+K` / `Ctrl+K`)**: Campo de pesquisa rápido no header com atalho de teclado `Ctrl K` que abre a Command Palette para navegação instantânea por telas, módulos e ações rápidas;
-4. **Header com Efeito de Vidro**: Barra superior com translucidez (`backdrop-blur-md bg-card/90`) e sombra suave;
+4. **Header**: Barra superior branca e sólida de 64px com borda inferior sutil;
 5. **Grupos de Módulos (Sidebar)**: Títulos em caixa alta/tamanho reduzido, ícone com cor de destaque ativa e chevrons dinâmicos que rotacionam suavemente;
-6. **Indicador Lateral Ativo**: Links de navegação ativa recebem indicador vertical destacado e fundo sutil `bg-primary/10`;
+6. **Item Ativo**: Links de navegação ativa recebem fundo `sidebar-accent`, texto `sidebar-accent-foreground` em negrito e um ponto azul à direita;
 7. **Submenus Expansivos**: Subitens com pontos discretos indicando a rota ativa com recuo visual;
 8. **Responsividade**: Drawer lateral acionado via botão hambúrguer para dispositivos móveis;
 9. **Scrollbars**: Rolagem fina com trilha invisível e cantos arredondados na navegação interna;
 10. **Carregamento de Rotas**: Rotas lazy usam `RouteLoadingFallback`; páginas públicas exibem o modo de tela cheia e páginas internas mantêm sidebar/header visíveis enquanto a área de conteúdo carrega.
+11. **Cabeçalho de página padrão**: toda tela interna começa com `PageHeader` (eyebrow com o módulo, título, descrição curta, ações à direita e barra secundária opcional). Se a página não declarar o próprio `PageHeader`, o `Layout` exibe o cabeçalho automático (`AutoPageHeader`) com módulo e nome da tela registrados em `src/lib/appScreens.ts`. **Exceção — módulo Orçamentário** (Dashboard, Planejamento, Descentralizações, Crédito disponível, Empenhos): sem eyebrow, título nem descrição visíveis; o topo da página fica só com o seletor de visão e as ações/filtros na mesma linha (`PageHeader compact`), e o `h1` permanece `sr-only` para acessibilidade. Não crie `h1` avulsos em páginas internas.
+12. **Troca de visão**: alternâncias entre visões de uma mesma tela (ex.: Execução × Restos a Pagar, Orçamento × RAP × Contratos) usam `SegmentedControl` ou `Tabs` na barra secundária do `PageHeader`, nunca abas "folder" nem listas de abas duplicadas para desktop e mobile.
 
 
 ## Textos e encoding
@@ -29,8 +31,8 @@ O shell principal em [Layout.tsx](file:///c:/Users/3128880/Desktop/Programação
 ## Padrão 1: tabela operacional
 
 Estrutura:
-1. `HeaderActions`
-2. `FilterPanel` (Filtros)
+1. `PageHeader` (título, descrição e `SegmentedControl` quando houver visões; ações globais podem continuar em `HeaderActions`)
+2. `FilterPanel` (busca e filtros principais visíveis; filtros avançados em "Mais filtros")
 3. `DataTablePanel` (Tabela com overflow horizontal)
 4. `TablePagination` (Paginação no rodapé)
 
@@ -51,15 +53,20 @@ Estrutura:
 2. Informações e progresso de carregamento;
 3. Exibição de cards ou tabelas com estados de erro/sucesso explícitos.
 
+## Padrão: Mapeamento de Processos (tela cheia)
+
+`/mapeamentos` ocupa a área inteira do `Layout` (sem `PageHeader`). A barra própria (`ProcessMappingNavbar`) traz apenas seletor de processo, ferramentas do fluxograma (zoom, grade e criação de etapas), busca, alternador Fluxograma / Matriz / Guia e ações; o título fica `sr-only`, porque o módulo e a tela já aparecem no cabeçalho global e na navegação. Cores usam a escala `brand-*` (azul-céu) e `slate-*` neutros; âmbar e vermelho são reservados a decisões e fins de processo. As cores hexadecimais de conexões e modelos de processo são identificadores de dados e foram mantidas.
+
 ## Padrão 4: dashboard analítico
 
 Estrutura:
-1. Filtros globais de período;
-2. Grid de `StatCard` com realces interativos;
-3. `ChartPanel` contendo gráficos e legendas customizadas;
-4. Tabelas secundárias de apoio.
+1. `PageHeader` com descrição da visão ativa, filtros (`DashboardFiltersSheet`) nas ações e `Tabs` das visões na barra secundária;
+2. Uma única linha com até 4 `StatCard` no padrão "metric" — cada número aparece uma só vez na tela;
+3. Velocímetros (`GaugeChart`) de Empenhado/Descentralizado e Liquidado/Descentralizado;
+4. `ChartPanel` principal (evolução) ao lado do funil de execução, com as razões entre etapas;
+5. Gráficos de apoio e tabela de detalhamento.
 
-O dashboard preserva a paleta de cores analíticas (azul para planejado/séries base, verde para pago, roxo para empenhado e âmbar para etapas intermediárias) com transições suaves e estados vazios amigáveis.
+Séries seguem a ordem azul-céu `#1E88E5`, ciano `#00B7DC`, azul profundo `#1565C0`, âmbar `#F2A93B` e verde `#2E9E6A`. Evite gradientes em texto, brilhos decorativos e cartões que repetem o mesmo valor.
 
 ## Padrão 5: autenticação
 

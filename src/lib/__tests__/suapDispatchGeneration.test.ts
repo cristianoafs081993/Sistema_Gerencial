@@ -133,7 +133,7 @@ describe('suapDispatchGeneration', () => {
     });
 
     expect(html).toContain('[favorecido]');
-    expect(html).toContain('[valor da liquidacao]');
+    expect(html).toContain('[valor da liquidação]');
     expect(html).toContain('[empenho]');
   });
 
@@ -158,9 +158,9 @@ describe('suapDispatchGeneration', () => {
     });
 
     expect(aquisicao).toContain('ateste do recebimento do objeto adquirido');
-    expect(aquisicao).toContain('destinado a este <i>Campus</i> Currais Novos (Processo n&ordm; <b>23035.000123.2026-11</b>)');
+    expect(aquisicao).toContain('destinado a este <i>Campus</i> Currais Novos (Processo n. <b>23035.000123.2026-11</b>)');
     expect(aquisicao).toContain('<b>equipamentos de informatica</b>');
-    expect(servico).toContain('ateste da prestacao de servicos de <b>manutencao preventiva</b>');
+    expect(servico).toContain('ateste da prestação de serviços de <b>manutencao preventiva</b>');
     expect(servico).not.toContain('recebimento do objeto adquirido');
   });
 

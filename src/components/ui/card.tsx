@@ -3,11 +3,9 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Card — Aura Style:
- * - Border luminosa sutil (border-glow) em vez de borda cinza plana
- * - Sombra multicamada (shadow-soft)
- * - Hover com elevação suave
- * - CardTitle com text-gradient-dark para headings premium
+ * Card — Paretto Institucional:
+ * - Superfície branca com borda sutil e cantos de 12px
+ * - Sombra mínima; hover apenas reforça a sombra (sem deslocamento)
  */
 const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
   <div
@@ -15,8 +13,7 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
     className={cn(
       "rounded-xl bg-card text-card-foreground",
       "border border-border",
-      "shadow-sm transition-all duration-200 ease-out",
-      "hover:shadow-md hover:-translate-y-[1px]",
+      "shadow-xs transition-shadow duration-200 ease-out",
       className
     )}
     {...props}
@@ -36,7 +33,7 @@ const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HT
     <h3
       ref={ref}
       className={cn(
-        "text-base font-semibold leading-none tracking-tight text-foreground",
+        "text-[15px] font-bold leading-none tracking-[-0.01em] text-foreground",
         className
       )}
       {...props}

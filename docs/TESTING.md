@@ -28,6 +28,12 @@ Pontos mais criticos devem ter cobertura preferencial:
 - integracoes, proxies, storage e Edge Functions
 - regras de encoding em textos de UI e documentacao
 
+Design system Céu (base Paretto):
+
+- `src/__tests__/designSystemTokens.test.ts` garante tema único (sem `data-suap-theme` nem `SuapThemeSwitcher`), a paleta clara azul-céu no `:root` (navy restrito ao painel do login), Manrope + IBM Plex Mono em `index.css`, `tailwind.config.ts` e `index.html`, botões com `rounded-lg` e ação principal em `primary`, e a ausência do mascote do Paretto.
+- `src/components/__tests__/Layout.test.tsx` confirma que o menu do usuário não oferece mais seletor de temas.
+- `src/components/__tests__/Layout.test.tsx` também cobre o cabeçalho automático (`AutoPageHeader`: módulo + título da rota), a supressão dele quando a página declara `PageHeader` e a ausência de título visível nas telas do módulo Orçamentário; `DashboardCurrentTab.test.tsx` cobre a linha única de indicadores e o card Liquidado / Pago; `Dashboard.test.tsx` garante que as visões Orçamento, RAP e Contratos aparecem uma única vez.
+
 Requisições de Compra:
 
 - A RLS e os vínculos `requisicao_compra_itens`/`requisicao_compra_empenhos` devem permitir que usuários do grupo `fiscais-de-contratos` visualizem as requisições e seus detalhes; o slug legado `fiscal-contratos` também deve continuar funcionando.
@@ -143,7 +149,7 @@ A pasta corrente e centralizada por `src/test/extensionFixtures.ts`. As suites `
 
 - No Plano de Atividades concluído 8, cobrir a ordenação nos cabeçalhos das tabelas originais e o checkbox `Exibir somente atividades com saldo` inserido no card nativo de filtros, sem esconder linhas com saldo positivo.
 
-- `suapProcessDocumentExtension.test.ts` cobre a restauração do snapshot e do resumo financeiro ao navegar de um processo para o documento SUAP relacionado, o alinhamento dos controles de minimizar/maximizar na mesma linha do título "SIAGES", a funcionalidade de colapsar e expandir seções, o ajuste manual interativo da etapa atual do processo, bem como a exibição e o acionamento do botão de check discreto na etapa atual para disparar automações configuradas com avanço de etapa e notificação toast.
+- `suapProcessDocumentExtension.test.ts` cobre a restauração do snapshot e do resumo financeiro ao navegar de um processo para o documento SUAP relacionado, o alinhamento dos controles de minimizar/maximizar na mesma linha do título "SIAGES", a inicialização da extensão minimizada por padrão em páginas de visualização de PDFs digitalizados (`/documento_eletronico/visualizar_documento_digitalizado/<id>/`) sem sobrescrever a preferência global persistida do usuário, a exibição simplificada da aba de IA contendo apenas o botão de ação direta ("Gerar documento"), a funcionalidade de colapsar e expandir seções, a remoção do item Caixa na seção Processo e posicionamento da seção Caminho do Processo como última seção do painel de resumo, o ajuste manual interativo da etapa atual do processo, bem como a exibição e o acionamento do botão de check discreto na etapa atual para disparar automações configuradas com avanço de etapa e notificação toast.
 - `suapProcessFlow.test.ts` cobre o fluxo BPMN, propagação das definições de automação das etapas do mapeamento e preservação de metadados operacionais.
 - `suapSiafiFavorecidos.test.ts` cobre a identificação da tabela SIAFI, validação prévia, normalização de CPF, conversão de moeda para centavos sem separador, inclusão de linhas, preservação de dados existentes, limite de 10 registros por lote e ausência de clique em `Confirmar`.
 - `suapSiafiPopup.test.ts` cobre carregamento REST de listas compartilhadas com a sessão da extensão, bloqueio sem sessão, ocultação fora do host SIAFI e envio para o frame interno correto.
@@ -201,3 +207,10 @@ Ver [cenários e validação remota](ops/PNCP_CONTRACT_SYNC.md).
 - chaves de query e serviços carregam a UASG ativa, sem fallback silencioso para Currais Novos
 - contratos da Reitoria entram somente por empenho/fatura do campus selecionado; os detalhes filtram itens financeiros relacionados
 - a migration `20260907150000_add_user_campus_scope.sql` deve ser validada com métricas pré/pós de Currais Novos, ausência de nulos e teste RLS entre dois campi
+
+## Geração de Despacho de Liquidação (SUAP)
+
+- A pontuação, acentuação gráfica e crases dos templates de despacho manual em `suapDispatchGeneration.ts` e do diálogo `SuapDocumentGeneratorDialog.tsx` devem permanecer corretas em português culto (`Despacho de Liquidação`, `À Coordenação de Finanças e Contratos`, `Autorização para Liquidação da Despesa`, `prestação de serviços`, `recebimento do objeto adquirido`, `Direção-Geral`, etc.).
+- Os marcadores de pendência nos modelos manuais devem utilizar acentuação (`[valor da liquidação]`, `[objeto do serviço]`, `[objeto da aquisição]`, `[número do processo]`, `[número do edital]`).
+- A suite `src/lib/__tests__/suapDispatchGeneration.test.ts` e o teste estrutural em `src/services/__tests__/suapProcessPdfAiConfig.test.ts` validam essas strings e títulos.
+- Validação de encoding contra mojibake via `src/__tests__/encoding.test.ts`.

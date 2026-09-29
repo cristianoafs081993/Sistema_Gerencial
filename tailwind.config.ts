@@ -17,23 +17,39 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Open Sans", "Lato", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
-        ui: ["Open Sans", "Lato", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        sans: ["Manrope", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Arial", "sans-serif"],
+        ui: ["Manrope", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Arial", "sans-serif"],
         data: ["IBM Plex Mono", "Monaco", "Consolas", "ui-monospace", "monospace"],
       },
       colors: {
-        // --- SUAP BRAND COLORS ---
-        "suap-teal": "#0A7F70",
-        "suap-teal-light": "#00BDA4",
-        "suap-green": "#1F7A2D",
-        "suap-aurora": "#4456BB",
-        "suap-dunas": "#B98746",
-        "suap-govbr": "#1351B4",
-        "suap-luna": "#14B8AA",
-        "ifrn-green": "#1F7A2D",
-        "sebrae-blue": "#0A7F70",
-        "sebrae-navy": "#094E45",
-        "sebrae-gold": "#CAC302",
+        // --- MARCA (design system Céu) ---
+        "brand-navy": {
+          DEFAULT:    "hsl(var(--brand-navy))",
+          foreground: "hsl(var(--brand-navy-foreground))",
+        },
+        // Escala azul-céu completa (substitui o antigo verde-esmeralda nas telas de mapeamento)
+        brand: {
+          50:  "#EAF3FD",
+          100: "#D6E8FB",
+          200: "#B3D5F7",
+          300: "#8ABDF1",
+          400: "#4FA0EB",
+          500: "#1E88E5",
+          600: "#1976D2",
+          700: "#1565C0",
+          800: "#0F4F9A",
+          900: "#0B3B75",
+        },
+        "brand-sky":  "hsl(var(--brand-sky))",
+        "brand-cyan": "hsl(var(--brand-cyan))",
+        // Tons claros para valores grandes/em negrito (>= 18px) — contraste >= 3:1
+        "brand-green": "#2E9E6A",
+        "brand-aqua":  "#0891B2",
+        // Aliases legados mapeados para a paleta atual
+        "ifrn-green": "#1F7A4D",
+        "sebrae-blue": "hsl(var(--primary))",
+        "sebrae-navy": "hsl(var(--accent-foreground))",
+        "sebrae-gold": "#B07A0E",
         "app-bg": "hsl(var(--background))",
         "ink-legacy": "hsl(var(--foreground))",
         "muted-gray": "hsl(var(--muted-foreground))",
@@ -96,6 +112,18 @@ export default {
         destructive: {
           DEFAULT:    "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
+        },
+        success: {
+          DEFAULT:    "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT:    "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        info: {
+          DEFAULT:    "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
         },
         muted: {
           DEFAULT:    "hsl(var(--muted))",
@@ -175,12 +203,16 @@ export default {
         "shadow-card-hover":     "var(--shadow-lg)",
         "shadow-button-primary": "var(--shadow-primary)",
 
-        "xs":      "0 1px 2px 0 rgba(0,0,0,.06)",
-        "soft":    "0 1px 3px 0 rgba(0,0,0,.10), 0 1px 2px -1px rgba(0,0,0,.07)",
-        "card":    "0 4px 10px -2px rgba(0,0,0,.12), 0 2px 4px -2px rgba(0,0,0,.08)",
-        "lifted":  "0 10px 20px -4px rgba(0,0,0,.16), 0 4px 8px -4px rgba(0,0,0,.10)",
-        "float":   "0 20px 30px -6px rgba(0,0,0,.18), 0 8px 12px -6px rgba(0,0,0,.10)",
-        "primary": "0 4px 16px 0 rgba(26,92,230,.38)",
+        "xs":      "var(--shadow-xs)",
+        "sm":      "var(--shadow-sm)",
+        "md":      "var(--shadow-md)",
+        "lg":      "var(--shadow-lg)",
+        "xl":      "var(--shadow-xl)",
+        "soft":    "var(--shadow-sm)",
+        "card":    "var(--shadow-md)",
+        "lifted":  "var(--shadow-lg)",
+        "float":   "var(--shadow-xl)",
+        "primary": "var(--shadow-primary)",
         "inner-sm":"inset 0 1px 2px rgba(0,0,0,.08)",
       },
       transitionTimingFunction: {

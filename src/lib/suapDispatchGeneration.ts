@@ -193,33 +193,33 @@ const esc = (value: string) => value.replace(/[&<>"']/g, (character) => ({
 const required = (value: string, label: string) => value.trim() ? `<b>${esc(value)}</b>` : `<b>[${esc(label)}]</b>`;
 
 export function buildManualDespachoHtml(fields: ManualDespachoFields) {
-  const processReference = fields.processo.trim() ? ` (Processo n. ${required(fields.processo, 'numero do processo')})` : '';
-  const valor = required(fields.valor, 'valor da liquidacao');
+  const processReference = fields.processo.trim() ? ` (Processo n. ${required(fields.processo, 'número do processo')})` : '';
+  const valor = required(fields.valor, 'valor da liquidação');
   const empenho = required(fields.empenho.toUpperCase(), 'empenho');
   const favorecido = required(fields.favorecido.toUpperCase(), 'favorecido');
-  const assunto = 'Autorizacao para Liquidacao da Despesa';
+  const assunto = 'Autorização para Liquidação da Despesa';
 
   let body = '';
   if (fields.finalidade === 'projeto') {
-    body = `Considerando a regularidade da documentacao apresentada e a execucao das atividades pelo(s) bolsista(s) ${favorecido}, do projeto ${required(fields.projeto, 'nome do projeto')}, aprovado no Edital n. ${required(fields.edital, 'numero do edital')}${processReference}, <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}.`;
+    body = `Considerando a regularidade da documentação apresentada e a execução das atividades pelo(s) bolsista(s) ${favorecido}, do projeto ${required(fields.projeto, 'nome do projeto')}, aprovado no Edital n. ${required(fields.edital, 'número do edital')}${processReference}, <b>AUTORIZO</b> a liquidação da despesa no valor de ${valor}, referente ao empenho ${empenho}.`;
   } else if (fields.finalidade === 'bolsa-sem-projeto') {
-    body = `Considerando a regularidade da documentacao apresentada e a execucao das atividades pelo(s) bolsista(s) ${favorecido}${processReference}, <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}.`;
+    body = `Considerando a regularidade da documentação apresentada e a execução das atividades pelo(s) bolsista(s) ${favorecido}${processReference}, <b>AUTORIZO</b> a liquidação da despesa no valor de ${valor}, referente ao empenho ${empenho}.`;
   } else if (fields.finalidade === 'auxilio-transporte' || fields.finalidade === 'pafe' || fields.finalidade === 'auxilio-moradia') {
     const programa = fields.finalidade === 'auxilio-transporte'
-      ? 'Programa de Auxilio Transporte'
+      ? 'Programa de Auxílio-Transporte'
       : fields.finalidade === 'pafe'
-        ? 'Programa de Apoio a Formacao Estudantil (PAFE)'
-        : 'Programa de Auxilio Moradia';
-    body = `Considerando a regularidade dos documentos apresentados e o acompanhamento do ${programa}${processReference}, <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}.`;
+        ? 'Programa de Apoio à Formação Estudantil (PAFE)'
+        : 'Programa de Auxílio-Moradia';
+    body = `Considerando a regularidade dos documentos apresentados e o acompanhamento do ${programa}${processReference}, <b>AUTORIZO</b> a liquidação da despesa no valor de ${valor}, referente ao empenho ${empenho}.`;
   } else if (fields.finalidade === 'aquisicao') {
-    const objetoAdquirido = required(fields.descricao, 'objeto da aquisicao');
-    const destino = `destinado a este <i>Campus</i> Currais Novos${fields.processo.trim() ? ` (Processo n&ordm; ${required(fields.processo, 'numero do processo')})` : ''}`;
-    body = `Considerando a regularidade da documenta&ccedil;&atilde;o apresentada e o ateste do recebimento do objeto adquirido &mdash; ${objetoAdquirido} &mdash; ${destino}, <b>AUTORIZO</b> a liquida&ccedil;&atilde;o da despesa no valor de ${valor}, referente ao empenho ${empenho}, em favor de ${favorecido}.`;
+    const objetoAdquirido = required(fields.descricao, 'objeto da aquisição');
+    const destino = `destinado a este <i>Campus</i> Currais Novos${fields.processo.trim() ? ` (Processo n. ${required(fields.processo, 'número do processo')})` : ''}`;
+    body = `Considerando a regularidade da documentação apresentada e o ateste do recebimento do objeto adquirido &mdash; ${objetoAdquirido} &mdash; ${destino}, <b>AUTORIZO</b> a liquidação da despesa no valor de ${valor}, referente ao empenho ${empenho}, em favor de ${favorecido}.`;
   } else {
-    const reference = required(fields.descricao, 'objeto do servico');
-    body = `Considerando a regularidade dos documentos apresentados e o ateste da prestacao de servicos de ${reference}${processReference}, <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}, em favor de ${favorecido}.`;
+    const reference = required(fields.descricao, 'objeto do serviço');
+    body = `Considerando a regularidade dos documentos apresentados e o ateste da prestação de serviços de ${reference}${processReference}, <b>AUTORIZO</b> a liquidação da despesa no valor de ${valor}, referente ao empenho ${empenho}, em favor de ${favorecido}.`;
   }
 
-  const nextStep = fields.processo.trim() ? 'Na sequencia, encaminhe-se o processo a Direcao-Geral para analise e posterior autorizacao do pagamento.' : 'Na sequencia, encaminhe-se o documento a Direcao-Geral para analise e posterior autorizacao do pagamento.';
-  return `<div style="font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; text-align: justify; color: black;"><div>A Coordenacao de Financas e Contratos do <i>Campus</i> Currais Novos</div><div style="font-weight: bold; margin-top: 30px;">Assunto: ${assunto}</div><div style="text-indent: 2.5cm; margin-top: 30px; margin-bottom: 25px;">${body}</div><div style="margin-top: 25px;">${nextStep}</div><div style="margin-top: 40px;">Atenciosamente,</div></div>`;
+  const nextStep = fields.processo.trim() ? 'Na sequência, encaminhe-se o processo à Direção-Geral para análise e posterior autorização do pagamento.' : 'Na sequência, encaminhe-se o documento à Direção-Geral para análise e posterior autorização do pagamento.';
+  return `<div style="font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; text-align: justify; color: black;"><div>À Coordenação de Finanças e Contratos do <i>Campus</i> Currais Novos</div><div style="font-weight: bold; margin-top: 30px;">Assunto: ${assunto}</div><div style="text-indent: 2.5cm; margin-top: 30px; margin-bottom: 25px;">${body}</div><div style="margin-top: 25px;">${nextStep}</div><div style="margin-top: 40px;">Atenciosamente,</div></div>`;
 }

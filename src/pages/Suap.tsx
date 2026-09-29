@@ -1313,14 +1313,14 @@ export default function Suap() {
               <DropdownMenuContent align="start">
                 <DropdownMenuItem onClick={startStandaloneDispatchGeneration}>
                   <FileText className="mr-2 h-4 w-4" />
-                  Despacho de Liquidacao avulso
+                  Despacho de Liquidação avulso
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={selectedProcesses.length === 0 || bulkAction !== null}
                   onClick={() => startDispatchGeneration(selectedProcesses)}
                 >
                   <FileText className="mr-2 h-4 w-4" />
-                  Despacho de Liquidacao
+                  Despacho de Liquidação
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1558,7 +1558,7 @@ export default function Suap() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => startDispatchGeneration([processo])}>
                                 <FileText className="mr-2 h-4 w-4" />
-                                Despacho de Liquidacao
+                                Despacho de Liquidação
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>

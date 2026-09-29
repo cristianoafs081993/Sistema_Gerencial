@@ -93,7 +93,7 @@ export const ProcessMappingExportModal: React.FC<ProcessMappingExportModalProps>
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 max-w-xl w-full">
         <div className="flex items-center justify-between pb-4 border-b border-slate-200">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center">
               <Download className="w-5 h-5" />
             </div>
             <div>
@@ -116,9 +116,9 @@ export const ProcessMappingExportModal: React.FC<ProcessMappingExportModalProps>
             <button
               type="button"
               onClick={handleDownload}
-              className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-emerald-50 hover:border-emerald-300 transition-all text-slate-700 hover:text-emerald-900 group"
+              className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-brand-50 hover:border-brand-300 transition-all text-slate-700 hover:text-brand-900 group"
             >
-              <FileJson className="w-5 h-5 mb-1.5 text-slate-500 group-hover:text-emerald-600" />
+              <FileJson className="w-5 h-5 mb-1.5 text-slate-500 group-hover:text-brand-600" />
               <span className="font-bold">Baixar JSON</span>
               <span className="text-[10px] text-slate-400">Arquivo completo</span>
             </button>
@@ -126,12 +126,12 @@ export const ProcessMappingExportModal: React.FC<ProcessMappingExportModalProps>
             <button
               type="button"
               onClick={handleCopyJson}
-              className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-blue-50 hover:border-blue-300 transition-all text-slate-700 hover:text-blue-900 group"
+              className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-brand-50 hover:border-brand-300 transition-all text-slate-700 hover:text-brand-900 group"
             >
               {copied ? (
-                <Check className="w-5 h-5 mb-1.5 text-emerald-600" />
+                <Check className="w-5 h-5 mb-1.5 text-brand-600" />
               ) : (
-                <Copy className="w-5 h-5 mb-1.5 text-slate-500 group-hover:text-blue-600" />
+                <Copy className="w-5 h-5 mb-1.5 text-slate-500 group-hover:text-brand-600" />
               )}
               <span className="font-bold">{copied ? 'Copiado!' : 'Copiar JSON'}</span>
               <span className="text-[10px] text-slate-400">Área de transferência</span>
@@ -151,7 +151,7 @@ export const ProcessMappingExportModal: React.FC<ProcessMappingExportModalProps>
           {/* Import JSON Section */}
           <div className="border-t border-slate-200 pt-4 space-y-3">
             <div className="flex items-center gap-2">
-              <Upload className="w-4 h-4 text-emerald-600" />
+              <Upload className="w-4 h-4 text-brand-600" />
               <h4 className="font-bold text-slate-800">Importar Mapeamento Externo</h4>
             </div>
 
@@ -169,7 +169,7 @@ export const ProcessMappingExportModal: React.FC<ProcessMappingExportModalProps>
                 type="file"
                 accept=".json"
                 onChange={handleFileUpload}
-                className="w-full text-slate-600 text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+                className="w-full text-slate-600 text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 cursor-pointer"
               />
             </div>
 
@@ -185,7 +185,7 @@ export const ProcessMappingExportModal: React.FC<ProcessMappingExportModalProps>
                   setImportJsonText(e.target.value);
                   setImportError('');
                 }}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono text-[11px] focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono text-[11px] focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
               <button
                 type="submit"

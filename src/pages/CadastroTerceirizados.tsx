@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/design-system/PageHeader';
 import { useEffect, useState, useMemo } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { requisicoesCompraService } from '@/services/requisicoesCompra';
@@ -371,25 +372,17 @@ export default function CadastroTerceirizadosPage() {
   return (
     <div className="space-y-6 p-6">
       {!isPermissionsOpen && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-text-primary font-ui flex items-center gap-2">
-              <Users className="h-6 w-6 text-primary" />
-              Cadastro de Terceirizados
-            </h1>
-            <p className="text-sm text-text-muted mt-1">
-              Gerencie prestadores terceirizados e configure seus vínculos de acesso a contratos e empenhos.
-            </p>
-          </div>
-          <Button
-            type="button"
-            onClick={handleOpenCreateDialog}
-            className="bg-primary hover:bg-primary/95 text-primary-foreground gap-1.5 self-start sm:self-auto"
-          >
-            <UserPlus className="h-4 w-4" />
-            Cadastrar Terceirizado
-          </Button>
-        </div>
+        <PageHeader
+          title="Cadastro de Terceirizados"
+          description="Gerencie prestadores terceirizados e configure seus vínculos de acesso a contratos e empenhos."
+          className="mb-0"
+          actions={
+            <Button type="button" onClick={handleOpenCreateDialog} className="gap-1.5">
+              <UserPlus className="h-4 w-4" />
+              Cadastrar Terceirizado
+            </Button>
+          }
+        />
       )}
 
       {isPermissionsOpen && selectedTerceirizado ? (

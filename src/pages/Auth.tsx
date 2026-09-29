@@ -69,7 +69,7 @@ export default function Auth() {
   return (
     <main className="grid grid-cols-1 md:grid-cols-12 min-h-screen bg-background text-foreground font-ui">
       {/* Left Column: Visual Brand side for Desktop */}
-      <div className="md:col-span-5 lg:col-span-6 xl:col-span-7 hidden md:flex flex-col justify-between p-12 bg-[#0B1538] text-white relative overflow-hidden">
+      <div className="md:col-span-5 lg:col-span-6 xl:col-span-7 hidden md:flex flex-col justify-between p-12 bg-brand-navy text-white relative overflow-hidden">
         <img
           src="/login-finance-background.jpg"
           alt=""
@@ -77,9 +77,9 @@ export default function Auth() {
           data-testid="auth-visual-background"
           className="absolute inset-0 h-full w-full object-cover object-center opacity-30 pointer-events-none"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0B1538]/95 via-[#1A2B66]/85 to-[#0056C3]/45 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-brand-navy/95 via-brand-navy/85 to-primary/40 pointer-events-none" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.06),transparent_45%)] pointer-events-none" />
-        <div className="absolute -left-16 -top-16 w-96 h-96 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
+        <div className="absolute -left-16 -top-16 w-96 h-96 rounded-full bg-primary/15 blur-3xl pointer-events-none" />
         <div className="absolute -right-16 -bottom-16 w-96 h-96 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
         
         {/* Top Branding Logo */}
@@ -87,7 +87,7 @@ export default function Auth() {
           <LogoIcon size={34} />
           <div>
             <h1 className="font-bold text-lg tracking-tight leading-none text-white flex items-center gap-1.5 m-0">
-              SIAGES <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">Beta</span>
+              SIAGES <span className="text-[9px] tracking-[0.08em] uppercase bg-brand-cyan text-brand-navy px-1.5 py-0.5 rounded-md font-bold">Beta</span>
             </h1>
             <p className="text-[10px] text-slate-300 tracking-wider m-0 mt-0.5">Sistema Integrado de Administração e Gestão Estratégica</p>
           </div>
@@ -147,7 +147,7 @@ export default function Auth() {
             <LogoIcon size={38} />
             <div>
               <h1 className="font-bold text-xl tracking-tight leading-none text-foreground flex items-center gap-1.5 m-0">
-                SIAGES <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">Beta</span>
+                SIAGES <span className="text-[9px] tracking-[0.08em] uppercase bg-accent text-accent-foreground px-1.5 py-0.5 rounded-md font-bold">Beta</span>
               </h1>
               <p className="text-[10px] text-muted-foreground tracking-wider m-0 mt-0.5">Sistema Integrado de Administração e Gestão Estratégica</p>
             </div>
@@ -155,9 +155,9 @@ export default function Auth() {
 
           <div className="relative">
             {isLoading ? (
-              <Card className="border-border-default/70 shadow-[0_22px_60px_rgba(26,43,102,0.06)] bg-white/80 backdrop-blur-sm">
+              <Card className="border-border-default/70 shadow-lg bg-card">
                 <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
                     <Loader2 className="h-5 w-5 animate-spin" />
                   </div>
                   <div className="space-y-1">
@@ -176,9 +176,9 @@ export default function Auth() {
                   onSuccess={handlePasswordSetupSuccess}
                 />
               ) : (
-                <Card className="border-border-default/70 shadow-[0_22px_60px_rgba(26,43,102,0.06)] bg-white/80 backdrop-blur-sm">
+                <Card className="border-border-default/70 shadow-lg bg-card">
                   <CardContent className="space-y-5 py-10 text-center">
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#2f9e41]/10 text-[#2f9e41]">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
                       <CheckCircle2 className="h-6 w-6" />
                     </div>
                     <div className="space-y-2">

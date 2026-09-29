@@ -129,7 +129,7 @@ describe('DashboardCurrentTab', () => {
   it('renderiza o card de Detalhamento por Origem com as linhas', () => {
     renderDashboardCurrentTab();
 
-    expect(screen.getByText('Detalhamento por Origem')).toBeInTheDocument();
+    expect(screen.getByText('Detalhamento por origem')).toBeInTheDocument();
     expect(screen.getByText('231796')).toBeInTheDocument();
     expect(screen.getByText('261941')).toBeInTheDocument();
     expect(screen.queryByTestId('origem-atividades-modal')).not.toBeInTheDocument();
@@ -178,7 +178,7 @@ describe('DashboardCurrentTab', () => {
     });
 
     const cardTitle = screen.getByText('Liquidado / Pago');
-    const card = cardTitle.closest('div');
+    const card = cardTitle.closest('[data-testid="liquidado-pago-card"]');
     expect(card).toBeInTheDocument();
     expect(within(card!).getByText('Liquidado')).toBeInTheDocument();
     expect(within(card!).getByText('Pago')).toBeInTheDocument();

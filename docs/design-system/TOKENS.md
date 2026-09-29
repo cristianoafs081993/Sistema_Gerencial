@@ -1,73 +1,69 @@
-# TOKENS — SUAP Design System (IFRN)
+# TOKENS — Design system Céu (base Paretto)
 
 ## Fontes de verdade
 
 - `src/index.css`
 - `tailwind.config.ts`
-- `src/components/suap/SuapThemeSwitcher.tsx`
-- Referência oficial: `https://suap.ifrn.edu.br/comum/design_system`
+- `index.html` (carregamento das fontes)
+- Referência de origem: design system do site Paretto Concursos (`Paretto-Concursos-Site/app/globals.css`) para tipografia, forma e componentes, **sem o mascote**. A paleta foi clareada para transmitir leveza e modernidade: azul-céu como ação, superfícies brancas com leve tom azulado e ciano como realce.
 
-Os tokens visuais foram consolidados em `src/index.css` e `tailwind.config.ts` para refletir com fidelidade o **Design System oficial do SUAP (IFRN)**.
+O sistema usa um **tema único**. Os antigos temas SUAP (Padrão, IFs, Aurora, Dunas, Gov.br, Luna, Alto Contraste e Modo Daltonismo), o atributo `data-suap-theme` e o seletor `SuapThemeSwitcher` foram removidos. Não há modo escuro ativo: classes `dark:` remanescentes em páginas são inertes.
 
 ## Tipografia
 
-- **Interface de Usuário (UI SUAP)**: `Open Sans, Lato, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`.
-- **Dados e Códigos (Monospace)**: `IBM Plex Mono, Monaco, Consolas, monospace` com alinhamento tabular (`font-variant-numeric: tabular-nums`).
-- **Peso base**: `400` (Regular) e `500` (Medium).
-- **Títulos (Headings)**: `600` (Semi-bold) e `700` (Bold) com tracking compacto (`tracking-tight`).
+- **Interface**: `Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif` (pesos 400–800).
+- **Dados e códigos (monospace)**: `IBM Plex Mono, Monaco, Consolas, monospace` com `font-variant-numeric: tabular-nums`.
+- **Títulos**: `h1` 28px / `800` / tracking `-0.02em`; `h2` 24px / `800`; `h3` 16–18px / `700`.
+- **Rótulos e eyebrows**: 10–11px, `700`, caixa alta, tracking `0.14em–0.2em`, cor `muted-foreground`.
+- A fonte manuscrita do Paretto (Caveat) **não** é usada.
 
-## Temas e Paletas Oficiais do SUAP
+## Paleta
 
-O sistema suporta alternância dinâmica de temas via atributo `data-suap-theme` e seletor `SuapThemeSwitcher`:
+| Token | Valor | Uso |
+| --- | --- | --- |
+| `--background` | `#F6F9FD` | fundo da aplicação |
+| `--foreground` | `#1B2B3A` | texto principal |
+| `--card` / `--popover` | `#FFFFFF` | superfícies |
+| `--border` / `--input` | `#DDE6F0` | divisores e contornos |
+| `--muted` / `--secondary` | `#EEF3F9` | superfícies de apoio, cabeçalho de tabela |
+| `--muted-foreground` | `#5B6B7B` | texto secundário (5,5:1 sobre branco) |
+| `--primary` | `#1976D2` | botões, links, abas e paginação ativas, avatar (4,6:1 com texto branco) |
+| `--ring` / `--brand-sky` | `#1E88E5` | foco, barras de progresso, indicadores e séries de gráfico |
+| `--accent` / `--accent-foreground` | `#EAF3FD` / `#1565C0` | hover e seleção suaves, item ativo da sidebar, selo "Beta" |
+| `--brand-cyan` | `#00B7DC` | realce secundário (liquidado, gradientes) |
+| `--brand-navy` | `#0B2945` | **somente** superfícies escuras — hoje, o painel lateral do login |
+| `--success` | `#1F7A4D` | sucesso |
+| `--warning` | `#9A5C00` | atenção |
+| `--info` | `#0079A8` | informativo |
+| `--destructive` | `#D03434` | erro/perigo |
 
-1. **Padrão (Teal SUAP - Default)**:
-   - Primária: `#0A7F70` (`--primary-700`), `#00BDA4` (`--primary-600`), `#00E5C7` (`--primary-500`).
-   - Fundo: `#F8F9FA` / `#F2F2F2`, superfícies `#FFFFFF`, texto `#1A1A1A` e `#666666`.
-2. **IFs (Institutos Federais / IFRN)**:
-   - Primária Verde IFRN `#1F7A2D`, Destaque Vermelho `#E41D1B`.
-3. **Aurora**:
-   - Roxo / Violeta `#4456BB` com degradê elegante.
-4. **Dunas**:
-   - Tons de areia e ocre `#B98746`.
-5. **Gov.br**:
-   - Azul padrão federal `#1351B4`.
-6. **Luna (Dark Mode)**:
-   - Fundo escuro `#1A1A1A` com realces em ciano `#14B8AA`.
-   - `color-scheme: dark` ativado para controles nativos, scrollbars e inputs de data.
-   - Variáveis semânticas de alto contraste: `--success: 142 70% 48%`, `--warning: 43 96% 56%`, `--info: 199 90% 60%`, `--destructive: 0 85% 60%`.
+`#1E88E5` não é usado como fundo de texto branco (contraste 3,7:1, abaixo de AA); nesses casos use `primary`.
 
-7. **Alto Contraste**:
-   - Amarelo `#FFFF00` sobre preto absoluto para acessibilidade e baixa visão.
-   - `color-scheme: dark` ativado com bordas reforçadas em `#FFFF00` e variáveis saturadas.
-8. **Modo Daltonismo**:
-   - Paleta otimizada para discromatopsia com magenta `#B94686` e verde `#009E73`.
+Escala completa `brand-50` … `brand-900` (azul-céu, `brand-500` = `#1E88E5`, `brand-600` = `#1976D2`) disponível para telas com muitas variações de tom, como o Mapeamento de Processos; ela substituiu o antigo verde-esmeralda (`emerald-*`) e o `blue-*` avulso ali.
 
-## Tokens semânticos
+Classes Tailwind de marca: `bg-brand-sky`, `text-brand-sky`, `bg-brand-cyan`, `bg-brand-navy` (login). Aliases legados (`ifrn-green`, `sebrae-blue`, `sebrae-navy`, `sebrae-gold`) continuam existindo, mapeados para a paleta atual. As cores `suap-*` e o acento lima foram removidos.
 
-- `--background`: HSL do fundo da página (específico por tema SUAP).
-- `--foreground`: HSL do texto principal.
-- `--card`: fundo dos cartões, modais e tabelas (`bg-card`).
-- `--border` e `--input`: divisores e contornos sutis adaptativos (`hsl(var(--border))`).
-- `--muted`: superfície de apoio e cabeçalhos de tabela (`bg-muted`).
-- `--primary`: cor primária do tema ativo do SUAP.
-- `--success`: verde semântico acessível (`#1FAD34` no claro, `#22C55E` no Luna).
-- `--warning`: amarelo/âmbar de atenção (`#989301` no claro, `#FBBF24` no Luna).
-- `--info`: azul/ciano informativo (`#008DCC` no claro, `#38BDF8` no Luna).
-- `--destructive`: vermelho de erro/perigo (`#C20A0A` no claro, `#EF4444` no Luna).
-- Cores utilitárias legadas (`amber`, `purple`) preservam toda a escala numérica oficial do Tailwind (`50` a `950`) associada a `DEFAULT`, prevenindo a quebra de gradientes e variações de tons.
+## Forma e elevação
 
-## Diretrizes para Gráficos e Recharts no Tema Dark
+- `--radius`: `0.625rem` (10px). Botões e inputs usam `rounded-lg`; cards e painéis `rounded-xl` (12px); badges permanecem em pílula.
+- Sombras azuladas e leves: `--shadow-xs` a `--shadow-xl` e `--shadow-primary`. As utilidades Tailwind `shadow-xs`, `shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-soft`, `shadow-card`, `shadow-lifted`, `shadow-float` e `shadow-primary` apontam para essas variáveis.
+- Cards não se deslocam no hover; apenas reforçam a sombra/borda.
+- Gradientes: `--gradient-primary` (azul-céu), `--gradient-accent` (céu → ciano), `--gradient-warning` (âmbar), `--gradient-card`.
 
-- **Linhas de Grade (`CartesianGrid`)**: utilizar sempre `stroke="hsl(var(--border))"` em vez de `#e5e7eb` ou `#dbe3f0`, garantindo visibilidade sutil tanto no claro quanto no escuro.
-- **Eixos (`XAxis` / `YAxis`)**: usar `tick={{ fill: 'currentColor', fontSize: 12 }}` com `className="text-muted-foreground"`.
-- **Tooltips Customizados**: envolver com `bg-card/95 border border-border text-foreground shadow-xl backdrop-blur-sm` para legibilidade ideal sobre qualquer fundo.
-- **Containers de Gráfico**: usar `bg-card/50 border border-border` em vez de gradientes claros hardcoded.
-- **Gráficos Gauge e SVGs Customizados**: utilizar `fill="currentColor" className="text-foreground"` para o valor percentual central, `stroke="currentColor" className="text-foreground"` para ponteiros e `fill="hsl(var(--muted))"` para arcos de fundo.
+## Diretrizes para gráficos (Recharts)
 
-## Componentes e Padrões SUAP
+- **Linhas de grade**: `stroke="hsl(var(--border))"`.
+- **Eixos**: `tick={{ fill: 'currentColor', fontSize: 12 }}` com `className="text-muted-foreground"`.
+- **Séries**: preferir, nesta ordem, azul-céu `#1E88E5`, ciano `#00B7DC`, azul profundo `#1565C0`, âmbar `#F2A93B`, verde `#2E9E6A`, cinza-azulado `#7C8DA6`.
+- **Velocímetros (`GaugeChart`)**: mantêm a escala semântica vermelho → âmbar → verde.
+- **Tooltips**: `bg-card border border-border text-foreground shadow-lg`.
 
-- **Botões (`Button`, `.btn`, `.button`)**: Estilo *pill* arredondado (`rounded-full`), altura 36px, padding `8px 16px`.
-- **Badges (`Badge`, `span.status`)**: Formato pílula com borda de 1px, fundo translúcido e texto contrastado.
-- **Tabelas (`Table`, `table.listagem`)**: Cabeçalhos em `bg-muted/70`, linhas com hover suave `bg-primary/10`.
-- **Sidebar & Header**: Menu colapsável com indicador ativo na cor do tema, busca rápida e seletor de temas do SUAP (`SuapThemeSubMenu`) integrado ao menu do usuário (`src/components/suap/SuapThemeSubMenu.tsx`).
-- **Modais & Dialogs**: `bg-card text-foreground border border-border`, cabeçalhos em `bg-muted/40` e rodapés alinhados a tokens do tema.
+## Componentes e padrões
+
+- **Botões**: cantos de 8px (`rounded-lg`), peso `700`, altura 36px. `default`/`suap`/`brand` em `primary`; `outline` branco com borda.
+- **Badges**: pílula com borda de 1px, fundo translúcido (10%) e texto na cor semântica.
+- **Tabelas**: cabeçalhos em `bg-muted`, hover de linha em `accent`, números tabulares.
+- **Sidebar**: fundo branco, itens em `sidebar-foreground`, item ativo em `sidebar-accent` com ponto azul à direita; rótulos de grupo em caixa alta espaçada.
+- **Header**: 64px, fundo branco sólido, busca `rounded-lg` sobre `background`.
+- **Login**: painel lateral escuro (navy com brilho azul) mantido para contraste de entrada; formulário claro.
+- **Marca**: logotipo institucional do SIAGES + selo "Beta" em `accent`. O símbolo "P" e o mascote do Paretto **não** são usados.

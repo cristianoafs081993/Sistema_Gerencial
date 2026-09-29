@@ -200,7 +200,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
       {/* Drawer Header */}
       <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs font-black px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+          <span className="font-mono text-xs font-black px-2 py-0.5 rounded bg-brand-100 text-brand-800 border border-brand-200">
             {formData.code || 'ETAPA'}
           </span>
           <div>
@@ -260,7 +260,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
           onClick={() => setActiveTab('links')}
           className={`py-2.5 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
             activeTab === 'links'
-              ? 'border-blue-600 text-blue-700 font-bold'
+              ? 'border-brand-600 text-brand-700 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -273,7 +273,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
           onClick={() => setActiveTab('procedure')}
           className={`py-2.5 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
             activeTab === 'procedure'
-              ? 'border-blue-600 text-blue-700 font-bold'
+              ? 'border-brand-600 text-brand-700 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -286,7 +286,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
           onClick={() => setActiveTab('checklist')}
           className={`py-2.5 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
             activeTab === 'checklist'
-              ? 'border-blue-600 text-blue-700 font-bold'
+              ? 'border-brand-600 text-brand-700 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -299,7 +299,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
           onClick={() => setActiveTab('automations')}
           className={`py-2.5 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
             activeTab === 'automations'
-              ? 'border-blue-600 text-blue-700 font-bold'
+              ? 'border-brand-600 text-brand-700 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -331,7 +331,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                     key={preset.name}
                     type="button"
                     onClick={() => handleQuickSystem(preset.name, preset.url)}
-                    className="px-2 py-0.5 rounded bg-white hover:bg-blue-50 text-blue-700 border border-slate-200 text-[10px] font-semibold transition-colors"
+                    className="px-2 py-0.5 rounded bg-white hover:bg-brand-50 text-brand-700 border border-slate-200 text-[10px] font-semibold transition-colors"
                   >
                     + {preset.name}
                   </button>
@@ -342,14 +342,14 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                 placeholder="Nome do sistema (ex: SUAP - Módulo PCA)"
                 value={formData.systemName || ''}
                 onChange={(e) => handleChange('systemName', e.target.value)}
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
               <input
                 type="text"
                 placeholder="URL de acesso (ex: https://suap.ifrn.edu.br/...)"
                 value={formData.systemUrl || ''}
                 onChange={(e) => handleChange('systemUrl', e.target.value)}
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-[11px]"
+                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono text-[11px]"
               />
             </div>
 
@@ -370,7 +370,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                     key={preset.name}
                     type="button"
                     onClick={() => handleQuickTemplate(preset.name, preset.url)}
-                    className="px-2 py-0.5 rounded bg-white hover:bg-emerald-50 text-emerald-700 border border-slate-200 text-[10px] font-semibold transition-colors"
+                    className="px-2 py-0.5 rounded bg-white hover:bg-brand-50 text-brand-700 border border-slate-200 text-[10px] font-semibold transition-colors"
                   >
                     + {preset.name}
                   </button>
@@ -381,14 +381,14 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                 placeholder="Nome do documento (ex: Minuta de Termo de Referência AGU)"
                 value={formData.templateName || ''}
                 onChange={(e) => handleChange('templateName', e.target.value)}
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
               <input
                 type="text"
                 placeholder="URL de download ou modelo"
                 value={formData.templateUrl || ''}
                 onChange={(e) => handleChange('templateUrl', e.target.value)}
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono text-[11px]"
+                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono text-[11px]"
               />
             </div>
 
@@ -411,7 +411,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                           href={link.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-[10px] text-blue-600 truncate block hover:underline font-mono"
+                          className="text-[10px] text-brand-600 truncate block hover:underline font-mono"
                         >
                           {link.url}
                         </a>
@@ -626,13 +626,13 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                   {formData.outputDocuments?.map((doc, i) => (
                     <span
                       key={doc}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] mr-1 mb-1 font-medium"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-brand-50 text-brand-800 border border-brand-200 text-[10px] mr-1 mb-1 font-medium"
                     >
                       {doc}
                       <button
                         type="button"
                         onClick={() => handleRemoveOutputDoc(i)}
-                        className="text-emerald-500 hover:text-rose-600"
+                        className="text-brand-500 hover:text-rose-600"
                       >
                         ×
                       </button>
@@ -672,7 +672,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                         type="checkbox"
                         checked={item.done}
                         onChange={() => handleToggleChecklist(item.id)}
-                        className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                        className="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                       />
                       <span className={`text-xs ${item.done ? 'line-through text-slate-400' : 'text-slate-800 font-medium'}`}>
                         {item.text}
@@ -705,7 +705,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
               />
               <button
                 type="submit"
-                className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                className="w-full py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
               >
                 <Plus className="w-3.5 h-3.5" /> Adicionar Item ao Checklist
               </button>
@@ -717,12 +717,12 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
         {activeTab === 'automations' && (
           <div className="space-y-4">
             {/* Header explicativo */}
-            <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl space-y-1">
-              <div className="flex items-center gap-1.5 text-blue-800 font-bold text-xs">
-                <Zap className="w-3.5 h-3.5 text-blue-600" />
+            <div className="p-3 bg-brand-50/60 border border-brand-100 rounded-xl space-y-1">
+              <div className="flex items-center gap-1.5 text-brand-800 font-bold text-xs">
+                <Zap className="w-3.5 h-3.5 text-brand-600" />
                 <span>Automação do Botão de Check</span>
               </div>
-              <p className="text-[11px] text-blue-700 leading-relaxed">
+              <p className="text-[11px] text-brand-700 leading-relaxed">
                 Configure a ação disparada pelo botão de check discreto exibido na etapa atual do painel do SUAP.
               </p>
             </div>
@@ -742,7 +742,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                   onChange={(e) => handleAutomationChange('enabled', e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
               </label>
             </div>
 
@@ -810,7 +810,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                     key={item.label}
                     type="button"
                     onClick={() => handleApplyAutomationPreset(item.preset)}
-                    className="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-50 text-emerald-800 border border-slate-200 hover:border-emerald-300 text-[11px] font-semibold transition-colors shadow-2xs"
+                    className="px-2.5 py-1 rounded-lg bg-white hover:bg-brand-50 text-brand-800 border border-slate-200 hover:border-brand-300 text-[11px] font-semibold transition-colors shadow-2xs"
                   >
                     {item.label}
                   </button>
@@ -860,8 +860,8 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
             {formData.automation?.action === 'suap_upload_document' && (
               <div className="space-y-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
                 <div className="flex items-center justify-between pb-1 border-b border-slate-200/60">
-                  <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-emerald-600" /> Parâmetros de Upload no SUAP
+                  <span className="text-[11px] font-bold text-brand-800 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-brand-600" /> Parâmetros de Upload no SUAP
                   </span>
                   <span className="text-[10px] text-slate-400">Campos 100% editáveis</span>
                 </div>
@@ -907,7 +907,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                         key={sug}
                         type="button"
                         onClick={() => handleAutomationChange('tipoDocumento', sug)}
-                        className="px-1.5 py-0.5 rounded bg-slate-200/70 hover:bg-emerald-100 text-[10px] text-slate-700 hover:text-emerald-800 font-medium transition-colors"
+                        className="px-1.5 py-0.5 rounded bg-slate-200/70 hover:bg-brand-100 text-[10px] text-slate-700 hover:text-brand-800 font-medium transition-colors"
                       >
                         {sug}
                       </button>
@@ -1005,7 +1005,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                   type="checkbox"
                   checked={formData.automation?.autoAdvanceStep ?? true}
                   onChange={(e) => handleAutomationChange('autoAdvanceStep', e.target.checked)}
-                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                 />
                 <span className="text-xs text-slate-700 font-medium">
                   Avançar automaticamente para a próxima etapa após disparar esta ação
@@ -1082,7 +1082,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
+          className="px-4 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
         >
           Salvar & Concluir
         </button>

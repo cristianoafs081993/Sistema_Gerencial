@@ -49,7 +49,7 @@ export const ProcessMappingEdgeLine: React.FC<ProcessMappingEdgeLineProps> = ({
         strokeWidth={isSelected ? '2.5' : '1.75'}
         strokeDasharray={edge.style === 'dashed' ? '6,5' : 'none'}
         markerEnd={isSelected ? 'url(#mapping-arrow-selected)' : 'url(#mapping-arrow)'}
-        className="transition-colors group-hover:stroke-blue-500"
+        className="transition-colors group-hover:stroke-brand-500"
       />
 
       {/* Edge Branch Label */}
@@ -72,7 +72,7 @@ export const ProcessMappingEdgeLine: React.FC<ProcessMappingEdgeLineProps> = ({
             fill="#ffffff"
             stroke={isSelected ? '#2563eb' : '#cbd5e1'}
             strokeWidth="1.2"
-            className="filter drop-shadow-xs group-hover:stroke-blue-400"
+            className="filter drop-shadow-xs group-hover:stroke-brand-400"
           />
           {/* Text */}
           <text

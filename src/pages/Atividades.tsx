@@ -105,7 +105,7 @@ function PlanningScopeSwitcher({ currentScope }: { currentScope: PlanningScope }
             className={cn(
               'inline-flex h-7 items-center justify-center whitespace-nowrap rounded-md px-3 text-[11px] font-semibold transition-all sm:h-8 sm:px-4 sm:text-xs',
               isActive
-                ? 'bg-[#2f9e41] text-white shadow-sm'
+                ? 'bg-primary text-primary-foreground shadow-sm'
                 : 'text-slate-600 hover:bg-background hover:text-foreground',
             )}
           >

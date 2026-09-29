@@ -1,3 +1,5 @@
+import { LoadingState } from '@/components/design-system/LoadingState';
+import { PageHeader } from '@/components/design-system/PageHeader';
 import { useCallback, useEffect, useState } from 'react';
 import { FileSearch, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -161,14 +163,10 @@ export default function AuditLog() {
         </Button>
       </HeaderActions>
 
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1a1a19]">Administração</p>
-        <h1 className="text-2xl font-bold tracking-[-0.02em] text-[#34322d]">Trilha de Auditoria</h1>
-        <p className="max-w-3xl text-sm leading-6 text-[#858481]">
-          Registro individual de acessos por usuário e senha — requisito legal inciso V. Exibe os últimos 300
-          eventos. Use os filtros para localizar registros específicos.
-        </p>
-      </div>
+      <PageHeader
+        title="Trilha de Auditoria"
+        description="Registro individual de acessos por usuário e senha — requisito legal inciso V. Exibe os últimos 300 eventos. Use os filtros para localizar registros específicos."
+      />
 
       {/* Filtros */}
       <FilterPanel title="Filtros">
@@ -215,10 +213,7 @@ export default function AuditLog() {
         }
       >
         {isLoading ? (
-          <div className="flex items-center justify-center gap-3 py-12 text-sm text-slate-500">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Carregando registros...
-          </div>
+          <LoadingState label="Carregando registros..." />
         ) : entries.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-12 text-sm text-slate-400">
             <FileSearch className="h-8 w-8" />

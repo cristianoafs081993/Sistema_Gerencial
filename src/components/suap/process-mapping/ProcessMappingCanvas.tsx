@@ -363,7 +363,7 @@ export const ProcessMappingCanvas = React.forwardRef<ProcessMappingCanvasHandle,
           </span>
         ) : (
           <span className="flex items-center gap-1.5">
-            <MousePointer2 className="h-3.5 w-3.5 text-emerald-600" />
+            <MousePointer2 className="h-3.5 w-3.5 text-brand-600" />
             Clique em uma etapa para ver detalhes ou use &apos;+&apos; para conectar
           </span>
         )}
@@ -373,9 +373,9 @@ export const ProcessMappingCanvas = React.forwardRef<ProcessMappingCanvasHandle,
       {selectedEdge && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-white/95 backdrop-blur-md border border-slate-200 shadow-xl rounded-xl px-3 py-1.5 flex items-center gap-2.5 text-xs text-slate-700 animate-in fade-in slide-in-from-top-2 duration-150 select-none">
           <div className="flex items-center gap-1.5 pr-2 border-r border-slate-200">
-            <span className="font-bold text-[11px] text-blue-600 uppercase tracking-wider">Conexão</span>
+            <span className="font-bold text-[11px] text-brand-600 uppercase tracking-wider">Conexão</span>
             {selectedEdge.label ? (
-              <span className="bg-blue-50 text-blue-800 font-semibold px-2 py-0.5 rounded text-[11px] max-w-[130px] truncate border border-blue-200/60">
+              <span className="bg-brand-50 text-brand-800 font-semibold px-2 py-0.5 rounded text-[11px] max-w-[130px] truncate border border-brand-200/60">
                 {selectedEdge.label}
               </span>
             ) : (
@@ -389,7 +389,7 @@ export const ProcessMappingCanvas = React.forwardRef<ProcessMappingCanvasHandle,
             <select
               value={selectedEdge.sourceAnchor || 'auto'}
               onChange={(e) => handleChangeEdgeSourceAnchor(selectedEdge.id, e.target.value as any)}
-              className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-pointer focus:ring-1 focus:ring-blue-500"
+              className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-pointer focus:ring-1 focus:ring-brand-500"
               title="Porta de saída do nó de origem"
             >
               <option value="auto">Auto</option>
@@ -406,7 +406,7 @@ export const ProcessMappingCanvas = React.forwardRef<ProcessMappingCanvasHandle,
             <select
               value={selectedEdge.targetAnchor || 'auto'}
               onChange={(e) => handleChangeEdgeTargetAnchor(selectedEdge.id, e.target.value as any)}
-              className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-pointer focus:ring-1 focus:ring-blue-500"
+              className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-pointer focus:ring-1 focus:ring-brand-500"
               title="Porta de entrada do nó de destino"
             >
               <option value="auto">Auto</option>

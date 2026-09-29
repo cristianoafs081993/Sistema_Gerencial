@@ -34,7 +34,7 @@ export const ProcessMappingSidebar: React.FC<ProcessMappingSidebarProps> = ({
           <button
             type="button"
             onClick={onOpenNewProcessModal}
-            className="text-emerald-700 hover:text-emerald-800 text-[10px] font-bold transition-colors"
+            className="text-brand-700 hover:text-brand-800 text-[10px] font-bold transition-colors"
             title="Criar novo fluxo"
           >
             + NOVO
@@ -50,13 +50,13 @@ export const ProcessMappingSidebar: React.FC<ProcessMappingSidebarProps> = ({
                 onClick={() => onSelectProcess(proc.id)}
                 className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs transition-colors ${
                   isActive
-                    ? 'bg-emerald-50 text-emerald-800 font-semibold border border-emerald-200/80 shadow-2xs'
+                    ? 'bg-brand-50 text-brand-800 font-semibold border border-brand-200/80 shadow-2xs'
                     : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 <div
                   className={`w-2 h-2 rounded-full shrink-0 ${
-                    isActive ? 'bg-emerald-600' : 'bg-slate-300'
+                    isActive ? 'bg-brand-600' : 'bg-slate-300'
                   }`}
                 />
                 <div className="truncate">
@@ -76,7 +76,7 @@ export const ProcessMappingSidebar: React.FC<ProcessMappingSidebarProps> = ({
           {/* Tarefa */}
           <div
             onClick={() => onAddNode('task')}
-            className="border border-dashed border-slate-300 p-2.5 rounded-lg flex flex-col items-center gap-1 hover:border-emerald-500 hover:bg-emerald-50/40 cursor-pointer transition-colors"
+            className="border border-dashed border-slate-300 p-2.5 rounded-lg flex flex-col items-center gap-1 hover:border-brand-500 hover:bg-brand-50/40 cursor-pointer transition-colors"
             title="Clique para adicionar uma Tarefa"
           >
             <div className="w-5 h-4 border-2 border-slate-400 rounded-xs bg-white" />
@@ -86,7 +86,7 @@ export const ProcessMappingSidebar: React.FC<ProcessMappingSidebarProps> = ({
           {/* Início/Fim */}
           <div
             onClick={() => onAddNode('end')}
-            className="border border-dashed border-slate-300 p-2.5 rounded-lg flex flex-col items-center gap-1 hover:border-emerald-500 hover:bg-emerald-50/40 cursor-pointer transition-colors"
+            className="border border-dashed border-slate-300 p-2.5 rounded-lg flex flex-col items-center gap-1 hover:border-brand-500 hover:bg-brand-50/40 cursor-pointer transition-colors"
             title="Clique para adicionar Início ou Fim"
           >
             <div className="w-4 h-4 border-2 border-slate-400 rounded-full bg-white" />
@@ -106,7 +106,7 @@ export const ProcessMappingSidebar: React.FC<ProcessMappingSidebarProps> = ({
           {/* Conectar */}
           <div
             onClick={onActivateConnectMode}
-            className="border border-dashed border-slate-300 p-2.5 rounded-lg flex flex-col items-center gap-1 hover:border-blue-400 hover:bg-blue-50/40 cursor-pointer transition-colors"
+            className="border border-dashed border-slate-300 p-2.5 rounded-lg flex flex-col items-center gap-1 hover:border-brand-400 hover:bg-brand-50/40 cursor-pointer transition-colors"
             title="Passe o mouse sobre uma etapa no fluxo e clique no '+' para conectar"
           >
             <div className="w-4 h-0.5 bg-slate-400 my-1.5" />
@@ -127,11 +127,11 @@ export const ProcessMappingSidebar: React.FC<ProcessMappingSidebarProps> = ({
         </div>
         <div className="flex justify-between items-center">
           <span className="font-semibold text-slate-700">Sistemas:</span>
-          <span className="text-blue-600 font-semibold font-mono">{systemsCount} links</span>
+          <span className="text-brand-600 font-semibold font-mono">{systemsCount} links</span>
         </div>
         <div className="flex justify-between items-center">
           <span className="font-semibold text-slate-700">Modelos:</span>
-          <span className="text-emerald-600 font-semibold font-mono">{templatesCount} docs</span>
+          <span className="text-brand-600 font-semibold font-mono">{templatesCount} docs</span>
         </div>
       </div>
     </aside>

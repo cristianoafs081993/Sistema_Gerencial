@@ -254,13 +254,13 @@ export const ProcessMappingAiModal: React.FC<ProcessMappingAiModalProps> = ({
 
           {/* Preview of Generated Process */}
           {generatedProcessPreview && (
-            <div className="mt-4 p-4 rounded-xl border border-emerald-200 bg-emerald-50/40 space-y-3 animate-in fade-in duration-200">
+            <div className="mt-4 p-4 rounded-xl border border-brand-200 bg-brand-50/40 space-y-3 animate-in fade-in duration-200">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <div className="flex items-center gap-1.5 text-brand-800 font-bold">
+                  <CheckCircle2 className="w-4 h-4 text-brand-600" />
                   <span>Fluxo Mapeado com Sucesso</span>
                 </div>
-                <span className="font-mono text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-brand-100 text-brand-800 font-bold">
                   {generatedProcessPreview.code}
                 </span>
               </div>
@@ -286,7 +286,7 @@ export const ProcessMappingAiModal: React.FC<ProcessMappingAiModalProps> = ({
               <button
                 type="button"
                 onClick={handleApply}
-                className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1.5"
+                className="w-full py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1.5"
               >
                 <span>Aplicar e Abrir no Mapeador</span>
                 <ArrowRight className="w-4 h-4" />

@@ -360,10 +360,10 @@ describe('Dashboard', () => {
   it('exibe o grafico de contratos em uma aba dedicada', () => {
     render(<Dashboard />);
 
-    expect(screen.getAllByRole('button', { name: 'Orçamento' })).toHaveLength(2);
-    expect(screen.getAllByRole('button', { name: 'RAP' })).toHaveLength(2);
-    expect(screen.getAllByRole('button', { name: 'Contratos' })).toHaveLength(2);
-    expect(screen.getAllByRole('button', { name: 'filter-pi-en' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Orçamento' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'RAP' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Contratos' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'filter-pi-en' })).toHaveLength(1);
     expect(screen.getByTestId('contract-execution-tab')).toBeInTheDocument();
     expect(within(screen.getByTestId('current-tab')).queryByTestId('contract-expense-period')).not.toBeInTheDocument();
     expect(within(screen.getByTestId('contract-execution-tab')).queryByTestId('contract-expense-period')).not.toBeInTheDocument();

@@ -131,7 +131,7 @@ export function AuthPanel({ title, description }: AuthPanelProps) {
         <Button
           type="button"
           onClick={handleSuapLogin}
-          className="w-full bg-[#1b5e20] hover:bg-[#1b5e20]/90 text-white h-11 shadow-sm rounded-xl font-bold gap-2 flex items-center justify-center transition-all"
+          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-11 shadow-sm rounded-xl font-bold gap-2 flex items-center justify-center transition-all"
         >
           <GraduationCap className="h-5 w-5" />
           Entrar com SUAP
