@@ -14,6 +14,8 @@ interface StatCardProps {
   };
   stitchColor?: 'vibrant-blue' | 'purple' | 'amber' | 'emerald-green' | 'red-500';
   progress?: number;
+  /** Texto curto ao lado da barra explicando o que ela mede (ex.: "do planejado"). */
+  progressLabel?: string;
   isLoading?: boolean;
 }
 
@@ -26,6 +28,7 @@ export function StatCard({
   trend,
   stitchColor,
   progress,
+  progressLabel,
   isLoading,
 }: StatCardProps) {
 
@@ -93,14 +96,28 @@ export function StatCard({
         )}
 
         {progress !== undefined && (
-          <div className="mt-4 w-full bg-muted rounded-full h-1 overflow-hidden">
-            {isLoading ? (
-              <div className="h-full w-full animate-shimmer rounded-full" />
-            ) : (
-              <div
-                className={cn("h-full rounded-full transition-all duration-700 ease-spring", progressBgMap[stitchColor])}
-                style={{ width: `${Math.min(progress, 100)}%` }}
-              />
+          <div className="mt-4 flex items-center gap-3">
+            <div
+              className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-label={progressLabel ?? "Progresso"}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(Math.min(progress, 100))}
+            >
+              {isLoading ? (
+                <div className="h-full w-full animate-shimmer rounded-full" />
+              ) : (
+                <div
+                  className={cn("h-full rounded-full transition-all duration-700 ease-spring", progressBgMap[stitchColor])}
+                  style={{ width: `${Math.min(progress, 100)}%` }}
+                />
+              )}
+            </div>
+            {!isLoading && (
+              <span className="shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">
+                {progress.toFixed(1).replace(".", ",")}%{progressLabel ? ` ${progressLabel}` : ""}
+              </span>
             )}
           </div>
         )}

@@ -112,7 +112,6 @@ export function DashboardCurrentTab({
   totalEmpenhado,
   totalDescentralizado,
   aDescentralizar,
-  percentualExecutado,
   totalLiquidado,
   totalPago,
   dadosPorOrigem,
@@ -177,7 +176,6 @@ export function DashboardCurrentTab({
           value={formatCurrency(totalPlanejado)}
           icon={Wallet}
           stitchColor="vibrant-blue"
-          progress={percentualExecutado}
           isLoading={isLoading}
         />
         <StatCard
@@ -186,6 +184,7 @@ export function DashboardCurrentTab({
           icon={Receipt}
           stitchColor={aDescentralizar >= 0 ? 'emerald-green' : 'red-500'}
           progress={percent(totalDescentralizado, totalPlanejado)}
+          progressLabel="do planejado"
           isLoading={isLoading}
         />
         <StatCard
@@ -194,6 +193,7 @@ export function DashboardCurrentTab({
           icon={TrendingUp}
           stitchColor="purple"
           progress={percent(totalEmpenhado, totalPlanejado)}
+          progressLabel="do planejado"
           isLoading={isLoading}
         />
         <div data-testid="liquidado-pago-card" className="rounded-xl border border-border bg-card p-5 shadow-xs transition-shadow duration-200 hover:shadow-md">
@@ -212,7 +212,7 @@ export function DashboardCurrentTab({
                   {isLoading ? (
                     <span className="h-4 w-24 animate-pulse rounded bg-muted" />
                   ) : (
-                    <span className={`text-lg font-bold tracking-tight ${item.text}`}>{formatCurrency(item.value)}</span>
+                    <span className={`text-base font-bold tracking-tight ${item.text}`}>{formatCurrency(item.value)}</span>
                   )}
                 </div>
                 <div className="h-1 overflow-hidden rounded-full bg-muted">
