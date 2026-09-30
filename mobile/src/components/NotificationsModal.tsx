@@ -1,15 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  TouchableWithoutFeedback,
-  ActivityIndicator,
-  RefreshControl,
-} from 'react-native';
+import { Modal, View, StyleSheet, TouchableOpacity, ScrollView, TouchableWithoutFeedback, ActivityIndicator, RefreshControl } from 'react-native';
+import { Text } from './AppText';
 import { colors } from '../constants/theme';
 import { formatBRL } from '../constants/data';
 import { NotificationItem, NotificationType } from '../types';

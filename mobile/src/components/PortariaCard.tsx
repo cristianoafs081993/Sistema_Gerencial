@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text } from './AppText';
 import { PortariaEventoItem } from '../types';
 import { colors } from '../constants/theme';
 import { IconMapPin, IconUsers, IconAlertTriangle, IconClock, IconRight } from './Icons';

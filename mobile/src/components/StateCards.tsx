@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from './AppText';
 import { colors, radius } from '../constants/theme';
 
 /** Erro de carregamento com ação de repetir (nunca mostramos dados de demonstração). */

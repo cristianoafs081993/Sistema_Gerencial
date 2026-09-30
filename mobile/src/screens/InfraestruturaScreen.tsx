@@ -1,14 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  RefreshControl,
-  ActivityIndicator,
-} from 'react-native';
+import { View, TouchableOpacity, ScrollView, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { colors } from '../constants/theme';
 import { formatBRL } from '../constants/data';
 import {

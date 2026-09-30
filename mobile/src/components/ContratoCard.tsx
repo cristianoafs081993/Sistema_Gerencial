@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text } from './AppText';
 import { colors, radius } from '../constants/theme';
 import type { ContratoItem, ContratoStatus } from '../types';
 import { formatarMoeda, formatarDataIso } from '../lib/format';

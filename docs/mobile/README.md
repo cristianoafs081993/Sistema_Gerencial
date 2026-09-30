@@ -108,6 +108,8 @@ npm run mobile:web
 
 ## Design system
 
+**Fonte:** o app usa a Manrope (a mesma do web), carregada em `App.tsx` com `expo-font` (`@expo-google-fonts/manrope`, pesos 400–800). Como o React Native não escolhe a variação pelo `fontWeight` em fontes customizadas, todas as telas usam `Text`/`TextInput` de `mobile/src/components/AppText.tsx`, que converte o peso do estilo na família correspondente; nunca importe `Text`/`TextInput` direto de `react-native`. Se a fonte falhar ao carregar, o app segue com a fonte do sistema.
+
 **Logo:** o app usa a logo oficial do SIAGES (`mobile/assets/logo.png`, o mesmo arquivo do web, `public/logo-transparent.png`) no topo, no login e nas telas de estado, e também como ícone, ícone adaptativo do Android e tela de abertura (fundo branco). Os arquivos de ícone têm 512 px; para publicar nas lojas o ideal é uma versão de 1024 px.
 
 O app usa os tokens do design system Céu do web (azul-céu `#1976D2`/`#1E88E5`, ciano `#00B7DC`, superfícies `#F6F9FD`), definidos em [`mobile/src/constants/theme.ts`](../../mobile/src/constants/theme.ts). Ao mudar o visual do web, atualize o tema do mobile no mesmo trabalho.

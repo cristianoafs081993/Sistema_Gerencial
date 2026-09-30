@@ -1,15 +1,6 @@
 import React, { useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius } from '../constants/theme';
 import { BrandLogo } from '../components/BrandLogo';
@@ -17,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 export const LoginScreen: React.FC = () => {
   const { signIn } = useAuth();
-  const passwordRef = useRef<TextInput>(null);
+  const passwordRef = useRef<React.ElementRef<typeof TextInput>>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { colors, radius } from '../constants/theme';
 import { formatarDataIso, formatarMoeda } from '../lib/format';
 import { codigoPtresDaOrigem } from '../lib/dashboardRules';

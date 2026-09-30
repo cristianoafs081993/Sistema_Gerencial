@@ -1,5 +1,6 @@
 import React from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from './AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius } from '../constants/theme';
 import type { EmpenhoItem } from '../types';

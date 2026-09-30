@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, StyleSheet, Image } from 'react-native';
+import { Text } from './AppText';
 import { OcorrenciaItem } from '../types';
 import { colors } from '../constants/theme';
 import { IconClock, IconCheck, IconAlertTriangle } from './Icons';

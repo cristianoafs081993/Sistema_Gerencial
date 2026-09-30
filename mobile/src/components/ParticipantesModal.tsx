@@ -1,15 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { Modal, View, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { Text, TextInput } from './AppText';
 import { PortariaEventoItem, PortariaParticipanteItem } from '../types';
 import { colors } from '../constants/theme';
 import {

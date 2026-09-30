@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from './AppText';
 import { colors, radius } from '../constants/theme';
 import { formatarMoeda } from '../lib/format';
 

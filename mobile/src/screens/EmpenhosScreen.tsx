@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { View, TouchableOpacity, ScrollView, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { colors, radius } from '../constants/theme';
 import { formatarMoeda } from '../lib/format';
 import { EmpenhoItem, EmpenhoFilter } from '../types';

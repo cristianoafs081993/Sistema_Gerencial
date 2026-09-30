@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useFonts } from 'expo-font';
+import {
+  Manrope_400Regular,
+  Manrope_500Medium,
+  Manrope_600SemiBold,
+  Manrope_700Bold,
+  Manrope_800ExtraBold,
+} from '@expo-google-fonts/manrope';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from './src/constants/theme';
@@ -194,6 +202,24 @@ function Gate() {
 }
 
 export default function App() {
+  const [fontesProntas, erroFontes] = useFonts({
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+    Manrope_800ExtraBold,
+  });
+
+  // Sem a fonte carregada mostramos só um indicador (nenhum texto é desenhado antes da hora).
+  // Se o download/carga falhar, segue com a fonte do sistema em vez de travar o app.
+  if (!fontesProntas && !erroFontes) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
+        <ActivityIndicator size="large" color={colors.blue} />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />

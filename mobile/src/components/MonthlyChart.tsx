@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from './AppText';
 import { colors, radius } from '../constants/theme';
 import { formatarMoeda, formatarMoedaCompacta } from '../lib/format';
 import type { SerieMensal } from '../lib/dashboardRules';

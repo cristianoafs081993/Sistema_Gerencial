@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { colors, radius } from '../constants/theme';
 import { formatarMoeda } from '../lib/format';
 import { creditoPorPtres, filtrarCredito, totalCredito, type CreditoLinha, type FiltroSaldo } from '../lib/orcamentoRules';

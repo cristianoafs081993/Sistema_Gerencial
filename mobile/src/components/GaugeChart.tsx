@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
+import { Text } from './AppText';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
 import { colors } from '../constants/theme';
+import { FAMILIAS_MANROPE } from './AppText';
 
 interface GaugeChartProps {
   /** Valor atingido (numerador). */
@@ -15,8 +17,8 @@ interface GaugeChartProps {
   size?: number;
 }
 
-// No web o SVG usa serifa por padrão; no celular, a fonte do sistema já é sem serifa.
-const FONTE = Platform.select({ web: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif', default: undefined });
+// Texto do SVG usa a mesma família Manrope do restante do app (o padrão do SVG no web é serifado).
+const FONTE = (peso: 700 | 800) => Platform.select({ default: FAMILIAS_MANROPE[peso] });
 
 const CX = 120;
 const CY = 112;
@@ -63,7 +65,7 @@ function useValorAnimado(alvo: number, duracao = 900): number {
 }
 
 /** Velocímetro semicircular (escala vermelho → verde), igual ao do painel web. */
-export const GaugeChart: React.FC<GaugeChartProps> = ({ value, total, label, caption, size = 120 }) => {
+export const GaugeChart: React.FC<GaugeChartProps> = ({ value, total, label, caption, size = 136 }) => {
   const pctReal = total > 0 ? (value / total) * 100 : 0;
   const pctLimitado = Math.min(Math.max(pctReal, 0), 100);
   const pct = useValorAnimado(pctLimitado);
@@ -77,7 +79,7 @@ export const GaugeChart: React.FC<GaugeChartProps> = ({ value, total, label, cap
 
   return (
     <View style={styles.wrapper} accessible accessibilityRole="image" accessibilityLabel={`${label}: ${textoPct}`}>
-      <Svg width="100%" height={size} viewBox="0 0 240 132">
+      <Svg width="100%" height={size} viewBox="0 0 240 152">
         <Defs>
           <LinearGradient id={gradienteId} gradientUnits="userSpaceOnUse" x1={CX - OUTER} y1={0} x2={CX + OUTER} y2={0}>
             <Stop offset="0%" stopColor="#EF4444" />
@@ -99,10 +101,10 @@ export const GaugeChart: React.FC<GaugeChartProps> = ({ value, total, label, cap
           );
         })}
 
-        <SvgText fontFamily={FONTE} x={CX - (OUTER + INNER) / 2} y={CY + 14} fontSize="10" fontWeight="700" fill={colors.mutedLight} textAnchor="middle">
+        <SvgText fontFamily={FONTE(700)} x={CX - (OUTER + INNER) / 2} y={CY + 14} fontSize="10" fontWeight="normal" fill={colors.mutedLight} textAnchor="middle">
           0%
         </SvgText>
-        <SvgText fontFamily={FONTE} x={CX + (OUTER + INNER) / 2} y={CY + 14} fontSize="10" fontWeight="700" fill={colors.mutedLight} textAnchor="middle">
+        <SvgText fontFamily={FONTE(700)} x={CX + (OUTER + INNER) / 2} y={CY + 14} fontSize="10" fontWeight="normal" fill={colors.mutedLight} textAnchor="middle">
           100%
         </SvgText>
 
@@ -110,7 +112,7 @@ export const GaugeChart: React.FC<GaugeChartProps> = ({ value, total, label, cap
         <Circle cx={CX} cy={CY} r={7} fill={colors.ink} />
         <Circle cx={CX} cy={CY} r={3} fill={colors.white} />
 
-        <SvgText fontFamily={FONTE} x={CX} y={CY - 22} fontSize="25" fontWeight="800" fill={colors.ink} textAnchor="middle">
+        <SvgText fontFamily={FONTE(800)} x={CX} y={CY + 40} fontSize="26" fontWeight="normal" fill={colors.ink} textAnchor="middle">
           {`${pct.toFixed(1).replace('.', ',')}%`}
         </SvgText>
       </Svg>

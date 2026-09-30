@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Text } from './AppText';
 import { EnergiaFaturaItem, EnergiaSolarItem } from '../types';
 import { colors } from '../constants/theme';
 import { formatBRL } from '../constants/data';

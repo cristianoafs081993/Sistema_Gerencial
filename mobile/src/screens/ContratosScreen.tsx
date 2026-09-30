@@ -1,13 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  RefreshControl,
-} from 'react-native';
+import { View, TouchableOpacity, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { colors, radius } from '../constants/theme';
 import { ContratoItem, ContratoFilter } from '../types';
 import { IconSearch } from '../components/Icons';

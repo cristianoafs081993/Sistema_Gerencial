@@ -1,13 +1,6 @@
 import React, { useState } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-} from 'react-native';
+import { Modal, View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { Text, TextInput } from './AppText';
 import { colors } from '../constants/theme';
 import { PtresItem } from '../types';
 import { IconFilter, IconCheck, IconClose, IconSearch } from './Icons';

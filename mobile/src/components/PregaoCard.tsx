@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import { Text } from './AppText';
 import { colors } from '../constants/theme';
 import { PregaoItem } from '../types';
 import { formatBRL } from '../constants/data';
