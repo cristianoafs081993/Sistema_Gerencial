@@ -172,7 +172,7 @@ export function DashboardCurrentTab({
     <div className="space-y-6">
       <section aria-label="Indicadores de execução" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          title="Total planejado"
+          title="Planejado"
           value={formatCurrency(totalPlanejado)}
           icon={Wallet}
           stitchColor="vibrant-blue"
@@ -189,7 +189,7 @@ export function DashboardCurrentTab({
           isLoading={isLoading}
         />
         <StatCard
-          title="Total empenhado"
+          title="Empenhado"
           value={formatCurrency(totalEmpenhado)}
           icon={TrendingUp}
           stitchColor="purple"
