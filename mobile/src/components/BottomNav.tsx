@@ -8,15 +8,18 @@ import { IconGrid, IconWallet, IconDoc, IconGavel, IconWrench } from './Icons';
 interface BottomNavProps {
   currentTab: TabType;
   onTabChange: (tab: TabType) => void;
+  /** Abas liberadas para o usuário; sem a propriedade, todas aparecem. */
+  allowedTabs?: TabType[];
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
   currentTab,
   onTabChange,
+  allowedTabs,
 }) => {
   const insets = useSafeAreaInsets();
 
-  const tabs: { id: TabType; label: string; icon: (isActive: boolean) => React.ReactNode }[] = [
+  const allTabs: { id: TabType; label: string; icon: (isActive: boolean) => React.ReactNode }[] = [
     {
       id: 'dashboard',
       label: 'Dashboard',
@@ -53,6 +56,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       ),
     },
   ];
+
+  const tabs = allowedTabs ? allTabs.filter((tab) => allowedTabs.includes(tab.id)) : allTabs;
 
   return (
     <View

@@ -34,6 +34,16 @@ O app mobile conecta-se diretamente ao Supabase através da biblioteca `@supabas
 - **Pull-to-Refresh**: Todas as telas contam com gesto de arrastar para baixo (`RefreshControl`) para forçar a sincronização instantânea.
 - **Cache e Fallback Offline**: Em caso de perda de conectividade ou latência extrema, o app recupera o estado em cache ou dados demonstrativos prévios, garantindo que o usuário nunca fique diante de telas vazias ou travadas.
 
+## Autenticação e acesso
+
+O app exige login com as **mesmas contas do sistema web** (Supabase Auth, e-mail e senha). A sessão fica salva no aparelho (`AsyncStorage`) e é renovada automaticamente; o avatar no topo abre a conta com o botão **Sair**.
+
+Depois do login o app aplica as mesmas regras de permissão do web (`mobile/src/services/access.ts`): grupos do usuário → telas permitidas → interseção com os módulos habilitados para o órgão. Cada aba do app depende de telas do web: Dashboard (`dashboard`), Empenhos (`empenhos`), Contratos (`contratos`), Licitações (`licitacoes-pregoes` ou `atas-registro-precos`) e Infra (`manutencao` ou telas de `energia`). Superadministradores veem todas as abas. Usuários **terceirizados** e usuários sem grupo veem a tela "Sem acesso ao app" (no web terceirizados só enxergam empenhos vinculados a eles, regra ainda não implementada no app).
+
+Arquivos: `src/contexts/AuthContext.tsx` (estado da sessão), `src/screens/LoginScreen.tsx`, `src/screens/AccessStateScreen.tsx` e `src/components/AccountModal.tsx`. Testes: `src/test/mobile-access.test.ts`.
+
+> **Pendência de segurança:** o app já lê como usuário autenticado, mas o banco ainda mantém políticas de leitura pública (`TO anon USING (true)`) em tabelas como `empenhos`, `contratos_api` e `descentralizacoes`. Enquanto elas existirem, quem tiver a chave anônima continua lendo esses dados sem login. Revogar essas políticas exige migration e deploy no banco remoto e deve ser feito depois de validar o login com usuários reais.
+
 ## Telas Implementadas
 
 1. **Dashboard (Visão Geral - 01)**:

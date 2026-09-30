@@ -8,6 +8,7 @@ interface HeaderProps {
   campusName?: string;
   notificationCount?: number;
   onPressNotification?: () => void;
+  onPressAvatar?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -15,6 +16,7 @@ export const Header: React.FC<HeaderProps> = ({
   campusName = 'Campus Currais Novos',
   notificationCount = 0,
   onPressNotification,
+  onPressAvatar,
 }) => {
   return (
     <View style={styles.container}>
@@ -48,9 +50,15 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </TouchableOpacity>
 
-          <View style={styles.avatar}>
+          <TouchableOpacity
+            style={styles.avatar}
+            onPress={onPressAvatar}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Conta e sair"
+          >
             <Text style={styles.avatarText}>{initials}</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -98,7 +106,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   brandDot: {
-    color: '#4870cc',
+    color: colors.cyan,
   },
   rightActions: {
     flexDirection: 'row',
