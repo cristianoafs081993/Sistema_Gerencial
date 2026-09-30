@@ -8,6 +8,7 @@ import { GaugeChart } from '../components/GaugeChart';
 import { KpiCard } from '../components/KpiCard';
 import { FunnelCard, type EtapaFunil } from '../components/FunnelCard';
 import { MonthlyChart } from '../components/MonthlyChart';
+import type { OrcamentoSection } from './OrcamentoScreen';
 import { PtresFilterModal } from '../components/PtresFilterModal';
 import { Skeleton } from '../components/Skeleton';
 import { fetchDashboard, type DashboardData } from '../services/dashboard';
@@ -17,11 +18,15 @@ interface DashboardScreenProps {
   onNavigateToContratosAlert: () => void;
   /** Se o usuário não pode abrir Contratos, o alerta some. */
   canOpenContratos?: boolean;
+  /** Abre uma seção da aba Orçamento (tocar nos indicadores). */
+  onOpenOrcamento?: (section: OrcamentoSection) => void;
+  orcamentoSections?: OrcamentoSection[];
 }
 
 const pct = (valor: number) => `${valor.toFixed(1).replace('.', ',')}%`;
 
-export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNavigateToContratosAlert, canOpenContratos = true }) => {
+export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNavigateToContratosAlert, canOpenContratos = true, onOpenOrcamento, orcamentoSections = [] }) => {
+  const abrir = (section: OrcamentoSection) => (onOpenOrcamento && orcamentoSections.includes(section) ? () => onOpenOrcamento(section) : undefined);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -182,11 +187,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
               </View>
 
               <View style={styles.heroFoot}>
-                <View style={styles.heroFootItem}>
+                <TouchableOpacity
+                  style={styles.heroFootItem}
+                  disabled={!abrir('descentralizacoes')}
+                  onPress={abrir('descentralizacoes')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Descentralizado. Toque para ver as descentralizações."
+                >
                   <Text style={styles.heroFootLabel}>Descentralizado</Text>
                   <Text style={styles.heroFootValue}>{formatarMoeda(metricas.descentralizado, false)}</Text>
                   <Text style={styles.heroFootPct}>{pct(metricas.pctDescentralizado)} do planejado</Text>
-                </View>
+                </TouchableOpacity>
                 <View style={[styles.heroFootItem, styles.heroFootRight]}>
                   <Text style={styles.heroFootLabel}>A descentralizar</Text>
                   <Text style={styles.heroFootValue}>{formatarMoeda(Math.max(0, metricas.aDescentralizar), false)}</Text>
@@ -212,6 +223,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
                 caption={`${pct(metricas.pctExecutado)} do planejado`}
                 progress={metricas.pctExecutado}
                 tone={colors.sky}
+                onPress={abrir('empenhos')}
                 icon={<IconDoc size={15} color={colors.sky} />}
               />
               <KpiCard
@@ -220,6 +232,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
                 caption={`${pct(metricas.pctCreditoDescentralizado)} do descentralizado`}
                 progress={metricas.pctCreditoDescentralizado}
                 tone={colors.tealText}
+                onPress={abrir('credito')}
                 icon={<IconWallet size={15} color={colors.tealText} />}
               />
               <KpiCard
@@ -228,6 +241,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
                 caption={`${pct(metricas.pctLiquidadoEmpenhado)} do empenhado`}
                 progress={metricas.pctLiquidadoEmpenhado}
                 tone="#0891B2"
+                onPress={abrir('empenhos')}
                 icon={<IconLayers size={15} color="#0891B2" />}
               />
               <KpiCard
@@ -236,6 +250,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
                 caption={`${pct(metricas.pctPagoLiquidado)} do liquidado`}
                 progress={metricas.pctPagoLiquidado}
                 tone={colors.greenProgress}
+                onPress={abrir('empenhos')}
                 icon={<IconCheck size={15} color={colors.greenProgress} />}
               />
             </View>

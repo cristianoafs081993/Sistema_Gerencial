@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors, radius } from '../constants/theme';
 
 interface KpiCardProps {
@@ -11,11 +11,21 @@ interface KpiCardProps {
   progress?: number;
   tone?: string;
   icon?: React.ReactNode;
+  /** Quando informado, o cartão vira um botão (abre a tela de detalhe). */
+  onPress?: () => void;
 }
 
 /** Indicador do painel: rótulo, valor, barra fina de progresso e legenda. */
-export const KpiCard: React.FC<KpiCardProps> = ({ label, value, caption, progress, tone = colors.sky, icon }) => (
-  <View style={styles.card} accessible accessibilityLabel={`${label}: ${value}. ${caption}`}>
+export const KpiCard: React.FC<KpiCardProps> = ({ label, value, caption, progress, tone = colors.sky, icon, onPress }) => (
+  <TouchableOpacity
+    style={styles.card}
+    disabled={!onPress}
+    onPress={onPress}
+    activeOpacity={0.8}
+    accessible
+    accessibilityRole={onPress ? 'button' : undefined}
+    accessibilityLabel={`${label}: ${value}. ${caption}${onPress ? '. Toque para ver detalhes.' : ''}`}
+  >
     <View style={styles.labelRow}>
       <Text style={styles.label} numberOfLines={1}>
         {label}
@@ -33,7 +43,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({ label, value, caption, progres
     <Text style={styles.caption} numberOfLines={1}>
       {caption}
     </Text>
-  </View>
+  </TouchableOpacity>
 );
 
 const styles = StyleSheet.create({

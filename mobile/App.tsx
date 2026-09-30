@@ -8,7 +8,7 @@ import { Header } from './src/components/Header';
 import { BottomNav } from './src/components/BottomNav';
 import { NotificationsModal } from './src/components/NotificationsModal';
 import { DashboardScreen } from './src/screens/DashboardScreen';
-import { OrcamentoScreen } from './src/screens/OrcamentoScreen';
+import { OrcamentoScreen, type OrcamentoSection } from './src/screens/OrcamentoScreen';
 import { ContratosScreen } from './src/screens/ContratosScreen';
 import { LicitacoesScreen } from './src/screens/LicitacoesScreen';
 import { InfraestruturaScreen } from './src/screens/InfraestruturaScreen';
@@ -40,6 +40,7 @@ function AuthenticatedApp({ access, email, userName, onSignOut }: AuthenticatedA
     allowedTabs.includes('dashboard') ? 'dashboard' : allowedTabs[0],
   );
   const [isAccountOpen, setIsAccountOpen] = useState<boolean>(false);
+  const [orcamentoRequest, setOrcamentoRequest] = useState<{ section: OrcamentoSection; id: number } | null>(null);
   const setCurrentTab = useCallback(
     (tab: TabType) => {
       if (allowedTabs.includes(tab)) setCurrentTabState(tab);
@@ -77,6 +78,12 @@ function AuthenticatedApp({ access, email, userName, onSignOut }: AuthenticatedA
     setLastReadTimestamp(Date.now());
   };
 
+  const handleOpenOrcamento = (section: OrcamentoSection) => {
+    if (!secoesOrcamento(access.screens).includes(section)) return;
+    setOrcamentoRequest({ section, id: Date.now() });
+    setCurrentTab('empenhos');
+  };
+
   const handleNavigateToContratosAlert = () => {
     setContratosFilter('vencer');
     setCurrentTab('contratos');
@@ -100,12 +107,14 @@ function AuthenticatedApp({ access, email, userName, onSignOut }: AuthenticatedA
         {currentTab === 'dashboard' && (
           <DashboardScreen
             userName={userName}
+            onOpenOrcamento={handleOpenOrcamento}
+            orcamentoSections={secoesOrcamento(access.screens)}
             canOpenContratos={allowedTabs.includes('contratos')}
             onNavigateToContratosAlert={handleNavigateToContratosAlert}
           />
         )}
 
-        {currentTab === 'empenhos' && <OrcamentoScreen sections={secoesOrcamento(access.screens)} />}
+        {currentTab === 'empenhos' && <OrcamentoScreen sections={secoesOrcamento(access.screens)} request={orcamentoRequest} />}
 
         {currentTab === 'contratos' && (
           <ContratosScreen

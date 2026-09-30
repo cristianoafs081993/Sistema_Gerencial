@@ -23,11 +23,20 @@ const NOMES: Record<OrcamentoSection, string> = {
 interface Props {
   /** Seções liberadas ao usuário (na ordem de exibição). */
   sections: OrcamentoSection[];
+  /** Pedido de abrir uma seção (ex.: toque num indicador do Dashboard); `id` muda a cada pedido. */
+  request?: { section: OrcamentoSection; id: number } | null;
 }
 
 /** Módulo Orçamentário além do Dashboard: Empenhos, Descentralizações e Crédito disponível. */
-export const OrcamentoScreen: React.FC<Props> = ({ sections }) => {
-  const [section, setSection] = useState<OrcamentoSection>(sections[0]);
+export const OrcamentoScreen: React.FC<Props> = ({ sections, request }) => {
+  const [section, setSection] = useState<OrcamentoSection>(
+    request && sections.includes(request.section) ? request.section : sections[0],
+  );
+
+  useEffect(() => {
+    if (request && sections.includes(request.section)) setSection(request.section);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request?.id]);
 
   useEffect(() => {
     if (!sections.includes(section)) setSection(sections[0]);
