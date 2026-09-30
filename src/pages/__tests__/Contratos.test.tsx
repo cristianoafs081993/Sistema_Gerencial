@@ -342,9 +342,8 @@ describe('Contratos', () => {
 
     expect(await screen.findByText('Contrato 00062/2018')).toBeInTheDocument();
 
-    const itensSection = screen.getByRole('button', { name: /Itens/i });
-    fireEvent.click(itensSection);
-
+    // Na página, os itens ficam na aba Resumo, já expandidos.
+    expect(screen.getByRole('button', { name: /Itens/i })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getAllByText('PRESTAÇÃO DE SERVIÇOS DE APOIO ADMINISTRATIVO').length).toBeGreaterThan(0);
   });
 
@@ -390,7 +389,7 @@ describe('Contratos', () => {
     expect(await screen.findByText('62/2018')).toBeInTheDocument();
     expect(screen.getByText('15/2026')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /^Favoritos$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Favoritos/i }));
 
     expect(screen.getByText('62/2018')).toBeInTheDocument();
     expect(screen.queryByText('15/2026')).not.toBeInTheDocument();

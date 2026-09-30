@@ -38,6 +38,10 @@ Estrutura:
 
 As tabelas devem usar cabeçalho suave, linhas com divisores claros, efeito de hover suave (`row-hover`) e tipografia tabular `IBM Plex Mono` para dados.
 
+## Padrão: Contratos
+
+`/contratos` segue o padrão de tabela operacional sem indicadores: `PageHeader compact`, busca em `FilterPanel`, visões (`Vigentes`, `A vencer em 90 dias`, `Com faturas pendentes`, `Vencidos (120d)`, `Favoritos`) em `SegmentedControl` com a contagem de cada uma, e `DataTablePanel`. Cada contrato mostra a vigência em `Badge` (`success` > 90 dias, `warning` até 90 dias, `danger` vencido ou encerrado). Linhas com fatura pendente usam o token `warning`; o carregamento usa `PageLoadingSkeleton`. As regras de cada visão ficam em um único predicado (`matchesView`), usado no filtro e nas contagens.
+
 ## Padrão 2: consulta com KPIs e tabela
 
 Estrutura:
@@ -55,7 +59,7 @@ Estrutura:
 
 ## Padrão: Mapeamento de Processos (tela cheia)
 
-`/mapeamentos` ocupa a área inteira do `Layout` (sem `PageHeader`). A barra própria (`ProcessMappingNavbar`) traz apenas seletor de processo, ferramentas do fluxograma (zoom, grade e criação de etapas), busca, alternador Fluxograma / Matriz / Guia e ações; o título fica `sr-only`, porque o módulo e a tela já aparecem no cabeçalho global e na navegação. Cores usam a escala `brand-*` (azul-céu) e `slate-*` neutros; âmbar e vermelho são reservados a decisões e fins de processo. As cores hexadecimais de conexões e modelos de processo são identificadores de dados e foram mantidas.
+`/mapeamentos` ocupa a área inteira do `Layout` (sem `PageHeader`). A barra própria (`ProcessMappingNavbar`) organiza os controles em três blocos balanceados: à esquerda, o seletor de processo e o alternador de visão (Fluxograma / Matriz / Guia); ao centro, as ferramentas de viewport e grade do canvas quando no modo fluxograma; e à direita, a busca rápida e o botão de exportação. Elementos soltos ou redundantes (como atalhos de restauração global e links repetidos de retorno) foram removidos para manter foco operacional. O título principal fica `sr-only`, pois o módulo e a tela já aparecem no cabeçalho global e na navegação. A criação de etapas ocorre de forma contextual no próprio fluxograma: ao clicar no botão `+` ao lado de qualquer etapa existente (`ProcessMappingNodeCard`), um menu contextual permite escolher o tipo de nó a inserir (Tarefa, Decisão ou Fim) com ligação e posicionamento automáticos, ou iniciar conexão manual com outra etapa. Cores usam a escala `brand-*` (azul-céu) e `slate-*` neutros; âmbar e vermelho são reservados a decisões e fins de processo. O canvas do fluxograma (`ProcessMappingCanvas`) possui contenção estrita de rolagem e arrasto com limites superiores e esquerdos fixados em zero (`maxY = 0`, `maxX = 0`), garantindo que o topo da primeira raia permaneça alinhado diretamente ao cabeçalho ao rolar ou arrastar para cima, sem criar espaço em branco vazio.
 
 ## Padrão 4: dashboard analítico
 
@@ -132,3 +136,7 @@ A tela de mapeamento operacional de processos adota arquitetura de estúdio inte
 7. **Modais Auxiliares**: modais acessíveis para exportação/impressão em PDF e JSON e criação de novos processos;
 8. **Integração com o SUAP**: quando acessado com parâmetro `?suapId=...`, sincroniza os nós e reflete a etapa atual do processo nos modos de visão com interface limpa e foco no fluxo operacional; no painel da extensão injetado no SUAP (`process-toolkit.css`), o cabeçalho do card exibe de forma enxuta apenas a identificação "Caminho do processo" e o link "Mapa completo ↗", sem título intermediário redundante, enquanto o rótulo "Mapeamento aplicado" e o dropdown de seleção do fluxo BPMN ficam alinhados na mesma linha horizontal (`display: flex; align-items: center; justify-content: space-between;`), com tooltips nativos em hover para títulos longos de etapas truncadas por reticências.
 
+
+## Detalhe de contrato (`ContratoApiDetailsSheet`, modo página)
+
+A listagem de Contratos continua sendo tabela. O detalhe aberto pelo contrato segue a organização do app mobile, em abas: **Resumo** (objeto, indicadores, execução financeira com barra de progresso e prazo de vigência, gestão e fiscalização — gestores, fiscais, prepostos e garantias — e itens do contrato), **Empenhos** (empenhos vinculados ao campus, incluindo RAP), **Faturas** (faturas e NF-e/instrumentos de cobrança), **Termos** (histórico do contrato) e **Documentos e ocorrências** (ocorrências, despesas acessórias, terceirizados e anexos PNCP/Compras.gov.br). O cronograma contratual não é exibido. Cada fatura é um bloco limpo com número, situação, referência, valor líquido, datas (emissão, vencimento, ateste, liquidação, pagamento), empenho, Doc. SIAFI (`raw_data.sfadrao_id`), processo e chave da NF-e (`chave_nfe`); glosa, juros, multa e repactuação só aparecem quando existem. O cabeçalho mostra o status Vigente / A vencer (até 90 dias) / Encerrado. O modo diálogo mantém o layout único em acordeões.

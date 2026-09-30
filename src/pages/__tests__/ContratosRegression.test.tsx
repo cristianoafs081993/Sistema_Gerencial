@@ -466,6 +466,7 @@ describe('Contratos regressions', () => {
     expect(screen.getByText('A liquidar campus')).toBeInTheDocument();
     expect(screen.queryByText('2023NE000050')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Ver detalhes do contrato/i }));
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: /^Empenhos/ }), { button: 0, ctrlKey: false });
     const table = await screen.findByRole('table', { name: 'Empenhos vinculados ao campus' });
     expect(within(table).getAllByRole('row').slice(1).map(row => within(row).getAllByRole('cell')[0].textContent)).toEqual([
       '2023NE000050', '2023NE000777', '158366264352024NE000118', '2024NE000319', '2024NE000999', '2026NE000027',
@@ -478,6 +479,7 @@ describe('Contratos regressions', () => {
   it('faz o saldo SIAFI local prevalecer quando a API traz o mesmo empenho com prefixo completo', async () => {
     renderContratos();
     fireEvent.click(await screen.findByRole('button', { name: /Ver detalhes do contrato/i }));
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: /^Empenhos/ }), { button: 0, ctrlKey: false });
     const row = (await screen.findByText('158366264352024NE000118')).closest('tr')!;
     expect(within(row).getByText('SIAFI local + vínculo API Comprasnet')).toBeInTheDocument();
     expect(within(row).getAllByRole('cell').slice(-1)[0]).toHaveTextContent('R$ 0,00');
@@ -487,6 +489,7 @@ describe('Contratos regressions', () => {
   it('mostra RAP antigo da API com saldo e liquidado de restos em vez de saldo de exercicio', async () => {
     renderContratos();
     fireEvent.click(await screen.findByRole('button', { name: /Ver detalhes do contrato/i }));
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: /^Empenhos/ }), { button: 0, ctrlKey: false });
     const row = (await screen.findByText('2023NE000050')).closest('tr')!;
     const cells = within(row).getAllByRole('cell');
     expect(cells[1]).toHaveTextContent('RAP');
@@ -498,6 +501,7 @@ describe('Contratos regressions', () => {
   it('nao usa valor a liquidar da API como saldo quando empenho antigo tem rp a pagar zero', async () => {
     renderContratos();
     fireEvent.click(await screen.findByRole('button', { name: /Ver detalhes do contrato/i }));
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: /^Empenhos/ }), { button: 0, ctrlKey: false });
     const row = (await screen.findByText('2024NE000999')).closest('tr')!;
     expect(within(row).getAllByRole('cell').slice(-1)[0]).toHaveTextContent('R$ 0,00');
     expect(within(row).queryByText('R$ 999,00')).not.toBeInTheDocument();
@@ -511,12 +515,38 @@ describe('Contratos regressions', () => {
     expect(await screen.findByRole('heading', { name: /Contrato 00062\/2018/ })).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getAllByText('PRESTACAO DE SERVICOS DE APOIO ADMINISTRATIVO').length).toBeGreaterThan(0);
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Vigência e documentos' }), { button: 0, ctrlKey: false });
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /^Termos/ }), { button: 0, ctrlKey: false });
     expect(screen.getByRole('button', { name: /Histórico do contrato/i })).toBeVisible();
     expect(screen.getByText(/Assinatura - 00158\/2021/i)).toBeVisible();
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Faturas e pagamentos' }), { button: 0, ctrlKey: false });
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /^Faturas/ }), { button: 0, ctrlKey: false });
+    screen.getAllByRole('button', { name: /Expandir fatura/i }).forEach((toggle) => fireEvent.click(toggle));
     expect(screen.getByText(/Sem item vinculado/i)).toBeVisible();
     expect(screen.getByText('48162')).toBeVisible();
+  });
+
+  it('mantém as faturas colapsadas por padrão e expande os detalhes ao clicar', async () => {
+    renderContratos();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Ver detalhes do contrato/i }));
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: /^Faturas/ }), { button: 0, ctrlKey: false });
+    const toggle = screen.getAllByRole('button', { name: /Expandir fatura/i })[0];
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Emissão')).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByText('Emissão').length).toBeGreaterThan(0);
+  });
+
+  it('organiza o detalhe em abas Resumo, Empenhos, Itens, Faturas, Termos e Documentos', async () => {
+    renderContratos();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Ver detalhes do contrato/i }));
+    const tabs = await screen.findAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent?.replace(/\d+$/, ''))).toEqual([
+      'Resumo', 'Empenhos', 'Faturas', 'Termos', 'Documentos e ocorrências',
+    ]);
+    expect(screen.getByRole('progressbar', { name: 'Percentual do valor global empenhado' })).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: 'Empenhos vinculados ao campus' })).not.toBeInTheDocument();
   });
 
   it('preserva busca e favoritos ao retornar do detalhe', async () => {
@@ -537,6 +567,7 @@ describe('Contratos regressions', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Ver detalhes do contrato/i }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar');
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: /^Empenhos/ }), { button: 0, ctrlKey: false });
     expect(await screen.findByRole('table', { name: 'Empenhos vinculados ao campus' })).toBeVisible();
   });
 
@@ -551,9 +582,9 @@ describe('Contratos regressions', () => {
     await screen.findByText('Fornecedor Teste');
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'elevadores' } });
     expect(screen.getByText('Fornecedor Teste')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'A vencer em 90 dias' }));
+    fireEvent.click(screen.getByRole('button', { name: /^A vencer em 90 dias/ }));
     expect(screen.getByText('Fornecedor Teste')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Com faturas pendentes' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Com faturas pendentes/ }));
     expect(screen.getByText('Fornecedor Teste')).toBeVisible();
     expect(screen.queryByText('Invoice Aberta')).not.toBeInTheDocument();
   });

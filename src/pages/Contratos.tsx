@@ -2,7 +2,7 @@ import { formatContractDate, contractDaysRemaining, contractDeadlineLabel } from
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
 import type { Empenho } from '@/types';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Search, Calendar, ArrowUpDown, ChevronUp, ChevronDown, RefreshCw, Eye, Star } from 'lucide-react';
+import { Search, ArrowUpDown, ChevronUp, ChevronDown, RefreshCw, Eye, Star } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { formatCurrency, formatarDocumento, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { HeaderActions } from '@/components/HeaderParts';
+import { PageHeader } from '@/components/design-system/PageHeader';
+import { PageLoadingSkeleton } from '@/components/design-system/PageLoadingSkeleton';
+import { SegmentedControl } from '@/components/design-system/SegmentedControl';
 import { CampusDataUnavailable } from '@/components/CampusDataUnavailable';
 import { ContratosSyncDialog } from '@/components/modals/ContratosSyncDialog';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
@@ -57,6 +60,18 @@ const getEmpenhoSortParts = (value: unknown) => {
     normalized,
   };
 };
+
+const vigenciaVariant = (
+  dataTermino: string | Date | null | undefined,
+  apiContrato?: { situacao_derivada?: boolean | null } | null,
+): 'success' | 'warning' | 'danger' | 'secondary' => {
+  const days = contractDaysRemaining(dataTermino);
+  if (days === null) return 'secondary';
+  if (days < 0 || apiContrato?.situacao_derivada === false) return 'danger';
+  return days <= 90 ? 'warning' : 'success';
+};
+
+type ViewFilter = 'all' | 'favorites' | 'expired120' | 'expiring90' | 'pending';
 
 const compareEmpenhoRefs = (a: unknown, b: unknown) => {
   const left = getEmpenhoSortParts(a);
@@ -163,7 +178,7 @@ export default function Contratos() {
   const detailRequest = useRef(0);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewFilter, setViewFilter] = useState<'all' | 'favorites' | 'expired120' | 'expiring90' | 'pending'>('all');
+  const [viewFilter, setViewFilter] = useState<ViewFilter>('all');
   const { favoriteIdsByType, isFavorite, toggleFavorite, isPending: isFavoritePending } = useUserFavorites();
   const [sortConfig, setSortConfig] = useState<{
     key: string;
@@ -479,38 +494,35 @@ export default function Contratos() {
     setIsDetailsOpen(true);
   }, [campusUasg, openApiDetails]);
 
+  // Mesmas regras de cada visão, usadas no filtro da tabela e nas contagens dos botões.
+  const matchesView = useCallback(
+    (c: ContratoDisplay, view: ViewFilter) => {
+      const apiSituacaoAtiva = !c.apiContrato || c.apiContrato.situacao_derivada === true;
+      if (view === 'all') return apiSituacaoAtiva;
+      if (view === 'favorites') {
+        return Boolean(
+          (c.localId && favoriteIdsByType.contrato.has(c.localId)) ||
+            (c.apiContrato && favoriteIdsByType.contrato_api?.has(c.apiContrato.id)),
+        );
+      }
+      if (view === 'expired120') {
+        const days = contractDaysRemaining(c.data_termino);
+        return days !== null && days < 0 && days >= -120;
+      }
+      if (view === 'expiring90') {
+        const days = contractDaysRemaining(c.data_termino);
+        return days !== null && days >= 0 && days <= 90 && apiSituacaoAtiva;
+      }
+      return apiFaturas.some(
+        (f) => f.contrato_api_id === c.apiContrato?.id && !['pago', 'siafi apropriado'].includes((f.situacao || '').toLowerCase()),
+      );
+    },
+    [favoriteIdsByType, apiFaturas],
+  );
+
   const filteredContratos = useMemo(() => {
     const searchNormalized = normalizeString(searchTerm);
-    let baseContratos = visibleContratos;
-
-    if (viewFilter === 'all') {
-      baseContratos = visibleContratos.filter(
-        (contrato) => !contrato.apiContrato || contrato.apiContrato.situacao_derivada === true
-      );
-    } else if (viewFilter === 'favorites') {
-      baseContratos = visibleContratos.filter((contrato) =>
-        (contrato.localId && favoriteIdsByType.contrato.has(contrato.localId)) ||
-        (contrato.apiContrato && favoriteIdsByType.contrato_api?.has(contrato.apiContrato.id)),
-      );
-    } else if (viewFilter === 'expired120') {
-      const today = new Date();
-      const hundredTwentyDaysAgo = new Date(today.getTime() - 120 * 24 * 60 * 60 * 1000);
-      baseContratos = visibleContratos.filter((contrato) => {
-        if (!contrato.data_termino) return false;
-        const dateTermino = new Date(contrato.data_termino);
-        if (isNaN(dateTermino.getTime())) return false;
-        return dateTermino.getTime() < today.getTime() && dateTermino.getTime() >= hundredTwentyDaysAgo.getTime();
-      });
-    }
-
-    if (viewFilter === 'expiring90') {
-      baseContratos = visibleContratos.filter(c => {
-        const days = contractDaysRemaining(c.data_termino);
-        return days !== null && days >= 0 && days <= 90 && (!c.apiContrato || c.apiContrato.situacao_derivada === true);
-      });
-    } else if (viewFilter === 'pending') {
-      baseContratos = visibleContratos.filter(c => apiFaturas.some(f => f.contrato_api_id === c.apiContrato?.id && !['pago', 'siafi apropriado'].includes((f.situacao || '').toLowerCase())));
-    }
+    const baseContratos = visibleContratos.filter((c) => matchesView(c, viewFilter));
 
     let result = baseContratos.filter((c) => {
       return normalizeString(c.numero).includes(searchNormalized) || normalizeString(c.contratada).includes(searchNormalized) || normalizeString(c.cnpj || '').includes(searchNormalized) || normalizeString(c.apiContrato?.objeto || '').includes(searchNormalized);
@@ -560,7 +572,7 @@ export default function Contratos() {
     }
 
     return result;
-  }, [visibleContratos, viewFilter, favoriteIdsByType, searchTerm, normalizeString, sortConfig, apiFaturas]);
+  }, [matchesView, visibleContratos, viewFilter, favoriteIdsByType, searchTerm, normalizeString, sortConfig, apiFaturas]);
 
   const safeFormatDate = formatContractDate;
 
@@ -761,14 +773,28 @@ export default function Contratos() {
     return list;
   }, [searchTerm, viewFilter]);
 
+  // Contagens exibidas nos botões de visão.
+  const resumo = useMemo(() => {
+    const contagens: Record<ViewFilter, number> = { all: 0, favorites: 0, expired120: 0, expiring90: 0, pending: 0 };
+    visibleContratos.forEach((c) => {
+      (Object.keys(contagens) as ViewFilter[]).forEach((view) => {
+        if (matchesView(c, view)) contagens[view] += 1;
+      });
+    });
+    return { contagens };
+  }, [visibleContratos, matchesView]);
+
   if (isLoading || isApiLoading || isPermissionsLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <>
+        <PageHeader compact />
+        <PageLoadingSkeleton label="Carregando contratos..." />
+      </>
     );
   }
   return (
+    <>
+    <PageHeader compact />
     <div className="space-y-6 pb-10">
       <HeaderActions>
         {lastSyncLabel ? (
@@ -786,35 +812,19 @@ export default function Contratos() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
             <Input aria-label="Buscar contratos" placeholder="Buscar por número, contratada ou objeto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-system h-10 pl-9 text-sm" />
           </div>
-          <div className="inline-flex flex-wrap h-auto overflow-hidden rounded-xl border border-border-default bg-card shadow-sm">
-            <Button
-              type="button"
-              variant={viewFilter === 'all' ? 'default' : 'ghost'}
-              className="h-10 rounded-none px-4 text-xs font-semibold"
-              onClick={() => setViewFilter('all')}
-            >
-              Vigentes
-            </Button>
-            <Button
-              type="button"
-              variant={viewFilter === 'favorites' ? 'default' : 'ghost'}
-              className="h-10 rounded-none px-4 text-xs font-semibold"
-              onClick={() => setViewFilter('favorites')}
-            >
-              <Star className="h-3.5 w-3.5 mr-1" />
-              Favoritos
-            </Button>
-            <Button
-              type="button"
-              variant={viewFilter === 'expired120' ? 'default' : 'ghost'}
-              className="h-10 rounded-none px-4 text-xs font-semibold"
-              onClick={() => setViewFilter('expired120')}
-            >
-              <Calendar className="h-3.5 w-3.5 mr-1" />
-              Vencidos (120d)
-            </Button>
-            <Button type="button" variant={viewFilter === 'expiring90' ? 'default' : 'ghost'} className="h-10 rounded-none px-4 text-xs" onClick={() => setViewFilter('expiring90')}>A vencer em 90 dias</Button>
-            <Button type="button" variant={viewFilter === 'pending' ? 'default' : 'ghost'} className="h-10 rounded-none px-4 text-xs" onClick={() => setViewFilter('pending')}>Com faturas pendentes</Button>
+          <div className="overflow-x-auto pb-1">
+            <SegmentedControl
+              aria-label="Visão dos contratos"
+              value={viewFilter}
+              onChange={setViewFilter}
+              options={[
+                { value: 'all', label: 'Vigentes', count: resumo.contagens.all },
+                { value: 'expiring90', label: 'A vencer em 90 dias', count: resumo.contagens.expiring90 },
+                { value: 'pending', label: 'Com faturas pendentes', count: resumo.contagens.pending },
+                { value: 'expired120', label: 'Vencidos (120d)', count: resumo.contagens.expired120 },
+                { value: 'favorites', label: 'Favoritos', count: resumo.contagens.favorites },
+              ]}
+            />
           </div>
         </div>
 
@@ -910,7 +920,7 @@ export default function Contratos() {
                     className={cn(
                       'border-b border-border-default/40 transition-all last:border-0',
                       hasOpenInvoice
-                        ? 'bg-amber-500/[0.03] hover:bg-amber-500/[0.06] border-l-4 border-l-amber-500'
+                        ? 'bg-warning/[0.04] hover:bg-warning/[0.08] border-l-4 border-l-warning'
                         : 'hover:bg-surface-subtle/60'
                     )}
                   >
@@ -924,10 +934,10 @@ export default function Contratos() {
                               size="icon"
                               aria-label={contratoFavorite ? `Remover contrato ${c.numero} dos favoritos` : `Favoritar contrato ${c.numero}`}
                               className={cn(
-                                'h-8 w-8 hover:bg-amber-50',
+                                'h-8 w-8 hover:bg-warning/10',
                                 contratoFavorite
-                                  ? 'text-amber-500 hover:text-amber-600'
-                                  : 'text-muted-foreground hover:text-amber-500',
+                                  ? 'text-warning hover:text-warning/80'
+                                  : 'text-muted-foreground hover:text-warning',
                               )}
                               disabled={isFavoritePending || !favoriteEntity}
                               onClick={() => {
@@ -982,7 +992,11 @@ export default function Contratos() {
                       <div className="flex flex-col text-xs space-y-0.5">
                         <span className="text-text-secondary">Início: {safeFormatDate(c.data_inicio)}</span>
                         <span className="font-medium text-text-secondary">Fim: {safeFormatDate(c.data_termino)}</span>
-                        <span className="font-medium text-foreground">{contractDeadlineLabel(c.data_termino)}</span>
+                        <span className="mt-1 flex justify-end">
+                          <Badge variant={vigenciaVariant(c.data_termino, apiContrato)} className="whitespace-nowrap">
+                            {contractDeadlineLabel(c.data_termino)}
+                          </Badge>
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="py-3 px-4 text-right">
@@ -1033,5 +1047,6 @@ export default function Contratos() {
       </div>
       {inspectedEmpenho && <EmpenhoDialog presentation="page" backLabel="Voltar ao contrato" readOnly open={!!inspectedEmpenho} onOpenChange={open => { if (!open) setInspectedEmpenho(null); }} empenho={inspectedEmpenho} atividades={atividades} onSave={() => {}} />}
     </div>
+    </>
   );
 }
