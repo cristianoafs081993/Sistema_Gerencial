@@ -7,18 +7,36 @@ import {
   ScrollView,
   StyleSheet,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
-import { colors } from '../constants/theme';
-import { formatBRL } from '../constants/data';
+import { colors, radius } from '../constants/theme';
 import { ContratoItem, ContratoFilter } from '../types';
-import { IconShield, IconSearch } from '../components/Icons';
+import { IconSearch } from '../components/Icons';
 import { ContratoCard } from '../components/ContratoCard';
-import { fetchContratos } from '../services/api';
+import { ContratoDetalheModal } from '../components/ContratoDetalheModal';
+import { ListSkeleton } from '../components/Skeleton';
+import { fetchContratos, fetchUltimaSincronizacaoContratos } from '../services/contratos';
+import { formatarMoeda } from '../lib/format';
 
 interface ContratosScreenProps {
   initialFilter?: ContratoFilter;
   onClearInitialFilter?: () => void;
+}
+
+const normalizar = (texto: string) =>
+  texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+
+function formatarSincronizacao(iso: string | null): string | null {
+  if (!iso) return null;
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return null;
+  const dia = String(data.getDate()).padStart(2, '0');
+  const mes = String(data.getMonth() + 1).padStart(2, '0');
+  const hora = String(data.getHours()).padStart(2, '0');
+  const minuto = String(data.getMinutes()).padStart(2, '0');
+  return `${dia}/${mes} às ${hora}:${minuto}`;
 }
 
 export const ContratosScreen: React.FC<ContratosScreenProps> = ({
@@ -28,16 +46,25 @@ export const ContratosScreen: React.FC<ContratosScreenProps> = ({
   const [contratos, setContratos] = useState<ContratoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<ContratoFilter>(initialFilter);
+  const [erro, setErro] = useState<string | null>(null);
+  const [ultimaSync, setUltimaSync] = useState<string | null>(null);
+  const [busca, setBusca] = useState('');
+  const [filtro, setFiltro] = useState<ContratoFilter>(initialFilter);
+  const [selecionado, setSelecionado] = useState<ContratoItem | null>(null);
 
-  const loadContratos = useCallback(async (isRefresh = false) => {
+  const carregar = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
+    setErro(null);
     try {
-      const data = await fetchContratos();
-      setContratos(data);
-    } catch (err) {
-      console.error('Erro ao carregar contratos:', err);
+      const [lista, sync] = await Promise.all([
+        fetchContratos(),
+        fetchUltimaSincronizacaoContratos().catch(() => null),
+      ]);
+      setContratos(lista);
+      setUltimaSync(sync);
+    } catch (error) {
+      console.error('Erro ao carregar contratos:', error);
+      setErro('Não foi possível carregar os contratos. Verifique sua conexão e tente novamente.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -45,244 +72,156 @@ export const ContratosScreen: React.FC<ContratosScreenProps> = ({
   }, []);
 
   useEffect(() => {
-    loadContratos();
-  }, [loadContratos]);
+    carregar();
+  }, [carregar]);
 
   useEffect(() => {
-    if (initialFilter) {
-      setActiveFilter(initialFilter);
-    }
+    if (initialFilter) setFiltro(initialFilter);
   }, [initialFilter]);
 
-  const normalize = (str: string) =>
-    str
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
+  const resumo = useMemo(() => {
+    const ativos = contratos.filter((c) => c.status !== 'expirado');
+    return {
+      ativos: ativos.length,
+      valorAtivos: ativos.reduce((soma, c) => soma + c.valorGlobal, 0),
+      aVencer: contratos.filter((c) => c.status === 'a_vencer').length,
+      pendentes: contratos.filter((c) => c.faturasPendentes > 0).length,
+    };
+  }, [contratos]);
 
-  const filteredContratos = useMemo(() => {
-    const q = normalize(searchQuery.trim());
-    return contratos.filter((item) => {
-      const matchesSearch =
-        !q ||
-        normalize(item.id).includes(q) ||
-        normalize(item.name).includes(q) ||
-        normalize(item.title).includes(q);
-
-      let matchesFilter = true;
-      if (activeFilter === 'vigente') {
-        matchesFilter = !item.remaining.startsWith('Expirado');
-      } else if (activeFilter === 'vencer') {
-        matchesFilter = item.warning;
-      }
-
-      return matchesSearch && matchesFilter;
+  const filtrados = useMemo(() => {
+    const termo = normalizar(busca.trim());
+    return contratos.filter((c) => {
+      const passaBusca =
+        !termo ||
+        normalizar(c.numero).includes(termo) ||
+        normalizar(c.fornecedor).includes(termo) ||
+        normalizar(c.objeto).includes(termo);
+      if (!passaBusca) return false;
+      if (filtro === 'vigente') return c.status !== 'expirado';
+      if (filtro === 'vencer') return c.status === 'a_vencer';
+      if (filtro === 'pendentes') return c.faturasPendentes > 0;
+      return true;
     });
-  }, [contratos, searchQuery, activeFilter]);
+  }, [contratos, busca, filtro]);
 
-  const totalValorGlobal = useMemo(() => {
-    return contratos.reduce((acc, curr) => acc + curr.value, 0);
-  }, [contratos]);
-
-  const vigentesCount = useMemo(() => {
-    return contratos.filter((c) => !c.remaining.startsWith('Expirado')).length;
-  }, [contratos]);
-
-  const filterOptions: { id: ContratoFilter; label: string }[] = [
-    { id: 'all', label: 'Todos' },
-    { id: 'vigente', label: 'Vigentes' },
-    { id: 'vencer', label: 'A vencer' },
+  const opcoes: { id: ContratoFilter; label: string }[] = [
+    { id: 'all', label: `Todos (${contratos.length})` },
+    { id: 'vigente', label: `Vigentes (${resumo.ativos})` },
+    { id: 'vencer', label: `A vencer (${resumo.aVencer})` },
+    { id: 'pendentes', label: `Faturas pendentes (${resumo.pendentes})` },
   ];
 
-  const handleFilterSelect = (filterId: ContratoFilter) => {
-    setActiveFilter(filterId);
-    if (onClearInitialFilter) {
-      onClearInitialFilter();
-    }
+  const escolherFiltro = (id: ContratoFilter) => {
+    setFiltro(id);
+    onClearInitialFilter?.();
   };
 
-  if (loading && contratos.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.blue} />
-        <Text style={styles.loadingText}>Carregando contratos do Supabase...</Text>
-      </View>
-    );
-  }
+  const sincronizacao = formatarSincronizacao(ultimaSync);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => loadContratos(true)}
-          colors={[colors.blue]}
-          tintColor={colors.blue}
-        />
-      }
-    >
-      {/* Title Row */}
-      <View style={styles.titleRow}>
+    <>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => carregar(true)} colors={[colors.blue]} tintColor={colors.blue} />
+        }
+      >
         <Text style={styles.titleText}>Contratos</Text>
-        <View style={styles.campusBadge}>
-          <IconShield size={14} color="#4F6580" />
-          <Text style={styles.campusBadgeText}>Campus</Text>
-        </View>
-      </View>
+        <Text style={styles.listIntro}>
+          {sincronizacao ? `Dados do Comprasnet · atualizado em ${sincronizacao}` : 'Dados do Comprasnet'}
+        </Text>
 
-      <Text style={styles.listIntro}>Serviços em dia. Prazos sob controle.</Text>
-
-      {/* Summary Strip */}
-      <View style={styles.summaryStrip}>
-        <View style={styles.summaryLeft}>
-          <Text style={styles.summaryLabel}>
-            Valor global · contratos vigentes
-          </Text>
-          <Text style={styles.summaryValue}>
-            {formatBRL(totalValorGlobal || 12840600, false)}
-          </Text>
-        </View>
-        <View style={styles.summaryRight}>
-          <Text style={styles.summaryLabel}>Vigentes</Text>
-          <Text style={[styles.summaryValue, { color: colors.blue }]}>
-            {vigentesCount || contratos.length}
-          </Text>
-        </View>
-      </View>
-
-      {/* Search Input Box */}
-      <View style={styles.searchBox}>
-        <IconSearch size={19} color="#7C8DA6" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar contrato ou empresa"
-          placeholderTextColor="#6B7C8F"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          clearButtonMode="while-editing"
-        />
-      </View>
-
-      {/* Filter Chips */}
-      <View style={styles.chipsContainer}>
-        {filterOptions.map((opt) => {
-          const isSelected = activeFilter === opt.id;
-          return (
-            <TouchableOpacity
-              key={opt.id}
-              style={[styles.chip, isSelected && styles.chipSelected]}
-              onPress={() => handleFilterSelect(opt.id)}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  isSelected && styles.chipTextSelected,
-                ]}
-              >
-                {opt.label}
-              </Text>
+        {loading ? (
+          <ListSkeleton count={3} label="Carregando contratos" />
+        ) : erro ? (
+          <View style={styles.errorCard} accessibilityLiveRegion="polite">
+            <Text style={styles.errorTitle}>Não foi possível carregar</Text>
+            <Text style={styles.errorDesc}>{erro}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={() => carregar()} accessibilityRole="button">
+              <Text style={styles.retryText}>Tentar novamente</Text>
             </TouchableOpacity>
-          );
-        })}
-      </View>
+          </View>
+        ) : (
+          <>
+            <View style={styles.summaryStrip}>
+              <View style={styles.summaryLeft}>
+                <Text style={styles.summaryLabel}>Valor global · contratos ativos</Text>
+                <Text style={styles.summaryValue}>{formatarMoeda(resumo.valorAtivos, false)}</Text>
+              </View>
+              <View style={styles.summaryRight}>
+                <Text style={styles.summaryLabel}>Ativos</Text>
+                <Text style={[styles.summaryValue, { color: colors.blue }]}>{resumo.ativos}</Text>
+              </View>
+            </View>
 
-      {/* Result Counter Row */}
-      <View style={styles.resultRow}>
-        <Text style={styles.resultCount}>
-          {filteredContratos.length}{' '}
-          {filteredContratos.length === 1 ? 'contrato' : 'contratos'} na listagem
-        </Text>
-        <Text style={styles.resultSort}>Vencimento mais próximo</Text>
-      </View>
+            <View style={styles.searchBox}>
+              <IconSearch size={19} color={colors.mutedLight} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Buscar por número, empresa ou objeto"
+                placeholderTextColor={colors.mutedText}
+                value={busca}
+                onChangeText={setBusca}
+                clearButtonMode="while-editing"
+                accessibilityLabel="Buscar contratos"
+              />
+            </View>
 
-      {/* List / Empty State */}
-      {filteredContratos.length > 0 ? (
-        filteredContratos.map((item) => (
-          <ContratoCard key={item.id} item={item} />
-        ))
-      ) : (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>Nenhum resultado</Text>
-          <Text style={styles.emptyDesc}>
-            Tente outro número, empresa ou filtro.
-          </Text>
-        </View>
-      )}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
+              {opcoes.map((opt) => {
+                const selecionada = filtro === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={[styles.chip, selecionada && styles.chipSelected]}
+                    onPress={() => escolherFiltro(opt.id)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: selecionada }}
+                  >
+                    <Text style={[styles.chipText, selecionada && styles.chipTextSelected]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
 
-      {/* Footer Note */}
-      <View style={styles.footerContainer}>
-        <Text style={styles.footerNote}>
-          Exibindo contratos reais vinculados à UASG do Campus ({contratos.length} no total).
-        </Text>
-        <Text style={styles.footerNote}>
-          Dados integrados em tempo real com o Comprasnet / Supabase.
-        </Text>
-      </View>
-    </ScrollView>
+            <View style={styles.resultRow}>
+              <Text style={styles.resultCount}>
+                {filtrados.length} {filtrados.length === 1 ? 'contrato' : 'contratos'}
+              </Text>
+              <Text style={styles.resultSort}>Mais urgentes primeiro</Text>
+            </View>
+
+            {filtrados.length > 0 ? (
+              filtrados.map((item) => <ContratoCard key={item.uuid} item={item} onPress={setSelecionado} />)
+            ) : (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>{contratos.length === 0 ? 'Nenhum contrato encontrado' : 'Nenhum resultado'}</Text>
+                <Text style={styles.emptyDesc}>
+                  {contratos.length === 0
+                    ? 'Não há contratos vigentes ou recentes vinculados ao seu campus.'
+                    : 'Tente outro número, empresa, objeto ou filtro.'}
+                </Text>
+              </View>
+            )}
+          </>
+        )}
+      </ScrollView>
+
+      <ContratoDetalheModal contrato={selecionado} onClose={() => setSelecionado(null)} />
+    </>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: colors.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: colors.muted,
-    textAlign: 'center',
-  },
-  content: {
-    paddingHorizontal: 18,
-    paddingTop: 20,
-    paddingBottom: 28,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 0,
-  },
-  titleText: {
-    fontSize: 27,
-    letterSpacing: -1,
-    fontWeight: '700',
-    color: colors.ink,
-  },
-  campusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingVertical: 7,
-    paddingHorizontal: 9,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 9,
-  },
-  campusBadgeText: {
-    fontSize: 12,
-    color: '#4F6580',
-    fontWeight: '500',
-  },
-  listIntro: {
-    fontSize: 14,
-    color: colors.muted,
-    marginTop: 8,
-    marginBottom: 21,
-  },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 28 },
+  titleText: { fontSize: 27, letterSpacing: -1, fontWeight: '800', color: colors.ink },
+  listIntro: { fontSize: 13, color: colors.muted, marginTop: 6, marginBottom: 18 },
   summaryStrip: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -292,28 +231,12 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: 17,
     padding: 17,
-    marginBottom: 19,
+    marginBottom: 16,
   },
-  summaryLeft: {
-    flex: 1,
-  },
-  summaryRight: {
-    borderLeftWidth: 1,
-    borderLeftColor: colors.line,
-    paddingLeft: 20,
-    alignItems: 'flex-end',
-  },
-  summaryLabel: {
-    color: colors.muted,
-    fontSize: 12,
-  },
-  summaryValue: {
-    fontSize: 23,
-    fontWeight: '700',
-    letterSpacing: -0.7,
-    color: colors.ink,
-    marginTop: 7,
-  },
+  summaryLeft: { flex: 1 },
+  summaryRight: { borderLeftWidth: 1, borderLeftColor: colors.line, paddingLeft: 20, alignItems: 'flex-end' },
+  summaryLabel: { color: colors.muted, fontSize: 12 },
+  summaryValue: { fontSize: 23, fontWeight: '800', letterSpacing: -0.7, color: colors.ink, marginTop: 6 },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -321,88 +244,50 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.lineInput,
     paddingHorizontal: 13,
-    borderRadius: 12,
+    borderRadius: radius.md,
     minHeight: 47,
     gap: 10,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.ink,
-    paddingVertical: 12,
-  },
-  chipsContainer: {
-    flexDirection: 'row',
-    gap: 7,
-    marginTop: 14,
-    marginBottom: 19,
-    flexWrap: 'wrap',
-  },
+  searchInput: { flex: 1, fontSize: 14, color: colors.ink, paddingVertical: 12 },
+  chipsContainer: { flexDirection: 'row', gap: 7, marginTop: 14, marginBottom: 16, paddingRight: 18 },
   chip: {
     paddingVertical: 8,
-    paddingHorizontal: 11,
-    borderRadius: 10,
+    paddingHorizontal: 13,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.lineChip,
-    backgroundColor: 'transparent',
+    backgroundColor: colors.white,
     minHeight: 36,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  chipSelected: {
-    backgroundColor: colors.blue,
-    borderColor: colors.blue,
-  },
-  chipText: {
-    fontSize: 12,
-    color: '#67778f',
-  },
-  chipTextSelected: {
-    color: colors.white,
-    fontWeight: '600',
-  },
-  resultRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  resultCount: {
-    fontSize: 12,
-    color: colors.muted,
-  },
-  resultSort: {
-    fontSize: 12,
-    color: colors.muted,
-  },
+  chipSelected: { backgroundColor: colors.blue, borderColor: colors.blue },
+  chipText: { fontSize: 13, color: colors.tagText, fontWeight: '600' },
+  chipTextSelected: { color: colors.white, fontWeight: '700' },
+  resultRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  resultCount: { fontSize: 12, color: colors.muted },
+  resultSort: { fontSize: 12, color: colors.muted },
   emptyCard: {
     backgroundColor: colors.white,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: '#c8d2e2',
+    borderColor: colors.mutedExtraLight,
     borderRadius: 16,
     paddingVertical: 30,
     paddingHorizontal: 14,
     alignItems: 'center',
   },
-  emptyTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.ink,
-    marginBottom: 6,
+  emptyTitle: { fontSize: 14, fontWeight: '800', color: colors.ink, marginBottom: 6 },
+  emptyDesc: { fontSize: 13, color: colors.muted, textAlign: 'center' },
+  errorCard: {
+    backgroundColor: colors.dangerBg,
+    borderRadius: 16,
+    padding: 18,
+    gap: 8,
+    alignItems: 'flex-start',
   },
-  emptyDesc: {
-    fontSize: 13,
-    color: colors.muted,
-    textAlign: 'center',
-  },
-  footerContainer: {
-    marginTop: 18,
-    alignItems: 'center',
-  },
-  footerNote: {
-    textAlign: 'center',
-    color: '#7f8ba0',
-    fontSize: 12,
-    lineHeight: 20,
-  },
+  errorTitle: { fontSize: 15, fontWeight: '800', color: colors.danger },
+  errorDesc: { fontSize: 13, lineHeight: 19, color: colors.inkLight },
+  retryButton: { marginTop: 6, backgroundColor: colors.blue, borderRadius: radius.sm, paddingVertical: 10, paddingHorizontal: 18 },
+  retryText: { fontSize: 14, fontWeight: '800', color: colors.white },
 });

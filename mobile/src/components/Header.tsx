@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors } from '../constants/theme';
-import { IconChart, IconBuilding, IconBell } from './Icons';
+import { IconBuilding, IconBell } from './Icons';
+import { BrandLogo } from './BrandLogo';
 
 interface HeaderProps {
   initials?: string;
@@ -23,9 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Top Bar */}
       <View style={styles.topbar}>
         <View style={styles.brand}>
-          <View style={styles.brandmark}>
-            <IconChart size={18} color={colors.white} />
-          </View>
+          <BrandLogo size={32} />
           <Text style={styles.brandText}>
             siages
             <Text style={styles.brandDot}>.</Text>
@@ -90,14 +89,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-  },
-  brandmark: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
-    backgroundColor: colors.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   brandText: {
     fontSize: 20,

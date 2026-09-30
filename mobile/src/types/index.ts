@@ -1,7 +1,7 @@
 export type TabType = 'dashboard' | 'empenhos' | 'contratos' | 'licitacoes' | 'infraestrutura';
 
 export type EmpenhoFilter = 'all' | 'exercicio' | 'rap';
-export type ContratoFilter = 'all' | 'vigente' | 'vencer';
+export type ContratoFilter = 'all' | 'vigente' | 'vencer' | 'pendentes';
 export type LicitacaoSubTab = 'pregoes' | 'atas';
 export type PregaoFilter = 'all' | 'abertas' | 'encerradas' | 'srp';
 export type AtaFilter = 'all' | 'vigentes' | 'vencer' | 'campus';
@@ -133,19 +133,81 @@ export interface EmpenhoItem {
   inscrito?: number;
 }
 
+export type ContratoStatus = 'vigente' | 'a_vencer' | 'expirado';
+
 export interface ContratoItem {
-  id: string;
-  title: string;
-  name: string;
-  value: number;
-  campus: number;
-  end: string;
-  remaining: string;
-  pct: number;
-  warning: boolean;
-  docs: number;
-  invoices: number;
+  /** contratos_api.id (UUID) — chave única; o número do contrato pode se repetir. */
+  uuid: string;
+  numero: string;
+  fornecedor: string;
+  objeto: string;
+  categoria: string | null;
+  processo: string | null;
+  unidadeOrigem: string | null;
+  valorGlobal: number;
+  empenhado: number;
+  aLiquidar: number;
+  liquidado: number;
+  pago: number;
+  vigenciaInicio: string | null;
+  vigenciaFim: string | null;
+  status: ContratoStatus;
+  dias: number | null;
+  vigenciaTexto: string;
+  percentualDecorrido: number;
+  faturasPendentes: number;
   icon: 'shield' | 'building' | 'doc';
+}
+
+export interface ContratoEmpenhoLinha {
+  id: string;
+  numero: string;
+  credor: string | null;
+  dataEmissao: string | null;
+  naturezaDespesa: string | null;
+  empenhado: number;
+  aLiquidar: number;
+  liquidado: number;
+  pago: number;
+}
+
+export interface ContratoFaturaLinha {
+  id: string;
+  numero: string;
+  referencia: string;
+  situacao: string;
+  pendente: boolean;
+  valorBruto: number;
+  valorLiquido: number;
+  vencimento: string | null;
+  pagamento: string | null;
+}
+
+export interface ContratoItemLinha {
+  id: string;
+  descricao: string;
+  numeroItem: string | null;
+  quantidade: number;
+  valorUnitario: number;
+  valorTotal: number;
+}
+
+export interface ContratoTermoLinha {
+  id: string;
+  tipo: string;
+  numero: string | null;
+  assinatura: string | null;
+  vigenciaInicio: string | null;
+  vigenciaFim: string | null;
+  valor: number;
+  observacao: string | null;
+}
+
+export interface ContratoDetalhe {
+  empenhos: ContratoEmpenhoLinha[];
+  faturas: ContratoFaturaLinha[];
+  itens: ContratoItemLinha[];
+  termos: ContratoTermoLinha[];
 }
 
 export interface ChartMonthData {

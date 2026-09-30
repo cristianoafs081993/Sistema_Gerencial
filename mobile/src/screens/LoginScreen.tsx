@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius } from '../constants/theme';
-import { IconChart } from '../components/Icons';
+import { BrandLogo } from '../components/BrandLogo';
 import { useAuth } from '../contexts/AuthContext';
 
 export const LoginScreen: React.FC = () => {
@@ -50,9 +50,7 @@ export const LoginScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.brand}>
-            <View style={styles.brandmark}>
-              <IconChart size={26} color={colors.white} />
-            </View>
+            <BrandLogo size={84} />
             <Text style={styles.brandText}>
               siages<Text style={styles.brandDot}>.</Text>
             </Text>
@@ -146,14 +144,6 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.bg },
   content: { flexGrow: 1, justifyContent: 'center', padding: 20, gap: 24 },
   brand: { alignItems: 'center', gap: 8 },
-  brandmark: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: colors.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   brandText: { fontSize: 30, fontWeight: '800', letterSpacing: -1.2, color: colors.ink },
   brandDot: { color: colors.cyan },
   tagline: { fontSize: 14, color: colors.muted, textAlign: 'center' },

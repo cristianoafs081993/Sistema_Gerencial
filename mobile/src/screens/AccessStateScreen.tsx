@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius } from '../constants/theme';
+import { BrandLogo } from '../components/BrandLogo';
 
 type Props =
   | { kind: 'loading'; message: string }
@@ -13,6 +14,7 @@ export const AccessStateScreen: React.FC<Props> = (props) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.center}>
+        <BrandLogo size={props.kind === 'loading' ? 72 : 56} />
         {props.kind === 'loading' ? (
           <>
             <ActivityIndicator size="large" color={colors.blue} />

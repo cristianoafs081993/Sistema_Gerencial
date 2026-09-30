@@ -1,7 +1,7 @@
 import { supabase, DEFAULT_CAMPUS_UASG } from '../lib/supabase';
+import { formatarDataIso } from '../lib/format';
 import {
   EmpenhoItem,
-  ContratoItem,
   NotificationItem,
   PregaoItem,
   AtaItem,
@@ -15,7 +15,6 @@ import {
 import {
   dashboardData,
   empenhosData,
-  contratosData,
   mockNotificationsData,
   pregoesData,
   atasData,
@@ -93,6 +92,7 @@ export const isOrigemRecursoIgnoradaNoEmpenhado = (origem?: string | null): bool
 
 const formatDatePtBR = (dateStr?: string | null): string => {
   if (!dateStr) return 'Não informada';
+  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return formatarDataIso(dateStr, dateStr);
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
@@ -604,68 +604,6 @@ export async function fetchEmpenhos(
   } catch (err) {
     console.error('Erro ao buscar empenhos:', err);
     return empenhosData;
-  }
-}
-
-export async function fetchContratos(
-  campusUasg = DEFAULT_CAMPUS_UASG
-): Promise<ContratoItem[]> {
-  try {
-    const { data, error } = await supabase
-      .from('contratos_api')
-      .select('id, numero, fornecedor_nome, objeto, valor_global, vigencia_fim, situacao, categoria')
-      .eq('unidade_codigo', campusUasg)
-      .order('vigencia_fim', { ascending: false })
-      .limit(60);
-
-    if (error || !data || data.length === 0) {
-      console.warn('Usando lista fallback de contratos:', error);
-      return contratosData;
-    }
-
-    return data.map((row) => {
-      const val = Number(row.valor_global) || 0;
-      const remainingInfo = getDaysRemaining(row.vigencia_fim);
-
-      let title = row.objeto ? row.objeto.trim() : 'Contrato de Serviços';
-      if (title.length > 55) {
-        title = title.slice(0, 52).trim() + '...';
-      }
-
-      let icon: 'shield' | 'building' | 'doc' = 'doc';
-      const objLower = (row.objeto || '').toLowerCase();
-      if (objLower.includes('vigil') || objLower.includes('seguran') || objLower.includes('prote')) {
-        icon = 'shield';
-      } else if (
-        objLower.includes('manuten') ||
-        objLower.includes('energia') ||
-        objLower.includes('loca') ||
-        objLower.includes('telecom') ||
-        objLower.includes('inter') ||
-        objLower.includes('reform') ||
-        objLower.includes('obra')
-      ) {
-        icon = 'building';
-      }
-
-      return {
-        id: row.numero || 'S/N',
-        title,
-        name: row.fornecedor_nome || 'Contratada não identificada',
-        value: val,
-        campus: Math.round(val * 0.7),
-        end: formatDatePtBR(row.vigencia_fim),
-        remaining: remainingInfo.text,
-        pct: remainingInfo.pct,
-        warning: remainingInfo.warning,
-        docs: 3,
-        invoices: remainingInfo.warning ? 1 : 0,
-        icon,
-      };
-    });
-  } catch (err) {
-    console.error('Erro ao buscar contratos:', err);
-    return contratosData;
   }
 }
 

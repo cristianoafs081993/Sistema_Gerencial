@@ -62,10 +62,11 @@ Arquivos: `src/contexts/AuthContext.tsx` (estado da sessão), `src/screens/Login
    - Cards com código NE, barra de progresso da liquidação/pagamento, datas, ND e saldos.
 
 3. **Contratos (Gestão Contratual - 03)**:
-   - Faixa de resumo com valor global vigente.
-   - Busca em tempo real por número de contrato ou empresa.
-   - Filtro por chips: `Todos`, `Vigentes`, `A vencer`.
-   - Cards com ícone categórico, valores, prazo restante e contadores.
+   - Dados reais do Comprasnet (`contratos_api*`), com as mesmas regras do web: contratos no escopo do campus (`contratos_api_campus_scope`), situação e vigência derivadas no servidor, lista padrão com vigentes e expirados há até 120 dias, valor global pela soma dos termos do histórico, empenhos apenas da UG do campus e faturas pendentes (situação diferente de "Pago" e "SIAFI Apropriado"). Regras puras em `mobile/src/lib/contratosRules.ts`; consultas em `mobile/src/services/contratos.ts`.
+   - Faixa de resumo (valor global e quantidade de contratos ativos), data da última sincronização, busca por número, empresa ou objeto e filtros: `Todos`, `Vigentes`, `A vencer` (até 90 dias) e `Faturas pendentes`, cada um com contagem. Ordem: a vencer (mais urgente), vigentes e expirados.
+   - Cartão com fornecedor como título, objeto resumido, valor global, empenhado no campus, barra e texto de vigência e alerta de faturas pendentes.
+   - **Detalhe do contrato** (toque no cartão): resumo financeiro (empenhado, a liquidar, liquidado, pago), vigência, objeto completo e abas de **Empenhos**, **Faturas**, **Itens** e **Termos** (aditivos).
+   - Sem dados de demonstração: em caso de falha o app mostra o erro com "Tentar novamente", e sem contratos mostra o estado vazio. (Versões anteriores exibiam contratos fictícios, "empenhado" calculado como 70% do valor e "3 documentos" fixos; isso foi removido.)
 
 4. **Licitações (Pregões e Atas - 04)**:
    - Seletor segmentado superior: `[ Pregões ]` e `[ Atas ]`.
@@ -102,5 +103,7 @@ npm run mobile:web
 - Na primeira vez, rode `npm --prefix mobile install`.
 
 ## Design system
+
+**Logo:** o app usa a logo oficial do SIAGES (`mobile/assets/logo.png`, o mesmo arquivo do web, `public/logo-transparent.png`) no topo, no login e nas telas de estado, e também como ícone, ícone adaptativo do Android e tela de abertura (fundo branco). Os arquivos de ícone têm 512 px; para publicar nas lojas o ideal é uma versão de 1024 px.
 
 O app usa os tokens do design system Céu do web (azul-céu `#1976D2`/`#1E88E5`, ciano `#00B7DC`, superfícies `#F6F9FD`), definidos em [`mobile/src/constants/theme.ts`](../../mobile/src/constants/theme.ts). Ao mudar o visual do web, atualize o tema do mobile no mesmo trabalho.

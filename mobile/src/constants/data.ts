@@ -67,50 +67,6 @@ export const empenhosData: EmpenhoItem[] = [
   },
 ];
 
-export const contratosData: ContratoItem[] = [
-  {
-    id: '00018/2025',
-    title: 'Vigilância patrimonial',
-    name: 'Potiguar Segurança Ltda.',
-    value: 864000,
-    campus: 576000,
-    end: '30 set. 2026',
-    remaining: 'Vence em 22 dias',
-    pct: 94,
-    warning: true,
-    docs: 4,
-    invoices: 2,
-    icon: 'shield',
-  },
-  {
-    id: '00007/2026',
-    title: 'Conectividade e internet',
-    name: 'Seridó Telecom Ltda.',
-    value: 96000,
-    campus: 64000,
-    end: '31 dez. 2026',
-    remaining: '114 dias restantes',
-    pct: 68,
-    warning: false,
-    docs: 3,
-    invoices: 0,
-    icon: 'building',
-  },
-  {
-    id: '00129/2024',
-    title: 'Limpeza e conservação',
-    name: 'Grupo RL Soluções e Apoio Ltda.',
-    value: 9364047.86,
-    campus: 1306650.79,
-    end: '11 jul. 2028',
-    remaining: 'Vigência até jul. 2028',
-    pct: 8,
-    warning: false,
-    docs: 8,
-    invoices: 1,
-    icon: 'doc',
-  },
-];
 
 export const defaultPtresList: PtresItem[] = [
   { code: 'all', name: 'Todos os recursos (PTRES)', shortLabel: 'Todos' },
