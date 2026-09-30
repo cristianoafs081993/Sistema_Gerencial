@@ -29,7 +29,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     },
     {
       id: 'empenhos',
-      label: 'Empenhos',
+      label: 'Orçamento',
       icon: (isActive) => (
         <IconWallet size={21} color={isActive ? colors.blue : colors.navInactive} />
       ),

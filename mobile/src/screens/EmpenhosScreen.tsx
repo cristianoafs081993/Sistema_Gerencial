@@ -4,6 +4,7 @@ import { colors, radius } from '../constants/theme';
 import { formatarMoeda } from '../lib/format';
 import { EmpenhoItem, EmpenhoFilter } from '../types';
 import { IconSearch } from '../components/Icons';
+import { Chip } from '../components/Chip';
 import { EmpenhoCard } from '../components/EmpenhoCard';
 import { EmpenhoDetalheModal } from '../components/EmpenhoDetalheModal';
 import { ListSkeleton } from '../components/Skeleton';
@@ -216,21 +217,9 @@ export const EmpenhosScreen: React.FC = () => {
   );
 };
 
-const Chip: React.FC<{ label: string; selected: boolean; onPress: () => void; small?: boolean }> = ({ label, selected, onPress, small }) => (
-  <TouchableOpacity
-    style={[styles.chip, small && styles.chipSmall, selected && styles.chipSelected]}
-    onPress={onPress}
-    activeOpacity={0.7}
-    accessibilityRole="button"
-    accessibilityState={{ selected }}
-  >
-    <Text style={[styles.chipText, small && styles.chipTextSmall, selected && styles.chipTextSelected]}>{label}</Text>
-  </TouchableOpacity>
-);
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 28 },
+  content: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 28 },
   titleText: { fontSize: 27, letterSpacing: -1, fontWeight: '800', color: colors.ink },
   listIntro: { fontSize: 13, color: colors.muted, marginTop: 6, marginBottom: 18 },
   summaryStrip: {

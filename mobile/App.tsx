@@ -8,7 +8,7 @@ import { Header } from './src/components/Header';
 import { BottomNav } from './src/components/BottomNav';
 import { NotificationsModal } from './src/components/NotificationsModal';
 import { DashboardScreen } from './src/screens/DashboardScreen';
-import { EmpenhosScreen } from './src/screens/EmpenhosScreen';
+import { OrcamentoScreen } from './src/screens/OrcamentoScreen';
 import { ContratosScreen } from './src/screens/ContratosScreen';
 import { LicitacoesScreen } from './src/screens/LicitacoesScreen';
 import { InfraestruturaScreen } from './src/screens/InfraestruturaScreen';
@@ -16,7 +16,7 @@ import { AccountModal } from './src/components/AccountModal';
 import { AccessStateScreen } from './src/screens/AccessStateScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
-import type { AppAccess } from './src/services/access';
+import { secoesOrcamento, type AppAccess } from './src/services/access';
 import { primeiroNome } from './src/lib/format';
 import { fetchNotifications } from './src/services/api';
 
@@ -105,7 +105,7 @@ function AuthenticatedApp({ access, email, userName, onSignOut }: AuthenticatedA
           />
         )}
 
-        {currentTab === 'empenhos' && <EmpenhosScreen />}
+        {currentTab === 'empenhos' && <OrcamentoScreen sections={secoesOrcamento(access.screens)} />}
 
         {currentTab === 'contratos' && (
           <ContratosScreen

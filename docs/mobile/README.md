@@ -60,6 +60,10 @@ Arquivos: `src/contexts/AuthContext.tsx` (estado da sessão), `src/screens/Login
    - Busca por número, fornecedor ou descrição; filtros por tipo (Todos, Exercício, Restos a pagar, com contagem) e por situação (A liquidar, A pagar, Pagos). Lista virtualizada (377 empenhos).
    - Cartão com NE, situação, fornecedor, descrição, valores e progresso do pagamento; **toque abre o detalhe** com execução financeira, descrição completa, natureza da despesa, plano interno, origem do recurso e processo.
 
+   - A aba **Orçamento** tem um seletor interno com **Empenhos**, **Descentralizações** e **Crédito**; cada parte aparece conforme a permissão da tela correspondente no web (`empenhos`, `descentralizacoes`, `credito-disponivel`).
+   - **Descentralizações**: total como no web (saldo oficial da conta por PTRES quando não há busca; soma dos lançamentos quando há busca ou a conta não foi importada), busca, filtro por PTRES, barras de valor por PTRES (toque para filtrar) e lista de lançamentos com data, dimensão, origem, nota de crédito, natureza da despesa, plano interno, descrição e valor (anulações em vermelho). A origem 230446 (PNAE) entra no total desta tela, mas fica fora da soma global do Dashboard, como no web.
+   - **Crédito disponível**: último relatório importado do SIAFI (com data), total, busca, filtros de PTRES e de saldo (com saldo, zerados, todos), barras por PTRES e, ao tocar em uma linha, o detalhe com descentralizado, empenhado no exercício e as listas de empenhos e descentralizações do PTRES. Regras em `mobile/src/lib/orcamentoRules.ts`; consultas em `mobile/src/services/orcamento.ts`.
+
 3. **Contratos (Gestão Contratual - 03)**:
    - Dados reais do Comprasnet (`contratos_api*`), com as mesmas regras do web: contratos no escopo do campus (`contratos_api_campus_scope`), situação e vigência derivadas no servidor, lista padrão com vigentes e expirados há até 120 dias, valor global pela soma dos termos do histórico, empenhos apenas da UG do campus e faturas pendentes (situação diferente de "Pago" e "SIAFI Apropriado"). Regras puras em `mobile/src/lib/contratosRules.ts`; consultas em `mobile/src/services/contratos.ts`.
    - Faixa de resumo (valor global e quantidade de contratos ativos), data da última sincronização, busca por número, empresa ou objeto e filtros: `Todos`, `Vigentes`, `A vencer` (até 90 dias) e `Faturas pendentes`, cada um com contagem. Ordem: a vencer (mais urgente), vigentes e expirados.
@@ -79,7 +83,7 @@ Arquivos: `src/contexts/AuthContext.tsx` (estado da sessão), `src/screens/Login
    - **Energia**: Painel de faturas e geração solar fotovoltaica. Cards de consumo faturado em kWh e valores em R$ discriminados por fornecedor (`COSERN`, `Mercatto`), e acompanhamento de geração das UFVs. Chips de filtro por fonte e KPIs de consumo e valor total.
 
 6. **Navegação Inferior (Bottom Navigation)**:
-   - 5 abas (`Dashboard`, `Empenhos`, `Contratos`, `Licitações`, `Infra`) com ícones vetoriais SVG e tratamento de Safe Area Insets (iOS e Android).
+   - 5 abas (`Dashboard`, `Orçamento`, `Contratos`, `Licitações`, `Infra`) com ícones vetoriais SVG e tratamento de Safe Area Insets (iOS e Android).
 
 ## Como Executar
 

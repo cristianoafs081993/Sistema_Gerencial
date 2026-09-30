@@ -18,12 +18,14 @@ export type AppAccess = {
   orgName: string | null;
   /** Abas do app liberadas para o usuário. */
   tabs: TabType[];
+  /** Ids das telas do web liberadas (base das seções dentro de cada aba). */
+  screens: string[];
 };
 
 /** Quais telas do web liberam cada aba do app (qualquer uma basta). */
 const TAB_SCREENS: Record<TabType, string[]> = {
   dashboard: ['dashboard'],
-  empenhos: ['empenhos'],
+  empenhos: ['empenhos', 'descentralizacoes', 'credito-disponivel'],
   contratos: ['contratos'],
   licitacoes: ['licitacoes-pregoes', 'atas-registro-precos'],
   infraestrutura: [
@@ -39,6 +41,20 @@ const TAB_SCREENS: Record<TabType, string[]> = {
 };
 
 export const ALL_TABS = Object.keys(TAB_SCREENS) as TabType[];
+const ALL_SCREENS = Array.from(new Set(Object.values(TAB_SCREENS).flat()));
+
+export type OrcamentoSecao = 'empenhos' | 'descentralizacoes' | 'credito';
+const SECAO_TELA: Record<OrcamentoSecao, string> = {
+  empenhos: 'empenhos',
+  descentralizacoes: 'descentralizacoes',
+  credito: 'credito-disponivel',
+};
+
+/** Seções da aba Orçamento que o usuário pode abrir (mesma permissão das telas do web). */
+export function secoesOrcamento(screens: string[]): OrcamentoSecao[] {
+  const liberadas = new Set(screens);
+  return (Object.keys(SECAO_TELA) as OrcamentoSecao[]).filter((secao) => liberadas.has(SECAO_TELA[secao]));
+}
 
 export function isSuperAdminUser(user: Pick<User, 'email' | 'app_metadata'> | null | undefined): boolean {
   if (!user) return false;
@@ -74,11 +90,11 @@ export async function fetchAppAccess(user: User): Promise<AppAccess> {
   const isTerceirizado = memberships.some((row) => row.user_groups!.slug === 'terceirizado');
 
   if (isSuperAdmin) {
-    return { isSuperAdmin, isTerceirizado: false, groupNames: ['Superadministrador'], orgName: org?.name ?? null, tabs: ALL_TABS };
+    return { isSuperAdmin, isTerceirizado: false, groupNames: ['Superadministrador'], orgName: org?.name ?? null, tabs: ALL_TABS, screens: ALL_SCREENS };
   }
 
   if (isTerceirizado || memberships.length === 0) {
-    return { isSuperAdmin, isTerceirizado, groupNames, orgName: org?.name ?? null, tabs: [] };
+    return { isSuperAdmin, isTerceirizado, groupNames, orgName: org?.name ?? null, tabs: [], screens: [] };
   }
 
   const groupIds = memberships.map((row) => row.group_id);
@@ -104,5 +120,5 @@ export async function fetchAppAccess(user: User): Promise<AppAccess> {
     }
   }
 
-  return { isSuperAdmin, isTerceirizado: false, groupNames, orgName: org?.name ?? null, tabs: tabsFromScreens(screenIds) };
+  return { isSuperAdmin, isTerceirizado: false, groupNames, orgName: org?.name ?? null, tabs: tabsFromScreens(screenIds), screens: screenIds };
 }
