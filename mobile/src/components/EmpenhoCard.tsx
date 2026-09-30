@@ -1,107 +1,83 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { colors } from '../constants/theme';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { colors, radius } from '../constants/theme';
 import { EmpenhoItem } from '../types';
-import { formatBRL } from '../constants/data';
-import { IconCalendar } from './Icons';
+import { formatarMoeda } from '../lib/format';
+import { IconCalendar, IconRight } from './Icons';
 
 interface EmpenhoCardProps {
   item: EmpenhoItem;
+  onPress?: (item: EmpenhoItem) => void;
 }
 
-export const EmpenhoCard: React.FC<EmpenhoCardProps> = ({ item }) => {
+export function visualDoEmpenho(item: EmpenhoItem): { bg: string; fg: string; bar: string } {
+  if (item.badge === 'blue') return { bg: colors.blueBg, fg: colors.blue, bar: colors.sky };
+  if (item.badge === 'amber') return { bg: colors.amberBadgeBg, fg: colors.amberText, bar: colors.amberProgress };
+  return { bg: colors.greenBg, fg: colors.greenText, bar: colors.greenProgress };
+}
+
+export const EmpenhoCard: React.FC<EmpenhoCardProps> = ({ item, onPress }) => {
   const isRap = item.tipo === 'rap';
-  const baseValue = isRap ? (item.inscrito || item.value) : item.value;
-  const percentPaid = baseValue > 0 ? Math.min(100, Math.round((item.paid / baseValue) * 100)) : 100;
-
-  // Badge colors
-  let badgeBg = colors.greenBg;
-  let badgeText = colors.greenText;
-  if (item.badge === 'blue') {
-    badgeBg = '#EAF3FD';
-    badgeText = '#4265ba';
-  } else if (item.badge === 'amber') {
-    badgeBg = colors.amberBadgeBg;
-    badgeText = colors.amberText;
-  }
-
-  const progressBarColor =
-    item.status === 'pago'
-      ? colors.greenProgress
-      : (isRap ? '#e09f3e' : colors.blue);
-
-  const displaySaldo = item.saldo ?? item.value;
+  const base = isRap ? item.inscrito || item.value : item.value;
+  const percentPago = base > 0 ? Math.min(100, Math.round((item.paid / base) * 100)) : 100;
+  const visual = visualDoEmpenho(item);
+  const saldo = item.saldo ?? item.value;
 
   return (
-    <View style={styles.card}>
-      {/* Top Header */}
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.8}
+      onPress={() => onPress?.(item)}
+      accessibilityRole="button"
+      accessibilityLabel={`Empenho ${item.id}, ${item.name}, ${item.label}. Toque para ver detalhes.`}
+    >
       <View style={styles.topRow}>
-        <Text style={styles.codeText}>{item.id}</Text>
-        <View style={[styles.badge, { backgroundColor: badgeBg }]}>
-          <Text style={[styles.badgeText, { color: badgeText }]}>
-            {item.label}
+        <Text style={styles.code}>{item.id}</Text>
+        <View style={[styles.badge, { backgroundColor: visual.bg }]}>
+          <Text style={[styles.badgeText, { color: visual.fg }]}>{item.label}</Text>
+        </View>
+      </View>
+
+      <Text style={styles.title} numberOfLines={2}>
+        {item.name}
+      </Text>
+      <Text style={styles.desc} numberOfLines={2}>
+        {item.desc}
+      </Text>
+
+      <View style={styles.valueRow}>
+        <View>
+          <Text style={styles.valueLabel}>{isRap ? 'Saldo atual' : 'Empenhado'}</Text>
+          <Text style={[styles.value, isRap && saldo > 0 && { color: colors.amber }]}>
+            {formatarMoeda(isRap ? saldo : item.value, false)}
           </Text>
         </View>
-      </View>
-
-      {/* Title & Description */}
-      <Text style={styles.title}>{item.name}</Text>
-      <Text style={styles.desc}>{item.desc}</Text>
-
-      {/* Value */}
-      {isRap ? (
-        <View style={styles.rapContainer}>
-          <View style={styles.valueRow}>
-            <Text style={[styles.valueText, displaySaldo > 0 ? { color: '#b45309' } : {}]}>
-              {formatBRL(displaySaldo)}
-            </Text>
-            <Text style={styles.valueLabel}>Saldo atual</Text>
-          </View>
-          <View style={styles.rapSubRow}>
-            <Text style={styles.rapSubText}>
-              Inscrito: {formatBRL(baseValue)} · Pago: {formatBRL(item.paid)}
-            </Text>
-          </View>
+        <View style={styles.valueRight}>
+          <Text style={styles.valueLabel}>{isRap ? 'Inscrito' : 'Pago'}</Text>
+          <Text style={styles.valueSecondary}>{formatarMoeda(isRap ? base : item.paid, false)}</Text>
         </View>
-      ) : (
-        <View style={styles.valueRow}>
-          <Text style={styles.valueText}>{formatBRL(item.value)}</Text>
-          <Text style={styles.valueLabel}>Empenhado</Text>
-        </View>
-      )}
-
-      {/* Progress bar */}
-      <View style={styles.progressBarBg}>
-        <View
-          style={[
-            styles.progressBarFill,
-            {
-              width: `${Math.min(percentPaid, 100)}%`,
-              backgroundColor: progressBarColor,
-            },
-          ]}
-        />
       </View>
 
-      {/* Progress Label */}
-      <View style={styles.progressLabelRow}>
-        <Text style={styles.progressLabelLeft}>
-          Pago {formatBRL(item.paid)}
-        </Text>
-        <Text style={styles.progressLabelRight}>{percentPaid}%</Text>
+      <View style={styles.barBg}>
+        <View style={[styles.barFill, { width: `${percentPago}%`, backgroundColor: visual.bar }]} />
+      </View>
+      <View style={styles.barLabels}>
+        <Text style={styles.barText}>{isRap ? `Pago ${formatarMoeda(item.paid, false)}` : `${percentPago}% pago`}</Text>
+        <Text style={styles.barText}>{isRap ? `${percentPago}% pago` : ''}</Text>
       </View>
 
-      {/* Footer */}
       <View style={styles.footer}>
         <View style={styles.footerLeft}>
           <IconCalendar size={14} color={colors.mutedText} />
           <Text style={styles.footerText}>{item.date}</Text>
+          <Text style={styles.footerDot}>·</Text>
+          <Text style={styles.footerText}>
+            {isRap ? 'RAP · ' : ''}ND {item.nd}
+          </Text>
         </View>
-        <Text style={styles.footerRight}>
-          {item.tipo === 'rap' ? 'RAP · ' : ''}ND {item.nd}
-        </Text>
+        <IconRight size={15} color={colors.mutedLight} />
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -111,116 +87,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
     borderRadius: 18,
-    padding: 17,
+    padding: 16,
     marginBottom: 12,
   },
-  topRow: {
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  code: { fontSize: 12.5, fontWeight: '800', letterSpacing: 0.2, color: colors.muted },
+  badge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: radius.pill },
+  badgeText: { fontSize: 12, fontWeight: '800' },
+  title: { fontSize: 16, fontWeight: '800', letterSpacing: -0.3, color: colors.ink, lineHeight: 21 },
+  desc: { fontSize: 13, color: colors.muted, lineHeight: 19, marginTop: 4 },
+  valueRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 14, marginBottom: 10 },
+  valueRight: { alignItems: 'flex-end' },
+  valueLabel: { fontSize: 11.5, color: colors.muted, marginBottom: 2 },
+  value: { fontSize: 22, fontWeight: '800', letterSpacing: -0.8, color: colors.ink },
+  valueSecondary: { fontSize: 15, fontWeight: '700', color: colors.inkLight },
+  barBg: { height: 5, backgroundColor: colors.progressBg, borderRadius: 3, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 3 },
+  barLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  barText: { fontSize: 11.5, color: colors.muted },
+  footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
-  },
-  codeText: {
-    fontSize: 12,
-    letterSpacing: 0.4,
-    fontWeight: '700',
-    color: '#5a6a83',
-  },
-  badge: {
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.ink,
-    letterSpacing: -0.2,
-    marginBottom: 4,
-    lineHeight: 22,
-  },
-  desc: {
-    fontSize: 12,
-    color: colors.muted,
-    lineHeight: 18,
-    marginBottom: 17,
-  },
-  rapContainer: {
-    marginBottom: 12,
-  },
-  rapSubRow: {
-    marginTop: -4,
-    marginBottom: 4,
-  },
-  rapSubText: {
-    fontSize: 11,
-    color: colors.muted,
-  },
-  valueRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 12,
-  },
-  valueText: {
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.7,
-    color: colors.ink,
-  },
-  valueLabel: {
-    fontSize: 12,
-    color: colors.muted,
-  },
-  progressBarBg: {
-    height: 5,
-    backgroundColor: colors.progressBg,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  progressLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  progressLabelLeft: {
-    fontSize: 12,
-    color: colors.muted,
-  },
-  progressLabelRight: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4262a1',
-  },
-  footer: {
-    marginTop: 15,
-    paddingTop: 13,
+    marginTop: 12,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: colors.line,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
-  footerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  footerText: {
-    fontSize: 12,
-    color: colors.mutedText,
-  },
-  footerRight: {
-    fontSize: 12,
-    color: colors.mutedText,
-    fontWeight: '500',
-  },
+  footerLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  footerText: { fontSize: 12, color: colors.mutedText },
+  footerDot: { fontSize: 12, color: colors.mutedExtraLight },
 });

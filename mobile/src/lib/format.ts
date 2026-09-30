@@ -31,3 +31,13 @@ export function formatarMoedaCompacta(value: number): string {
   if (abs >= 1_000) return `R$ ${Math.round(n / 1_000).toLocaleString('pt-BR')} mil`;
   return formatarMoeda(n, false);
 }
+
+/** Primeiro nome para saudações: usa o nome do perfil e, sem ele, a parte inicial do e-mail. */
+export function primeiroNome(user?: { email?: string | null; user_metadata?: Record<string, unknown> | null } | null): string {
+  const meta = user?.user_metadata ?? {};
+  const completo = [meta.full_name, meta.name, meta.display_name].find((v): v is string => typeof v === 'string' && v.trim().length > 0);
+  const base = completo ?? (user?.email ?? '').split('@')[0];
+  const primeiro = base.trim().split(/[\s._-]+/).filter(Boolean)[0] ?? '';
+  if (!primeiro) return 'tudo bem';
+  return primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase();
+}

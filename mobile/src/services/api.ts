@@ -12,57 +12,6 @@ import {
   PortariaEventoItem,
   PortariaParticipanteItem,
 } from '../types';
-import {
-  dashboardData,
-  empenhosData,
-  mockNotificationsData,
-  pregoesData,
-  atasData,
-  defaultPtresList,
-  ocorrenciasData,
-  energiaFaturasData,
-  energiaSolarData,
-  portariaEventosData,
-  portariaParticipantesData,
-} from '../constants/data';
-
-export interface DashboardMetricsResult {
-  exercicio: string;
-  usuario: string;
-  campus: string;
-  instituicao: string;
-  selectedPtres?: string;
-  availablePtres?: PtresItem[];
-  planejado: number;
-  totalAtividades: number;
-  percentualExecutado: string;
-  percentualExecutadoNum: number;
-  percentualDescentralizadoPlanejadoNum: number;
-  aDescentralizar: number;
-  creditoDisponivel: number;
-  percentualCreditoDisponivel: string;
-  saldoDisponivel: number;
-  percentualDescentralizado: string;
-  descentralizado: number;
-  empenhado: number;
-  percentualEmpenhado: string;
-  empenhadoDescentralizadoPct: number;
-  liquidado: number;
-  liquidadoPct: string;
-  pago: number;
-  pagoPct: string;
-  aPagar: number;
-  totalEmpenhos: number;
-  contratosValorGlobal: number;
-  contratosVigentes: number;
-  contratosAVencerCount: number;
-  referencia: string;
-  monthlyChart: {
-    month: string;
-    liquidado: number;
-    pago: number;
-  }[];
-}
 
 export const matchesPtres = (origemRecurso?: string | null, targetPtres?: string): boolean => {
   if (!targetPtres || targetPtres === 'all') return true;
@@ -164,348 +113,6 @@ export function getCampusSuapUnitCode(campusUasg: string): string {
   return CAMPUS_TO_SUAP_UNIT[campusUasg] || '19';
 }
 
-export async function fetchDashboardMetrics(
-  campusUasg = DEFAULT_CAMPUS_UASG,
-  selectedPtres = 'all'
-): Promise<DashboardMetricsResult> {
-  try {
-    // 0. Fetch atividades do campus para o Planejado (isolado por unidade gestora SUAP e sincronizações ativas)
-    const targetUnitCode = getCampusSuapUnitCode(campusUasg);
-    let atividadesQuery = supabase
-      .from('atividades')
-      .select('valor_total, origem_recurso, suap_unit_code, sync_active')
-      .eq('campus_uasg', campusUasg)
-      .neq('sync_active', false);
-
-    if (targetUnitCode) {
-      atividadesQuery = atividadesQuery.or(`suap_unit_code.eq.${targetUnitCode},suap_unit_code.is.null`);
-    }
-
-    const { data: atividadesRows } = await atividadesQuery;
-
-    // 1. Fetch empenhos do exercício corrente (tipo = 'exercicio' e não cancelados)
-    const { data: empenhosRows, error: empenhosError } = await supabase
-      .from('empenhos')
-      .select('valor, valor_liquidado, valor_liquidado_oficial, valor_pago_oficial, data_empenho, status, tipo, origem_recurso')
-      .eq('campus_uasg', campusUasg)
-      .eq('tipo', 'exercicio')
-      .neq('status', 'cancelado');
-
-    // 2. Fetch descentralizacoes
-    const { data: descRows } = await supabase
-      .from('descentralizacoes')
-      .select('valor, origem_recurso')
-      .eq('campus_uasg', campusUasg);
-
-    // 3. Fetch contratos_api
-    const { data: contratosRows } = await supabase
-      .from('contratos_api')
-      .select('valor_global, situacao, vigencia_fim')
-      .eq('unidade_codigo', campusUasg);
-
-    // 4. Fetch crédito disponível do lote mais recente da tela web (creditos_disponiveis_detalhes)
-    let creditoRows: any[] = [];
-    try {
-      const { data: latestBatch } = await supabase
-        .from('creditos_disponiveis_detalhes')
-        .select('import_batch_id')
-        .eq('campus_uasg', campusUasg)
-        .order('imported_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (latestBatch?.import_batch_id) {
-        const { data: cRows } = await supabase
-          .from('creditos_disponiveis_detalhes')
-          .select('ptres, descricao, valor')
-          .eq('import_batch_id', latestBatch.import_batch_id)
-          .eq('campus_uasg', campusUasg);
-
-        if (cRows && cRows.length > 0) {
-          creditoRows = cRows;
-        }
-      }
-    } catch (err) {
-      console.warn('Não foi possível obter crédito disponível de creditos_disponiveis_detalhes:', err);
-    }
-
-    // Extrai a lista dinâmica de PTRES disponíveis
-    const ptresSet = new Set<string>();
-    const descMap: Record<string, string> = {};
-
-    creditoRows.forEach((r: any) => {
-      if (r.ptres) {
-        ptresSet.add(r.ptres);
-        if (r.descricao && !descMap[r.ptres]) descMap[r.ptres] = r.descricao;
-      }
-    });
-
-    (atividadesRows || []).forEach((r: any) => {
-      if (r.origem_recurso) {
-        const code = String(r.origem_recurso).split(/[\s\-\/]/)[0];
-        if (/^\d+$/.test(code)) ptresSet.add(code);
-      }
-    });
-
-    (empenhosRows || []).forEach((r: any) => {
-      if (r.origem_recurso) {
-        const code = String(r.origem_recurso).split(/[\s\-\/]/)[0];
-        if (/^\d+$/.test(code)) ptresSet.add(code);
-      }
-    });
-
-    (descRows || []).forEach((r: any) => {
-      if (r.origem_recurso) {
-        const code = String(r.origem_recurso).split(/[\s\-\/]/)[0];
-        if (/^\d+$/.test(code)) ptresSet.add(code);
-      }
-    });
-
-    const priority = ['231796', '261941', '231802', '231798', '171166', '260296', '230446'];
-    const sortedPtresCodes = Array.from(ptresSet)
-      .filter((p) => /^\d+$/.test(p))
-      .sort((a, b) => {
-        const idxA = priority.indexOf(a);
-        const idxB = priority.indexOf(b);
-        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-        if (idxA !== -1) return -1;
-        if (idxB !== -1) return 1;
-        return a.localeCompare(b);
-      });
-
-    const availablePtres: PtresItem[] = [
-      { code: 'all', name: 'Todos os recursos (PTRES)', shortLabel: 'Todos' },
-      ...sortedPtresCodes.map((code) => ({
-        code,
-        name: KNOWN_PTRES_NAMES[code] || descMap[code] || `PTRES ${code}`,
-        shortLabel: code,
-      })),
-    ];
-
-    if (empenhosError || !empenhosRows || empenhosRows.length === 0) {
-      console.warn('Usando fallback do dashboard:', empenhosError);
-      return {
-        ...dashboardData,
-        selectedPtres,
-        availablePtres,
-        contratosAVencerCount: 11,
-        monthlyChart: [
-          { month: 'Jan', liquidado: 757, pago: 708 },
-          { month: 'Fev', liquidado: 538, pago: 499 },
-          { month: 'Mar', liquidado: 210, pago: 190 },
-          { month: 'Abr', liquidado: 280, pago: 250 },
-          { month: 'Mai', liquidado: 260, pago: 250 },
-          { month: 'Jun', liquidado: 340, pago: 310 },
-        ],
-      };
-    }
-
-    const isFiltered = selectedPtres && selectedPtres !== 'all';
-
-    // Filtragem por PTRES
-    const activeAtividades = isFiltered
-      ? (atividadesRows || []).filter((a: any) => matchesPtres(a.origem_recurso, selectedPtres))
-      : (atividadesRows || []);
-
-    const activeEmpenhos = isFiltered
-      ? (empenhosRows || []).filter((e: any) => matchesPtres(e.origem_recurso, selectedPtres))
-      : (empenhosRows || []);
-
-    const activeDesc = isFiltered
-      ? (descRows || []).filter((d: any) => matchesPtres(d.origem_recurso, selectedPtres))
-      : (descRows || []).filter((d: any) => !isOrigemRecursoIgnoradaNoEmpenhado(d.origem_recurso));
-
-    let creditoDisponivelOficial: number | null = null;
-    if (creditoRows && creditoRows.length > 0) {
-      const activeCred = isFiltered
-        ? creditoRows.filter((c: any) => matchesPtres(c.ptres, selectedPtres))
-        : creditoRows;
-      creditoDisponivelOficial = activeCred.reduce((acc: number, r: any) => acc + (Number(r.valor) || 0), 0);
-    }
-
-    // Totais do exercício alinhados com o Dashboard.tsx da web
-    let totalEmpenhadoParaSoma = 0;
-    let totalLiquidado = 0;
-    let totalPago = 0;
-
-    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const monthlyDataMap: Record<string, { liquidado: number; pago: number }> = {};
-    monthNames.forEach((m) => {
-      monthlyDataMap[m] = { liquidado: 0, pago: 0 };
-    });
-
-    activeEmpenhos.forEach((row: any) => {
-      const val = Number(row.valor) || 0;
-      const liq = Number(row.valor_liquidado_oficial ?? row.valor_liquidado ?? 0);
-      const pag = Number(row.valor_pago_oficial ?? 0);
-
-      // Na web, a soma do empenhado descentralizado desconsidera a origem 230446 (PNAE) quando em visão global
-      if (!isFiltered && isOrigemRecursoIgnoradaNoEmpenhado(row.origem_recurso)) {
-        // Ignora na soma geral de descentralizado
-      } else {
-        totalEmpenhadoParaSoma += val;
-      }
-
-      totalLiquidado += liq;
-      totalPago += pag;
-
-      if (row.data_empenho) {
-        const d = new Date(row.data_empenho);
-        const mIdx = d.getMonth();
-        if (mIdx >= 0 && mIdx < monthNames.length) {
-          const mName = monthNames[mIdx];
-          monthlyDataMap[mName].liquidado += liq / 1000;
-          monthlyDataMap[mName].pago += pag / 1000;
-        }
-      }
-    });
-
-    // Descentralizado
-    const totalDescentralizado =
-      activeDesc.length > 0
-        ? activeDesc.reduce((acc: number, r: any) => acc + (Number(r.valor) || 0), 0)
-        : (isFiltered ? 0 : 2584623.54);
-
-    // Planejado (total das atividades orçadas)
-    const totalPlanejado =
-      activeAtividades.length > 0
-        ? activeAtividades.reduce((acc: number, r: any) => acc + (Number(r.valor_total) || 0), 0)
-        : (isFiltered ? 0 : 3414691.10);
-    const totalAtividades = activeAtividades.length;
-
-    const planejadoInt = Math.round(totalPlanejado);
-    const descentralizadoInt = Math.round(totalDescentralizado);
-    const empenhadoInt = Math.round(totalEmpenhadoParaSoma);
-    const aDescentralizarInt = planejadoInt - descentralizadoInt;
-    const saldoDisponivelInt = Math.max(0, descentralizadoInt - empenhadoInt);
-    const creditoDisponivelFinal =
-      creditoDisponivelOficial !== null ? creditoDisponivelOficial : saldoDisponivelInt;
-    const creditoDisponivelInt = Math.round(creditoDisponivelFinal);
-    const liquidadoInt = Math.round(totalLiquidado);
-    const pagoInt = Math.round(totalPago);
-    const aPagarInt = Math.max(0, liquidadoInt - pagoInt);
-
-    const percentualExecutadoNum =
-      totalPlanejado > 0
-        ? Number(((totalEmpenhadoParaSoma / totalPlanejado) * 100).toFixed(1))
-        : 0;
-    const percentualExecutado = percentualExecutadoNum.toFixed(1).replace('.', ',') + '%';
-
-    const percentualDescentralizadoPlanejadoNum =
-      totalPlanejado > 0
-        ? Number(((totalDescentralizado / totalPlanejado) * 100).toFixed(1))
-        : (descentralizadoInt > 0 ? 100 : 0);
-
-    const empenhadoNum =
-      totalDescentralizado > 0
-        ? Number(((totalEmpenhadoParaSoma / totalDescentralizado) * 100).toFixed(1))
-        : 0;
-    const pctEmpenhado = empenhadoNum.toFixed(1).replace('.', ',') + '%';
-
-    const creditoNum =
-      totalDescentralizado > 0
-        ? Number(((creditoDisponivelFinal / totalDescentralizado) * 100).toFixed(1))
-        : 0;
-    const pctCreditoDisponivel = creditoNum.toFixed(1).replace('.', ',') + '%';
-
-    const saldoNum =
-      totalDescentralizado > 0
-        ? Number(((saldoDisponivelInt / totalDescentralizado) * 100).toFixed(1))
-        : 0;
-    const pctSaldo = saldoNum.toFixed(1).replace('.', ',') + '%';
-
-    const liquidadoNum =
-      totalEmpenhadoParaSoma > 0
-        ? Number(((totalLiquidado / totalEmpenhadoParaSoma) * 100).toFixed(1))
-        : 0;
-    const pctLiquidado = liquidadoNum.toFixed(1).replace('.', ',') + '%';
-
-    const pagoNum =
-      totalLiquidado > 0
-        ? Number(((totalPago / totalLiquidado) * 100).toFixed(1))
-        : 0;
-    const pctPago = pagoNum.toFixed(1).replace('.', ',') + '%';
-
-    let contratosGlobal = 0;
-    let contratosVigentes = 0;
-    let contratosAVencerCount = 0;
-
-    (contratosRows || []).forEach((c) => {
-      const isVigente = c.situacao === true;
-      if (isVigente) {
-        contratosVigentes++;
-        contratosGlobal += Number(c.valor_global) || 0;
-        const remaining = getDaysRemaining(c.vigencia_fim);
-        if (remaining.warning) {
-          contratosAVencerCount++;
-        }
-      }
-    });
-
-    const now = new Date();
-    const formattedRef = `${String(now.getDate()).padStart(2, '0')} set. ${now.getFullYear()} · ${String(
-      now.getHours()
-    ).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-    // Monta os 6 meses para o gráfico (Jan a Jun ou meses com execução)
-    const monthlyChart = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'].map((m) => ({
-      month: m,
-      liquidado: Math.round(monthlyDataMap[m]?.liquidado || 0),
-      pago: Math.round(monthlyDataMap[m]?.pago || 0),
-    }));
-
-    return {
-      exercicio: '2026',
-      usuario: 'Cristiano',
-      campus: 'Campus Currais Novos',
-      instituicao: 'IFRN',
-      selectedPtres,
-      availablePtres,
-      planejado: planejadoInt,
-      totalAtividades,
-      percentualExecutado,
-      percentualExecutadoNum,
-      percentualDescentralizadoPlanejadoNum,
-      aDescentralizar: aDescentralizarInt,
-      creditoDisponivel: creditoDisponivelInt,
-      percentualCreditoDisponivel: pctCreditoDisponivel,
-      saldoDisponivel: saldoDisponivelInt,
-      percentualDescentralizado: pctSaldo,
-      descentralizado: descentralizadoInt,
-      empenhado: empenhadoInt,
-      percentualEmpenhado: pctEmpenhado,
-      empenhadoDescentralizadoPct: empenhadoNum,
-      liquidado: liquidadoInt,
-      liquidadoPct: pctLiquidado,
-      pago: pagoInt,
-      pagoPct: pctPago,
-      aPagar: aPagarInt,
-      totalEmpenhos: activeEmpenhos.length,
-      contratosValorGlobal: Math.round(contratosGlobal || 50651970),
-      contratosVigentes: contratosVigentes || 54,
-      contratosAVencerCount: contratosAVencerCount || 11,
-      referencia: formattedRef,
-      monthlyChart,
-    };
-  } catch (err) {
-    console.warn('Erro ao buscar métricas do Supabase, usando mock:', err);
-    return {
-      ...dashboardData,
-      selectedPtres,
-      availablePtres: defaultPtresList,
-      contratosAVencerCount: 11,
-      monthlyChart: [
-        { month: 'Jan', liquidado: 757, pago: 708 },
-        { month: 'Fev', liquidado: 538, pago: 499 },
-        { month: 'Mar', liquidado: 210, pago: 190 },
-        { month: 'Abr', liquidado: 280, pago: 250 },
-        { month: 'Mai', liquidado: 260, pago: 250 },
-        { month: 'Jun', liquidado: 340, pago: 310 },
-      ],
-    };
-  }
-}
-
 export async function fetchEmpenhos(
   campusUasg = DEFAULT_CAMPUS_UASG,
   tipoFilter: 'exercicio' | 'rap' | 'all' = 'all'
@@ -514,7 +121,7 @@ export async function fetchEmpenhos(
     let query = supabase
       .from('empenhos')
       .select(
-        'id, numero, descricao, valor, valor_liquidado, valor_liquidado_oficial, valor_pago_oficial, saldo_rap_oficial, rap_inscrito, rap_a_liquidar, rap_liquidado, rap_pago, valor_liquidado_a_pagar, status, data_empenho, natureza_despesa, favorecido_nome, tipo'
+        'id, numero, descricao, valor, valor_liquidado, valor_liquidado_oficial, valor_pago_oficial, saldo_rap_oficial, rap_inscrito, rap_a_liquidar, rap_liquidado, rap_pago, valor_liquidado_a_pagar, status, data_empenho, natureza_despesa, favorecido_nome, tipo, processo, plano_interno, origem_recurso'
       )
       .eq('campus_uasg', campusUasg)
       .neq('status', 'cancelado')
@@ -526,10 +133,8 @@ export async function fetchEmpenhos(
 
     const { data, error } = await query;
 
-    if (error || !data || data.length === 0) {
-      console.warn('Usando lista fallback de empenhos:', error);
-      return empenhosData;
-    }
+    if (error) throw new Error(error.message);
+    if (!data) return [];
 
     return data.map((row) => {
       const isRap = row.tipo === 'rap';
@@ -559,6 +164,10 @@ export async function fetchEmpenhos(
           date: formatDatePtBR(row.data_empenho),
           nd: row.natureza_despesa || '339039',
           tipo: 'rap',
+          processo: row.processo ?? null,
+          planoInterno: row.plano_interno ?? null,
+          origem: row.origem_recurso ?? null,
+          liquidado: Number(row.rap_liquidado ?? 0),
         };
       }
 
@@ -599,11 +208,15 @@ export async function fetchEmpenhos(
         date: formatDatePtBR(row.data_empenho),
         nd: row.natureza_despesa || '339039',
         tipo: 'exercicio',
+        processo: row.processo ?? null,
+        planoInterno: row.plano_interno ?? null,
+        origem: row.origem_recurso ?? null,
+        liquidado,
       };
     });
   } catch (err) {
     console.error('Erro ao buscar empenhos:', err);
-    return empenhosData;
+    throw err;
   }
 }
 
@@ -792,14 +405,11 @@ export async function fetchNotifications(
       })
       .sort((a, b) => b.date.getTime() - a.date.getTime());
 
-    const interleaved = interleaveEvents(sortedEmpenhos, sortedDescentralizacoes, sortedRequisicoes, 60);
-    if (interleaved.length > 0) {
-      return interleaved;
-    }
-    return mockNotificationsData;
+    return interleaveEvents(sortedEmpenhos, sortedDescentralizacoes, sortedRequisicoes, 60);
   } catch (err) {
-    console.warn('Erro ao buscar notificações do backend, usando mock:', err);
-    return mockNotificationsData;
+    // Notificações são complementares: em falha o sino fica vazio (nunca exibimos avisos fictícios).
+    console.warn('Erro ao buscar notificações do backend:', err);
+    return [];
   }
 }
 
@@ -814,7 +424,7 @@ export async function fetchPregoes(
       .limit(100);
 
     if (error) throw error;
-    if (!data || data.length === 0) return pregoesData;
+    if (!data || data.length === 0) return [];
 
     const now = new Date().getTime();
 
@@ -870,7 +480,7 @@ export async function fetchPregoes(
     });
   } catch (err) {
     console.warn('Erro ao buscar pregões, usando mock:', err);
-    return pregoesData;
+    return [];
   }
 }
 
@@ -885,7 +495,7 @@ export async function fetchAtas(
       .limit(100);
 
     if (error) throw error;
-    if (!data || data.length === 0) return atasData;
+    if (!data || data.length === 0) return [];
 
     const now = new Date().getTime();
 
@@ -948,7 +558,7 @@ export async function fetchAtas(
     });
   } catch (err) {
     console.warn('Erro ao buscar atas, usando mock:', err);
-    return atasData;
+    return [];
   }
 }
 
@@ -961,7 +571,7 @@ export async function fetchOcorrencias(): Promise<OcorrenciaItem[]> {
 
     if (error || !data || data.length === 0) {
       if (error) console.warn('Erro ao buscar ocorrências no Supabase:', error);
-      return ocorrenciasData;
+      return [];
     }
 
     return data.map((row: any) => ({
@@ -979,7 +589,7 @@ export async function fetchOcorrencias(): Promise<OcorrenciaItem[]> {
     }));
   } catch (err) {
     console.warn('Erro ao buscar ocorrências, usando fallback:', err);
-    return ocorrenciasData;
+    return [];
   }
 }
 
@@ -993,7 +603,7 @@ export async function fetchEnergiaFaturas(): Promise<EnergiaFaturaItem[]> {
 
     if (error || !data || data.length === 0) {
       if (error) console.warn('Erro ao buscar faturas de energia:', error);
-      return energiaFaturasData;
+      return [];
     }
 
     return data.map((row: any) => ({
@@ -1009,7 +619,7 @@ export async function fetchEnergiaFaturas(): Promise<EnergiaFaturaItem[]> {
     }));
   } catch (err) {
     console.warn('Erro ao buscar faturas de energia, usando fallback:', err);
-    return energiaFaturasData;
+    return [];
   }
 }
 
@@ -1022,7 +632,7 @@ export async function fetchEnergiaSolar(): Promise<EnergiaSolarItem[]> {
 
     if (error || !data || data.length === 0) {
       if (error) console.warn('Erro ao buscar dados solar:', error);
-      return energiaSolarData;
+      return [];
     }
 
     return data.map((row: any) => ({
@@ -1035,7 +645,7 @@ export async function fetchEnergiaSolar(): Promise<EnergiaSolarItem[]> {
     }));
   } catch (err) {
     console.warn('Erro ao buscar dados de energia solar, usando fallback:', err);
-    return energiaSolarData;
+    return [];
   }
 }
 
@@ -1066,7 +676,7 @@ export async function fetchPortariaEventos(campusUasg?: string): Promise<Portari
 
     if (error || !data || data.length === 0) {
       if (error) console.warn('Erro ao buscar eventos da portaria no Supabase:', error);
-      return portariaEventosData;
+      return [];
     }
 
     return data.map((row: any) => {
@@ -1095,7 +705,7 @@ export async function fetchPortariaEventos(campusUasg?: string): Promise<Portari
     });
   } catch (err) {
     console.warn('Erro ao buscar eventos da portaria, usando fallback:', err);
-    return portariaEventosData;
+    return [];
   }
 }
 
@@ -1109,7 +719,7 @@ export async function fetchPortariaParticipantes(eventoId: string): Promise<Port
 
     if (error || !data || data.length === 0) {
       if (error) console.warn('Erro ao buscar participantes da portaria:', error);
-      return portariaParticipantesData[eventoId] || [];
+      return [];
     }
 
     return data.map((row: any) => ({
@@ -1126,7 +736,7 @@ export async function fetchPortariaParticipantes(eventoId: string): Promise<Port
     }));
   } catch (err) {
     console.warn('Erro em fetchPortariaParticipantes:', err);
-    return portariaParticipantesData[eventoId] || [];
+    return [];
   }
 }
 

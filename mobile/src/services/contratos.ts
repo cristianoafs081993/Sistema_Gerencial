@@ -6,6 +6,7 @@ import {
   faturaPendente,
   valorTotalDoHistorico,
 } from '../lib/contratosRules';
+import { chunk, lerTudo, tabelaInexistente, type Row } from './query';
 import type {
   ContratoDetalhe,
   ContratoEmpenhoLinha,
@@ -22,32 +23,11 @@ import type {
  * nunca dados de demonstração.
  */
 
-const PAGE_SIZE = 1000;
 const IN_CHUNK = 80;
 const ESCOPO_LEGADO = ['ug_campus', 'reitoria_com_empenho_campus', 'reitoria_com_fatura_campus'];
 
 const CONTRATO_COLUNAS =
   'id, numero, fornecedor_nome, objeto, processo, categoria, unidade_origem_nome, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, situacao, situacao_derivada';
-
-type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-
-function chunk<T>(list: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
-  return out;
-}
-
-/** Consulta paginada (PostgREST devolve no máximo 1000 linhas por chamada). */
-async function lerTudo(factory: (from: number, to: number) => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>): Promise<Row[]> {
-  const rows: Row[] = [];
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await factory(from, from + PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    rows.push(...(data ?? []));
-    if (!data || data.length < PAGE_SIZE) break;
-  }
-  return rows;
-}
 
 async function lerPorContratos(
   tabela: string,
@@ -65,10 +45,6 @@ async function lerPorContratos(
     ),
   );
   return partes.flat();
-}
-
-function tabelaInexistente(error: { code?: string; message?: string } | null): boolean {
-  return Boolean(error && (error.code === '42P01' || error.code === 'PGRST205' || /does not exist|could not find the table/i.test(error.message || '')));
 }
 
 async function idsNoEscopoDoCampus(campusUasg: string): Promise<string[] | null> {
@@ -91,7 +67,8 @@ function iconeDoContrato(objeto: string, categoria: string | null): ContratoItem
 
 const numero = (valor: unknown): number => Number(valor) || 0;
 
-export async function fetchContratos(campusUasg: string = DEFAULT_CAMPUS_UASG, hoje = new Date()): Promise<ContratoItem[]> {
+/** Contratos do campus que o web mostra por padrão (vigentes e expirados há até 120 dias). */
+async function carregarContratosVisiveis(campusUasg: string, hoje: Date): Promise<Row[]> {
   const escopo = await idsNoEscopoDoCampus(campusUasg);
   if (escopo && escopo.length === 0) return [];
 
@@ -107,9 +84,34 @@ export async function fetchContratos(campusUasg: string = DEFAULT_CAMPUS_UASG, h
     )
   ).flat();
 
-  const visiveis = contratos.filter((c) =>
+  return contratos.filter((c) =>
     contratoVisivelPorPadrao(c.vigencia_fim_derivada ?? c.vigencia_fim, c.situacao_derivada ?? c.situacao, hoje),
   );
+}
+
+export type ResumoContratos = { ativos: number; aVencer: number; valorAtivos: number };
+
+/** Contagens rápidas (sem empenhos/faturas) para o Dashboard, com a mesma regra da tela de Contratos. */
+export async function fetchResumoContratos(campusUasg: string = DEFAULT_CAMPUS_UASG, hoje = new Date()): Promise<ResumoContratos> {
+  const contratos = await carregarContratosVisiveis(campusUasg, hoje);
+  const resumo: ResumoContratos = { ativos: 0, aVencer: 0, valorAtivos: 0 };
+  for (const c of contratos) {
+    const vigencia = calcularVigencia(
+      c.vigencia_inicio_derivada ?? c.vigencia_inicio,
+      c.vigencia_fim_derivada ?? c.vigencia_fim,
+      c.situacao_derivada ?? c.situacao,
+      hoje,
+    );
+    if (vigencia.status === 'expirado') continue;
+    resumo.ativos += 1;
+    resumo.valorAtivos += numero(c.valor_global);
+    if (vigencia.status === 'a_vencer') resumo.aVencer += 1;
+  }
+  return resumo;
+}
+
+export async function fetchContratos(campusUasg: string = DEFAULT_CAMPUS_UASG, hoje = new Date()): Promise<ContratoItem[]> {
+  const visiveis = await carregarContratosVisiveis(campusUasg, hoje);
   if (visiveis.length === 0) return [];
 
   const ids = visiveis.map((c) => c.id as string);

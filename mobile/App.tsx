@@ -17,6 +17,7 @@ import { AccessStateScreen } from './src/screens/AccessStateScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import type { AppAccess } from './src/services/access';
+import { primeiroNome } from './src/lib/format';
 import { fetchNotifications } from './src/services/api';
 
 function initialsFromEmail(email?: string | null): string {
@@ -29,10 +30,11 @@ function initialsFromEmail(email?: string | null): string {
 type AuthenticatedAppProps = {
   access: AppAccess;
   email?: string | null;
+  userName: string;
   onSignOut: () => void;
 };
 
-function AuthenticatedApp({ access, email, onSignOut }: AuthenticatedAppProps) {
+function AuthenticatedApp({ access, email, userName, onSignOut }: AuthenticatedAppProps) {
   const allowedTabs = access.tabs;
   const [currentTab, setCurrentTabState] = useState<TabType>(
     allowedTabs.includes('dashboard') ? 'dashboard' : allowedTabs[0],
@@ -97,6 +99,8 @@ function AuthenticatedApp({ access, email, onSignOut }: AuthenticatedAppProps) {
       <View style={styles.screenContainer}>
         {currentTab === 'dashboard' && (
           <DashboardScreen
+            userName={userName}
+            canOpenContratos={allowedTabs.includes('contratos')}
             onNavigateToContratosAlert={handleNavigateToContratosAlert}
           />
         )}
@@ -177,7 +181,7 @@ function Gate() {
       />
     );
   }
-  return <AuthenticatedApp access={access} email={user?.email} onSignOut={signOut} />;
+  return <AuthenticatedApp access={access} email={user?.email} userName={primeiroNome(user)} onSignOut={signOut} />;
 }
 
 export default function App() {

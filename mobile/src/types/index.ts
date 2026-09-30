@@ -131,6 +131,11 @@ export interface EmpenhoItem {
   tipo?: 'exercicio' | 'rap';
   saldo?: number;
   inscrito?: number;
+  processo?: string | null;
+  planoInterno?: string | null;
+  origem?: string | null;
+  /** Valor liquidado (RAP: liquidado no ano). */
+  liquidado?: number;
 }
 
 export type ContratoStatus = 'vigente' | 'a_vencer' | 'expirado';

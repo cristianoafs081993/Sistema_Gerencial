@@ -47,19 +47,18 @@ Arquivos: `src/contexts/AuthContext.tsx` (estado da sessão), `src/screens/Login
 ## Telas Implementadas
 
 1. **Dashboard (Visão Geral - 01)**:
-   - Identificação do campus: `IFRN / Campus Currais Novos`.
-   - **Filtro funcional por PTRES / Origem de Recurso**: Seletor interativo no topo (`[ 🏷️ PTRES: Todos ▾ ]` ou `[ 🏷️ PTRES 231796 ▾ ]`) que abre modal com busca e opções consolidadas (`Todos`, `231796 - PROAD`, `261941 - DIAE`, `231802 - PROEN`, `231798 - PROEN`, `171166 - DIGPE`, `260296 - PROEN`, etc.), recalculando instantaneamente Planejado, Descentralizado, Empenhado, Crédito Disponível, Liquidado, Pago e o gráfico de evolução semestral.
-   - Card Hero de **Planejado**: com gradiente azul-céu (`#1976D2` a `#1E88E5`, design system Céu do web), valor em tempo real convergente com o sistema web (R$ 3,41M geral e R$ 2,35M no PTRES 231796), quantidade de atividades e rosca de progresso empenhado/descentralizado.
-   - Grid de indicadores de execução: Empenhado, Crédito Disponível (oficial SIAFI), Liquidado e Pago.
-   - Faixa auxiliar: A pagar e percentual de execução no planejado.
-   - Card de **Execução no Semestre**: Gráfico vetorial SVG dinâmico com barras pareadas escaladas proporcionalmente aos valores reais.
-   - Card de alerta contratual dinâmico: indica a quantidade de contratos prestes a vencer e redireciona com 1 toque para a aba de Contratos com filtro ativo.
+   - Saudação com o nome do usuário logado e filtro por **PTRES / origem de recurso** (recalcula todo o painel). A lista de PTRES vem dos dados reais (atividades, empenhos, descentralizações e crédito), com os principais primeiro.
+   - Card **Planejado** (gradiente azul-céu): valor, atividades, % executado, barra de descentralização e os totais Descentralizado / A descentralizar.
+   - **Velocímetros de execução** (essenciais ao painel, portados do web): Empenhado/Descentralizado e Liquidado/Descentralizado, escala vermelho → verde com ponteiro animado.
+   - Indicadores (Empenhado, Crédito disponível oficial do SIAFI, Liquidado, Pago) com barra e % de referência, faixa "A pagar", **funil de execução** (Planejado → Pago) e **gráfico mensal** de empenhado e liquidado por mês do empenho (toque no mês para ver os valores exatos).
+   - Alerta de contratos que vencem em até 90 dias (mesma regra da aba Contratos); só aparece se houver contratos a vencer.
+   - **Mesmos números do web**: o "descentralizado" é o saldo oficial da conta de descentralizações por PTRES (`descentralizacoes_conta_saldos`), a origem 230446 (PNAE) fica fora da soma global, e o empenhado/liquidado/pago seguem as colunas oficiais. Regras puras em `mobile/src/lib/dashboardRules.ts`; consultas em `mobile/src/services/dashboard.ts`.
+   - Sem dados de demonstração: falha de rede mostra erro com "Tentar novamente"; recorte vazio mostra "Sem dados neste recorte"; carregamento usa esqueletos.
 
 2. **Empenhos (Execução Orçamentária - 02)**:
-   - Faixa de resumo com totais reais do exercício.
-   - Busca em tempo real por número de NE, fornecedor ou texto da descrição.
-   - Filtro por chips: `Todos`, `Exercício`, `Restos a pagar`.
-   - Cards com código NE, barra de progresso da liquidação/pagamento, datas, ND e saldos.
+   - Resumo separado: **empenhado do exercício** (com pago) e **saldo de restos a pagar**, nunca somados entre si.
+   - Busca por número, fornecedor ou descrição; filtros por tipo (Todos, Exercício, Restos a pagar, com contagem) e por situação (A liquidar, A pagar, Pagos). Lista virtualizada (377 empenhos).
+   - Cartão com NE, situação, fornecedor, descrição, valores e progresso do pagamento; **toque abre o detalhe** com execução financeira, descrição completa, natureza da despesa, plano interno, origem do recurso e processo.
 
 3. **Contratos (Gestão Contratual - 03)**:
    - Dados reais do Comprasnet (`contratos_api*`), com as mesmas regras do web: contratos no escopo do campus (`contratos_api_campus_scope`), situação e vigência derivadas no servidor, lista padrão com vigentes e expirados há até 120 dias, valor global pela soma dos termos do histórico, empenhos apenas da UG do campus e faturas pendentes (situação diferente de "Pago" e "SIAFI Apropriado"). Regras puras em `mobile/src/lib/contratosRules.ts`; consultas em `mobile/src/services/contratos.ts`.
