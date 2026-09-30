@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 6,
     paddingHorizontal: 10,
-    backgroundColor: '#ecf1ff',
+    backgroundColor: '#EAF3FD',
     borderWidth: 1,
     borderColor: '#d7e2fc',
     borderRadius: 10,
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
   balanceCard: {
     padding: 22,
     borderRadius: 22,
-    shadowColor: '#234fc8',
+    shadowColor: '#1976D2',
     shadowOffset: { width: 0, height: 9 },
     shadowOpacity: 0.18,
     shadowRadius: 18,
@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
   },
   subtleText: {
     fontSize: 12,
-    color: '#d1ddff',
+    color: '#D6E8FB',
   },
   balanceFoot: {
     marginTop: 22,
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
   },
   footLabel: {
     fontSize: 12,
-    color: '#d1ddff',
+    color: '#D6E8FB',
   },
   footValue: {
     fontSize: 16,

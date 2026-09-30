@@ -85,11 +85,11 @@ export const PtresFilterModal: React.FC<PtresFilterModalProps> = ({
           {/* Search box if options > 5 */}
           {options.length > 5 && (
             <View style={styles.searchBox}>
-              <IconSearch size={16} color="#8b97aa" />
+              <IconSearch size={16} color="#7C8DA6" />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Buscar código ou descrição do PTRES..."
-                placeholderTextColor="#7c899d"
+                placeholderTextColor="#6B7C8F"
                 value={searchTerm}
                 onChangeText={setSearchTerm}
                 clearButtonMode="while-editing"
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 10,
-    backgroundColor: '#ecf1ff',
+    backgroundColor: '#EAF3FD',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     borderColor: '#cbd5e1',
   },
   codeBadgeSelected: {
-    backgroundColor: '#ecf1ff',
+    backgroundColor: '#EAF3FD',
     borderColor: colors.blue,
   },
   codeBadgeAll: {

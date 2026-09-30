@@ -18,7 +18,7 @@ export const EmpenhoCard: React.FC<EmpenhoCardProps> = ({ item }) => {
   let badgeBg = colors.greenBg;
   let badgeText = colors.greenText;
   if (item.badge === 'blue') {
-    badgeBg = '#ecf1ff';
+    badgeBg = '#EAF3FD';
     badgeText = '#4265ba';
   } else if (item.badge === 'amber') {
     badgeBg = colors.amberBadgeBg;

@@ -39,7 +39,7 @@ O app mobile conecta-se diretamente ao Supabase através da biblioteca `@supabas
 1. **Dashboard (Visão Geral - 01)**:
    - Identificação do campus: `IFRN / Campus Currais Novos`.
    - **Filtro funcional por PTRES / Origem de Recurso**: Seletor interativo no topo (`[ 🏷️ PTRES: Todos ▾ ]` ou `[ 🏷️ PTRES 231796 ▾ ]`) que abre modal com busca e opções consolidadas (`Todos`, `231796 - PROAD`, `261941 - DIAE`, `231802 - PROEN`, `231798 - PROEN`, `171166 - DIGPE`, `260296 - PROEN`, etc.), recalculando instantaneamente Planejado, Descentralizado, Empenhado, Crédito Disponível, Liquidado, Pago e o gráfico de evolução semestral.
-   - Card Hero de **Planejado**: com gradiente (`#10307e` a `#234fc8`), valor em tempo real convergente com o sistema web (R$ 3,41M geral e R$ 2,35M no PTRES 231796), quantidade de atividades e rosca de progresso empenhado/descentralizado.
+   - Card Hero de **Planejado**: com gradiente azul-céu (`#1976D2` a `#1E88E5`, design system Céu do web), valor em tempo real convergente com o sistema web (R$ 3,41M geral e R$ 2,35M no PTRES 231796), quantidade de atividades e rosca de progresso empenhado/descentralizado.
    - Grid de indicadores de execução: Empenhado, Crédito Disponível (oficial SIAFI), Liquidado e Pago.
    - Faixa auxiliar: A pagar e percentual de execução no planejado.
    - Card de **Execução no Semestre**: Gráfico vetorial SVG dinâmico com barras pareadas escaladas proporcionalmente aos valores reais.
@@ -85,3 +85,12 @@ Escaneie o QR Code no app **Expo Go** (Android ou iOS).
 ```bash
 npm run mobile:web
 ```
+
+### Requisitos
+
+- **Node.js >= 20.19.4** (exigido pelo Expo SDK 57). Com Node 20.18 o app ainda sobe, mas o Expo CLI avisa que a versão é não suportada; atualize o Node antes de gerar builds.
+- Na primeira vez, rode `npm --prefix mobile install`.
+
+## Design system
+
+O app usa os tokens do design system Céu do web (azul-céu `#1976D2`/`#1E88E5`, ciano `#00B7DC`, superfícies `#F6F9FD`), definidos em [`mobile/src/constants/theme.ts`](../../mobile/src/constants/theme.ts). Ao mudar o visual do web, atualize o tema do mobile no mesmo trabalho.

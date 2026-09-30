@@ -130,7 +130,7 @@ export const EmpenhosScreen: React.FC = () => {
       <View style={styles.titleRow}>
         <Text style={styles.titleText}>Empenhos</Text>
         <View style={styles.yearBadge}>
-          <IconCalendar size={14} color="#51627b" />
+          <IconCalendar size={14} color="#4F6580" />
           <Text style={styles.yearText}>2026</Text>
         </View>
       </View>
@@ -164,11 +164,11 @@ export const EmpenhosScreen: React.FC = () => {
 
       {/* Search Input Box */}
       <View style={styles.searchBox}>
-        <IconSearch size={19} color="#8b97aa" />
+        <IconSearch size={19} color="#7C8DA6" />
         <TextInput
           style={styles.searchInput}
           placeholder="Buscar número ou fornecedor"
-          placeholderTextColor="#7c899d"
+          placeholderTextColor="#6B7C8F"
           value={searchQuery}
           onChangeText={setSearchQuery}
           clearButtonMode="while-editing"
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
   },
   yearText: {
     fontSize: 12,
-    color: '#51627b',
+    color: '#4F6580',
     fontWeight: '500',
   },
   listIntro: {

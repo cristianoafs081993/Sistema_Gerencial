@@ -25,7 +25,7 @@ export const AtaCard: React.FC<AtaCardProps> = ({ item }) => {
   }
 
   // Vínculo badge
-  let vinculoBg = '#ecf1ff';
+  let vinculoBg = '#EAF3FD';
   let vinculoText = colors.blue;
   let vinculoLabel = 'Gerenciadora';
 
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 9,
-    backgroundColor: '#ecf1ff',
+    backgroundColor: '#EAF3FD',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -128,7 +128,7 @@ export const ContratosScreen: React.FC<ContratosScreenProps> = ({
       <View style={styles.titleRow}>
         <Text style={styles.titleText}>Contratos</Text>
         <View style={styles.campusBadge}>
-          <IconShield size={14} color="#51627b" />
+          <IconShield size={14} color="#4F6580" />
           <Text style={styles.campusBadgeText}>Campus</Text>
         </View>
       </View>
@@ -155,11 +155,11 @@ export const ContratosScreen: React.FC<ContratosScreenProps> = ({
 
       {/* Search Input Box */}
       <View style={styles.searchBox}>
-        <IconSearch size={19} color="#8b97aa" />
+        <IconSearch size={19} color="#7C8DA6" />
         <TextInput
           style={styles.searchInput}
           placeholder="Buscar contrato ou empresa"
-          placeholderTextColor="#7c899d"
+          placeholderTextColor="#6B7C8F"
           value={searchQuery}
           onChangeText={setSearchQuery}
           clearButtonMode="while-editing"
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   },
   campusBadgeText: {
     fontSize: 12,
-    color: '#51627b',
+    color: '#4F6580',
     fontWeight: '500',
   },
   listIntro: {

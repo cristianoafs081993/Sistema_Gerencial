@@ -18,7 +18,7 @@ export const PregaoCard: React.FC<PregaoCardProps> = ({ item }) => {
     badgeBg = colors.greenBg;
     badgeText = colors.greenText;
   } else if (item.statusProposta === 'Futura') {
-    badgeBg = '#ecf1ff';
+    badgeBg = '#EAF3FD';
     badgeText = '#4265ba';
   } else if (item.statusProposta === 'Em andamento') {
     badgeBg = colors.amberBadgeBg;
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 9,
-    backgroundColor: '#ecf1ff',
+    backgroundColor: '#EAF3FD',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 7,
-    backgroundColor: '#ecf1ff',
+    backgroundColor: '#EAF3FD',
   },
   linkButtonText: {
     fontSize: 11,

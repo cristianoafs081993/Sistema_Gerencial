@@ -172,7 +172,7 @@ export const LicitacoesScreen: React.FC = () => {
       <View style={styles.titleRow}>
         <Text style={styles.titleText}>Licitações</Text>
         <View style={styles.campusBadge}>
-          <IconGavel size={14} color="#51627b" />
+          <IconGavel size={14} color="#4F6580" />
           <Text style={styles.campusBadgeText}>PNCP / Compras</Text>
         </View>
       </View>
@@ -260,11 +260,11 @@ export const LicitacoesScreen: React.FC = () => {
 
           {/* Search Box */}
           <View style={styles.searchBox}>
-            <IconSearch size={19} color="#8b97aa" />
+            <IconSearch size={19} color="#7C8DA6" />
             <TextInput
               style={styles.searchInput}
               placeholder="Buscar pregão, objeto ou UASG"
-              placeholderTextColor="#7c899d"
+              placeholderTextColor="#6B7C8F"
               value={searchQuery}
               onChangeText={setSearchQuery}
               clearButtonMode="while-editing"
@@ -339,11 +339,11 @@ export const LicitacoesScreen: React.FC = () => {
 
           {/* Search Box */}
           <View style={styles.searchBox}>
-            <IconSearch size={19} color="#8b97aa" />
+            <IconSearch size={19} color="#7C8DA6" />
             <TextInput
               style={styles.searchInput}
               placeholder="Buscar ata, compra ou objeto"
-              placeholderTextColor="#7c899d"
+              placeholderTextColor="#6B7C8F"
               value={searchQuery}
               onChangeText={setSearchQuery}
               clearButtonMode="while-editing"
@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
   campusBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#51627b',
+    color: '#4F6580',
   },
   listIntro: {
     fontSize: 13,

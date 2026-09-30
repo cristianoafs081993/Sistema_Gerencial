@@ -78,7 +78,7 @@ export const ExecutionChart: React.FC<ExecutionChartProps> = ({
             y1="15"
             x2="304"
             y2="15"
-            stroke="#edf0f6"
+            stroke="#E6EDF5"
             strokeDasharray="3 3"
           />
           <Line
@@ -86,7 +86,7 @@ export const ExecutionChart: React.FC<ExecutionChartProps> = ({
             y1="65"
             x2="304"
             y2="65"
-            stroke="#edf0f6"
+            stroke="#E6EDF5"
             strokeDasharray="3 3"
           />
           <Line
@@ -94,22 +94,22 @@ export const ExecutionChart: React.FC<ExecutionChartProps> = ({
             y1="115"
             x2="304"
             y2="115"
-            stroke="#edf0f6"
+            stroke="#E6EDF5"
             strokeDasharray="3 3"
           />
 
           {/* Y Axis Labels */}
-          <SvgText x="0" y="19" fontSize="12" fill="#7b879b">
+          <SvgText x="0" y="19" fontSize="12" fill="#6B7C8F">
             {maxScale}
           </SvgText>
-          <SvgText x="0" y="69" fontSize="12" fill="#7b879b">
+          <SvgText x="0" y="69" fontSize="12" fill="#6B7C8F">
             {midScale}
           </SvgText>
-          <SvgText x="15" y="119" fontSize="12" fill="#7b879b">
+          <SvgText x="15" y="119" fontSize="12" fill="#6B7C8F">
             0
           </SvgText>
 
-          {/* Liquidado Bars (#214bc6) */}
+          {/* Liquidado Bars (#1976D2) */}
           <G fill={colors.blue}>
             {monthsToRender.map((m, idx) => {
               const pos = xPositions[idx];
@@ -127,7 +127,7 @@ export const ExecutionChart: React.FC<ExecutionChartProps> = ({
             })}
           </G>
 
-          {/* Pago Bars (#afc4ff) */}
+          {/* Pago Bars (#B3D5F7) */}
           <G fill={colors.blueLight}>
             {monthsToRender.map((m, idx) => {
               const pos = xPositions[idx];
@@ -155,7 +155,7 @@ export const ExecutionChart: React.FC<ExecutionChartProps> = ({
                   x={pos.text}
                   y="138"
                   fontSize="12"
-                  fill="#7b879b"
+                  fill="#6B7C8F"
                 >
                   {m.month}
                 </SvgText>
