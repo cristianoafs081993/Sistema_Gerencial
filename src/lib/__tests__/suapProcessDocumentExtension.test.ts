@@ -619,6 +619,72 @@ describe('process-document 1.9', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('alterna para o estado conectado com email e botao sair quando autenticado, e volta ao form ao sair', async () => {
+    const fakeToken = 'header.' + btoa(JSON.stringify({ email: 'gestor@siages.gov.br' })) + '.sig';
+    localValues['siages-extension-session'] = {
+      accessToken: fakeToken,
+      refreshToken: 'refresh-token',
+      expiresAt: Date.now() / 1000 + 3600,
+    };
+    const api = loadProcessScript();
+    await api.installToolkit();
+    api.selectTab('settings');
+
+    const form = document.querySelector('.suape-auth-form') as HTMLFormElement;
+    expect(form).toBeTruthy();
+
+    await waitFor(() => expect(form.dataset.authenticated).toBe('true'));
+
+    const connectedBox = form.querySelector('[data-auth-connected-box]') as HTMLElement;
+    const emailEl = form.querySelector('.suape-auth-user-email') as HTMLElement;
+    const signInBtn = form.querySelector('[data-signin]') as HTMLElement;
+    const signOutBtn = form.querySelector('[data-signout]') as HTMLButtonElement;
+    const emailField = form.querySelector('label[for="suape-auth-email"]') as HTMLElement;
+    const passwordField = form.querySelector('label[for="suape-auth-password"]') as HTMLElement;
+
+    expect(connectedBox.style.display).not.toBe('none');
+    expect(emailEl).toHaveTextContent('gestor@siages.gov.br');
+    expect(emailField.style.display).toBe('none');
+    expect(passwordField.style.display).toBe('none');
+    expect(signInBtn.style.display).toBe('none');
+    expect(signOutBtn.style.display).not.toBe('none');
+    expect(form.querySelector('[data-auth-message]')).toHaveTextContent('Sessão ativa');
+
+    signOutBtn.click();
+
+    await waitFor(() => expect(form.dataset.authenticated).toBe('false'));
+    expect(connectedBox.style.display).toBe('none');
+    expect(emailField.style.display).not.toBe('none');
+    expect(passwordField.style.display).not.toBe('none');
+    expect(signInBtn.style.display).not.toBe('none');
+    expect(signOutBtn.style.display).toBe('none');
+    expect(form.querySelector('[data-auth-message]')).toHaveTextContent('Sessão encerrada.');
+  });
+
+  it('aplica margem e borda nos titulos de secao estaticos nas configuracoes', async () => {
+    const toolkitStyle = document.createElement('style');
+    toolkitStyle.textContent = readFileSync(extensionFixturePath('process-toolkit.css'), 'utf8');
+    document.head.appendChild(toolkitStyle);
+
+    const api = loadProcessScript();
+    await api.installToolkit();
+    api.selectTab('settings');
+
+    const sectionTitles = Array.from(document.querySelectorAll('#siages-suap-toolkit [data-panel="settings"] .suape-section > .suape-section-title')) as HTMLElement[];
+    expect(sectionTitles.length).toBeGreaterThanOrEqual(2);
+    expect(sectionTitles[0]).toHaveTextContent('Aparência');
+    expect(sectionTitles[1]).toHaveTextContent('Acesso ao SIAGES');
+
+    const appearanceComputed = getComputedStyle(sectionTitles[0]);
+    expect(appearanceComputed.display).toBe('block');
+    expect(appearanceComputed.paddingTop).toBe('10px');
+    expect(appearanceComputed.paddingLeft).toBe('12px');
+    expect(appearanceComputed.paddingBottom).toBe('9px');
+    expect(toolkitStyle.textContent).toContain('border-bottom: 1px solid var(--suape-border) !important;');
+
+    toolkitStyle.remove();
+  });
+
   it('posiciona os botoes de minimizar e maximizar na mesma linha do titulo SIAGES', async () => {
     const api = loadProcessScript();
     await api.installToolkit();

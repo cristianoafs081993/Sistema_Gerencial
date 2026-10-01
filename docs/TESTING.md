@@ -228,3 +228,13 @@ Ver [cenários e validação remota](ops/PNCP_CONTRACT_SYNC.md).
 - Os marcadores de pendência nos modelos manuais devem utilizar acentuação (`[valor da liquidação]`, `[objeto do serviço]`, `[objeto da aquisição]`, `[número do processo]`, `[número do edital]`).
 - A suite `src/lib/__tests__/suapDispatchGeneration.test.ts` e o teste estrutural em `src/services/__tests__/suapProcessPdfAiConfig.test.ts` validam essas strings e títulos.
 - Validação de encoding contra mojibake via `src/__tests__/encoding.test.ts`.
+
+## Extensão SUAP - Painel do Processo e Configurações
+
+- Os títulos de seções estáticas do painel de configurações (`Aparência`, `Acesso ao SIAGES`) e mensagens de estado mantêm espaçamento (`padding: 10px 12px 9px !important`), borda divisória inferior e display em bloco, impedindo que encostem nas bordas do card.
+- A tela de autenticação da extensão na aba de configurações alterna de forma reativa:
+  - Quando autenticado (`session?.accessToken`), exibe o card de usuário conectado com e-mail, status de sessão ativa e botão de largura total `Sair`, ocultando os campos de login e o botão `Entrar`.
+  - Ao clicar em `Sair`, encerra a sessão via `SiagesExtensionAuth.signOut()`, oculta os dados do usuário e reexibe os campos de e-mail e senha com o botão `Entrar`.
+  - O isolamento contra estilos hostis do SUAP cobre formulário, campos, caixas de usuário e botões de ação.
+- A suite `src/lib/__tests__/suapProcessDocumentExtension.test.ts` valida o isolamento de layout, a alternância de estado de login/logout e as regras de estilo de títulos de seção.
+

@@ -56,6 +56,18 @@
 .suape-section-header { display: flex !important; width: 100% !important; align-items: center !important; justify-content: space-between !important; padding: 9px 12px !important; border: 0 !important; background: transparent !important; cursor: pointer !important; text-align: left !important; font: inherit !important; color: inherit !important; }
 .suape-section-header:hover, .suape-section-header:focus-visible { background: var(--suape-primary-soft) !important; outline: none !important; }
 .suape-section-title { margin: 0 !important; padding: 0 !important; color: var(--suape-muted) !important; font-size: 10px !important; font-weight: 800 !important; letter-spacing: .08em !important; text-transform: uppercase !important; line-height: 1.2 !important; }
+#siages-suap-toolkit h3.suape-section-title,
+.suape-section > .suape-section-title {
+  display: block !important;
+  padding: 10px 12px 9px !important;
+  border-bottom: 1px solid var(--suape-border) !important;
+  background: var(--suape-surface) !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  float: none !important;
+  position: static !important;
+  width: 100% !important;
+}
 .suape-section-chevron { font-size: 11px !important; color: var(--suape-muted) !important; line-height: 1 !important; margin-left: 6px !important; flex-shrink: 0 !important; }
 .suape-section-body { border-top: 1px solid var(--suape-border); }
 .suape-section-body > .suape-data-row:first-child { border-top: 0 !important; }
@@ -142,6 +154,10 @@ textarea.suape-input { min-height: 72px; resize: vertical; }
   transform: translateY(-50%) scale(1.08) !important;
   outline: none !important;
 }
+/* Etapas com mais de uma automação: botões de check lado a lado */
+.suape-flow-step-check ~ .suape-flow-step-check { right: 30px !important; }
+.suape-flow-step-check ~ .suape-flow-step-check ~ .suape-flow-step-check { right: 54px !important; }
+.suape-flow-step-current:has(.suape-flow-step-check ~ .suape-flow-step-check) .suape-flow-step-body { padding-right: 52px; }
 .suape-flow-step-check-active {
   background: #10b981 !important;
   color: #fff !important;
@@ -277,11 +293,16 @@ textarea.suape-input { min-height: 72px; resize: vertical; }
   opacity: 1 !important;
   visibility: visible !important;
 }
-.suape-auth-actions { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+.suape-auth-actions { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; gap: 8px !important; width: 100% !important; }
 #siages-suap-toolkit .suape-auth-actions > button { float: none !important; position: static !important; width: 100% !important; margin: 0 !important; }
 .suape-auth-message { grid-column: 1 / -1; margin: 0 !important; }
 .suape-auth-message[data-state="success"] { color: var(--suape-primary) !important; }
 .suape-auth-message[data-state="error"] { color: var(--suape-danger) !important; }
+.suape-auth-connected { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; gap: 10px !important; padding: 11px !important; clear: both !important; }
+#siages-suap-toolkit .suape-auth-user-box { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; gap: 4px !important; padding: 9px 11px !important; border: 1px solid var(--suape-border) !important; border-radius: 8px !important; background: var(--suape-bg) !important; }
+#siages-suap-toolkit .suape-auth-user-label { display: block !important; font-size: 10px !important; font-weight: 700 !important; letter-spacing: .05em !important; text-transform: uppercase !important; color: var(--suape-muted) !important; margin: 0 !important; padding: 0 !important; }
+#siages-suap-toolkit .suape-auth-user-email { display: block !important; font-size: 12px !important; font-weight: 600 !important; color: var(--suape-text) !important; word-break: break-all !important; margin: 0 !important; padding: 0 !important; }
+#siages-suap-toolkit .suape-auth-connected > button { float: none !important; position: static !important; width: 100% !important; margin: 0 !important; }
 .suape-empty { padding: 18px 10px; color: var(--suape-muted); text-align: center; }
 #siages-suap-toolkit[data-collapsed="true"] .suape-tabs,
 #siages-suap-toolkit[data-collapsed="true"] .suape-panels,

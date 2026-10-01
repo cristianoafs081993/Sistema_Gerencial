@@ -33,6 +33,7 @@
     syncStatus: { stage: 'checking', message: 'Preparando a consulta do processo...' },
     financeSummary: null, hasFinanceSummary: false, flow: null, selectedMappingId: '', manualStepNodeId: '', mappings: [], customMappings: [], snippets: { ...DEFAULT_SNIPPETS }, editingKey: null,
     collapsedSections: new Set(),
+    authSession: null,
   };
   let documentAnalysisObserver = null;
   let documentAnalysisCleanup = null;
@@ -442,19 +443,20 @@
       window.open(fullUrl, '_blank', 'noopener,noreferrer');
     } catch (_) {}
   }
-  async function triggerStepAutomation(step, summary, button) {
+  async function triggerStepAutomation(step, summary, button, chosenAutomation) {
     if (button) {
       button.classList.add('suape-flow-step-check-active');
       setTimeout(() => button.classList.remove('suape-flow-step-check-active'), 800);
     }
 
-        let automation = step.automation;
+        let automation = chosenAutomation || step.automation;
     if (!automation && Array.isArray(state.customMappings)) {
       const activeMappingId = summary?.mappingId || state.selectedMappingId || 'liquidacao-pagamento-bolsas';
       const foundMapping = state.customMappings.find((m) => m.id === activeMappingId || m.code === activeMappingId);
       const foundNode = foundMapping?.nodes?.find((n) => n.id === step.nodeId || n.code === step.code);
-      if (foundNode?.automation) {
-        automation = foundNode.automation;
+      const foundAutomations = Array.isArray(foundNode?.automations) ? foundNode.automations : (foundNode?.automation ? [foundNode.automation] : []);
+      if (foundAutomations.length) {
+        automation = foundAutomations.find((item) => item && item.enabled) || foundAutomations[0];
       }
     }
     const process = state.snapshot?.process;
@@ -1051,25 +1053,33 @@
       item.append(dot, stepBody);
 
       if (isCurrent) {
-        const checkBtn = createElement('button', 'suape-flow-step-check');
-        checkBtn.type = 'button';
-        const automationTitle = step.automation?.title || 'Concluir etapa e disparar automação';
-        checkBtn.setAttribute('title', automationTitle);
-        checkBtn.setAttribute('aria-label', automationTitle);
-        checkBtn.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        // Uma etapa pode ter várias automações: um botão de check para cada uma ativa
+        const stepAutomations = Array.isArray(step.automations)
+          ? step.automations
+          : (step.automation ? [step.automation] : []);
+        const enabledAutomations = stepAutomations.filter((entry) => entry && entry.enabled);
+        const buttonTargets = enabledAutomations.length ? enabledAutomations : [step.automation || null];
+        buttonTargets.forEach((chosenAutomation) => {
+          const checkBtn = createElement('button', 'suape-flow-step-check');
+          checkBtn.type = 'button';
+          const automationTitle = chosenAutomation?.title || 'Concluir etapa e disparar automação';
+          checkBtn.setAttribute('title', automationTitle);
+          checkBtn.setAttribute('aria-label', automationTitle);
+          checkBtn.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
 
-        checkBtn.addEventListener('click', (event) => {
-          event.stopPropagation();
-          void triggerStepAutomation(step, summary, checkBtn);
-        });
-        checkBtn.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
+          checkBtn.addEventListener('click', (event) => {
             event.stopPropagation();
-            void triggerStepAutomation(step, summary, checkBtn);
-          }
+            void triggerStepAutomation(step, summary, checkBtn, chosenAutomation || undefined);
+          });
+          checkBtn.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              event.stopPropagation();
+              void triggerStepAutomation(step, summary, checkBtn, chosenAutomation || undefined);
+            }
+          });
+          item.appendChild(checkBtn);
         });
-        item.appendChild(checkBtn);
       }
 
       item.addEventListener('click', () => {
@@ -1202,13 +1212,37 @@
   }
   async function deleteShortcut(key, filter) { const next = { ...state.snippets }; delete next[key]; state.snippets = next; await storageSet('sync', { [SNIPPETS_KEY]: next }); renderShortcuts(filter); }
 
+  function extractEmailFromSession(session) {
+    if (session?.user?.email) return session.user.email;
+    if (!session?.accessToken || typeof session.accessToken !== 'string') return '';
+    try {
+      const parts = session.accessToken.split('.');
+      if (parts.length < 2) return '';
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return payload?.email || '';
+    } catch {
+      return '';
+    }
+  }
+
   function isolateAuthFormLayout(form) {
-    const force = (element, styles) => Object.entries(styles).forEach(([property, value]) => element.style.setProperty(property, value, 'important'));
+    const force = (element, styles) => Object.entries(styles).forEach(([property, value]) => element?.style.setProperty(property, value, 'important'));
     force(form, { display: 'grid', 'grid-template-columns': 'minmax(0, 1fr)', gap: '10px', clear: 'both' });
+    const userBox = form.querySelector('.suape-auth-user-box');
+    if (userBox) {
+      force(userBox, { display: 'grid', 'grid-template-columns': 'minmax(0, 1fr)', gap: '4px', padding: '9px 11px', 'border-radius': '8px', border: '1px solid var(--suape-border)', background: 'var(--suape-bg)' });
+      const label = userBox.querySelector('.suape-auth-user-label');
+      force(label, { display: 'block', 'font-size': '10px', 'font-weight': '700', 'letter-spacing': '.05em', 'text-transform': 'uppercase', color: 'var(--suape-muted)', margin: '0', padding: '0', float: 'none', position: 'static' });
+      const email = userBox.querySelector('.suape-auth-user-email');
+      force(email, { display: 'block', 'font-size': '12px', 'font-weight': '600', color: 'var(--suape-text)', 'word-break': 'break-all', margin: '0', padding: '0', float: 'none', position: 'static' });
+    }
     form.querySelectorAll(':scope > label').forEach((label) => force(label, { display: 'grid', 'grid-template-columns': 'minmax(0, 1fr)', 'grid-area': 'auto', 'grid-column': 'auto', 'grid-row': 'auto', gap: '4px', float: 'none', position: 'static', width: 'auto', height: 'auto', margin: '0', padding: '0', opacity: '1', visibility: 'visible', 'text-align': 'left' }));
     form.querySelectorAll('.suape-input').forEach((input) => force(input, { display: 'block', 'grid-area': 'auto', 'grid-column': 'auto', 'grid-row': 'auto', float: 'none', position: 'static', width: '100%', 'max-width': 'none', height: '38px', margin: '0', opacity: '1', visibility: 'visible' }));
-    const actions = form.querySelector('.suape-auth-actions'); force(actions, { display: 'grid', 'grid-template-columns': 'repeat(2, minmax(0, 1fr))', gap: '8px' });
-    actions.querySelectorAll('button').forEach((button) => force(button, { float: 'none', position: 'static', width: '100%', margin: '0' }));
+    const actions = form.querySelector('.suape-auth-actions');
+    if (actions) {
+      force(actions, { display: 'grid', 'grid-template-columns': 'minmax(0, 1fr)', gap: '8px', width: '100%' });
+      actions.querySelectorAll('button').forEach((button) => force(button, { float: 'none', position: 'static', width: '100%', margin: '0' }));
+    }
   }
 
   function isolateShortcutsLayout(container) {
@@ -1241,17 +1275,62 @@
     const themeSection = createElement('section', 'suape-section'); themeSection.appendChild(createElement('h3', 'suape-section-title', 'Aparência'));
     const themeBody = createElement('div', 'suape-form'); themeBody.style.padding = '11px'; const themeButton = createElement('button', 'suape-button suape-button-secondary suape-full', state.theme === 'dark' ? 'Usar modo claro' : 'Usar modo escuro'); themeButton.type = 'button'; themeButton.addEventListener('click', async () => { await toggleTheme(); renderSettings(); }); themeBody.appendChild(themeButton); themeSection.appendChild(themeBody); container.appendChild(themeSection);
     const authSection = createElement('section', 'suape-section'); authSection.appendChild(createElement('h3', 'suape-section-title', 'Acesso ao SIAGES'));
-    const form = createElement('form', 'suape-form suape-auth-form'); form.noValidate = true; form.style.padding = '11px'; form.innerHTML = '<label for="suape-auth-email"><span>E-mail cadastrado no SIAGES</span><input id="suape-auth-email" class="suape-input" name="email" type="text" inputmode="email" autocomplete="username" placeholder="nome@dominio.com" required></label><label for="suape-auth-password"><span>Senha do SIAGES</span><input id="suape-auth-password" class="suape-input" name="password" type="password" autocomplete="current-password" required></label><div class="suape-auth-actions"><button class="suape-button" type="submit">Entrar</button><button class="suape-button suape-button-secondary" type="button" data-signout>Sair</button></div><div class="suape-help suape-auth-message" data-auth-message aria-live="polite">Use seu e-mail e senha cadastrados no SIAGES, não a matrícula e senha do SUAP.</div>';
-    isolateAuthFormLayout(form); form.addEventListener('submit', signIn); form.querySelector('[data-signout]').addEventListener('click', signOut); authSection.appendChild(form); container.appendChild(authSection); void updateAuthStatus(form);
+    const form = createElement('form', 'suape-form suape-auth-form'); form.noValidate = true; form.style.padding = '11px'; form.dataset.authenticated = 'false';
+    form.innerHTML = [
+      '<div class="suape-auth-user-box" data-auth-connected-box style="display:none !important;"><span class="suape-auth-user-label">Usuário conectado</span><strong class="suape-auth-user-email"></strong></div>',
+      '<label for="suape-auth-email" data-auth-field><span>E-mail cadastrado no SIAGES</span><input id="suape-auth-email" class="suape-input" name="email" type="text" inputmode="email" autocomplete="username" placeholder="nome@dominio.com" required></label>',
+      '<label for="suape-auth-password" data-auth-field><span>Senha do SIAGES</span><input id="suape-auth-password" class="suape-input" name="password" type="password" autocomplete="current-password" required></label>',
+      '<div class="suape-auth-actions"><button class="suape-button suape-full" type="submit" data-signin>Entrar</button><button class="suape-button suape-button-secondary suape-full" type="button" data-signout style="display:none !important;">Sair</button></div>',
+      '<div class="suape-help suape-auth-message" data-auth-message aria-live="polite">Use seu e-mail e senha cadastrados no SIAGES, não a matrícula e senha do SUAP.</div>'
+    ].join('');
+    isolateAuthFormLayout(form);
+    form.addEventListener('submit', signIn);
+    form.querySelector('[data-signout]').addEventListener('click', signOut);
+    authSection.appendChild(form);
+    container.appendChild(authSection);
+    void updateAuthStatus(form);
   }
-  async function updateAuthStatus(form) {
+
+  async function updateAuthStatus(form, givenSession = null, customMessage = null) {
     const requestId = String(Number(form.dataset.authStatusRequest || 0) + 1);
     form.dataset.authStatusRequest = requestId;
-    const message = form.querySelector('[data-auth-message]'); const session = await globalThis.SiagesExtensionAuth?.getSession();
+    let session = givenSession;
+    if (!session && globalThis.SiagesExtensionAuth?.getSession) {
+      try {
+        session = await globalThis.SiagesExtensionAuth.getSession();
+      } catch {
+        session = null;
+      }
+    }
     if (form.dataset.authStatusRequest !== requestId) return;
-    message.dataset.state = session?.accessToken ? 'success' : '';
-    message.textContent = session?.accessToken ? 'Sessão ativa. Os dados usam as permissões do seu usuário.' : 'Entre para consultar e sincronizar processos.';
+    const isAuthenticated = Boolean(session?.accessToken);
+    form.dataset.authenticated = isAuthenticated ? 'true' : 'false';
+
+    const connectedBox = form.querySelector('[data-auth-connected-box]');
+    if (connectedBox) {
+      connectedBox.style.setProperty('display', isAuthenticated ? 'grid' : 'none', 'important');
+      const emailEl = connectedBox.querySelector('.suape-auth-user-email');
+      if (emailEl) {
+        emailEl.textContent = extractEmailFromSession(session) || 'Usuário autenticado';
+      }
+    }
+    form.querySelectorAll('[data-auth-field]').forEach((field) => {
+      field.style.setProperty('display', isAuthenticated ? 'none' : 'grid', 'important');
+    });
+    const signInBtn = form.querySelector('[data-signin]');
+    if (signInBtn) signInBtn.style.setProperty('display', isAuthenticated ? 'none' : 'block', 'important');
+    const signOutBtn = form.querySelector('[data-signout]');
+    if (signOutBtn) signOutBtn.style.setProperty('display', isAuthenticated ? 'block' : 'none', 'important');
+
+    const message = form.querySelector('[data-auth-message]');
+    if (message) {
+      message.dataset.state = isAuthenticated ? 'success' : '';
+      message.textContent = customMessage || (isAuthenticated
+        ? 'Sessão ativa. Os dados usam as permissões do seu usuário.'
+        : 'Entre para consultar e sincronizar processos.');
+    }
   }
+
   async function signIn(event) {
     event.preventDefault(); const form = event.currentTarget; const message = form.querySelector('[data-auth-message]'); const button = form.querySelector('button[type="submit"]');
     form.dataset.authStatusRequest = String(Number(form.dataset.authStatusRequest || 0) + 1);
@@ -1263,12 +1342,28 @@
     button.disabled = true; message.dataset.state = 'loading'; message.textContent = 'Autenticando...';
     try {
       if (!globalThis.SiagesExtensionAuth?.signIn) throw new Error('O serviço de autenticação da extensão não está disponível.');
-      await globalThis.SiagesExtensionAuth.signIn(email, password);
-      if (passwordInput) passwordInput.value = ''; message.dataset.state = 'success'; message.textContent = 'Sessão ativa.'; restartBridge();
+      const session = await globalThis.SiagesExtensionAuth.signIn(email, password);
+      if (passwordInput) passwordInput.value = '';
+      void updateAuthStatus(form, session);
+      restartBridge();
     } catch (error) { message.dataset.state = 'error'; message.textContent = formatAuthError(error); } finally { button.disabled = false; }
   }
-  async function signOut(event) { const form = event.currentTarget.closest('form'); const message = form.querySelector('[data-auth-message]'); try { if (!globalThis.SiagesExtensionAuth?.signOut) throw new Error('O serviço de autenticação da extensão não está disponível.'); await globalThis.SiagesExtensionAuth.signOut(); message.dataset.state = ''; message.textContent = 'Sessão encerrada.'; } catch (error) { message.dataset.state = 'error'; message.textContent = formatAuthError(error); } }
 
+  async function signOut(event) {
+    const button = event.currentTarget;
+    const form = button.closest('form');
+    button.disabled = true;
+    try {
+      if (!globalThis.SiagesExtensionAuth?.signOut) throw new Error('O serviço de autenticação da extensão não está disponível.');
+      await globalThis.SiagesExtensionAuth.signOut();
+      await updateAuthStatus(form, null, 'Sessão encerrada.');
+    } catch (error) {
+      const message = form?.querySelector('[data-auth-message]');
+      if (message) { message.dataset.state = 'error'; message.textContent = formatAuthError(error); }
+    } finally {
+      button.disabled = false;
+    }
+  }
   function closeModal() { document.getElementById(MODAL_ID)?.remove(); }
 
   function documentReviewLabel(documentType) {

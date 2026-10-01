@@ -21,12 +21,13 @@ function buildSession(payload) {
     accessToken: payload.access_token,
     refreshToken: payload.refresh_token,
     expiresAt: Math.floor(Date.now() / 1000) + Number(payload.expires_in || 3600),
+    user: payload.user || null,
   };
 }
 
 function toPublicSession(session) {
   if (!session?.accessToken) return null;
-  return { accessToken: session.accessToken, expiresAt: session.expiresAt };
+  return { accessToken: session.accessToken, expiresAt: session.expiresAt, user: session.user || null };
 }
 
 async function readStoredSession() {
