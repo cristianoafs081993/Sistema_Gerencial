@@ -8,6 +8,7 @@ import {
   FileText,
   FileUp,
   Link2,
+  Pencil,
   Plus,
   Scale,
   Trash2,
@@ -16,6 +17,12 @@ import {
   Zap,
 } from 'lucide-react';
 
+import { getNodeAutomations } from '@/lib/processMappingAutomations';
+import { getNodeSystems } from '@/lib/processMappingSystems';
+import {
+  AUTOMATION_ACTIONS,
+  ProcessMappingAutomationEditor,
+} from './ProcessMappingAutomationEditor';
 import type {
   ProcessMappingAutomation,
   ProcessMappingAutomationAction,
@@ -23,8 +30,46 @@ import type {
   ProcessMappingLane,
   ProcessMappingLink,
   ProcessMappingNode,
-  ProcessMappingStepStatus,
+  ProcessMappingSystem,
 } from '@/types/processMapping';
+
+const AUTOMATION_ACTION_LABELS: Record<ProcessMappingAutomationAction, string> = {
+  advance_step: 'Encaminhar para outro setor',
+  suap_upload_document: 'Upload de documento externo no SUAP',
+  open_url: 'Abrir sistema ou link externo',
+  copy_text: 'Copiar texto / minuta para a área de transferência',
+  suap_document: 'Gerar / clonar documento no SUAP',
+  custom_webhook: 'Disparar requisição Webhook HTTP',
+};
+
+const ReadField: React.FC<{ label: string; children?: React.ReactNode; mono?: boolean }> = ({
+  label,
+  children,
+  mono,
+}) => (
+  <div className="min-w-0">
+    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">{label}</span>
+    {children ? (
+      <div className={`text-xs text-slate-800 break-words ${mono ? 'font-mono text-[11px]' : 'font-medium'}`}>
+        {children}
+      </div>
+    ) : (
+      <span className="text-[11px] text-slate-400 italic">Não informado</span>
+    )}
+  </div>
+);
+
+const ExternalAnchor: React.FC<{ url: string }> = ({ url }) => (
+  <a
+    href={url}
+    target="_blank"
+    rel="noreferrer"
+    className="text-[11px] text-brand-600 hover:underline font-mono break-all inline-flex items-center gap-1"
+  >
+    <ExternalLink className="w-3 h-3 shrink-0" />
+    {url}
+  </a>
+);
 
 interface ProcessMappingDetailDrawerProps {
   node: ProcessMappingNode | null;
@@ -46,7 +91,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
   onDeleteNode,
 }) => {
   const [formData, setFormData] = useState<ProcessMappingNode | null>(null);
-  const [activeTab, setActiveTab] = useState<'links' | 'procedure' | 'checklist' | 'automations'>('links');
+  const [activeTab, setActiveTab] = useState<'links' | 'procedure' | 'automations'>('procedure');
 
   // Input states for adding new items
   const [newChecklistText, setNewChecklistText] = useState('');
@@ -56,11 +101,20 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [newLinkCategory, setNewLinkCategory] = useState<ProcessMappingLink['category']>('system');
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [expandedAutomation, setExpandedAutomation] = useState<number | null>(null);
+
   useEffect(() => {
     if (node) {
       setFormData({ ...node });
     }
   }, [node]);
+
+  // Cada etapa abre em modo de leitura
+  const nodeId = node?.id;
+  useEffect(() => {
+    setIsEditing(false);
+  }, [nodeId]);
 
   if (!isOpen || !formData) return null;
 
@@ -70,15 +124,36 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
     onUpdateNode(updated);
   };
 
-  // Quick system presets
-  const handleQuickSystem = (name: string, defaultUrl: string) => {
-    const updated = {
+  // Sistemas da etapa (vários). systemName/systemUrl espelham o primeiro, por compatibilidade.
+  const systems = getNodeSystems(formData);
+
+  const commitSystems = (next: ProcessMappingSystem[]) => {
+    const updated: ProcessMappingNode = {
       ...formData,
-      systemName: name,
-      systemUrl: formData.systemUrl || defaultUrl,
+      systems: next,
+      systemName: next[0]?.name || undefined,
+      systemUrl: next[0]?.url || undefined,
     };
     setFormData(updated);
     onUpdateNode(updated);
+  };
+
+  const handleUpdateSystem = (index: number, patch: Partial<ProcessMappingSystem>) => {
+    commitSystems(systems.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  };
+
+  const handleAddSystem = (name = '', url = '') => {
+    // Um sistema vazio no fim da lista é reaproveitado antes de criar outro
+    const last = systems[systems.length - 1];
+    if (last && !last.name && !last.url && (name || url)) {
+      commitSystems(systems.map((item, i) => (i === systems.length - 1 ? { ...item, name, url } : item)));
+      return;
+    }
+    commitSystems([...systems, { id: `sys-${Date.now()}`, name, url }]);
+  };
+
+  const handleDeleteSystem = (index: number) => {
+    commitSystems(systems.filter((_, i) => i !== index));
   };
 
   // Quick template presets
@@ -170,29 +245,32 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
     handleChange('customLinks', next);
   };
 
-  const handleAutomationChange = <K extends keyof ProcessMappingAutomation>(
-    field: K,
-    value: ProcessMappingAutomation[K]
-  ) => {
-    const current: ProcessMappingAutomation = formData.automation || {
-      enabled: true,
-      title: 'Concluir e avançar etapa',
-      action: 'advance_step',
-      autoAdvanceStep: true,
-    };
-    const updatedAutomation: ProcessMappingAutomation = { ...current, [field]: value };
-    handleChange('automation', updatedAutomation);
+  // Automações (várias por etapa). Ao salvar, o campo legado `automation` é migrado para `automations`.
+  const automations = getNodeAutomations(formData);
+
+  const commitAutomations = (next: ProcessMappingAutomation[]) => {
+    const updated: ProcessMappingNode = { ...formData, automations: next, automation: undefined };
+    setFormData(updated);
+    onUpdateNode(updated);
   };
 
-  const handleApplyAutomationPreset = (preset: Partial<ProcessMappingAutomation>) => {
-    const current: ProcessMappingAutomation = formData.automation || {
-      enabled: true,
-      title: 'Concluir e avançar etapa',
-      action: 'advance_step',
-      autoAdvanceStep: true,
-    };
-    const updatedAutomation: ProcessMappingAutomation = { ...current, ...preset, enabled: true };
-    handleChange('automation', updatedAutomation);
+  const handleUpdateAutomation = (index: number, next: ProcessMappingAutomation) => {
+    commitAutomations(automations.map((item, i) => (i === index ? next : item)));
+  };
+
+  const handleAddAutomation = () => {
+    const first = AUTOMATION_ACTIONS[0];
+    commitAutomations([
+      ...automations,
+      { ...first.preset, id: `auto-${Date.now()}`, enabled: true, action: first.action },
+    ]);
+    setExpandedAutomation(automations.length);
+  };
+
+  const handleDeleteAutomation = (index: number) => {
+    if (!window.confirm('Excluir esta automação?')) return;
+    commitAutomations(automations.filter((_, i) => i !== index));
+    setExpandedAutomation(null);
   };
 
   return (
@@ -254,20 +332,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex border-b border-slate-200 bg-white px-4 text-xs font-semibold select-none">
-        <button
-          type="button"
-          onClick={() => setActiveTab('links')}
-          className={`py-2.5 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
-            activeTab === 'links'
-              ? 'border-brand-600 text-brand-700 font-bold'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-          <span>Links & Sistemas</span>
-        </button>
-
+      <div className="flex border-b border-slate-200 bg-white px-4 text-xs font-semibold select-none overflow-x-auto whitespace-nowrap">
         <button
           type="button"
           onClick={() => setActiveTab('procedure')}
@@ -283,19 +348,6 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
 
         <button
           type="button"
-          onClick={() => setActiveTab('checklist')}
-          className={`py-2.5 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
-            activeTab === 'checklist'
-              ? 'border-brand-600 text-brand-700 font-bold'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <CheckCircle2 className="w-3.5 h-3.5" />
-          <span>Checklist ({formData.checklist?.length || 0})</span>
-        </button>
-
-        <button
-          type="button"
           onClick={() => setActiveTab('automations')}
           className={`py-2.5 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
             activeTab === 'automations'
@@ -304,21 +356,80 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
           }`}
         >
           <Zap className="w-3.5 h-3.5" />
-          <span>Automações{formData.automation?.enabled ? ' (1)' : ''}</span>
+          <span>Automações{automations.filter((a) => a.enabled).length > 0 ? ` (${automations.filter((a) => a.enabled).length})` : ''}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('links')}
+          className={`py-2.5 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
+            activeTab === 'links'
+              ? 'border-brand-600 text-brand-700 font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          <span>Links & Sistemas</span>
         </button>
       </div>
 
       {/* Drawer Body */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
         {/* TAB 1: Links & Sistemas */}
-        {activeTab === 'links' && (
+        {activeTab === 'links' && !isEditing && (
+          <div className="space-y-4" data-testid="drawer-view-links">
+            <div className="space-y-2 border border-slate-200 rounded-xl p-3.5 bg-slate-50/50">
+              <span className="block text-xs font-bold text-slate-800">
+                {systems.length > 1 ? 'Sistemas informatizados da etapa' : 'Sistema informatizado da etapa'}
+              </span>
+              {systems.length > 0 ? (
+                systems.map((system, index) => (
+                  <div key={system.id || index} className="min-w-0 space-y-0.5" data-testid="drawer-view-system-item">
+                    <p className="text-xs font-semibold text-slate-800">{system.name || 'Sistema'}</p>
+                    {system.url && <ExternalAnchor url={system.url} />}
+                  </div>
+                ))
+              ) : (
+                <p className="text-[11px] text-slate-400 italic">Nenhum sistema informado.</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5 border border-slate-200 rounded-xl p-3.5 bg-slate-50/50">
+              <span className="block text-xs font-bold text-slate-800">Modelo padronizado / minuta</span>
+              {formData.templateName || formData.templateUrl ? (
+                <>
+                  <p className="text-xs font-semibold text-slate-800">{formData.templateName || 'Modelo'}</p>
+                  {formData.templateUrl && <ExternalAnchor url={formData.templateUrl} />}
+                </>
+              ) : (
+                <p className="text-[11px] text-slate-400 italic">Nenhum modelo informado.</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="block text-xs font-bold text-slate-800">Links adicionais & normativos</span>
+              {formData.customLinks && formData.customLinks.length > 0 ? (
+                formData.customLinks.map((link) => (
+                  <div key={link.id} className="p-2 rounded-lg bg-slate-50 border border-slate-200 min-w-0">
+                    <p className="font-semibold text-slate-800 truncate">{link.label}</p>
+                    <ExternalAnchor url={link.url} />
+                  </div>
+                ))
+              ) : (
+                <p className="text-[11px] text-slate-400 italic">Nenhum link adicional cadastrado.</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'links' && isEditing && (
           <div className="space-y-5">
-            {/* Sistema Oficial */}
+            {/* Sistemas */}
             <div className="space-y-2 border border-slate-200 rounded-xl p-3.5 bg-slate-50/50">
               <label className="block text-xs font-bold text-slate-800">
-                🔗 Sistema Informatizado da Etapa
+                Sistemas Informatizados da Etapa
               </label>
-              <div className="flex flex-wrap gap-1.5 mb-2">
+              <div className="flex flex-wrap gap-1.5 mb-1">
                 <span className="text-[10px] text-slate-400 uppercase font-bold mr-1 self-center">Presets:</span>
                 {[
                   { name: 'SUAP', url: 'https://suap.ifrn.edu.br/' },
@@ -330,33 +441,64 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                   <button
                     key={preset.name}
                     type="button"
-                    onClick={() => handleQuickSystem(preset.name, preset.url)}
+                    onClick={() => handleAddSystem(preset.name, preset.url)}
                     className="px-2 py-0.5 rounded bg-white hover:bg-brand-50 text-brand-700 border border-slate-200 text-[10px] font-semibold transition-colors"
                   >
                     + {preset.name}
                   </button>
                 ))}
               </div>
-              <input
-                type="text"
-                placeholder="Nome do sistema (ex: SUAP - Módulo PCA)"
-                value={formData.systemName || ''}
-                onChange={(e) => handleChange('systemName', e.target.value)}
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-500"
-              />
-              <input
-                type="text"
-                placeholder="URL de acesso (ex: https://suap.ifrn.edu.br/...)"
-                value={formData.systemUrl || ''}
-                onChange={(e) => handleChange('systemUrl', e.target.value)}
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono text-[11px]"
-              />
+
+              {systems.map((system, index) => (
+                <div
+                  key={system.id || index}
+                  className="flex items-start gap-1.5"
+                  data-testid="drawer-edit-system-item"
+                >
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <input
+                      type="text"
+                      aria-label={`Nome do sistema ${index + 1}`}
+                      placeholder="Nome do sistema (ex: SUAP - Módulo PCA)"
+                      value={system.name}
+                      onChange={(e) => handleUpdateSystem(index, { name: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                    <input
+                      type="text"
+                      aria-label={`URL do sistema ${index + 1}`}
+                      placeholder="URL de acesso (ex: https://suap.ifrn.edu.br/...)"
+                      value={system.url}
+                      onChange={(e) => handleUpdateSystem(index, { url: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono text-[11px]"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSystem(index)}
+                    aria-label={`Excluir sistema ${index + 1}`}
+                    title="Excluir sistema"
+                    className="mt-1 shrink-0 rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                data-testid="add-system-btn"
+                onClick={() => handleAddSystem()}
+                className="w-full py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-lg text-xs border border-dashed border-slate-300 transition-colors flex items-center justify-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" /> Adicionar sistema
+              </button>
             </div>
 
             {/* Modelo / Minuta */}
             <div className="space-y-2 border border-slate-200 rounded-xl p-3.5 bg-slate-50/50">
               <label className="block text-xs font-bold text-slate-800">
-                📄 Modelo Padronizado / Minuta AGU
+                Modelo Padronizado / Minuta AGU
               </label>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 <span className="text-[10px] text-slate-400 uppercase font-bold mr-1 self-center">Presets:</span>
@@ -458,45 +600,94 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
         )}
 
         {/* TAB 2: Procedimento */}
-        {activeTab === 'procedure' && (
-          <div className="space-y-4">
-            {/* Title, Code & Status */}
-            <div className="grid grid-cols-12 gap-2">
-              <div className="col-span-3">
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Código</label>
+        {activeTab === 'procedure' && !isEditing && (
+          <div className="space-y-4" data-testid="drawer-view-procedure">
+            <ReadField label="Detalhamento operacional">
+              {formData.description ? (
+                <p className="whitespace-pre-wrap leading-relaxed font-normal">{formData.description}</p>
+              ) : null}
+            </ReadField>
+
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+              <ReadField label="Entradas obrigatórias">
+                {formData.inputDocuments && formData.inputDocuments.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {formData.inputDocuments.map((doc) => (
+                      <span key={doc} className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-medium">
+                        {doc}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </ReadField>
+              <ReadField label="Saídas produzidas">
+                {formData.outputDocuments && formData.outputDocuments.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {formData.outputDocuments.map((doc) => (
+                      <span
+                        key={doc}
+                        className="px-2 py-0.5 rounded bg-brand-50 text-brand-800 border border-brand-200 text-[10px] font-medium"
+                      >
+                        {doc}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </ReadField>
+            </div>
+            <div className="space-y-2 pt-3 border-t border-slate-100">
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Checklist ({formData.checklist?.length || 0})
+              </span>
+  <div className="space-y-2" data-testid="drawer-view-checklist">
+            {formData.checklist && formData.checklist.length > 0 ? (
+              formData.checklist.map((item) => (
+                <label
+                  key={item.id}
+                  className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={item.done}
+                    onChange={() => handleToggleChecklist(item.id)}
+                    className="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  <span className={`text-xs ${item.done ? 'line-through text-slate-400' : 'text-slate-800 font-medium'}`}>
+                    {item.text}
+                  </span>
+                </label>
+              ))
+            ) : (
+              <div className="p-4 text-center text-slate-400 border border-dashed rounded-xl">
+                Nenhum item na lista de checagem.
+              </div>
+            )}
+          </div>
+              <form onSubmit={handleAddChecklist} className="flex gap-1.5" data-testid="drawer-view-checklist-add">
                 <input
                   type="text"
-                  value={formData.code || ''}
-                  onChange={(e) => handleChange('code', e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono"
+                  aria-label="Novo item do checklist"
+                  placeholder="Adicionar item ao checklist..."
+                  value={newChecklistText}
+                  onChange={(e) => setNewChecklistText(e.target.value)}
+                  className="flex-1 min-w-0 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-brand-500"
                 />
-              </div>
-              <div className="col-span-5">
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Status da Etapa</label>
-                <select
-                  value={formData.status || 'pending'}
-                  onChange={(e) => handleChange('status', e.target.value as ProcessMappingStepStatus)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium"
+                <button
+                  type="submit"
+                  disabled={!newChecklistText.trim()}
+                  aria-label="Adicionar item ao checklist"
+                  title="Adicionar item"
+                  className="px-2.5 py-1.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 text-white rounded-lg transition-colors flex items-center justify-center"
                 >
-                  <option value="pending">⚪ Pendente</option>
-                  <option value="in_progress">🔵 Em Andamento</option>
-                  <option value="completed">🟢 Concluída</option>
-                  <option value="blocked">🔴 Bloqueada</option>
-                </select>
-              </div>
-              <div className="col-span-4">
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Tipo de Fluxo</label>
-                <select
-                  value={formData.flowRole || 'primary'}
-                  onChange={(e) => handleChange('flowRole', e.target.value as 'primary' | 'exception')}
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
-                >
-                  <option value="primary">Principal</option>
-                  <option value="exception">Exceção</option>
-                </select>
-              </div>
+                  <Plus className="w-4 h-4" />
+                </button>
+              </form>
             </div>
+          </div>
+        )}
 
+        {activeTab === 'procedure' && isEditing && (
+          <div className="space-y-4">
             <div>
               <label className="block text-[11px] font-bold text-slate-600 mb-1">Título da Atividade</label>
               <input
@@ -521,8 +712,8 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
               />
             </div>
 
-            {/* Responsible & SLA */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Responsible */}
+            <div className="grid grid-cols-1 gap-3">
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
                   Raia / Unidade Responsável
@@ -548,23 +739,6 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  Prazo de Referência (SLA)
-                </label>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="number"
-                    min={1}
-                    max={90}
-                    value={formData.slaDays || 3}
-                    onChange={(e) => handleChange('slaDays', Number(e.target.value))}
-                    className="w-20 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono"
-                  />
-                  <span className="text-slate-500 text-xs">dias úteis</span>
-                </div>
               </div>
             </div>
 
@@ -650,15 +824,11 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                 </form>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* TAB 3: Checklist */}
-        {activeTab === 'checklist' && (
-          <div className="space-y-4">
-            <p className="text-xs text-slate-500">
-              Checklist operacional exigido para certificar a conformidade e conclusão desta etapa do processo.
-            </p>
+            <div className="space-y-3 pt-3 border-t border-slate-100">
+              <label className="block text-[11px] font-bold text-slate-600">
+                Checklist operacional ({formData.checklist?.length || 0})
+              </label>
+<div className="space-y-4">
 
             <div className="space-y-2">
               {formData.checklist && formData.checklist.length > 0 ? (
@@ -711,381 +881,190 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
               </button>
             </form>
           </div>
+            </div>
+          </div>
         )}
 
         {/* TAB 4: Automações */}
-        {activeTab === 'automations' && (
-          <div className="space-y-4">
-            {/* Header explicativo */}
-            <div className="p-3 bg-brand-50/60 border border-brand-100 rounded-xl space-y-1">
-              <div className="flex items-center gap-1.5 text-brand-800 font-bold text-xs">
-                <Zap className="w-3.5 h-3.5 text-brand-600" />
-                <span>Automação do Botão de Check</span>
-              </div>
-              <p className="text-[11px] text-brand-700 leading-relaxed">
-                Configure a ação disparada pelo botão de check discreto exibido na etapa atual do painel do SUAP.
-              </p>
-            </div>
-
-            {/* Switch Habilitar Automação */}
-            <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/60">
-              <div>
-                <span className="block text-xs font-bold text-slate-800">Ativar automação nesta etapa</span>
-                <span className="block text-[11px] text-slate-500">
-                  Exibe o botão de check na etapa atual quando este processo estiver em andamento
-                </span>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.automation?.enabled ?? false}
-                  onChange={(e) => handleAutomationChange('enabled', e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
-              </label>
-            </div>
-
-            {/* Presets Rápidos */}
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-slate-600">
-                Presets Rápidos de Automação
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  {
-                    label: '⚡ Concluir e Avançar',
-                    preset: {
-                      title: 'Concluir conferência e avançar etapa',
-                      action: 'advance_step' as ProcessMappingAutomationAction,
-                      autoAdvanceStep: true,
-                      feedbackMessage: 'Etapa concluída e avançada com sucesso!',
-                    },
-                  },
-                  {
-                    label: '📋 Copiar Despacho',
-                    preset: {
-                      title: 'Copiar minuta de despacho',
-                      action: 'copy_text' as ProcessMappingAutomationAction,
-                      templateText: 'Certifico a conformidade da etapa {etapa} para o processo {processNumber}, referente ao credor {beneficiario}.',
-                      autoAdvanceStep: true,
-                      feedbackMessage: 'Minuta de despacho copiada!',
-                    },
-                  },
-                  {
-                    label: '🔗 Abrir SIAFI',
-                    preset: {
-                      title: 'Abrir SIAFI Web',
-                      action: 'open_url' as ProcessMappingAutomationAction,
-                      targetUrl: 'https://www.gov.br/tesouronacional/pt-br/siafi/',
-                      autoAdvanceStep: false,
-                      feedbackMessage: 'SIAFI aberto em nova aba.',
-                    },
-                  },
-                  {
-                    label: '📄 Minuta no SUAP',
-                    preset: {
-                      title: 'Criar documento no SUAP',
-                      action: 'suap_document' as ProcessMappingAutomationAction,
-                      documentType: 'despacho',
-                      templateText: 'Processo: {processNumber}\nBeneficiário: {beneficiario}\nEtapa: {etapa}',
-                      autoAdvanceStep: true,
-                      feedbackMessage: 'Automação de documento SUAP acionada!',
-                    },
-                  },
-                  {
-                    label: '📤 Upload de Liquidação',
-                    preset: {
-                      title: 'Upload de liquidação no SUAP',
-                      action: 'suap_upload_document' as ProcessMappingAutomationAction,
-                      tipoConferencia: 'Cópia Simples',
-                      tipoDocumento: 'Liquidação',
-                      assunto: 'Liquidação',
-                      autoAdvanceStep: true,
-                      feedbackMessage: 'Página de upload aberta e campos preenchidos!',
-                    },
-                  },
-                ].map((item) => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={() => handleApplyAutomationPreset(item.preset)}
-                    className="px-2.5 py-1 rounded-lg bg-white hover:bg-brand-50 text-brand-800 border border-slate-200 hover:border-brand-300 text-[11px] font-semibold transition-colors shadow-2xs"
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Título da Automação */}
-            <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-slate-600">
-                Título / Rótulo da Automação
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: Concluir conferência e registrar liquidação"
-                value={formData.automation?.title || ''}
-                onChange={(e) => handleAutomationChange('title', e.target.value)}
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
-              />
-              <span className="text-[10px] text-slate-400">
-                Exibido no tooltip do botão de check discreto no SUAP.
-              </span>
-            </div>
-
-            {/* Tipo de Ação */}
-            <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-slate-600">
-                Ação Executada ao Clicar
-              </label>
-              <select
-                value={formData.automation?.action || 'advance_step'}
-                onChange={(e) =>
-                  handleAutomationChange('action', e.target.value as ProcessMappingAutomationAction)
-                }
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium"
-              >
-                <option value="advance_step">⚡ Concluir etapa e avançar para a próxima</option>
-                <option value="suap_upload_document">📄 Upload de documento externo no SUAP</option>
-                <option value="open_url">🔗 Abrir sistema ou link externo com dados do processo</option>
-                <option value="copy_text">📋 Copiar texto / minuta parametrizada para a área de transferência</option>
-                <option value="suap_document">📄 Gerar / clonar documento no SUAP</option>
-                <option value="custom_webhook">🌐 Disparar requisição Webhook HTTP</option>
-              </select>
-            </div>
-
-            {/* Campos condicionais por ação */}
-            {formData.automation?.action === 'suap_upload_document' && (
-              <div className="space-y-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-                <div className="flex items-center justify-between pb-1 border-b border-slate-200/60">
-                  <span className="text-[11px] font-bold text-brand-800 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-brand-600" /> Parâmetros de Upload no SUAP
-                  </span>
-                  <span className="text-[10px] text-slate-400">Campos 100% editáveis</span>
-                </div>
-
-                {/* Campo 1: Tipo de Conferência */}
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-slate-700">
-                    Tipo de Conferência
-                  </label>
-                  <select
-                    value={formData.automation?.tipoConferencia || 'Cópia Simples'}
-                    onChange={(e) => handleAutomationChange('tipoConferencia', e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
-                  >
-                    <option value="Cópia Simples">Cópia Simples</option>
-                    <option value="Cópia Autenticada Administrativamente">Cópia Autenticada Administrativamente</option>
-                    <option value="Cópia Autenticada por Cartório">Cópia Autenticada por Cartório</option>
-                    <option value="Documento Original">Documento Original</option>
-                    <option value="Documento Original e Cópia">Documento Original e Cópia</option>
-                    <option value="Documento Original e Cópia Autenticada Administrativamente">Documento Original e Cópia Autenticada Administrativamente</option>
-                    <option value="Mídia">Mídia</option>
-                  </select>
-                  <p className="text-[10px] text-slate-400">
-                    Seletor nativo do formulário de upload do SUAP.
-                  </p>
-                </div>
-
-                {/* Campo 2: Tipo do Documento */}
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-slate-700">
-                    Tipo do Documento (Seletor com busca no SUAP)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Liquidação, Nota Fiscal, Termo..."
-                    value={formData.automation?.tipoDocumento || 'Liquidação'}
-                    onChange={(e) => handleAutomationChange('tipoDocumento', e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800"
-                  />
-                  <div className="flex flex-wrap gap-1 pt-0.5">
-                    {['Liquidação', 'Nota Fiscal', 'Recibo', 'Relatório', 'Termo', 'Despacho'].map((sug) => (
-                      <button
-                        key={sug}
-                        type="button"
-                        onClick={() => handleAutomationChange('tipoDocumento', sug)}
-                        className="px-1.5 py-0.5 rounded bg-slate-200/70 hover:bg-brand-100 text-[10px] text-slate-700 hover:text-brand-800 font-medium transition-colors"
-                      >
-                        {sug}
-                      </button>
-                    ))}
+        {activeTab === 'automations' && !isEditing && (
+          <div className="space-y-3" data-testid="drawer-view-automations">
+            {automations.length > 0 ? (
+              automations.map((automation, index) => (
+                <div
+                  key={automation.id || index}
+                  className="space-y-3 rounded-xl border border-slate-200 p-3"
+                  data-testid="drawer-view-automation-item"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-xs font-bold text-slate-800 min-w-0">
+                      {automation.title || 'Automação sem rótulo'}
+                    </span>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        automation.enabled ? 'bg-brand-50 text-brand-700' : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {automation.enabled ? 'Ativa' : 'Desativada'}
+                    </span>
                   </div>
-                  <p className="text-[10px] text-slate-400">
-                    Preenche e seleciona automaticamente o item correspondente no Select2 do SUAP.
-                  </p>
+                  <ReadField label="Ação executada ao clicar">{AUTOMATION_ACTION_LABELS[automation.action]}</ReadField>
+                  {automation.action === 'suap_upload_document' && (
+                    <div className="grid grid-cols-3 gap-3">
+                      <ReadField label="Tipo de conferência">{automation.tipoConferencia}</ReadField>
+                      <ReadField label="Tipo do documento">{automation.tipoDocumento}</ReadField>
+                      <ReadField label="Assunto">{automation.assunto}</ReadField>
+                    </div>
+                  )}
+                  {(automation.action === 'open_url' || automation.action === 'custom_webhook') && (
+                    <ReadField label="URL de destino" mono>
+                      {automation.targetUrl}
+                    </ReadField>
+                  )}
+                  {automation.action === 'suap_document' && (
+                    <ReadField label="Tipo de documento no SUAP">{automation.documentType}</ReadField>
+                  )}
+                  {(automation.action === 'copy_text' || automation.action === 'suap_document') && (
+                    <ReadField label="Texto / minuta" mono>
+                      {automation.templateText ? <p className="whitespace-pre-wrap">{automation.templateText}</p> : null}
+                    </ReadField>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <ReadField label="Avança a etapa">
+                      {automation.action === 'advance_step' || (automation.autoAdvanceStep ?? true) ? 'Sim' : 'Não'}
+                    </ReadField>
+                    <ReadField label="Mensagem de feedback">{automation.feedbackMessage}</ReadField>
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="p-4 text-center text-slate-400 border border-dashed rounded-xl">
+                Nenhuma automação configurada nesta etapa.
+              </div>
+            )}
+          </div>
+        )}
 
-                {/* Campo 3: Assunto */}
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-slate-700">
-                    Assunto do Documento
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Liquidação ou Liquidação - {beneficiario}"
-                    value={formData.automation?.assunto || 'Liquidação'}
-                    onChange={(e) => handleAutomationChange('assunto', e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
-                  />
-                  <p className="text-[10px] text-slate-400">
-                    Suporta texto livre e variáveis dinâmicas (ex: &#123;processNumber&#125;, &#123;beneficiario&#125;).
-                  </p>
+        {activeTab === 'automations' && isEditing && (
+          <div className="space-y-3" data-testid="drawer-edit-automations">
+            {automations.map((automation, index) => {
+              const expanded = expandedAutomation === index;
+              const option = AUTOMATION_ACTIONS.find((o) => o.action === automation.action);
+              return (
+                <div
+                  key={automation.id || index}
+                  className="rounded-xl border border-slate-200 bg-white"
+                  data-testid="drawer-automation-card"
+                >
+                  <div className="flex items-center gap-2 p-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedAutomation(expanded ? null : index)}
+                      aria-expanded={expanded}
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    >
+                      <span className="text-[10px] text-slate-400">{expanded ? '▾' : '▸'}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-bold text-slate-800">
+                          {option?.icon} {automation.title || 'Automação sem rótulo'}
+                        </span>
+                        <span className="block truncate text-[10px] text-slate-500">{option?.label}</span>
+                      </span>
+                    </button>
+                    <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        checked={automation.enabled}
+                        onChange={(e) => handleUpdateAutomation(index, { ...automation, enabled: e.target.checked })}
+                        aria-label={`Ativar automação ${index + 1}`}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAutomation(index)}
+                      aria-label={`Excluir automação ${index + 1}`}
+                      title="Excluir automação"
+                      className="shrink-0 rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {expanded && (
+                    <div className="border-t border-slate-100 p-3">
+                      <ProcessMappingAutomationEditor
+                        automation={automation}
+                        listId={`${formData.id}-${index}`}
+                        onChange={(next) => handleUpdateAutomation(index, next)}
+                      />
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-            {(formData.automation?.action === 'open_url' || formData.automation?.action === 'custom_webhook') && (
-              <div className="space-y-1 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-                <label className="block text-[11px] font-bold text-slate-700">
-                  {formData.automation?.action === 'open_url' ? 'URL do Sistema / Destino' : 'URL do Webhook (POST)'}
-                </label>
-                <input
-                  type="text"
-                  placeholder="https://... (ex: https://suap.ifrn.edu.br/ ou SIAFI)"
-                  value={formData.automation?.targetUrl || ''}
-                  onChange={(e) => handleAutomationChange('targetUrl', e.target.value)}
-                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-[11px]"
-                />
-                <span className="text-[10px] text-slate-500">
-                  Suporta placeholders dinâmicos (veja abaixo).
-                </span>
-              </div>
+              );
+            })}
+
+            {automations.length === 0 && (
+              <p className="text-center text-[11px] text-slate-400 italic">Nenhuma automação configurada nesta etapa.</p>
             )}
 
-            {formData.automation?.action === 'copy_text' && (
-              <div className="space-y-1 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-                <label className="block text-[11px] font-bold text-slate-700">
-                  Texto / Minuta a ser Copiado
-                </label>
-                <textarea
-                  rows={4}
-                  placeholder="Digite o texto padronizado. As tags como {processNumber} serão preenchidas automaticamente..."
-                  value={formData.automation?.templateText || ''}
-                  onChange={(e) => handleAutomationChange('templateText', e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono text-[11px]"
-                />
-              </div>
-            )}
-
-            {formData.automation?.action === 'suap_document' && (
-              <div className="space-y-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-slate-700">
-                    Tipo de Documento no SUAP
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: despacho, termo, certidao, relatorio"
-                    value={formData.automation?.documentType || ''}
-                    onChange={(e) => handleAutomationChange('documentType', e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-slate-700">
-                    Minuta / Conteúdo Padrão
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Conteúdo a ser inserido no documento..."
-                    value={formData.automation?.templateText || ''}
-                    onChange={(e) => handleAutomationChange('templateText', e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono text-[11px]"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Opção de Avançar Etapa */}
-            {formData.automation?.action !== 'advance_step' && (
-              <label className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={formData.automation?.autoAdvanceStep ?? true}
-                  onChange={(e) => handleAutomationChange('autoAdvanceStep', e.target.checked)}
-                  className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                />
-                <span className="text-xs text-slate-700 font-medium">
-                  Avançar automaticamente para a próxima etapa após disparar esta ação
-                </span>
-              </label>
-            )}
-
-            {/* Mensagem de Feedback */}
-            <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-slate-600">
-                Mensagem de Feedback (Toast)
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: Etapa concluída com sucesso!"
-                value={formData.automation?.feedbackMessage || ''}
-                onChange={(e) => handleAutomationChange('feedbackMessage', e.target.value)}
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
-              />
-            </div>
-
-            {/* Variáveis Dinâmicas Disponíveis */}
-            <div className="space-y-1.5 pt-2 border-t border-slate-100">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Variáveis Dinâmicas Disponíveis
-              </label>
-              <div className="flex flex-wrap gap-1">
-                {[
-                  '{processNumber}',
-                  '{suapId}',
-                  '{beneficiario}',
-                  '{cpfCnpj}',
-                  '{assunto}',
-                  '{valor}',
-                  '{etapa}',
-                ].map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    title={`Clique para inserir ${tag}`}
-                    onClick={() => {
-                      if (formData.automation?.action === 'copy_text' || formData.automation?.action === 'suap_document') {
-                        handleAutomationChange('templateText', (formData.automation?.templateText || '') + ` ${tag}`);
-                      } else if (formData.automation?.action === 'open_url' || formData.automation?.action === 'custom_webhook') {
-                        handleAutomationChange('targetUrl', (formData.automation?.targetUrl || '') + tag);
-                      }
-                    }}
-                    className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] transition-colors"
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <button
+              type="button"
+              data-testid="add-automation-btn"
+              onClick={handleAddAutomation}
+              className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5" /> Adicionar automação
+            </button>
           </div>
         )}
       </div>
 
       {/* Drawer Footer */}
       <div className="p-4 border-t border-slate-200 bg-slate-50/70 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => {
-            if (window.confirm(`Deseja realmente remover a etapa "${formData.title}"?`)) {
-              onDeleteNode(formData.id);
-            }
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold transition-colors"
-        >
-          <Trash2 className="w-4 h-4" />
-          <span>Excluir Etapa</span>
-        </button>
+        {isEditing ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm(`Deseja realmente remover a etapa "${formData.title}"?`)) {
+                onDeleteNode(formData.id);
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Excluir Etapa</span>
+          </button>
+        ) : (
+          <span />
+        )}
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
-        >
-          Salvar & Concluir
-        </button>
+        <div className="flex items-center gap-2">
+          {!isEditing && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-colors"
+            >
+              Fechar
+            </button>
+          )}
+          <button
+            type="button"
+            data-testid="drawer-toggle-edit"
+            onClick={() => setIsEditing((current) => !current)}
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
+          >
+            {isEditing ? (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5" /> Salvar & Concluir
+              </>
+            ) : (
+              <>
+                <Pencil className="w-3.5 h-3.5" /> Editar
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

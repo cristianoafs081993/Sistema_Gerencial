@@ -20,6 +20,12 @@ export interface ProcessMappingLink {
   category: 'system' | 'template' | 'legislation' | 'tutorial' | 'other';
 }
 
+export interface ProcessMappingSystem {
+  id: string;
+  name: string;
+  url: string;
+}
+
 export type ProcessMappingAutomationAction =
   | 'advance_step'
   | 'open_url'
@@ -29,6 +35,7 @@ export type ProcessMappingAutomationAction =
   | 'custom_webhook';
 
 export interface ProcessMappingAutomation {
+  id?: string;
   enabled: boolean;
   title: string;
   action: ProcessMappingAutomationAction;
@@ -53,6 +60,8 @@ export interface ProcessMappingNode {
   position: { x: number; y: number };
   width?: number;
   height?: number;
+  /** Sistemas da etapa. `systemName`/`systemUrl` espelham o primeiro item (compatibilidade). */
+  systems?: ProcessMappingSystem[];
   systemName?: string;
   systemUrl?: string;
   templateName?: string;
@@ -70,7 +79,9 @@ export interface ProcessMappingNode {
   notes?: string;
   color?: string;
   iconName?: string;
+  /** Legado: uma única automação. Use `automations`; leia sempre via `getNodeAutomations`. */
   automation?: ProcessMappingAutomation;
+  automations?: ProcessMappingAutomation[];
 }
 
 export interface ProcessMappingEdge {
@@ -143,7 +154,9 @@ export interface SuapProcessFlowStep {
   evidence?: string;
   laneName?: string;
   description?: string;
+  /** Primeira automação da etapa (compatibilidade com extensões antigas). */
   automation?: ProcessMappingAutomation;
+  automations?: ProcessMappingAutomation[];
 }
 
 export interface SuapProcessFlowSummary {

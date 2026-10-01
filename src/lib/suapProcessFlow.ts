@@ -1,3 +1,4 @@
+import { getNodeAutomations } from '@/lib/processMappingAutomations';
 import type {
   ProcessMappingDefinition,
   ProcessMappingLane,
@@ -106,7 +107,8 @@ export function buildSuapProcessFlowSummary(
       evidence: evidence?.label || evidence?.rawText,
       laneName: laneForNode(mapping, node)?.name,
       description: node.description,
-      automation: node.automation,
+      automation: getNodeAutomations(node)[0],
+      automations: getNodeAutomations(node),
     };
   });
 

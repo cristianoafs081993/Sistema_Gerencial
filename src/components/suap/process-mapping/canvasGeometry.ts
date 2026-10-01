@@ -5,6 +5,9 @@ export interface Point {
   y: number;
 }
 
+const MIN_ROUTE_Y = 30;
+const MIN_LABEL_Y = 16;
+
 export type AnchorType = 'top' | 'bottom' | 'left' | 'right';
 
 export interface EdgeControlPoint {
@@ -252,7 +255,8 @@ export function calculateEdgePath(
   // ROUTING CASES:
   // Case A: Loopback top bypass (top -> top)
   if (sourceAnchor === 'top' && targetAnchor === 'top') {
-    const bypassY = customW ? customW.y : Math.min(start.y, end.y) - 36;
+    // Mantém o desvio dentro do canvas: acima de y = 0 a linha e o rótulo ficam sob o cabeçalho
+    const bypassY = Math.max(MIN_ROUTE_Y, customW ? customW.y : Math.min(start.y, end.y) - 36);
     points = [
       start,
       { x: start.x, y: bypassY },
@@ -449,7 +453,7 @@ export function calculateEdgePath(
       const isHorizontal = Math.abs(p1.y - p2.y) < 1;
       labelPoint = {
         x: (p1.x + p2.x) / 2,
-        y: isHorizontal ? p1.y - 12 : (p1.y + p2.y) / 2,
+        y: isHorizontal ? Math.max(p1.y - 12, MIN_LABEL_Y) : (p1.y + p2.y) / 2,
       };
     }
   }

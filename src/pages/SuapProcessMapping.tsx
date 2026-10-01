@@ -30,7 +30,6 @@ import {
   type ProcessMappingCanvasHandle,
 } from '@/components/suap/process-mapping/ProcessMappingCanvas';
 import { ProcessMappingDetailDrawer } from '@/components/suap/process-mapping/ProcessMappingDetailDrawer';
-import { ProcessMappingExecutionGuide } from '@/components/suap/process-mapping/ProcessMappingExecutionGuide';
 import { ProcessMappingExportModal } from '@/components/suap/process-mapping/ProcessMappingExportModal';
 import { ProcessMappingListView } from '@/components/suap/process-mapping/ProcessMappingListView';
 import { ProcessMappingModalNew } from '@/components/suap/process-mapping/ProcessMappingModalNew';
@@ -433,16 +432,6 @@ export default function SuapProcessMappingPage() {
                 process={activeProcess}
                 onSelectNode={setSelectedNode}
                 onAddNewNode={() => handleAddNodeFromPalette('task')}
-              />
-            </div>
-          )}
-
-          {viewMode === 'execution' && (
-            <div className="flex-1 overflow-y-auto">
-              <ProcessMappingExecutionGuide
-                process={activeProcess}
-                onUpdateProcess={handleUpdateActiveProcess}
-                onSelectNode={setSelectedNode}
               />
             </div>
           )}

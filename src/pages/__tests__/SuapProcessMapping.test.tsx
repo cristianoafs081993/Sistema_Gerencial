@@ -49,7 +49,7 @@ describe('SuapProcessMapping', () => {
     expect(screen.getAllByText('Realizar o pagamento e concluir o processo')).not.toHaveLength(0);
   });
 
-  it('permite alternar entre os modos de visão: Fluxograma, Matriz e Guia', async () => {
+  it('permite alternar entre os modos de visão: Fluxograma e Matriz', async () => {
     render(
       <MemoryRouter initialEntries={['/mapeamentos']}>
         <Routes>
@@ -67,10 +67,7 @@ describe('SuapProcessMapping', () => {
     expect(screen.getByText('Matriz de Processo & Gestão de Procedimentos')).toBeInTheDocument();
     expect(screen.getByText(/Com Link de Sistema/i)).toBeInTheDocument();
 
-    // Alternar para visão em Guia
-    const guiaTab = screen.getByRole('tab', { name: /Guia/i });
-    fireEvent.click(guiaTab);
-    expect(screen.getByText('Progresso Geral')).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Guia/i })).toBeNull();
 
     // Alternar de volta para Fluxograma
     const fluxogramaTab = screen.getByRole('tab', { name: /Fluxograma/i });

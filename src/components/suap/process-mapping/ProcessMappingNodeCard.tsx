@@ -90,14 +90,15 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
           {node.code || 'Início'}
         </span>
 
-        {/* Quick Connect Trigger */}
+        {/* Quick Connect / Add Trigger */}
         <button
           type="button"
+          data-testid={`node-add-button-${node.id}`}
           onClick={(e) => {
             e.stopPropagation();
             onStartConnect(node, e);
           }}
-          title="Conectar a outra etapa"
+          title="Inserir próxima etapa ou conectar"
           className="absolute -right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 bg-brand-600 hover:bg-brand-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs text-xs z-20 font-bold"
         >
           +
@@ -171,15 +172,16 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
           {node.title}
         </span>
 
-        {/* Quick Connect Trigger */}
+        {/* Quick Connect / Add Trigger */}
         <button
           type="button"
+          data-testid={`node-add-button-${node.id}`}
           onClick={(e) => {
             e.stopPropagation();
             onStartConnect(node, e);
           }}
-          title="Conectar a outra etapa"
-          className="absolute -right-2 top-1/2 -translate-y-1/2 w-5 h-5 bg-brand-600 hover:bg-brand-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs text-xs z-20 font-bold"
+          title="Inserir próxima etapa ou conectar"
+          className="absolute -right-2 top-1/2 -translate-y-1/2 w-5 h-5 bg-amber-600 hover:bg-amber-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs text-xs z-20 font-bold"
         >
           +
         </button>
@@ -321,15 +323,16 @@ export const ProcessMappingNodeCard: React.FC<ProcessMappingNodeCardProps> = ({
         </div>
       </div>
 
-      {/* Quick Connect Trigger Handle */}
+      {/* Quick Connect / Add Trigger Handle */}
       <button
         type="button"
+        data-testid={`node-add-button-${node.id}`}
         onClick={(e) => {
           e.stopPropagation();
           onStartConnect(node, e);
         }}
-        title="Conectar com a próxima etapa"
-        className="absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-brand-600 hover:bg-brand-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-xs text-[10px] font-bold z-20"
+        title="Inserir próxima etapa ou conectar"
+        className="absolute -right-2 top-1/2 -translate-y-1/2 w-5 h-5 bg-brand-600 hover:bg-brand-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-xs text-xs font-bold z-20 cursor-pointer"
       >
         +
       </button>
