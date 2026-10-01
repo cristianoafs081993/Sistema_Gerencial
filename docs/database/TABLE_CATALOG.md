@@ -509,7 +509,7 @@ Regras:
 - Leitura anônima de requisições e seus itens liberada para Notificações Mobile via migration `20260909191500_grant_anon_notifications_read.sql`.
 - Requisições em `enviada_fornecedor` exigem ao menos uma NE, itens com `empenho_id` e permissão explícita para terceirizados. O saldo disponível valida e abate concorrentemente outras requisições já enviadas ao fornecedor da mesma NE.
 - Requisições com status `liquidada` não acumulam desconto no módulo para evitar duplicidade com as liquidações oficiais registradas no SIAFI.
-- Itens de requisições com status diferente de `draft` compõem o consumo automático de insumos no ambiente canônico `REFEITORIO` / Refeitório. A data analítica é `consumo_iniciado_em`.
+- Itens de requisições com status diferente de `draft` compõem o consumo automático de insumos no ambiente canônico `REFEITORIO` / Refeitório. A data analítica (`consumo_em` da view) é a data de cadastro da requisição (`created_at`); `consumo_iniciado_em` só marca a saída do rascunho e condiciona a inclusão.
 - `fn_empenho_saldo_disponivel` é `SECURITY DEFINER`, calcula saldo de exercício com dados SIAFI locais e prioriza `saldo_rap_oficial` para RAP.
 
 ### `requisicao_compra_empenhos`
@@ -1263,6 +1263,7 @@ Observações operacionais:
 
 - A view usa `security_invoker`; portanto, a leitura respeita as permissões das tabelas de origem.
 - Requisições sempre são associadas ao Refeitório e não geram linhas físicas de check-in.
+- Em linhas de requisição, `consumo_em` é a data de cadastro da requisição (`requisicoes_compra.created_at`); em linhas de check-in, é a data do check-in.
 
 ## Módulo do SUAP (Processos Eletrônicos)
 
