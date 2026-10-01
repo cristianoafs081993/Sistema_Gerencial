@@ -112,12 +112,15 @@ function PageHeaderView({
 /** Grupos cujas telas não exibem título visível: o módulo já aparece na navegação e o topo da página fica para seletor de visão e filtros. */
 const COMPACT_HEADER_GROUPS: string[] = ['orcamentario'];
 
+/** Telas avulsas sem título visível: o conteúdo já se identifica (abas ou painel com título próprio). */
+const COMPACT_HEADER_SCREENS: string[] = ['manutencao', 'refeitorio-insumos'];
+
 /** Cabeçalho automático do Layout para telas que não declaram `PageHeader` próprio. */
 export function AutoPageHeader() {
   const { pathname } = useLocation();
   const screen = findScreenForPath(pathname);
   if (!screen) return null;
-  if (COMPACT_HEADER_GROUPS.includes(screen.groupId)) {
+  if (COMPACT_HEADER_GROUPS.includes(screen.groupId) || COMPACT_HEADER_SCREENS.includes(screen.id)) {
     return <h1 className="sr-only">{screen.name}</h1>;
   }
   return <PageHeaderView pathname={pathname} />;
