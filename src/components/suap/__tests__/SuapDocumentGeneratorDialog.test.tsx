@@ -77,13 +77,19 @@ function renderDialog(processos: SuapProcesso[], initialQueue = createDispatchQu
 describe('SuapDocumentGeneratorDialog', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('gera despacho assistido sem painel lateral de minuta assistida', async () => {
+  it('gera despacho assistido e permite trocar o modelo da minuta', async () => {
     renderDialog([processoCompleto]);
 
     await waitFor(() => expect(screen.getByLabelText('Previa editavel do despacho')).toHaveTextContent('Fornecedor Teste'));
-    expect(screen.queryByText('Minuta assistida')).not.toBeInTheDocument();
     expect(screen.queryByText('Modelo da minuta')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Aplicar modelo' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Minuta assistida')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('combobox')[0]);
+    fireEvent.click(screen.getByText('Bolsa sem projeto'));
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar modelo' }));
+
+    expect(screen.getByLabelText('Previa editavel do despacho')).toHaveTextContent('pelo(s) bolsista(s)');
+    expect(screen.getByLabelText('Previa editavel do despacho')).not.toHaveTextContent('Despacho para Fornecedor Teste');
   });
 
   it('mantem o marcador quando a extracao parcial nao trouxe o campo', async () => {

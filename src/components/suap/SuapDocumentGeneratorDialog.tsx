@@ -54,7 +54,6 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
   currentProcessIdRef.current = currentItem?.processId || null;
   const isAssisted = Boolean(processo && isAiAssistedDispatch(processo));
   const manualFields = currentItem?.manualFields || (processo ? createManualDespachoFields(processo) : currentItem?.standalone ? createStandaloneManualDespachoFields() : null);
-  const showSidePanel = Boolean(currentItem?.error) || (!isAssisted && Boolean(manualFields));
   const isLast = Boolean(queue && queue.currentIndex === queue.items.length - 1);
   const isFirst = !queue || queue.currentIndex === 0;
   const pendingCount = queue?.items.filter((item) => item.status === 'pending').length || 0;
@@ -189,18 +188,30 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
               <Loader2 className="h-4 w-4 animate-spin" /> Montando despacho com os dados extraídos...
             </div>
           ) : (
-            <div className={showSidePanel ? "grid gap-5 lg:grid-cols-[330px_minmax(0,1fr)]" : "grid gap-5"}>
-              {showSidePanel ? <section className="space-y-4 rounded-lg border border-border-default/70 bg-surface-subtle/30 p-4">
+            <div className="grid gap-5 lg:grid-cols-[330px_minmax(0,1fr)]">
+              <section className="space-y-4 rounded-lg border border-border-default/70 bg-surface-subtle/30 p-4">
                 {currentItem.error ? (
                   <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
                     <p>{currentItem.error}</p>
                     {isAssisted ? <Button type="button" variant="ghost" size="sm" className="mt-2 h-7 px-2 text-rose-800" onClick={retryCurrent}><RotateCcw className="mr-1 h-3.5 w-3.5" /> Tentar novamente</Button> : null}
                   </div>
                 ) : null}
-                {isAssisted ? null : manualFields ? (
+                {isAssisted ? (
+                  <div className="space-y-4">
+                    {manualFields ? (
+                      <ManualDespachoForm
+                        fields={manualFields}
+                        onChange={changeManualField}
+                        onGenerate={generateManual}
+                        title=""
+                        submitLabel="Aplicar modelo"
+                      />
+                    ) : null}
+                  </div>
+                ) : manualFields ? (
                   <ManualDespachoForm fields={manualFields} onChange={changeManualField} onGenerate={generateManual} />
                 ) : null}
-              </section> : null}
+              </section>
 
               <section aria-label="Previa editavel do despacho" className="min-w-0 overflow-hidden border border-border-default/70 bg-white shadow-sm">
                 {currentItem.html ? (
@@ -267,10 +278,12 @@ function ManualDespachoForm({
   const noFavorecido = ['auxilio-transporte', 'pafe', 'auxilio-moradia'].includes(fields.finalidade);
   return (
     <div className="space-y-3">
-      <div className="space-y-1">
-        <p className="flex items-center gap-2 text-xs font-semibold text-text-primary"><Sparkles className="h-4 w-4 text-amber-600" /> {title}</p>
-        {description ? <p className="text-xs leading-5 text-text-secondary">{description}</p> : null}
-      </div>
+      {title || description ? (
+        <div className="space-y-1">
+          {title ? <p className="flex items-center gap-2 text-xs font-semibold text-text-primary"><Sparkles className="h-4 w-4 text-amber-600" /> {title}</p> : null}
+          {description ? <p className="text-xs leading-5 text-text-secondary">{description}</p> : null}
+        </div>
+      ) : null}
       <div className="space-y-1"><Label>Finalidade</Label><Select value={fields.finalidade} onValueChange={(value) => onChange('finalidade', value as ManualDespachoFields['finalidade'])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="servico">Servi&ccedil;o</SelectItem><SelectItem value="aquisicao">Aquisi&ccedil;&atilde;o</SelectItem><SelectItem value="projeto">Projeto</SelectItem><SelectItem value="bolsa-sem-projeto">Bolsa sem projeto</SelectItem><SelectItem value="auxilio-transporte">Auxílio-transporte</SelectItem><SelectItem value="pafe">PAFE</SelectItem><SelectItem value="auxilio-moradia">Auxílio-moradia</SelectItem></SelectContent></Select></div>
       <div className="space-y-1"><Label>Processo (opcional)</Label><Input value={fields.processo} onChange={(event) => onChange('processo', event.target.value)} /></div>
       {!noFavorecido ? <div className="space-y-1"><Label>Favorecido</Label><Input value={fields.favorecido} onChange={(event) => onChange('favorecido', event.target.value)} /></div> : null}
