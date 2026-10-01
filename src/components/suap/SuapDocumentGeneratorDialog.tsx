@@ -54,6 +54,7 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
   currentProcessIdRef.current = currentItem?.processId || null;
   const isAssisted = Boolean(processo && isAiAssistedDispatch(processo));
   const manualFields = currentItem?.manualFields || (processo ? createManualDespachoFields(processo) : currentItem?.standalone ? createStandaloneManualDespachoFields() : null);
+  const showSidePanel = Boolean(currentItem?.error) || (!isAssisted && Boolean(manualFields));
   const isLast = Boolean(queue && queue.currentIndex === queue.items.length - 1);
   const isFirst = !queue || queue.currentIndex === 0;
   const pendingCount = queue?.items.filter((item) => item.status === 'pending').length || 0;
@@ -188,35 +189,18 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
               <Loader2 className="h-4 w-4 animate-spin" /> Montando despacho com os dados extraídos...
             </div>
           ) : (
-            <div className="grid gap-5 lg:grid-cols-[330px_minmax(0,1fr)]">
-              <section className="space-y-4 rounded-lg border border-border-default/70 bg-surface-subtle/30 p-4">
+            <div className={showSidePanel ? "grid gap-5 lg:grid-cols-[330px_minmax(0,1fr)]" : "grid gap-5"}>
+              {showSidePanel ? <section className="space-y-4 rounded-lg border border-border-default/70 bg-surface-subtle/30 p-4">
                 {currentItem.error ? (
                   <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
                     <p>{currentItem.error}</p>
                     {isAssisted ? <Button type="button" variant="ghost" size="sm" className="mt-2 h-7 px-2 text-rose-800" onClick={retryCurrent}><RotateCcw className="mr-1 h-3.5 w-3.5" /> Tentar novamente</Button> : null}
                   </div>
                 ) : null}
-                {isAssisted ? (
-                  <div className="space-y-4">
-                    <div className="space-y-2 text-xs text-text-secondary">
-                      <p className="font-semibold text-text-primary">Minuta assistida</p>
-                      <p>A IA já preencheu os dados encontrados. Marcadores no texto indicam campos pendentes.</p>
-                    </div>
-                    {manualFields ? (
-                      <ManualDespachoForm
-                        fields={manualFields}
-                        onChange={changeManualField}
-                        onGenerate={generateManual}
-                        title="Modelo da minuta"
-                        description="Troque o modelo quando a IA classificar o caso errado e aplique para regerar o texto."
-                        submitLabel="Aplicar modelo"
-                      />
-                    ) : null}
-                  </div>
-                ) : manualFields ? (
+                {isAssisted ? null : manualFields ? (
                   <ManualDespachoForm fields={manualFields} onChange={changeManualField} onGenerate={generateManual} />
                 ) : null}
-              </section>
+              </section> : null}
 
               <section aria-label="Previa editavel do despacho" className="min-w-0 overflow-hidden border border-border-default/70 bg-white shadow-sm">
                 {currentItem.html ? (
