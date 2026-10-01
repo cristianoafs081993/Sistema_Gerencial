@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardOrigemAtividadesModal } from '../DashboardOrigemAtividadesModal';
 import type { Atividade, Empenho } from '@/types';
@@ -6,6 +6,15 @@ import type { Atividade, Empenho } from '@/types';
 vi.mock('@/components/modals/AtividadeDialog', () => ({
   AtividadeDialog: ({ open, atividade }: { open: boolean; atividade: Atividade | null }) =>
     open && atividade ? <div data-testid="atividade-dialog">{atividade.atividade}</div> : null,
+}));
+
+vi.mock('@/components/modals/EmpenhoDialog', () => ({
+  EmpenhoDialog: ({ open, empenho, readOnly }: { open: boolean; empenho: Empenho | null; readOnly?: boolean }) =>
+    open && empenho ? (
+      <div data-testid="empenho-dialog" data-readonly={String(!!readOnly)}>
+        {empenho.numero}
+      </div>
+    ) : null,
 }));
 
 const mockAtividades: Atividade[] = [
@@ -114,10 +123,11 @@ describe('DashboardOrigemAtividadesModal', () => {
     // Cards de resumo
     expect(screen.getByText('Saldo Disponível (SUAP)')).toBeInTheDocument();
     expect(screen.getByText('Atividades exibidas')).toBeInTheDocument();
-    // O saldo oficial do SUAP prevalece sobre o calculo planejado - empenhado (55.000 vs. 60.000).
+    // O saldo oficial do SUAP prevalece e o empenhado acompanha: 100.000 - 55.000 = 45.000.
+    expect(screen.getByText('Empenhado (SUAP)')).toBeInTheDocument();
     expect(screen.getAllByText(/R\$\s*55\.000,00/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/R\$\s*100\.000,00/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/R\$\s*40\.000,00/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/R\$\s*45\.000,00/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it('mantem os cards financeiros iguais ao total das linhas exibidas', () => {
@@ -134,7 +144,7 @@ describe('DashboardOrigemAtividadesModal', () => {
     // Com o filtro padrao, card e rodape representam a mesma linha e o saldo oficial do SUAP.
     expect(screen.getByText('Atividades exibidas:').parentElement).toHaveTextContent('1');
     expect(screen.getAllByText(/R\$\s*100\.000,00/i).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText(/R\$\s*40\.000,00/i).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/R\$\s*45\.000,00/i).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/R\$\s*55\.000,00/i).length).toBeGreaterThanOrEqual(2);
 
     fireEvent.click(screen.getByRole('button', { name: /Apenas com saldo/i }));
@@ -142,7 +152,7 @@ describe('DashboardOrigemAtividadesModal', () => {
     // Ao exibir todas, o mesmo contrato continua valendo para todas as linhas.
     expect(screen.getByText('Atividades exibidas:').parentElement).toHaveTextContent('2');
     expect(screen.getAllByText(/R\$\s*130\.000,00/i).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText(/R\$\s*70\.000,00/i).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/R\$\s*75\.000,00/i).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/R\$\s*55\.000,00/i).length).toBeGreaterThanOrEqual(2);
   });
 
@@ -224,6 +234,63 @@ describe('DashboardOrigemAtividadesModal', () => {
     fireEvent.click(detailButtons[0]);
 
     expect(screen.getByTestId('atividade-dialog')).toHaveTextContent('Atividade 01');
+  });
+
+  it('lista os empenhos vinculados e abre o detalhe do empenho ao clicar', () => {
+    render(
+      <DashboardOrigemAtividadesModal
+        open={true}
+        onOpenChange={onOpenChange}
+        origem="231796"
+        atividades={mockAtividades}
+        empenhos={mockEmpenhos}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '(1 empenho)' }));
+
+    const lista = screen.getByRole('list', { name: 'Empenhos identificados' });
+    expect(lista).toHaveTextContent('2024NE000101');
+    // A soma identificada (40.000) difere do consumo indicado pelo SUAP (45.000) e isso fica explicito.
+    expect(screen.getByText(/Somam R\$\s*40\.000,00; o SUAP indica R\$\s*45\.000,00/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /2024NE000101/ }));
+
+    const dialog = screen.getByTestId('empenho-dialog');
+    expect(dialog).toHaveTextContent('2024NE000101');
+    expect(dialog).toHaveAttribute('data-readonly', 'true');
+  });
+
+  it('mostra o empenhado total da origem e lista os empenhos sem atividade identificada', () => {
+    const empenhoSemAtividade: Empenho = {
+      ...mockEmpenhos[0],
+      id: 'emp-orfao',
+      numero: '2024NE000999',
+      descricao: 'Despesa sem correspondencia',
+      valor: 12000,
+      atividadeId: undefined,
+      dimensao: 'Outra',
+      componenteFuncional: 'Outro',
+      naturezaDespesa: '449052',
+    };
+
+    render(
+      <DashboardOrigemAtividadesModal
+        open={true}
+        onOpenChange={onOpenChange}
+        origem="231796"
+        atividades={mockAtividades}
+        empenhos={[...mockEmpenhos, empenhoSemAtividade]}
+      />,
+    );
+
+    const resumo = screen.getByTestId('origem-empenhos-resumo');
+    expect(resumo).toHaveTextContent(/Empenhado na origem \(SIAFI\):\s*R\$\s*82\.000,00 em 3 empenhos/);
+
+    fireEvent.click(within(resumo).getByRole('button', { name: /sem atividade identificada/ }));
+    const lista = screen.getByRole('list', { name: 'Empenhos sem atividade identificada' });
+    expect(lista).toHaveTextContent('2024NE000999');
+    expect(lista).not.toHaveTextContent('2024NE000101');
   });
 
   it('correlaciona empenhos SIAFI sem atividadeId por processo, descrição e siglas garantindo saldos corretos', () => {

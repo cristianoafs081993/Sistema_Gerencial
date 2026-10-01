@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   Eye,
   Layers,
@@ -8,6 +8,7 @@ import {
   Search,
   PiggyBank,
   TrendingUp,
+  ChevronRight,
 } from 'lucide-react';
 import {
   Dialog,
@@ -29,10 +30,71 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { AtividadeDialog } from '@/components/modals/AtividadeDialog';
+import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
 import { formatCurrency } from '@/lib/utils';
 import { extractPlanoInternoCode, matchEmpenhosToAtividades } from '@/utils/atividadeEmpenhoMatching';
 import type { Atividade, Empenho } from '@/types';
+
+const NAO_ASSOCIADOS_KEY = '__nao_associados__';
+
+type EmpenhosListaPopoverProps = {
+  titulo: string;
+  empenhos: Empenho[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSelect: (empenho: Empenho) => void;
+  triggerClassName?: string;
+  nota?: string;
+  children: ReactNode;
+};
+
+function EmpenhosListaPopover({ titulo, empenhos, open, onOpenChange, onSelect, triggerClassName, nota, children }: EmpenhosListaPopoverProps) {
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={`text-primary underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none ${triggerClassName ?? ''}`}
+          title={titulo}
+        >
+          {children}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-0">
+        <div className="border-b border-border-default/60 px-3 py-2">
+          <p className="text-xs font-semibold text-text-primary">{titulo}</p>
+          {nota && <p className="mt-0.5 text-[11px] text-muted-foreground">{nota}</p>}
+        </div>
+        <ul className="max-h-64 overflow-y-auto py-1" aria-label={titulo}>
+          {[...empenhos]
+            .sort((left, right) => (right.valor || 0) - (left.valor || 0))
+            .map((empenho) => (
+              <li key={empenho.id || empenho.numero}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(empenho)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-xs font-semibold text-text-primary">{empenho.numero}</div>
+                    {empenho.favorecidoNome && (
+                      <div className="truncate text-[11px] text-muted-foreground" title={empenho.favorecidoNome}>
+                        {empenho.favorecidoNome}
+                      </div>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-xs font-medium text-text-primary">{formatCurrency(empenho.valor || 0)}</span>
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                </button>
+              </li>
+            ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export interface DashboardOrigemAtividadesModalProps {
   open: boolean;
@@ -53,6 +115,8 @@ export function DashboardOrigemAtividadesModal({
 }: DashboardOrigemAtividadesModalProps) {
   const [selectedAtividadeForDialog, setSelectedAtividadeForDialog] = useState<Atividade | null>(null);
   const [isAtividadeDialogOpen, setIsAtividadeDialogOpen] = useState(false);
+  const [empenhosPopoverAtividadeId, setEmpenhosPopoverAtividadeId] = useState<string | null>(null);
+  const [selectedEmpenhoForDialog, setSelectedEmpenhoForDialog] = useState<Empenho | null>(null);
   const [apenasComSaldo, setApenasComSaldo] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -69,10 +133,19 @@ export function DashboardOrigemAtividadesModal({
   }, [empenhos, origem]);
 
   // Correlaciona de forma inteligente os empenhos às atividades da origem
-  const { empenhosPorAtividadeMap } = useMemo(() => {
-    if (!origem) return { empenhosPorAtividadeMap: new Map(), unmatchedEmpenhos: [] };
+  const { empenhosPorAtividadeMap, unmatchedEmpenhos } = useMemo(() => {
+    if (!origem) return { empenhosPorAtividadeMap: new Map(), unmatchedEmpenhos: [] as Empenho[] };
     return matchEmpenhosToAtividades(atividadesDaOrigem, empenhosDaOrigem);
   }, [atividadesDaOrigem, empenhosDaOrigem, origem]);
+
+  const totalEmpenhadoOrigem = useMemo(
+    () => empenhosDaOrigem.reduce((total, empenho) => total + (empenho.valor || 0), 0),
+    [empenhosDaOrigem],
+  );
+  const totalNaoAssociado = useMemo(
+    () => unmatchedEmpenhos.reduce((total, empenho) => total + (empenho.valor || 0), 0),
+    [unmatchedEmpenhos],
+  );
 
   // Enriquece as atividades com execução e com o saldo oficial do Plano 8 do SUAP.
   // O fallback preserva atividades legadas que ainda não possuem o campo sincronizado.
@@ -80,8 +153,11 @@ export function DashboardOrigemAtividadesModal({
     return atividadesDaOrigem.map((atividade) => {
       const empInfo = empenhosPorAtividadeMap.get(atividade.id) || { total: 0, count: 0, empenhos: [] };
       const planejado = atividade.valorTotal || 0;
-      const empenhado = empInfo.total;
-      const saldo = atividade.saldoDisponivel ?? (planejado - empenhado);
+      const empenhadoIdentificado = empInfo.total;
+      const saldo = atividade.saldoDisponivel ?? (planejado - empenhadoIdentificado);
+      // Com o saldo oficial do SUAP, o empenhado e o que o SUAP ja consumiu da atividade
+      // (planejado - saldo), para que Planejado - Empenhado = Saldo nos cards e nas linhas.
+      const empenhado = atividade.saldoDisponivel != null ? Math.max(0, planejado - saldo) : empenhadoIdentificado;
       const percentual = planejado > 0 ? (empenhado / planejado) * 100 : 0;
 
       return {
@@ -90,6 +166,7 @@ export function DashboardOrigemAtividadesModal({
         empenhado,
         saldo,
         percentual,
+        empenhadoIdentificado,
         qtdEmpenhos: empInfo.count,
         empenhos: empInfo.empenhos,
       };
@@ -143,6 +220,11 @@ export function DashboardOrigemAtividadesModal({
   const handleOpenAtividadeDetails = (atv: Atividade) => {
     setSelectedAtividadeForDialog(atv);
     setIsAtividadeDialogOpen(true);
+  };
+
+  const handleOpenEmpenhoDetails = (empenho: Empenho) => {
+    setEmpenhosPopoverAtividadeId(null);
+    setSelectedEmpenhoForDialog(empenho);
   };
 
   return (
@@ -211,13 +293,37 @@ export function DashboardOrigemAtividadesModal({
 
               <div className="rounded-lg border border-border-default/70 bg-slate-50/50 p-3 dark:bg-slate-900/30">
                 <div className="flex items-center justify-between text-xs text-text-muted">
-                  <span>Empenhado</span>
+                  <span>Empenhado (SUAP)</span>
                   <TrendingUp className="h-3.5 w-3.5 text-slate-500" />
                 </div>
                 <div className="mt-1 text-base font-semibold text-text-primary">
                   {formatCurrency(totaisVisiveis.empenhado)}
                 </div>
               </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted" data-testid="origem-empenhos-resumo">
+              <span>
+                Empenhado na origem (SIAFI):{' '}
+                <strong className="text-text-primary">{formatCurrency(totalEmpenhadoOrigem)}</strong> em {empenhosDaOrigem.length}{' '}
+                {empenhosDaOrigem.length === 1 ? 'empenho' : 'empenhos'}
+              </span>
+              {unmatchedEmpenhos.length > 0 && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <EmpenhosListaPopover
+                    titulo="Empenhos sem atividade identificada"
+                    empenhos={unmatchedEmpenhos}
+                    open={empenhosPopoverAtividadeId === NAO_ASSOCIADOS_KEY}
+                    onOpenChange={(isOpen) => setEmpenhosPopoverAtividadeId(isOpen ? NAO_ASSOCIADOS_KEY : null)}
+                    onSelect={handleOpenEmpenhoDetails}
+                    triggerClassName="text-xs"
+                  >
+                    {formatCurrency(totalNaoAssociado)} em {unmatchedEmpenhos.length}{' '}
+                    {unmatchedEmpenhos.length === 1 ? 'empenho' : 'empenhos'} sem atividade identificada
+                  </EmpenhosListaPopover>
+                </>
+              )}
             </div>
 
             {/* Barra de Filtros e Busca */}
@@ -309,7 +415,7 @@ export function DashboardOrigemAtividadesModal({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredAtividades.map(({ atividade, planejado, empenhado, saldo, percentual, qtdEmpenhos }) => {
+                  filteredAtividades.map(({ atividade, planejado, empenhado, empenhadoIdentificado, saldo, percentual, qtdEmpenhos, empenhos: empenhosDaAtividade }) => {
                     const isPositiveBalance = saldo > 0;
 
                     return (
@@ -391,9 +497,21 @@ export function DashboardOrigemAtividadesModal({
                         <TableCell className="px-4 py-3 text-right align-top text-xs text-text-primary">
                           <div>{formatCurrency(empenhado)}</div>
                           {qtdEmpenhos > 0 && (
-                            <span className="text-[10px] text-muted-foreground">
+                            <EmpenhosListaPopover
+                              titulo="Empenhos identificados"
+                              empenhos={empenhosDaAtividade}
+                              open={empenhosPopoverAtividadeId === atividade.id}
+                              onOpenChange={(isOpen) => setEmpenhosPopoverAtividadeId(isOpen ? atividade.id : null)}
+                              onSelect={handleOpenEmpenhoDetails}
+                              triggerClassName="text-[10px]"
+                              nota={
+                                Math.abs(empenhadoIdentificado - empenhado) >= 0.01
+                                  ? `Somam ${formatCurrency(empenhadoIdentificado)}; o SUAP indica ${formatCurrency(empenhado)} já consumido da atividade.`
+                                  : undefined
+                              }
+                            >
                               ({qtdEmpenhos} {qtdEmpenhos === 1 ? 'empenho' : 'empenhos'})
-                            </span>
+                            </EmpenhosListaPopover>
                           )}
                         </TableCell>
 
@@ -466,6 +584,19 @@ export function DashboardOrigemAtividadesModal({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {selectedEmpenhoForDialog && (
+        <EmpenhoDialog
+          readOnly
+          open={!!selectedEmpenhoForDialog}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setSelectedEmpenhoForDialog(null);
+          }}
+          empenho={selectedEmpenhoForDialog}
+          atividades={atividades}
+          onSave={() => {}}
+        />
+      )}
 
       {/* Modal de Detalhes da Atividade individual quando o usuário clica em "Ver detalhes" */}
       {selectedAtividadeForDialog && (
