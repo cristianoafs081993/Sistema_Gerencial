@@ -147,6 +147,13 @@ export function DashboardCurrentTab({
       barClassName: 'bg-primary',
     },
     {
+      label: 'Descentralizado',
+      value: totalDescentralizado,
+      ratio: percent(totalDescentralizado, totalPlanejado),
+      ratioLabel: `${percent(totalDescentralizado, totalPlanejado).toFixed(1)}% do planejado`,
+      barClassName: 'bg-brand-600',
+    },
+    {
       label: 'Empenhado',
       value: totalEmpenhado,
       ratio: percent(totalEmpenhado, totalPlanejado),

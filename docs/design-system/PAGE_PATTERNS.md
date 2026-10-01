@@ -67,7 +67,7 @@ Estrutura:
 1. `PageHeader` com descrição da visão ativa, filtros (`DashboardFiltersSheet`) nas ações e `Tabs` das visões na barra secundária;
 2. Uma única linha com até 4 `StatCard` no padrão "metric" — cada número aparece uma só vez na tela;
 3. Velocímetros (`GaugeChart`) de Empenhado/Descentralizado e Liquidado/Descentralizado;
-4. `ChartPanel` principal (evolução) ao lado do funil de execução, com as razões entre etapas;
+4. `ChartPanel` principal (evolução) ao lado do funil de execução (Planejado → Descentralizado → Empenhado → Liquidado → Pago, mesmas etapas do app mobile), com as razões entre etapas;
 5. Gráficos de apoio e tabela de detalhamento.
 
 Séries seguem a ordem azul-céu `#1E88E5`, ciano `#00B7DC`, azul profundo `#1565C0`, âmbar `#F2A93B` e verde `#2E9E6A`. Evite gradientes em texto, brilhos decorativos e cartões que repetem o mesmo valor.

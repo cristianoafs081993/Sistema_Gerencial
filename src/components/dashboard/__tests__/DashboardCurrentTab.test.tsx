@@ -217,4 +217,20 @@ describe('DashboardCurrentTab', () => {
     expect(rectangles.length).toBeGreaterThan(0);
     expect(rectangles.some((r) => r.getAttribute('data-radius') === '0,4,4,0')).toBe(true);
   });
+
+  it('exibe a etapa Descentralizado no funil de execução entre Planejado e Empenhado', () => {
+    renderDashboardCurrentTab({ totalDescentralizado: 120000 });
+
+    const funil = screen.getByRole('list', { name: 'Funil de execução' });
+    const etapas = within(funil).getAllByRole('listitem');
+    expect(etapas.map((etapa) => etapa.querySelector('span')?.textContent)).toEqual([
+      'Planejado',
+      'Descentralizado',
+      'Empenhado',
+      'Liquidado',
+      'Pago',
+    ]);
+    expect(within(etapas[1]).getByText('R$ 120.000,00')).toBeInTheDocument();
+    expect(within(etapas[1]).getByText('80.0% do planejado')).toBeInTheDocument();
+  });
 });
