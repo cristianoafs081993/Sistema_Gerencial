@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner';
 
 import { HeaderSubtitle } from '@/components/HeaderParts';
+import { PageHeader } from '@/components/design-system';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -836,13 +837,13 @@ export default function RequisicaoCompraPage() {
   };
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="pb-10 -mt-2 sm:-mt-3 lg:-mt-4">
       <HeaderSubtitle>Gestão de Requisições de Compra</HeaderSubtitle>
-
+      <PageHeader compact title="Requisição de Compra" />
 
       {/* VIEW: EDICÃO OU CRIAÇÃO DE REQUISICAO */}
       {isEditing && (
-        <Card className="border-primary/20 shadow-lg animate-in fade-in zoom-in-95 duration-200">
+        <Card className="border-primary/20 shadow-lg animate-in fade-in zoom-in-95 duration-200 mt-4">
           <CardHeader className="bg-primary/[0.02] border-b border-border-default/50">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -1187,19 +1188,6 @@ export default function RequisicaoCompraPage() {
       {/* VIEW: MAIN DASHBOARD */}
       {!isEditing && (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
-            <div className="flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-primary" />
-              <span className="font-ui text-sm font-bold text-text-primary uppercase tracking-wider">Requisições de Compra ({requisicoes.length})</span>
-            </div>
-            {(isTerceirizado || isSuperAdmin) && (
-              <Button type="button" className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5" onClick={handleNewRequisicao}>
-                <Plus className="h-4 w-4" />
-                Nova Requisição de Compra
-              </Button>
-            )}
-          </div>
-
           {/* Stat Cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card className="border border-border-default bg-surface-card p-4 shadow-soft">
@@ -1258,6 +1246,20 @@ export default function RequisicaoCompraPage() {
               </div>
             </Card>
           </div>
+
+          {/* Ações da Tabela */}
+          {(isTerceirizado || isSuperAdmin) && (
+            <div className="flex items-center justify-end">
+              <Button
+                type="button"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5"
+                onClick={handleNewRequisicao}
+              >
+                <Plus className="h-4 w-4" />
+                Nova Requisição de Compra
+              </Button>
+            </div>
+          )}
 
           {isLoadingRequisicoes ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3 border rounded-radius-lg border-border-default">

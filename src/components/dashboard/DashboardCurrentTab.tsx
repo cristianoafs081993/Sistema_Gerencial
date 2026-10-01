@@ -8,6 +8,7 @@ import {
   ComposedChart,
   Legend,
   Line,
+  Rectangle,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -344,15 +345,47 @@ export function DashboardCurrentTab({
                 <XAxis type="number" tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`} tick={{ fill: 'currentColor', fontSize: 12 }} className="text-muted-foreground" />
                 <YAxis dataKey="name" type="category" width={120} tick={{ fill: 'currentColor', fontSize: 11 }} className="text-muted-foreground" />
                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Legend />
+                <Legend
+                  verticalAlign="bottom"
+                  content={(props) => {
+                    const { payload } = props;
+                    if (!payload || !payload.length) return null;
+                    return (
+                      <div className="flex w-full flex-nowrap items-center justify-center gap-3 overflow-x-auto pt-2 text-xs select-none">
+                        {payload.map((entry: any, index: number) => (
+                          <span
+                            key={`legend-item-${entry.value || index}`}
+                            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap"
+                          >
+                            <span
+                              className="inline-block h-2.5 w-2.5 shrink-0 rounded-[3px]"
+                              style={{ backgroundColor: entry.color }}
+                            />
+                            <span className="text-xs font-semibold" style={{ color: entry.color }}>
+                              {entry.value}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  }}
+                />
                 {uniqueOrigens.map((origem, index) => (
                   <Bar
                     key={origem}
                     dataKey={origem}
                     stackId="a"
                     fill={SERIES_COLORS[index % SERIES_COLORS.length]}
-                    radius={index === uniqueOrigens.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
                     barSize={24}
+                    shape={(props: any) => {
+                      const payload = props.payload;
+                      if (!payload || !props.width || props.width <= 0) {
+                        return <Rectangle {...props} radius={[0, 0, 0, 0]} />;
+                      }
+                      const activeKeys = uniqueOrigens.filter((key) => Math.abs(Number(payload[key] || 0)) > 0);
+                      const isLast = activeKeys[activeKeys.length - 1] === origem;
+                      return <Rectangle {...props} radius={isLast ? [0, 4, 4, 0] : [0, 0, 0, 0]} />;
+                    }}
                   />
                 ))}
               </BarChart>

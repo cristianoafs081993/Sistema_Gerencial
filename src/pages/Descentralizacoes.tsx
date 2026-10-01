@@ -4,7 +4,7 @@ import { useData } from '@/contexts/DataContext';
 import { Descentralizacao, DIMENSOES } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -326,10 +326,7 @@ export default function Descentralizacoes() {
 
             {/* Table */}
             <Card className="card-system overflow-hidden border-none shadow-none mt-6">
-                <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between">
-                    <CardTitle className="table-title">
-                        <span>{sortedDescentralizacoes.length} {sortedDescentralizacoes.length !== 1 ? 'descentralizações' : 'descentralização'} encontrada{sortedDescentralizacoes.length !== 1 ? 's' : ''}</span>
-                    </CardTitle>
+                <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-end">
                     <Badge variant="secondary" className="text-sm px-3 py-1 bg-slate-100 text-slate-700 border-none">
                         Total: {formatCurrency(totalResumoFiltrado)}
                     </Badge>

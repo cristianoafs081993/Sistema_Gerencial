@@ -8,6 +8,8 @@ describe('RequisicaoCompra header', () => {
     const source = readFileSync('src/pages/RequisicaoCompra.tsx', 'utf8');
 
     expect(source).toContain('<HeaderSubtitle>Gestão de Requisições de Compra</HeaderSubtitle>');
+    expect(source).toContain('<PageHeader compact title="Requisição de Compra" />');
+    expect(source).not.toContain('Requisições de Compra ({requisicoes.length})');
     expect(source).not.toContain('Módulo de registro e conferência de Requisições de Compra');
     expect(source).not.toContain('>Gestão de Requisições de Compra</h1>');
   });

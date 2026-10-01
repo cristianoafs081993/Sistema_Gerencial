@@ -7,12 +7,23 @@ import type { Atividade, Empenho } from '@/types';
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  Bar: () => <div />,
+  Bar: ({ shape, ...props }: any) => (
+    <div data-testid="recharts-bar">
+      {typeof shape === 'function' ? shape({ payload: { '231796': 100 }, width: 10, ...props }) : null}
+    </div>
+  ),
+  Rectangle: (props: any) => <div data-testid="recharts-rectangle" data-radius={props.radius?.join(',')} />,
   XAxis: () => <div />,
   YAxis: () => <div />,
   Tooltip: () => <div />,
   CartesianGrid: () => <div />,
-  Legend: () => <div />,
+  Legend: ({ content }: { content?: any }) => (
+    <div data-testid="recharts-legend">
+      {typeof content === 'function'
+        ? content({ payload: [{ value: 'Origem-A', color: '#00c49f' }, { value: 'Origem-B', color: '#64748b' }] })
+        : null}
+    </div>
+  ),
   ComposedChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   Line: () => <div />,
   Area: () => <div />,
@@ -184,5 +195,26 @@ describe('DashboardCurrentTab', () => {
     expect(within(card!).getByText('Pago')).toBeInTheDocument();
     expect(within(card!).getByText('R$ 1.215.470,50')).toBeInTheDocument();
     expect(within(card!).getByText('R$ 1.207.245,19')).toBeInTheDocument();
+  });
+
+  it('renderiza a legenda de descentralizações em linha única com marcadores arredondados', () => {
+    renderDashboardCurrentTab({
+      dadosDescentralizacao: [
+        { name: 'AD - Administração', '231796': 100000 },
+        { name: 'AE - Atividades Estudantis', '231796': 50000, '261941': 50000 },
+      ],
+      uniqueOrigens: ['231796', '261941'],
+    });
+
+    const legend = screen.getByTestId('recharts-legend');
+    expect(legend).toBeInTheDocument();
+    expect(legend.querySelector('.flex-nowrap')).toBeInTheDocument();
+    expect(legend.querySelector('.rounded-\\[3px\\]')).toBeInTheDocument();
+    expect(within(legend).getByText('Origem-A')).toBeInTheDocument();
+    expect(within(legend).getByText('Origem-B')).toBeInTheDocument();
+
+    const rectangles = screen.getAllByTestId('recharts-rectangle');
+    expect(rectangles.length).toBeGreaterThan(0);
+    expect(rectangles.some((r) => r.getAttribute('data-radius') === '0,4,4,0')).toBe(true);
   });
 });

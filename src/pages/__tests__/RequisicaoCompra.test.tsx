@@ -131,10 +131,11 @@ describe('RequisicaoCompraPage', () => {
     mockedTransparenciaService.getItensEmpenhoPortal.mockResolvedValue([]);
   });
 
-  it('nao exibe mais a gestao administrativa de vinculos de terceirizados', async () => {
+  it('nao exibe mais a gestao administrativa de vinculos de terceirizados e nao exibe titulo redundante com contagem', async () => {
     renderPage();
 
     expect(await screen.findByRole('button', { name: /Nova Requisição de Compra/i })).toBeInTheDocument();
+    expect(screen.queryByText(/Requisições de Compra \(\d+\)/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Gerenciar Vínculos de Terceirizados/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/Vincular Contratos e Empenhos/i)).not.toBeInTheDocument();
   });

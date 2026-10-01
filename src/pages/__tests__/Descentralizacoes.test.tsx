@@ -224,7 +224,8 @@ describe('Descentralizacoes', () => {
       expect(screen.getByText('Total: R$ 175,00')).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/3 descentraliza/i)).toBeInTheDocument();
+    expect(screen.queryByText(/descentralizaç.*encontrada/i)).not.toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(4);
   });
 
   it('recalcula a soma ao filtrar por origem de recurso e ao combinar origem com dimensao', async () => {

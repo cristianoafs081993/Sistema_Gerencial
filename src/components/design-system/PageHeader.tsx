@@ -79,6 +79,9 @@ function PageHeaderView({
   const resolvedEyebrow = eyebrow ?? group?.name;
 
   if (compact) {
+    if (!toolbar && !actions) {
+      return resolvedTitle ? <h1 className="sr-only">{resolvedTitle}</h1> : null;
+    }
     return (
       <header
         className={cn('mb-6 flex flex-wrap items-center justify-between gap-3', className)}
