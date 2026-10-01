@@ -336,7 +336,7 @@ describe('ContratoApiDetailsSheet', () => {
     const historicoSection = screen.getByRole('button', { name: /Histórico do contrato/i });
     const itensSection = screen.getByRole('button', { name: /Itens/i });
     const faturasSection = screen.getByRole('button', { name: /Faturas associadas/i });
-    const gestaoSection = screen.getByRole('button', { name: /Gestão contratual/i });
+    const gestaoSection = screen.getByRole('button', { name: /Gestão e fiscalização/i });
     expect(historicoSection).toHaveAttribute('aria-expanded', 'false');
     expect(itensSection).toHaveAttribute('aria-expanded', 'false');
     expect(faturasSection).toHaveAttribute('aria-expanded', 'false');
@@ -381,6 +381,8 @@ describe('ContratoApiDetailsSheet', () => {
     const groupByItem = screen.getByRole('tab', { name: 'Item' });
     const groupByFatura = screen.getByRole('tab', { name: 'Fatura' });
     expect(groupByFatura).toHaveAttribute('data-state', 'active');
+    expect(screen.queryByText('Itens vinculados')).not.toBeInTheDocument();
+    screen.getAllByRole('button', { name: /Expandir fatura/i }).forEach((toggle) => fireEvent.click(toggle));
     expect(screen.getAllByText('Itens vinculados').length).toBeGreaterThan(0);
     expect(screen.getByText(/Sem item vinculado na API/i)).toBeInTheDocument();
 

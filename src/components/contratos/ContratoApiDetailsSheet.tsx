@@ -1,14 +1,16 @@
 import { RecordDetailsPage } from '@/components/records/RecordDetailsPage';
+import { validarChaveNfe } from '@/utils/nfeChave';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
-import { formatContractDate } from '@/utils/contractPresentation';
+import { contractDaysRemaining, contractDeadlineLabel, formatContractDate } from '@/utils/contractPresentation';
 import type { Empenho } from '@/types';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   AlertTriangle,
   Building2,
   CalendarClock,
+  ChevronDown,
   CircleDollarSign,
   Download,
   ExternalLink,
@@ -291,6 +293,10 @@ function SummaryMetric({
   );
 }
 
+function TabCount({ value }: { value: number }) {
+  return <span className="ml-1.5 rounded-full bg-muted px-1.5 text-[11px] font-semibold text-muted-foreground">{value}</span>;
+}
+
 function AccordionSectionTitle({
   icon,
   title,
@@ -318,58 +324,126 @@ function AccordionSectionTitle({
   );
 }
 
-function FaturaLine({
-  fatura,
-  faturaItem,
-  empenhos,
-}: {
-  fatura: ContratoApiFaturaRow;
-  faturaItem?: ContratoApiFaturaItemRow;
-  empenhos: ContratoApiFaturaEmpenhoRow[];
-}) {
+function FaturaField({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="rounded-md border border-border/70 px-3 py-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-xs font-semibold">{fatura.numero_instrumento_cobranca || '-'}</span>
-            <Badge variant={isFaturaExecutada(fatura) ? 'default' : 'secondary'} className="h-5 rounded-md text-[10px]">
-              {fatura.situacao || 'Sem situação'}
-            </Badge>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Emissão {formatDate(fatura.data_emissao)}
-            {fatura.data_ateste ? ` | Ateste ${formatDate(fatura.data_ateste)}` : ''}
-            {fatura.data_vencimento ? ` | Vencimento ${formatDate(fatura.data_vencimento)}` : ''}
-            {empenhos.length > 0 ? ` | Empenho ${empenhos.map((item) => item.numero_empenho).filter(Boolean).join(', ')}` : ''}
-          </p>
-          {(Number(fatura.glosa) > 0 || Number(fatura.juros) > 0 || Number(fatura.multa) > 0 || fatura.repactuacao) ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {Number(fatura.glosa) > 0 ? `Glosa ${formatCurrency(Number(fatura.glosa))}` : ''}
-              {Number(fatura.juros) > 0 ? `${Number(fatura.glosa) > 0 ? ' | ' : ''}Juros ${formatCurrency(Number(fatura.juros))}` : ''}
-              {Number(fatura.multa) > 0 ? `${Number(fatura.glosa) > 0 || Number(fatura.juros) > 0 ? ' | ' : ''}Multa ${formatCurrency(Number(fatura.multa))}` : ''}
-              {fatura.repactuacao ? ` | Repactuação: ${fatura.repactuacao}` : ''}
-            </p>
-          ) : null}
-          {faturaItem ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Qtd. {formatNumber(faturaItem.quantidade_faturado)} | Unitário {formatCurrency(faturaItem.valor_unitario_faturado ?? 0)}
-            </p>
-          ) : null}
-        </div>
-        <div className="text-right text-xs">
-          <p className="font-semibold">
-            {formatCurrency(faturaItem?.valor_total_faturado ?? fatura.valor_liquido ?? fatura.valor_bruto ?? 0)}
-          </p>
-          <p className="text-muted-foreground">{faturaItem ? 'Valor do item' : 'Valor da fatura'}</p>
-        </div>
-      </div>
+    <div>
+      <dt className="text-[11px] text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 text-xs font-medium text-foreground">{children}</dd>
     </div>
   );
 }
 
-const RECURSO_LABELS: Record<ContratoApiRecursoRow['tipo_recurso'], string> = {
-  cronograma: 'Cronograma',
+const rawText = (raw: Record<string, unknown> | null | undefined, key: string) => {
+  const value = String(raw?.[key] ?? '').trim();
+  return value || null;
+};
+
+function FaturaLine({
+  fatura,
+  faturaItem,
+  empenhos,
+  children,
+}: {
+  fatura: ContratoApiFaturaRow;
+  faturaItem?: ContratoApiFaturaItemRow;
+  empenhos: ContratoApiFaturaEmpenhoRow[];
+  children?: ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const chaveValidacao = validarChaveNfe(fatura.chave_nfe, {
+    fornecedorCnpj: rawText(fatura.raw_data, 'fornecedor_ic'),
+    numeroDocumento: fatura.numero_instrumento_cobranca,
+  });
+  const executada = isFaturaExecutada(fatura);
+  const docSiafi = rawText(fatura.raw_data, 'sfadrao_id');
+  const dataLiquidacao = rawText(fatura.raw_data, 'data_liquidacao');
+  const empenhoNumeros = Array.from(new Set(empenhos.map((item) => item.numero_empenho).filter(Boolean)));
+  const referencia = fatura.mes_referencia && fatura.ano_referencia
+    ? `${String(fatura.mes_referencia).padStart(2, '0')}/${fatura.ano_referencia}`
+    : null;
+  const chave = fatura.chave_nfe?.trim();
+  const ajustes = [
+    Number(fatura.glosa) > 0 ? `Glosa ${formatCurrency(Number(fatura.glosa))}` : '',
+    Number(fatura.juros) > 0 ? `Juros ${formatCurrency(Number(fatura.juros))}` : '',
+    Number(fatura.multa) > 0 ? `Multa ${formatCurrency(Number(fatura.multa))}` : '',
+    fatura.repactuacao ? `Repactuação: ${fatura.repactuacao}` : '',
+  ].filter(Boolean);
+
+  return (
+    <div className="rounded-lg border border-border/70 bg-card px-4 py-3">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-label={`${expanded ? 'Recolher' : 'Expandir'} fatura ${fatura.numero_instrumento_cobranca || fatura.api_fatura_id}`}
+        onClick={() => setExpanded((value) => !value)}
+        className="flex w-full flex-wrap items-start justify-between gap-3 text-left"
+      >
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', expanded && 'rotate-180')} />
+            <span className="text-sm font-bold text-foreground">Fatura <span className="font-mono">{fatura.numero_instrumento_cobranca || '-'}</span></span>
+            <Badge variant="outline" className={cn('h-5 rounded-full text-[10px] font-bold', executada ? 'border-status-success/30 bg-status-success/10 text-status-success' : 'border-status-warning/40 bg-status-warning/10 text-status-warning')}>
+              {fatura.situacao || 'Sem situação'}
+            </Badge>
+            {chaveValidacao && chaveValidacao.estado !== 'nao-nfe' ? (
+              <Badge variant="outline" className={cn('h-5 rounded-full text-[10px] font-bold', chaveValidacao.estado === 'valida' ? 'border-status-success/30 bg-status-success/10 text-status-success' : 'border-status-warning/40 bg-status-warning/10 text-status-warning')}>
+                {chaveValidacao.estado === 'valida' ? 'NF-e válida' : 'NF-e com pendência'}
+              </Badge>
+            ) : null}
+          </div>
+          {referencia ? <p className="mt-0.5 text-xs text-muted-foreground">Referência {referencia}</p> : null}
+        </div>
+        <div className="text-right">
+          <p className="text-base font-extrabold text-foreground">
+            {formatCurrency(faturaItem?.valor_total_faturado ?? fatura.valor_liquido ?? fatura.valor_bruto ?? 0)}
+          </p>
+          <p className="text-[11px] text-muted-foreground">{faturaItem ? 'Valor do item' : 'Valor líquido'}</p>
+        </div>
+      </button>
+
+      {faturaItem ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {`Qtd. ${formatNumber(faturaItem.quantidade_faturado)} | Unitário ${formatCurrency(faturaItem.valor_unitario_faturado ?? 0)}`}
+        </p>
+      ) : null}
+
+      {expanded ? (
+      <>
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-border/60 pt-3 sm:grid-cols-3 lg:grid-cols-4">
+        {!faturaItem && fatura.valor_bruto != null ? <FaturaField label="Valor bruto">{formatCurrency(Number(fatura.valor_bruto))}</FaturaField> : null}
+        <FaturaField label="Emissão">{formatDate(fatura.data_emissao)}</FaturaField>
+        {fatura.data_vencimento ? <FaturaField label="Vencimento">{formatDate(fatura.data_vencimento)}</FaturaField> : null}
+        {fatura.data_ateste ? <FaturaField label="Ateste">{formatDate(fatura.data_ateste)}</FaturaField> : null}
+        {dataLiquidacao ? <FaturaField label="Liquidação">{formatDate(dataLiquidacao)}</FaturaField> : null}
+        {fatura.data_pagamento ? <FaturaField label="Pagamento">{formatDate(fatura.data_pagamento)}</FaturaField> : null}
+        {empenhoNumeros.length > 0 ? <FaturaField label="Empenho"><span className="font-mono">{empenhoNumeros.join(', ')}</span></FaturaField> : null}
+        {docSiafi ? <FaturaField label="Doc. SIAFI"><span className="font-mono">{docSiafi}</span></FaturaField> : null}
+        {fatura.processo?.trim() ? <FaturaField label="Processo"><span className="font-mono">{fatura.processo.trim()}</span></FaturaField> : null}
+      </dl>
+
+      {ajustes.length > 0 ? <p className="mt-2 text-xs text-status-warning">{ajustes.join(' | ')}</p> : null}
+      {chave ? (
+        <div className="mt-3 rounded-md bg-muted/40 px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] text-muted-foreground">{chaveValidacao?.estado === 'nao-nfe' ? 'Código da nota' : 'Chave da NF-e'}</p>
+            {chaveValidacao && chaveValidacao.estado !== 'nao-nfe' ? (
+              <Badge variant="outline" className={cn('h-5 rounded-full text-[10px] font-bold', chaveValidacao.estado === 'valida' ? 'border-status-success/30 bg-status-success/10 text-status-success' : 'border-status-warning/40 bg-status-warning/10 text-status-warning')}>
+                {chaveValidacao.estado === 'valida' ? 'Chave válida' : chaveValidacao.estado === 'incompleta' ? 'Incompleta' : 'Inconsistente'}
+              </Badge>
+            ) : null}
+          </div>
+          <p className="mt-0.5 select-all break-all font-mono text-xs text-foreground">{chave}</p>
+          {chaveValidacao?.motivo && chaveValidacao.estado !== 'nao-nfe' ? <p className="mt-1 text-[11px] text-status-warning">{chaveValidacao.motivo}</p> : null}
+        </div>
+      ) : null}
+      {children ? <div className="mt-3 border-t border-border/60 pt-3">{children}</div> : null}
+      </>
+      ) : null}
+    </div>
+  );
+}
+
+const RECURSO_LABELS: Partial<Record<ContratoApiRecursoRow['tipo_recurso'], string>> = {
   garantias: 'Garantias',
   responsaveis: 'Responsáveis',
   prepostos: 'Prepostos',
@@ -390,15 +464,18 @@ function getRecursoDetails(recurso: ContratoApiRecursoRow) {
   ].filter(Boolean).join(' | ');
 }
 
-function ContratoGestaoRecursos({ recursos }: { recursos: ContratoApiRecursoRow[] }) {
-  const grouped = Object.entries(RECURSO_LABELS).map(([tipo, label]) => ({
+const RECURSOS_FISCALIZACAO: ContratoApiRecursoRow['tipo_recurso'][] = ['responsaveis', 'prepostos', 'garantias'];
+const RECURSOS_COMPLEMENTARES: ContratoApiRecursoRow['tipo_recurso'][] = ['ocorrencias', 'despesas_acessorias', 'terceirizados'];
+
+function ContratoGestaoRecursos({ recursos, tipos }: { recursos: ContratoApiRecursoRow[]; tipos: ContratoApiRecursoRow['tipo_recurso'][] }) {
+  const grouped = Object.entries(RECURSO_LABELS).filter(([tipo]) => tipos.includes(tipo as ContratoApiRecursoRow['tipo_recurso'])).map(([tipo, label]) => ({
     tipo: tipo as ContratoApiRecursoRow['tipo_recurso'],
     label,
     rows: recursos.filter((row) => row.tipo_recurso === tipo),
   })).filter((group) => group.rows.length > 0);
 
   if (grouped.length === 0) {
-    return <div className="rounded-md border border-dashed border-border/70 p-6 text-center text-sm text-muted-foreground">Nenhum recurso complementar sincronizado para este contrato.</div>;
+    return <div className="rounded-md border border-dashed border-border/70 p-6 text-center text-sm text-muted-foreground">Nenhum registro sincronizado para este contrato.</div>;
   }
 
   return <div className="space-y-4">{grouped.map((group) => (
@@ -493,6 +570,15 @@ export function ContratoApiDetailsSheet({
   const valorHistorico = getValorTotalFromHistorico(historico);
   const valorAcumulado = Number(contrato?.valor_acumulado) || 0;
   const valorTotalApi = valorHistorico || valorAcumulado;
+  const executionPercent = execution && execution.valorGlobal > 0
+    ? Math.min(100, Math.max(0, Math.round((execution.empenhado / execution.valorGlobal) * 100)))
+    : 0;
+  const daysRemaining = contractDaysRemaining(contrato?.vigencia_fim);
+  const vigenciaBadge = contrato?.situacao_derivada === false || (daysRemaining !== null && daysRemaining < 0)
+    ? { label: 'Encerrado', className: 'border-border bg-muted text-muted-foreground' }
+    : daysRemaining !== null && daysRemaining <= 90
+      ? { label: 'A vencer', className: 'border-status-warning/40 bg-status-warning/10 text-status-warning' }
+      : { label: 'Vigente', className: 'border-status-success/30 bg-status-success/10 text-status-success' };
   const valorTotalLabel = valorHistorico > 0 ? 'Valor total histórico' : 'Valor acumulado';
   const valorExecutadoItens = itemSummaries.reduce((sum, item) => sum + item.valorExecutado, 0);
   const faturasExecutadas = faturas.filter(isFaturaExecutada).length;
@@ -614,19 +700,22 @@ export function ContratoApiDetailsSheet({
             <p>Os dados já carregados foram preservados. Tente atualizar novamente.</p>
           </div>
         ) : null}
-        <Header className="border-b border-border px-6 py-4 bg-card shrink-0">
-          <Title className="flex flex-wrap items-center gap-2">
+        <Header className={cn('border-b border-border px-6 py-4 bg-card shrink-0', pageMode && 'flex flex-wrap items-center gap-x-3 gap-y-1')}>
+          <Title className={pageMode ? 'contents' : 'flex flex-wrap items-center gap-2'}>
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <FileText className="h-5 w-5" />
             </span>
             <span className="text-lg font-bold text-foreground">Contrato {contrato?.numero ?? '-'}</span>
+            {pageMode ? (
+              <Badge variant="outline" className={cn('rounded-full text-xs font-bold', vigenciaBadge.className)}>{vigenciaBadge.label}</Badge>
+            ) : null}
             {hasReitoriaOrigin ? <Badge variant="secondary" className="rounded-md">Origem Reitoria</Badge> : null}
             {pncpRef ? (
               <a
                 href={buildPncpContratoWebUrl(pncpRef)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs font-semibold text-action-primary bg-action-primary/10 hover:bg-action-primary/20 px-2.5 py-1 rounded-md transition-colors border border-action-primary/20 ml-auto"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-action-primary bg-action-primary/10 hover:bg-action-primary/20 px-2.5 py-1 rounded-md transition-colors border border-action-primary/20 ml-auto order-2"
                 title={`Abrir página do contrato ${pncpRef.numeroControlePNCP || ''} no Portal Nacional de Contratações Públicas (PNCP)`}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
@@ -634,7 +723,7 @@ export function ContratoApiDetailsSheet({
               </a>
             ) : null}
           </Title>
-          <Description className="text-xs text-muted-foreground mt-1">
+          <Description className={cn('text-xs text-muted-foreground', pageMode ? 'order-1 min-w-0 border-l border-border pl-3' : 'mt-1')}>
             {contrato?.fornecedor_nome || 'Fornecedor não informado'} | Vigência {(pageMode ? formatContractDate : formatDate)(contrato?.vigencia_inicio)} a {(pageMode ? formatContractDate : formatDate)(contrato?.vigencia_fim)}
           </Description>
         </Header>
@@ -650,7 +739,15 @@ export function ContratoApiDetailsSheet({
           ) : !details ? (
             <div className="py-16 text-center text-sm font-medium text-muted-foreground">Nenhum detalhe da API carregado.</div>
           ) : (
-            <div className="space-y-5">
+            <Tabs value={detailTab} onValueChange={setDetailTab} className="space-y-5">
+            {pageMode && <TabsList aria-label="Detalhes do contrato" className="h-auto w-full flex-wrap justify-start gap-1">
+              <TabsTrigger value="resumo">Resumo</TabsTrigger>
+              <TabsTrigger value="empenhos">Empenhos{execution ? <TabCount value={execution.rows.length} /> : null}</TabsTrigger>
+              <TabsTrigger value="faturas">Faturas<TabCount value={faturas.length} /></TabsTrigger>
+              <TabsTrigger value="termos">Termos<TabCount value={historico.length} /></TabsTrigger>
+              <TabsTrigger value="documentos">Documentos e ocorrências</TabsTrigger>
+            </TabsList>}
+            {(!pageMode || detailTab === 'resumo') && <div className="space-y-5">
               <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
                 <div className="flex flex-col gap-4">
 
@@ -712,15 +809,27 @@ export function ContratoApiDetailsSheet({
               </div>
             ) : null}
 
+            {pageMode && execution ? (
+              <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-sm font-bold text-foreground">Execução financeira (campus)</p>
+                  <p className="text-xs text-muted-foreground">{executionPercent}% do valor global empenhado</p>
+                </div>
+                <div role="progressbar" aria-label="Percentual do valor global empenhado" aria-valuemin={0} aria-valuemax={100} aria-valuenow={executionPercent} className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-action-primary" style={{ width: `${executionPercent}%` }} />
+                </div>
+                <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                  <CalendarClock className="h-4 w-4 text-action-primary" />
+                  <span className="font-semibold text-foreground">{contractDeadlineLabel(contrato?.vigencia_fim)}</span>
+                  <span>Vigência {formatContractDate(contrato?.vigencia_inicio)} a {formatContractDate(contrato?.vigencia_fim)}</span>
+                </p>
+              </div>
+            ) : null}
+
             {pageMode && <p className="text-xs text-muted-foreground">Última sincronização: {lastSyncLabel}</p>}
-            <Tabs value={detailTab} onValueChange={setDetailTab}>
-            {pageMode && <TabsList aria-label="Detalhes do contrato" className="h-auto flex-wrap justify-start">
-              <TabsTrigger value="resumo">Resumo e empenhos</TabsTrigger>
-              <TabsTrigger value="faturas">Faturas e pagamentos</TabsTrigger>
-              <TabsTrigger value="documentos">Vigência e documentos</TabsTrigger>
-            </TabsList>}
+            </div>}
             <TabsContent value={detailTab} forceMount className="space-y-4">
-            {pageMode && detailTab === 'resumo' && execution && <DataTablePanel title="Empenhos vinculados ao campus" className="mt-4">
+            {pageMode && detailTab === 'empenhos' && execution && <DataTablePanel title="Empenhos vinculados ao campus">
               <Table aria-label="Empenhos vinculados ao campus"><TableHeader><TableRow><TableHead>Empenho</TableHead><TableHead>Tipo</TableHead><TableHead className="text-right">Empenhado / base RAP</TableHead><TableHead className="text-right">Liquidado / liquidado-pago RAP</TableHead><TableHead className="text-right">A liquidar / saldo RAP</TableHead></TableRow></TableHeader>
               <TableBody>{execution.rows.length ? execution.rows.map(row => <TableRow key={row.id}>
                 <TableCell>{row.local && onOpenEmpenho ? <button type="button" className="font-data text-primary hover:underline" onClick={() => onOpenEmpenho(row.local!)}>{row.numero}</button> : <span className="font-data">{row.numero}</span>}</TableCell>
@@ -728,7 +837,7 @@ export function ContratoApiDetailsSheet({
               </TableRow>) : <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Nenhum empenho vinculado ao campus.</TableCell></TableRow>}</TableBody></Table>
             </DataTablePanel>}
             <Accordion defaultValue={pageMode ? ['historico', 'itens', 'faturas', 'gestao-contratual', 'documentos', 'nfe-rastreabilidade'] : undefined} key={contrato?.id ?? 'sem-contrato'} type="multiple" className="space-y-3">
-              <AccordionItem hidden={pageMode && detailTab !== 'documentos'} value="historico" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+              <AccordionItem hidden={pageMode && detailTab !== 'termos'} value="historico" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<History className="h-4 w-4" />}
@@ -785,6 +894,20 @@ export function ContratoApiDetailsSheet({
                       </TableBody>
                     </Table>
                   </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem hidden={pageMode && detailTab !== 'resumo'} value="gestao-fiscalizacao" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+                <AccordionTrigger className="gap-3 py-4 hover:no-underline">
+                  <AccordionSectionTitle
+                    icon={<CalendarClock className="h-4 w-4" />}
+                    title="Gestão e fiscalização"
+                    description="Gestores, fiscais, prepostos e garantias do contrato."
+                    count={`${recursos.filter((r) => RECURSOS_FISCALIZACAO.includes(r.tipo_recurso)).length} registros`}
+                  />
+                </AccordionTrigger>
+                <AccordionContent className="pb-4 pt-0">
+                  <ContratoGestaoRecursos recursos={recursos} tipos={RECURSOS_FISCALIZACAO} />
                 </AccordionContent>
               </AccordionItem>
 
@@ -943,13 +1066,13 @@ export function ContratoApiDetailsSheet({
                       {faturas.map((fatura) => {
                         const links = itensByFatura.get(fatura.id) ?? [];
                         return (
-                          <div key={fatura.id} className="rounded-md border border-border/70 bg-muted/20 p-3">
                             <FaturaLine
+                              key={fatura.id}
                               fatura={fatura}
                               empenhos={empenhosByFatura.get(fatura.id) ?? []}
-                            />
+                            >
                             {links.length > 0 ? (
-                              <div className="mt-3 space-y-2 border-t border-border/70 pt-3">
+                              <div className="space-y-2">
                                 <p className="text-[11px] font-semibold uppercase text-muted-foreground">Itens vinculados</p>
                                 {links.map((link) => {
                                   const item = link.contrato_api_item_id
@@ -968,13 +1091,11 @@ export function ContratoApiDetailsSheet({
                                 })}
                               </div>
                             ) : (
-                              <p className="mt-3 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+                              <p className="text-xs text-muted-foreground">
                                 Sem item vinculado na API.
                               </p>
                             )}
-
-
-                          </div>
+                            </FaturaLine>
                         );
                       })}
                     </TabsContent>
@@ -992,13 +1113,13 @@ export function ContratoApiDetailsSheet({
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<CalendarClock className="h-4 w-4" />}
-                    title="Gestão contratual"
-                    description="Cronograma, garantias, responsáveis, prepostos, ocorrências, despesas e terceirizados."
-                    count={`${recursos.length} registros`}
+                    title="Ocorrências e despesas"
+                    description="Ocorrências, despesas acessórias e terceirizados."
+                    count={`${recursos.filter((r) => RECURSOS_COMPLEMENTARES.includes(r.tipo_recurso)).length} registros`}
                   />
                 </AccordionTrigger>
                 <AccordionContent className="pb-4 pt-0">
-                  <ContratoGestaoRecursos recursos={recursos} />
+                  <ContratoGestaoRecursos recursos={recursos} tipos={RECURSOS_COMPLEMENTARES} />
                 </AccordionContent>
               </AccordionItem>
 
@@ -1198,11 +1319,10 @@ export function ContratoApiDetailsSheet({
             </Accordion>
             </TabsContent>
             </Tabs>
-          </div>
         )}
         </div>
     </>);
-  if (pageMode) return open ? <RecordDetailsPage backLabel="Voltar aos contratos" onBack={() => onOpenChange(false)}>{content}</RecordDetailsPage> : null;
+  if (pageMode) return open ? <RecordDetailsPage backLabel="Voltar aos contratos" breadcrumb={{ parent: 'Contratos', current: contrato?.numero ?? "-" }} onBack={() => onOpenChange(false)}>{content}</RecordDetailsPage> : null;
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="flex h-[min(90vh,880px)] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 bg-background sm:rounded-2xl border border-border shadow-2xl">{content}</DialogContent></Dialog>;
 
 }
