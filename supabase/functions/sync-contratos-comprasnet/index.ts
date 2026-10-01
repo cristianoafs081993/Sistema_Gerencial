@@ -790,16 +790,31 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
 
     let comprasDocumentosDisponiveis = true;
     let recursosDisponiveis = true;
-    for (const contract of contractData) {
-      if (comprasDocumentosDisponiveis && contract.arquivos !== undefined) {
-        comprasDocumentosDisponiveis = await replaceComprasDocumentos(supabase, contract.contratoApiId, contract.arquivos);
-      }
-      for (const recurso of contract.recursos) {
-        if (recursosDisponiveis && recurso.rows !== undefined) {
-          recursosDisponiveis = await replaceComplemento(supabase, contract.contratoApiId, recurso.tipo, recurso.rows);
+    // Cada contrato ativo faz ~8 substituicoes (documentos + recursos). Em serie, isso passava do
+    // tempo limite da Edge Function (~150s), entao processamos contratos e recursos em paralelo.
+    await mapWithConcurrency(
+      contractData.filter((contract) => contract.arquivos !== undefined || contract.recursos.length > 0),
+      async (contract) => {
+        const tarefas: Promise<void>[] = [];
+        if (contract.arquivos !== undefined) {
+          const arquivos = contract.arquivos;
+          tarefas.push((async () => {
+            if (!comprasDocumentosDisponiveis) return;
+            if (!(await replaceComprasDocumentos(supabase, contract.contratoApiId, arquivos))) comprasDocumentosDisponiveis = false;
+          })());
         }
-      }
-    }
+        for (const recurso of contract.recursos) {
+          if (recurso.rows === undefined) continue;
+          const rows = recurso.rows;
+          tarefas.push((async () => {
+            if (!recursosDisponiveis) return;
+            if (!(await replaceComplemento(supabase, contract.contratoApiId, recurso.tipo, rows))) recursosDisponiveis = false;
+          })());
+        }
+        await Promise.all(tarefas);
+      },
+      6,
+    );
 
     const arquivosPayload = contractData.flatMap((item) => item.arquivos ?? []);
     const recursosPayload = contractData.flatMap((item) => item.recursos.flatMap((recurso) => recurso.rows ?? []));

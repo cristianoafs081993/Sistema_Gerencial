@@ -518,7 +518,8 @@ Migrations necessárias para os recursos adicionais:
 Observacao:
 
 - publicada com `verify_jwt = false`, pois o cron chama a function por HTTP e a function usa service role apenas internamente
-- a migration `20260817170000_schedule_daily_sync_all_uasgs_empenhos.sql` agenda `sync-contratos-comprasnet-daily` com Supabase Cron/pg_net para executar diariamente as `03:00` no horario de Brasilia (`06:00 UTC`), sincronizando automaticamente contratos e empenhos de todas as 19 UASGs do IFRN
+- a migration `20260930120000_split_contratos_comprasnet_daily_sync_per_uasg.sql` substitui o job unico `sync-contratos-comprasnet-daily` por um job por UASG (`sync-contratos-comprasnet-uasg-<codigo>`), escalonados de 5 em 5 minutos a partir das `03:00` de Brasilia (`06:00 UTC`), com o campus `158366` e a Reitoria `158155` primeiro. O job unico chamava as 19 UASGs em uma requisicao e a Edge Function era encerrada por tempo limite (`WORKER_RESOURCE_LIMIT`, ~150s) apos ~2 unidades, deixando a execucao em `running` e o campus sem sincronizar desde 07/09/2026. A migration tambem fecha como `error` as execucoes `running` com mais de 1 hora
+- a gravacao de documentos de compras e recursos complementares por contrato roda em paralelo (concorrencia 6); em serie ela passava do tempo limite ate para uma unica UASG grande
 - aceita `unidadeCodigos` ou `unidadeCodigo` para sincronizar UASGs específicas, e executa a varredura completa das 19 UASGs quando omitido
 - o endpoint de "ativos" do Comprasnet nao e fonte de verdade de vigencia; a exibicao da UI usa `situacao_derivada`, nao `situacao`
 
