@@ -11,12 +11,13 @@ import {
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from './src/constants/theme';
-import { TabType, ContratoFilter, NotificationItem } from './src/types';
+import { TabType, ContratoFilter, NotificationItem, PtresItem } from './src/types';
 import { Header } from './src/components/Header';
 import { BottomNav } from './src/components/BottomNav';
+import { PtresFilterModal } from './src/components/PtresFilterModal';
 import { NotificationsModal } from './src/components/NotificationsModal';
 import { DashboardScreen } from './src/screens/DashboardScreen';
-import { OrcamentoScreen, type OrcamentoSection } from './src/screens/OrcamentoScreen';
+import { OrcamentoScreen } from './src/screens/OrcamentoScreen';
 import { ContratosScreen } from './src/screens/ContratosScreen';
 import { LicitacoesScreen } from './src/screens/LicitacoesScreen';
 import { InfraestruturaScreen } from './src/screens/InfraestruturaScreen';
@@ -25,7 +26,6 @@ import { AccessStateScreen } from './src/screens/AccessStateScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { secoesOrcamento, type AppAccess } from './src/services/access';
-import { primeiroNome } from './src/lib/format';
 import { fetchNotifications } from './src/services/api';
 
 function initialsFromEmail(email?: string | null): string {
@@ -38,23 +38,24 @@ function initialsFromEmail(email?: string | null): string {
 type AuthenticatedAppProps = {
   access: AppAccess;
   email?: string | null;
-  userName: string;
   onSignOut: () => void;
 };
 
-function AuthenticatedApp({ access, email, userName, onSignOut }: AuthenticatedAppProps) {
+function AuthenticatedApp({ access, email, onSignOut }: AuthenticatedAppProps) {
   const allowedTabs = access.tabs;
   const [currentTab, setCurrentTabState] = useState<TabType>(
     allowedTabs.includes('dashboard') ? 'dashboard' : allowedTabs[0],
   );
   const [isAccountOpen, setIsAccountOpen] = useState<boolean>(false);
-  const [orcamentoRequest, setOrcamentoRequest] = useState<{ section: OrcamentoSection; id: number } | null>(null);
   const setCurrentTab = useCallback(
     (tab: TabType) => {
       if (allowedTabs.includes(tab)) setCurrentTabState(tab);
     },
     [allowedTabs],
   );
+  const [selectedPtres, setSelectedPtres] = useState<string>('all');
+  const [ptresOptions, setPtresOptions] = useState<PtresItem[]>([]);
+  const [isPtresOpen, setIsPtresOpen] = useState<boolean>(false);
   const [contratosFilter, setContratosFilter] = useState<ContratoFilter>('all');
   const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -86,12 +87,6 @@ function AuthenticatedApp({ access, email, userName, onSignOut }: AuthenticatedA
     setLastReadTimestamp(Date.now());
   };
 
-  const handleOpenOrcamento = (section: OrcamentoSection) => {
-    if (!secoesOrcamento(access.screens).includes(section)) return;
-    setOrcamentoRequest({ section, id: Date.now() });
-    setCurrentTab('empenhos');
-  };
-
   const handleNavigateToContratosAlert = () => {
     setContratosFilter('vencer');
     setCurrentTab('contratos');
@@ -104,6 +99,16 @@ function AuthenticatedApp({ access, email, userName, onSignOut }: AuthenticatedA
         initials={initialsFromEmail(email)}
         onPressAvatar={() => setIsAccountOpen(true)}
         notificationCount={unreadCount}
+        ptresFilter={
+          currentTab === 'dashboard'
+            ? {
+                label: selectedPtres === 'all' ? 'PTRES: Todos' : `PTRES ${selectedPtres}`,
+                active: selectedPtres !== 'all',
+                disabled: ptresOptions.length === 0,
+                onPress: () => setIsPtresOpen(true),
+              }
+            : undefined
+        }
         onPressNotification={() => {
           loadNotifications();
           setIsNotificationsOpen(true);
@@ -114,15 +119,15 @@ function AuthenticatedApp({ access, email, userName, onSignOut }: AuthenticatedA
       <View style={styles.screenContainer}>
         {currentTab === 'dashboard' && (
           <DashboardScreen
-            userName={userName}
-            onOpenOrcamento={handleOpenOrcamento}
-            orcamentoSections={secoesOrcamento(access.screens)}
+            selectedPtres={selectedPtres}
+            onSelectPtres={setSelectedPtres}
+            onPtresOptions={setPtresOptions}
             canOpenContratos={allowedTabs.includes('contratos')}
             onNavigateToContratosAlert={handleNavigateToContratosAlert}
           />
         )}
 
-        {currentTab === 'empenhos' && <OrcamentoScreen sections={secoesOrcamento(access.screens)} request={orcamentoRequest} />}
+        {currentTab === 'empenhos' && <OrcamentoScreen sections={secoesOrcamento(access.screens)} />}
 
         {currentTab === 'contratos' && (
           <ContratosScreen
@@ -141,6 +146,14 @@ function AuthenticatedApp({ access, email, userName, onSignOut }: AuthenticatedA
         currentTab={currentTab}
         onTabChange={(tab) => setCurrentTab(tab)}
         allowedTabs={allowedTabs}
+      />
+
+      <PtresFilterModal
+        visible={isPtresOpen}
+        onClose={() => setIsPtresOpen(false)}
+        options={ptresOptions}
+        selectedCode={selectedPtres}
+        onSelect={setSelectedPtres}
       />
 
       <AccountModal
@@ -198,7 +211,7 @@ function Gate() {
       />
     );
   }
-  return <AuthenticatedApp access={access} email={user?.email} userName={primeiroNome(user)} onSignOut={signOut} />;
+  return <AuthenticatedApp access={access} email={user?.email} onSignOut={signOut} />;
 }
 
 export default function App() {

@@ -1,9 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '../components/AppText';
 import { colors, radius } from '../constants/theme';
 import { formatarDataIso, formatarMoeda } from '../lib/format';
-import { codigoPtresDaOrigem } from '../lib/dashboardRules';
 import {
   codigoDaDimensao,
   ehEstorno,
@@ -13,7 +12,6 @@ import {
 } from '../lib/orcamentoRules';
 import { fetchDescentralizacoes, type DescentralizacoesData } from '../services/orcamento';
 import { KNOWN_PTRES_NAMES } from '../services/api';
-import { Chip } from '../components/Chip';
 import { PtresBars } from '../components/PtresBars';
 import { ErrorCard, EmptyCard } from '../components/StateCards';
 import { ListSkeleton } from '../components/Skeleton';
@@ -83,48 +81,22 @@ export const DescentralizacoesScreen: React.FC = () => {
     carregar();
   }, [carregar]);
 
-  const codigosPtres = useMemo(() => {
-    if (!data) return [];
-    const codigos = new Set<string>();
-    data.contaSaldos.forEach((c) => codigos.add(c.ptres.trim()));
-    data.linhas.forEach((l) => {
-      const codigo = codigoPtresDaOrigem(l.origem);
-      if (codigo) codigos.add(codigo);
-    });
-    return Array.from(codigos).sort();
-  }, [data]);
-
+  // As barras usam o resumo sem o filtro de PTRES, para continuarem todas visíveis e permitirem trocar de PTRES.
   const resumo = useMemo(
-    () => (data ? resumirDescentralizacoes({ linhas: data.linhas, contaSaldos: data.contaSaldos, ptres, busca }) : null),
-    [data, ptres, busca],
+    () => (data ? resumirDescentralizacoes({ linhas: data.linhas, contaSaldos: data.contaSaldos, ptres: 'all', busca }) : null),
+    [data, busca],
   );
+  const alternarPtres = (codigo: string) => setPtres((atual) => (atual === codigo ? 'all' : codigo));
   const linhas = useMemo(() => (data ? filtrarDescentralizacoes(data.linhas, { ptres, busca }) : []), [data, ptres, busca]);
 
   const cabecalho = (
     <View>
-      <Text style={styles.titleText}>Descentralizações</Text>
-      <Text style={styles.intro}>Créditos recebidos pelo campus.</Text>
-
       {loading ? (
         <ListSkeleton count={3} label="Carregando descentralizações" />
       ) : erro ? (
         <ErrorCard message={erro} onRetry={() => carregar()} />
       ) : resumo ? (
         <>
-          <View style={styles.summary}>
-            <View style={styles.summaryLeft}>
-              <Text style={styles.summaryLabel}>{resumo.oficial ? 'Saldo oficial da conta' : 'Soma dos lançamentos'}</Text>
-              <Text style={styles.summaryValue}>{formatarMoeda(resumo.total, false)}</Text>
-              <Text style={styles.summaryHint}>
-                {resumo.oficial ? 'Conta de descentralizações (SIAFI)' : busca.trim() ? 'Somente os lançamentos da busca' : 'Sem saldo oficial importado'}
-              </Text>
-            </View>
-            <View style={styles.summaryRight}>
-              <Text style={styles.summaryLabel}>Lançamentos</Text>
-              <Text style={[styles.summaryValue, { color: colors.blue }]}>{resumo.quantidade}</Text>
-            </View>
-          </View>
-
           <View style={styles.searchBox}>
             <IconSearch size={19} color={colors.mutedLight} />
             <TextInput
@@ -138,17 +110,10 @@ export const DescentralizacoesScreen: React.FC = () => {
             />
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-            <Chip label="Todos os PTRES" selected={ptres === 'all'} onPress={() => setPtres('all')} />
-            {codigosPtres.map((codigo) => (
-              <Chip key={codigo} label={codigo} selected={ptres === codigo} onPress={() => setPtres(ptres === codigo ? 'all' : codigo)} />
-            ))}
-          </ScrollView>
-
-          {ptres === 'all' && resumo.porPtres.length > 1 ? (
+          {resumo.porPtres.length > 1 ? (
             <View>
               <Text style={styles.sectionTitle}>Por PTRES</Text>
-              <PtresBars dados={resumo.porPtres} nomes={KNOWN_PTRES_NAMES} onSelect={setPtres} />
+              <PtresBars dados={resumo.porPtres} nomes={KNOWN_PTRES_NAMES} selecionado={ptres} onSelect={alternarPtres} />
             </View>
           ) : null}
 
@@ -189,24 +154,6 @@ export const DescentralizacoesScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 28 },
-  titleText: { fontSize: 27, letterSpacing: -1, fontWeight: '800', color: colors.ink },
-  intro: { fontSize: 13, color: colors.muted, marginTop: 6, marginBottom: 16 },
-  summary: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 17,
-    padding: 17,
-    marginBottom: 14,
-  },
-  summaryLeft: { flex: 1 },
-  summaryRight: { borderLeftWidth: 1, borderLeftColor: colors.line, paddingLeft: 20, alignItems: 'flex-end' },
-  summaryLabel: { color: colors.muted, fontSize: 12 },
-  summaryValue: { fontSize: 23, fontWeight: '800', letterSpacing: -0.7, color: colors.ink, marginTop: 6 },
-  summaryHint: { fontSize: 11.5, color: colors.mutedText, marginTop: 2 },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -219,7 +166,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   searchInput: { flex: 1, fontSize: 14, color: colors.ink, paddingVertical: 12 },
-  chipsRow: { flexDirection: 'row', gap: 7, marginTop: 12, paddingRight: 18 },
   sectionTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.4, color: colors.ink, marginTop: 20, marginBottom: 10 },
   listHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   resultSort: { fontSize: 12, color: colors.muted },

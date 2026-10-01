@@ -19,6 +19,7 @@ const STATUS_VISUAL: Record<ContratoStatus, { label: string; bg: string; fg: str
 
 export const ContratoCard: React.FC<ContratoCardProps> = ({ item, onPress }) => {
   const visual = STATUS_VISUAL[item.status];
+  const percentualEmpenhado = item.valorGlobal > 0 ? Math.min(100, Math.max(0, Math.round((item.empenhado / item.valorGlobal) * 100))) : 0;
   const isTeal = item.icon === 'building';
   const iconBg = isTeal ? colors.tealBg : colors.blueBg;
   const iconColor = isTeal ? colors.tealText : colors.blue;
@@ -67,9 +68,13 @@ export const ContratoCard: React.FC<ContratoCardProps> = ({ item, onPress }) => 
         </View>
       </View>
 
-      <View style={styles.progressBg}>
+      <View
+        style={styles.progressBg}
+        accessible
+        accessibilityLabel={`${percentualEmpenhado}% do valor global empenhado`}
+      >
         <View
-          style={[styles.progressFill, { width: `${Math.min(item.percentualDecorrido, 100)}%`, backgroundColor: visual.bar }]}
+          style={[styles.progressFill, { width: `${percentualEmpenhado}%`, backgroundColor: visual.bar }]}
         />
       </View>
 

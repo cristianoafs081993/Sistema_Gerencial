@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, TouchableOpacity, ScrollView, FlatList, StyleSheet, RefreshControl } from 'react-native';
 import { Text, TextInput } from '../components/AppText';
 import { colors, radius } from '../constants/theme';
-import { formatarMoeda } from '../lib/format';
 import { EmpenhoItem, EmpenhoFilter } from '../types';
 import { IconSearch } from '../components/Icons';
 import { Chip } from '../components/Chip';
@@ -10,8 +9,6 @@ import { EmpenhoCard } from '../components/EmpenhoCard';
 import { EmpenhoDetalheModal } from '../components/EmpenhoDetalheModal';
 import { ListSkeleton } from '../components/Skeleton';
 import { fetchEmpenhos } from '../services/api';
-
-type StatusFilter = 'all' | 'liquidar' | 'pagar' | 'pago';
 
 const normalizar = (texto: string) =>
   texto
@@ -26,7 +23,6 @@ export const EmpenhosScreen: React.FC = () => {
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
   const [tipo, setTipo] = useState<EmpenhoFilter>('all');
-  const [status, setStatus] = useState<StatusFilter>('all');
   const [selecionado, setSelecionado] = useState<EmpenhoItem | null>(null);
 
   const carregar = useCallback(async (isRefresh = false) => {
@@ -61,72 +57,25 @@ export const EmpenhosScreen: React.FC = () => {
       const passaBusca =
         !termo || normalizar(item.id).includes(termo) || normalizar(item.name).includes(termo) || normalizar(item.desc).includes(termo);
       const passaTipo = tipo === 'all' || item.tipo === tipo;
-      const passaStatus = status === 'all' || item.status === status;
-      return passaBusca && passaTipo && passaStatus;
+      return passaBusca && passaTipo;
     });
 
-    if (tipo === 'rap') {
-      // Pendentes (saldo > 0) no topo, como no acompanhamento web.
-      return [...lista].sort((a, b) => {
-        const saldoA = a.saldo ?? a.value;
-        const saldoB = b.saldo ?? b.value;
-        if (saldoA > 0 && saldoB <= 0) return -1;
-        if (saldoA <= 0 && saldoB > 0) return 1;
-        return 0;
-      });
-    }
-    return lista;
-  }, [empenhos, busca, tipo, status]);
-
-  // Exercício e restos a pagar têm bases diferentes (empenhado × saldo); nunca somamos os dois.
-  const resumo = useMemo(() => {
-    const exercicio = filtrados.filter((item) => item.tipo !== 'rap');
-    const rap = filtrados.filter((item) => item.tipo === 'rap');
-    const empenhado = exercicio.reduce((soma, item) => soma + item.value, 0);
-    const pagoExercicio = exercicio.reduce((soma, item) => soma + item.paid, 0);
-    const saldoRap = rap.reduce((soma, item) => soma + (item.saldo ?? item.value), 0);
-    const inscritoRap = rap.reduce((soma, item) => soma + (item.inscrito ?? item.value), 0);
-    const pagoRap = rap.reduce((soma, item) => soma + item.paid, 0);
-    const pendentesRap = rap.filter((item) => (item.saldo ?? item.value) > 0).length;
-
-    if (tipo === 'rap') {
-      return {
-        rotulo: 'Saldo de restos a pagar',
-        valor: saldoRap,
-        apoio: `Inscrito ${formatarMoeda(inscritoRap, false)} · Pago ${formatarMoeda(pagoRap, false)}`,
-        contador: `${pendentesRap}/${filtrados.length}`,
-        contadorRotulo: 'Pendentes',
-      };
-    }
-    return {
-      rotulo: 'Empenhado no exercício',
-      valor: empenhado,
-      apoio:
-        tipo === 'all'
-          ? `Pago ${formatarMoeda(pagoExercicio, false)} · Saldo RAP ${formatarMoeda(saldoRap, false)}`
-          : `Pago ${formatarMoeda(pagoExercicio, false)}`,
-      contador: String(filtrados.length),
-      contadorRotulo: 'Empenhos',
-    };
-  }, [filtrados, tipo]);
+    // Exercício antes de restos a pagar; dentro de cada grupo, número do empenho decrescente.
+    return [...lista].sort((a, b) => {
+      const grupoA = a.tipo === 'rap' ? 1 : 0;
+      const grupoB = b.tipo === 'rap' ? 1 : 0;
+      if (grupoA !== grupoB) return grupoA - grupoB;
+      return b.id.localeCompare(a.id, 'pt-BR', { numeric: true });
+    });
+  }, [empenhos, busca, tipo]);
 
   const tipos: { id: EmpenhoFilter; label: string }[] = [
     { id: 'all', label: `Todos (${empenhos.length})` },
     { id: 'exercicio', label: `Exercício (${contagem.exercicio})` },
     { id: 'rap', label: `Restos a pagar (${contagem.rap})` },
   ];
-  const situacoes: { id: StatusFilter; label: string }[] = [
-    { id: 'all', label: 'Qualquer situação' },
-    { id: 'liquidar', label: 'A liquidar' },
-    { id: 'pagar', label: 'A pagar' },
-    { id: 'pago', label: 'Pagos' },
-  ];
-
   const cabecalho = (
     <View>
-      <Text style={styles.titleText}>Empenhos</Text>
-      <Text style={styles.listIntro}>Do compromisso ao pagamento.</Text>
-
       {loading ? (
         <ListSkeleton count={3} label="Carregando empenhos" />
       ) : erro ? (
@@ -139,18 +88,6 @@ export const EmpenhosScreen: React.FC = () => {
         </View>
       ) : (
         <>
-          <View style={styles.summaryStrip}>
-            <View style={styles.summaryLeft}>
-              <Text style={styles.summaryLabel}>{resumo.rotulo}</Text>
-              <Text style={styles.summaryValue}>{formatarMoeda(resumo.valor, false)}</Text>
-              <Text style={styles.summarySub}>{resumo.apoio}</Text>
-            </View>
-            <View style={styles.summaryRight}>
-              <Text style={styles.summaryLabel}>{resumo.contadorRotulo}</Text>
-              <Text style={[styles.summaryValue, { color: colors.blue }]}>{resumo.contador}</Text>
-            </View>
-          </View>
-
           <View style={styles.searchBox}>
             <IconSearch size={19} color={colors.mutedLight} />
             <TextInput
@@ -169,17 +106,11 @@ export const EmpenhosScreen: React.FC = () => {
               <Chip key={opt.id} label={opt.label} selected={tipo === opt.id} onPress={() => setTipo(opt.id)} />
             ))}
           </ScrollView>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipsRow, styles.chipsRowTight]}>
-            {situacoes.map((opt) => (
-              <Chip key={opt.id} label={opt.label} selected={status === opt.id} onPress={() => setStatus(opt.id)} small />
-            ))}
-          </ScrollView>
-
           <View style={styles.resultRow}>
             <Text style={styles.resultCount}>
               {filtrados.length} {filtrados.length === 1 ? 'empenho' : 'empenhos'}
             </Text>
-            <Text style={styles.resultSort}>Mais recentes primeiro</Text>
+            <Text style={styles.resultSort}>Maior número primeiro</Text>
           </View>
         </>
       )}
@@ -221,24 +152,6 @@ export const EmpenhosScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 28 },
-  titleText: { fontSize: 27, letterSpacing: -1, fontWeight: '800', color: colors.ink },
-  listIntro: { fontSize: 13, color: colors.muted, marginTop: 6, marginBottom: 18 },
-  summaryStrip: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 17,
-    padding: 17,
-    marginBottom: 16,
-  },
-  summaryLeft: { flex: 1 },
-  summaryRight: { borderLeftWidth: 1, borderLeftColor: colors.line, paddingLeft: 20, alignItems: 'flex-end' },
-  summaryLabel: { color: colors.muted, fontSize: 12 },
-  summaryValue: { fontSize: 23, fontWeight: '800', letterSpacing: -0.7, color: colors.ink, marginTop: 6 },
-  summarySub: { fontSize: 12, color: colors.muted, marginTop: 2 },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -251,8 +164,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   searchInput: { flex: 1, fontSize: 14, color: colors.ink, paddingVertical: 12 },
-  chipsRow: { flexDirection: 'row', gap: 7, marginTop: 14, paddingRight: 18 },
-  chipsRowTight: { marginTop: 8, marginBottom: 14 },
+  chipsRow: { flexDirection: 'row', gap: 7, marginTop: 14, marginBottom: 14, paddingRight: 18 },
   chip: {
     paddingVertical: 8,
     paddingHorizontal: 13,

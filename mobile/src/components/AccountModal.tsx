@@ -9,6 +9,7 @@ interface AccountModalProps {
   onClose: () => void;
   email?: string | null;
   orgName?: string | null;
+  campusName?: string;
   groupNames: string[];
   onSignOut: () => void;
 }
@@ -19,6 +20,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   onClose,
   email,
   orgName,
+  campusName = 'Campus Currais Novos',
   groupNames,
   onSignOut,
 }) => {
@@ -34,6 +36,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           <View style={styles.rows}>
             <Row label="E-mail" value={email || '—'} />
             <Row label="Órgão" value={orgName || 'Não vinculado'} />
+            <Row label="Campus" value={campusName} />
             <Row label="Perfil" value={groupNames.length ? groupNames.join(', ') : '—'} />
           </View>
 

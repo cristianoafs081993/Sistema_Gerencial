@@ -169,7 +169,7 @@ describe('mobile — fetchContratos', () => {
       valorGlobal: 125000, // soma dos termos, não o valor_global
       empenhado: 1000,
       aLiquidar: 400,
-      liquidado: 600,
+      liquidado: 1100,
       pago: 500,
       faturasPendentes: 2,
       status: 'vigente',
@@ -257,5 +257,69 @@ describe('mobile — fetchContratoDetalhe', () => {
     expect(detalhe.faturas[1]).toMatchObject({ numero: '7', referencia: '—', situacao: 'Sem situação', pendente: true });
     expect(detalhe.itens[0]).toMatchObject({ descricao: 'Limpeza mensal', quantidade: 12, valorUnitario: 100.5, valorTotal: 1206 });
     expect(detalhe.termos[0]).toMatchObject({ tipo: 'Termo Aditivo', valor: 500, observacao: 'prorroga' });
+  });
+
+  it('traz fiscais, garantias, documentos e dados de nota fiscal das faturas', async () => {
+    tables.set('contratos_api_faturas', {
+      data: [
+        {
+          id: 'f1',
+          numero_instrumento_cobranca: '1.808',
+          situacao: 'Siafi Apropriado',
+          valor_bruto: 100,
+          valor_liquido: 100,
+          data_ateste: '2026-07-23',
+          processo: '23421.004475.2026-67',
+          chave_nfe: ' 4326 ',
+          glosa: '2.5',
+          raw_data: {
+            data_liquidacao: '2026-07-30',
+            sfadrao_id: '2026NP000225',
+            dados_empenho: [{ numero_empenho: '2026NE000010' }, { numero_empenho: '2026NE000010' }],
+          },
+        },
+      ],
+      error: null,
+    });
+    tables.set('contratos_api_recursos', {
+      data: [
+        { id: 'r1', tipo_recurso: 'responsaveis', titulo: 'x', situacao: 'Inativo', data_inicio: '2023-01-01', raw_data: { funcao_id: 'Fiscal', usuario: '- ANA', portaria: '1/2023' } },
+        { id: 'r2', tipo_recurso: 'responsaveis', titulo: 'x', situacao: 'Ativo', data_inicio: '2024-10-29', raw_data: { funcao_id: 'Gestor', usuario: '- BRUNO', portaria: '349/2024' } },
+        { id: 'r3', tipo_recurso: 'garantias', titulo: 'Seguro-garantia', situacao: 'Ativa', vencimento: '2027-01-01', valor: 1000, raw_data: {} },
+      ],
+      error: null,
+    });
+    tables.set('contratos_api_compras_documentos', {
+      data: [
+        { id: 'd1', tipo: 'Contrato', descricao: null, origem: 'SEI', url: 'https://exemplo/doc.pdf' },
+        { id: 'd2', tipo: 'Sem link', url: '' },
+      ],
+      error: null,
+    });
+
+    const detalhe = await fetchContratoDetalhe('c1', '158366');
+
+    expect(detalhe.faturas[0]).toMatchObject({
+      chaveNfe: '4326',
+      dataAteste: '2026-07-23',
+      dataLiquidacao: '2026-07-30',
+      ordemBancaria: '2026NP000225',
+      empenhos: ['2026NE000010'],
+      glosa: 2.5,
+    });
+    expect(detalhe.responsaveis.map((r) => [r.nome, r.funcao, r.portaria])).toEqual([
+      ['BRUNO', 'Gestor', '349/2024'],
+      ['ANA', 'Fiscal', '1/2023'],
+    ]);
+    expect(detalhe.garantias[0]).toMatchObject({ tipo: 'Seguro-garantia', valor: 1000 });
+    expect(detalhe.documentos).toHaveLength(1);
+  });
+
+  it('mantém o detalhe quando fiscais e documentos não puderam ser lidos', async () => {
+    tables.set('contratos_api_recursos', { data: null, error: { message: 'falha' } });
+    tables.set('contratos_api_compras_documentos', { data: null, error: { message: 'falha' } });
+    const detalhe = await fetchContratoDetalhe('c1', '158366');
+    expect(detalhe.responsaveis).toEqual([]);
+    expect(detalhe.documentos).toEqual([]);
   });
 });

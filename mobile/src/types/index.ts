@@ -1,3 +1,4 @@
+import type { ChaveNfeValidacao } from '../lib/nfeChave';
 export type TabType = 'dashboard' | 'empenhos' | 'contratos' | 'licitacoes' | 'infraestrutura';
 
 export type EmpenhoFilter = 'all' | 'exercicio' | 'rap';
@@ -186,6 +187,16 @@ export interface ContratoFaturaLinha {
   valorLiquido: number;
   vencimento: string | null;
   pagamento: string | null;
+  chaveNfe: string | null;
+  chaveValidacao: ChaveNfeValidacao | null;
+  dataAteste: string | null;
+  dataLiquidacao: string | null;
+  processo: string | null;
+  empenhos: string[];
+  ordemBancaria: string | null;
+  glosa: number;
+  juros: number;
+  multa: number;
 }
 
 export interface ContratoItemLinha {
@@ -208,7 +219,36 @@ export interface ContratoTermoLinha {
   observacao: string | null;
 }
 
+export interface ContratoResponsavelLinha {
+  id: string;
+  funcao: string;
+  nome: string;
+  portaria: string | null;
+  situacao: string | null;
+  dataInicio: string | null;
+  dataFim: string | null;
+}
+
+export interface ContratoGarantiaLinha {
+  id: string;
+  tipo: string;
+  situacao: string | null;
+  vencimento: string | null;
+  valor: number;
+}
+
+export interface ContratoDocumentoLinha {
+  id: string;
+  tipo: string;
+  descricao: string | null;
+  origem: string | null;
+  url: string;
+}
+
 export interface ContratoDetalhe {
+  responsaveis: ContratoResponsavelLinha[];
+  garantias: ContratoGarantiaLinha[];
+  documentos: ContratoDocumentoLinha[];
   empenhos: ContratoEmpenhoLinha[];
   faturas: ContratoFaturaLinha[];
   itens: ContratoItemLinha[];

@@ -43,7 +43,7 @@ export const LoginScreen: React.FC = () => {
           <View style={styles.brand}>
             <BrandLogo size={84} />
             <Text style={styles.brandText}>
-              siages<Text style={styles.brandDot}>.</Text>
+              Siages<Text style={styles.brandDot}>.</Text>
             </Text>
             <Text style={styles.tagline}>Orçamento e contratos do seu campus, no bolso.</Text>
           </View>

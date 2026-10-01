@@ -20,7 +20,8 @@ export function visualDoEmpenho(item: EmpenhoItem): { bg: string; fg: string; ba
 export const EmpenhoCard: React.FC<EmpenhoCardProps> = ({ item, onPress }) => {
   const isRap = item.tipo === 'rap';
   const base = isRap ? item.inscrito || item.value : item.value;
-  const percentPago = base > 0 ? Math.min(100, Math.round((item.paid / base) * 100)) : 100;
+  const liquidado = item.liquidado ?? 0;
+  const percentLiquidado = base > 0 ? Math.min(100, Math.round((liquidado / base) * 100)) : 100;
   const visual = visualDoEmpenho(item);
   const saldo = item.saldo ?? item.value;
 
@@ -54,17 +55,17 @@ export const EmpenhoCard: React.FC<EmpenhoCardProps> = ({ item, onPress }) => {
           </Text>
         </View>
         <View style={styles.valueRight}>
-          <Text style={styles.valueLabel}>{isRap ? 'Inscrito' : 'Pago'}</Text>
-          <Text style={styles.valueSecondary}>{formatarMoeda(isRap ? base : item.paid, false)}</Text>
+          <Text style={styles.valueLabel}>{isRap ? 'Inscrito' : 'Liquidado'}</Text>
+          <Text style={styles.valueSecondary}>{formatarMoeda(isRap ? base : liquidado, false)}</Text>
         </View>
       </View>
 
       <View style={styles.barBg}>
-        <View style={[styles.barFill, { width: `${percentPago}%`, backgroundColor: visual.bar }]} />
+        <View style={[styles.barFill, { width: `${percentLiquidado}%`, backgroundColor: visual.bar }]} />
       </View>
       <View style={styles.barLabels}>
-        <Text style={styles.barText}>{isRap ? `Pago ${formatarMoeda(item.paid, false)}` : `${percentPago}% pago`}</Text>
-        <Text style={styles.barText}>{isRap ? `${percentPago}% pago` : ''}</Text>
+        <Text style={styles.barText}>{isRap ? `Liquidado ${formatarMoeda(liquidado, false)}` : `${percentLiquidado}% liquidado`}</Text>
+        <Text style={styles.barText}>{isRap ? `${percentLiquidado}% liquidado` : ''}</Text>
       </View>
 
       <View style={styles.footer}>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Linking, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from './AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius } from '../constants/theme';
@@ -13,7 +13,7 @@ interface Props {
   onClose: () => void;
 }
 
-type Aba = 'resumo' | 'empenhos' | 'faturas' | 'itens' | 'termos';
+type Aba = 'resumo' | 'empenhos' | 'faturas' | 'termos';
 
 const STATUS_VISUAL: Record<ContratoStatus, { label: string; bg: string; fg: string }> = {
   vigente: { label: 'Vigente', bg: colors.greenBg, fg: colors.greenText },
@@ -53,10 +53,9 @@ export const ContratoDetalheModal: React.FC<Props> = ({ contrato, onClose }) => 
   const visual = STATUS_VISUAL[contrato.status];
   const abas: { id: Aba; label: string }[] = [
     { id: 'resumo', label: 'Resumo' },
-    { id: 'empenhos', label: detalhe ? `Empenhos (${detalhe.empenhos.length})` : 'Empenhos' },
-    { id: 'faturas', label: detalhe ? `Faturas (${detalhe.faturas.length})` : 'Faturas' },
-    { id: 'itens', label: detalhe ? `Itens (${detalhe.itens.length})` : 'Itens' },
-    { id: 'termos', label: detalhe ? `Termos (${detalhe.termos.length})` : 'Termos' },
+    { id: 'empenhos', label: 'Empenhos' },
+    { id: 'faturas', label: 'Faturas' },
+    { id: 'termos', label: 'Termos' },
   ];
 
   return (
@@ -76,12 +75,9 @@ export const ContratoDetalheModal: React.FC<Props> = ({ contrato, onClose }) => 
             </View>
           </View>
           <Text style={styles.heroTitle}>{contrato.fornecedor}</Text>
-          <Text style={styles.heroSub}>
-            {contrato.vigenciaTexto} · até {formatarDataIso(contrato.vigenciaFim)}
-          </Text>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
+        <View style={styles.tabs}>
           {abas.map((item) => {
             const ativa = aba === item.id;
             return (
@@ -92,14 +88,16 @@ export const ContratoDetalheModal: React.FC<Props> = ({ contrato, onClose }) => 
                 accessibilityRole="tab"
                 accessibilityState={{ selected: ativa }}
               >
-                <Text style={[styles.tabText, ativa && styles.tabTextActive]}>{item.label}</Text>
+                <Text style={[styles.tabText, ativa && styles.tabTextActive]} numberOfLines={1} adjustsFontSizeToFit>
+                  {item.label}
+                </Text>
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
 
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
-          {aba === 'resumo' ? <Resumo contrato={contrato} /> : null}
+          {aba === 'resumo' ? <Resumo contrato={contrato} detalhe={detalhe} carregando={carregando} /> : null}
 
           {aba !== 'resumo' && carregando ? <SkeletonLista /> : null}
 
@@ -126,7 +124,7 @@ const Linha: React.FC<{ label: string; valor: string; forte?: boolean }> = ({ la
   </View>
 );
 
-const Resumo: React.FC<{ contrato: ContratoItem }> = ({ contrato }) => (
+const Resumo: React.FC<{ contrato: ContratoItem; detalhe: ContratoDetalhe | null; carregando: boolean }> = ({ contrato, detalhe, carregando }) => (
   <View style={styles.stack}>
     <View style={styles.panel}>
       <Text style={styles.panelTitle}>Execução financeira (campus)</Text>
@@ -134,7 +132,6 @@ const Resumo: React.FC<{ contrato: ContratoItem }> = ({ contrato }) => (
       <Linha label="Empenhado" valor={formatarMoeda(contrato.empenhado)} />
       <Linha label="A liquidar" valor={formatarMoeda(contrato.aLiquidar)} />
       <Linha label="Liquidado" valor={formatarMoeda(contrato.liquidado)} />
-      <Linha label="Pago" valor={formatarMoeda(contrato.pago)} />
     </View>
 
     <View style={styles.panel}>
@@ -158,6 +155,88 @@ const Resumo: React.FC<{ contrato: ContratoItem }> = ({ contrato }) => (
       {contrato.categoria ? <Linha label="Categoria" valor={contrato.categoria} /> : null}
       {contrato.unidadeOrigem ? <Linha label="Unidade de origem" valor={contrato.unidadeOrigem} /> : null}
     </View>
+
+    {carregando && !detalhe ? <SkeletonLista /> : null}
+
+    {detalhe && detalhe.responsaveis.length > 0 ? (
+      <View style={styles.panel}>
+        <Text style={styles.panelTitle}>Gestão e fiscalização</Text>
+        {detalhe.responsaveis.map((r) => (
+          <View key={r.id} style={styles.pessoa}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.itemTitle}>{r.nome}</Text>
+              {r.situacao ? (
+                <View style={[styles.pill, { backgroundColor: r.situacao === 'Ativo' ? colors.greenBg : colors.tagBg }]}>
+                  <Text style={[styles.pillText, { color: r.situacao === 'Ativo' ? colors.greenText : colors.tagText }]}>{r.situacao}</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={styles.itemSub}>
+              {r.funcao}
+              {r.portaria ? ` · Portaria ${r.portaria}` : ''}
+            </Text>
+            <Text style={styles.itemMeta}>
+              Desde {formatarDataIso(r.dataInicio)}
+              {r.dataFim ? ` até ${formatarDataIso(r.dataFim)}` : ''}
+            </Text>
+          </View>
+        ))}
+      </View>
+    ) : null}
+
+    {detalhe && detalhe.garantias.length > 0 ? (
+      <View style={styles.panel}>
+        <Text style={styles.panelTitle}>Garantias</Text>
+        {detalhe.garantias.map((g) => (
+          <View key={g.id} style={styles.pessoa}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.itemTitle}>{g.tipo}</Text>
+              {g.situacao ? <Text style={styles.itemMeta}>{g.situacao}</Text> : null}
+            </View>
+            <Linha label="Valor" valor={formatarMoeda(g.valor)} forte />
+            {g.vencimento ? <Linha label="Vencimento" valor={formatarDataIso(g.vencimento)} /> : null}
+          </View>
+        ))}
+      </View>
+    ) : null}
+
+    {detalhe && detalhe.documentos.length > 0 ? (
+      <View style={styles.panel}>
+        <Text style={styles.panelTitle}>Documentos</Text>
+        {detalhe.documentos.map((d) => (
+          <TouchableOpacity
+            key={d.id}
+            style={styles.documento}
+            activeOpacity={0.7}
+            onPress={() => Linking.openURL(d.url).catch((err) => console.warn('Não foi possível abrir o documento', err))}
+            accessibilityRole="link"
+            accessibilityLabel={`Abrir documento: ${d.tipo}${d.descricao ? `, ${d.descricao}` : ''}`}
+          >
+            <View style={styles.documentoTexto}>
+              <Text style={styles.itemTitle}>{d.tipo}</Text>
+              {d.descricao ? <Text style={styles.itemSub}>{d.descricao}</Text> : null}
+              {d.origem ? <Text style={styles.itemMeta}>Origem: {d.origem}</Text> : null}
+            </View>
+            <Text style={styles.documentoAbrir}>Abrir</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    ) : null}
+
+    {detalhe && detalhe.itens.length > 0 ? (
+      <View style={styles.panel}>
+        <Text style={styles.panelTitle}>Itens do contrato ({detalhe.itens.length})</Text>
+        {detalhe.itens.map((i) => (
+          <View key={i.id} style={styles.pessoa}>
+            {i.numeroItem ? <Text style={styles.itemMeta}>Item {i.numeroItem}</Text> : null}
+            <Text style={styles.itemTitle}>{i.descricao}</Text>
+            <Linha label="Quantidade" valor={i.quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} />
+            <Linha label="Valor unitário" valor={formatarMoeda(i.valorUnitario)} />
+            <Linha label="Valor total" valor={formatarMoeda(i.valorTotal)} forte />
+          </View>
+        ))}
+      </View>
+    ) : null}
   </View>
 );
 
@@ -218,24 +297,35 @@ const Listas: React.FC<{ aba: Exclude<Aba, 'resumo'>; detalhe: ContratoDetalhe }
             <Linha label="Valor líquido" valor={formatarMoeda(f.valorLiquido)} forte />
             <Linha label="Valor bruto" valor={formatarMoeda(f.valorBruto)} />
             <Linha label="Vencimento" valor={formatarDataIso(f.vencimento)} />
+            {f.dataAteste ? <Linha label="Ateste" valor={formatarDataIso(f.dataAteste)} /> : null}
+            {f.dataLiquidacao ? <Linha label="Liquidação" valor={formatarDataIso(f.dataLiquidacao)} /> : null}
             {f.pagamento ? <Linha label="Pagamento" valor={formatarDataIso(f.pagamento)} /> : null}
-          </View>
-        ))}
-      </View>
-    );
-  }
-
-  if (aba === 'itens') {
-    if (detalhe.itens.length === 0) return <Vazio texto="Este contrato não tem itens cadastrados." />;
-    return (
-      <View style={styles.stack}>
-        {detalhe.itens.map((i) => (
-          <View key={i.id} style={styles.panel}>
-            {i.numeroItem ? <Text style={styles.itemMeta}>Item {i.numeroItem}</Text> : null}
-            <Text style={styles.itemTitle}>{i.descricao}</Text>
-            <Linha label="Quantidade" valor={i.quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} />
-            <Linha label="Valor unitário" valor={formatarMoeda(i.valorUnitario)} />
-            <Linha label="Valor total" valor={formatarMoeda(i.valorTotal)} forte />
+            {f.empenhos.length > 0 ? <Linha label="Empenho" valor={f.empenhos.join(', ')} /> : null}
+            {f.ordemBancaria ? <Linha label="Doc. SIAFI" valor={f.ordemBancaria} /> : null}
+            {f.processo ? <Linha label="Processo" valor={f.processo} /> : null}
+            {f.glosa > 0 ? <Linha label="Glosa" valor={formatarMoeda(f.glosa)} /> : null}
+            {f.juros > 0 ? <Linha label="Juros" valor={formatarMoeda(f.juros)} /> : null}
+            {f.multa > 0 ? <Linha label="Multa" valor={formatarMoeda(f.multa)} /> : null}
+            {f.chaveNfe ? (
+              <View style={styles.chave}>
+                <View style={styles.rowBetween}>
+                  <Text style={styles.kvLabel}>{f.chaveValidacao?.estado === 'nao-nfe' ? 'Código da nota' : 'Chave da NF-e'}</Text>
+                  {f.chaveValidacao && f.chaveValidacao.estado !== 'nao-nfe' ? (
+                    <View style={[styles.pill, { backgroundColor: f.chaveValidacao.estado === 'valida' ? colors.greenBg : colors.amberBadgeBg }]}>
+                      <Text style={[styles.pillText, { color: f.chaveValidacao.estado === 'valida' ? colors.greenText : colors.amberText }]}>
+                        {f.chaveValidacao.estado === 'valida' ? 'Chave válida' : f.chaveValidacao.estado === 'incompleta' ? 'Incompleta' : 'Inconsistente'}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={styles.chaveValor} selectable>
+                  {f.chaveNfe}
+                </Text>
+                {f.chaveValidacao?.motivo && f.chaveValidacao.estado !== 'nao-nfe' ? (
+                  <Text style={styles.chaveMotivo}>{f.chaveValidacao.motivo}</Text>
+                ) : null}
+              </View>
+            ) : null}
           </View>
         ))}
       </View>
@@ -269,15 +359,28 @@ const styles = StyleSheet.create({
   hero: { backgroundColor: colors.white, paddingHorizontal: 20, paddingBottom: 16, gap: 6 },
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   heroCode: { fontSize: 13, fontWeight: '700', color: colors.muted },
+  pessoa: { gap: 2, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.line },
+  documento: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.line },
+  documentoTexto: { flex: 1, gap: 2 },
+  documentoAbrir: { fontSize: 13, fontWeight: '800', color: colors.blue },
+  chave: { marginTop: 6, gap: 2 },
+  chaveMotivo: { fontSize: 12, color: colors.amberText },
+  chaveValor: { fontSize: 12, color: colors.ink, letterSpacing: 0.2 },
   heroTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.6, color: colors.ink },
-  heroSub: { fontSize: 13, color: colors.muted },
   badge: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: radius.pill },
   badgeText: { fontSize: 12, fontWeight: '700' },
-  tabsScroll: { flexGrow: 0, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.line },
-  tabs: { paddingHorizontal: 14, gap: 6, paddingBottom: 10 },
-  tab: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: colors.tagBg },
+  tabs: {
+    flexDirection: 'row',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+  },
+  tab: { flex: 1, minHeight: 38, paddingVertical: 8, paddingHorizontal: 2, borderRadius: 14, backgroundColor: colors.tagBg, alignItems: 'center', justifyContent: 'center' },
   tabActive: { backgroundColor: colors.blue },
-  tabText: { fontSize: 13, fontWeight: '700', color: colors.tagText },
+  tabText: { fontSize: 12, fontWeight: '700', color: colors.tagText },
   tabTextActive: { color: colors.white },
   body: { flex: 1 },
   bodyContent: { padding: 16, paddingBottom: 32 },

@@ -8,7 +8,6 @@ import { ContratoCard } from '../components/ContratoCard';
 import { ContratoDetalheModal } from '../components/ContratoDetalheModal';
 import { ListSkeleton } from '../components/Skeleton';
 import { fetchContratos, fetchUltimaSincronizacaoContratos } from '../services/contratos';
-import { formatarMoeda } from '../lib/format';
 
 interface ContratosScreenProps {
   initialFilter?: ContratoFilter;
@@ -123,7 +122,6 @@ export const ContratosScreen: React.FC<ContratosScreenProps> = ({
           <RefreshControl refreshing={refreshing} onRefresh={() => carregar(true)} colors={[colors.blue]} tintColor={colors.blue} />
         }
       >
-        <Text style={styles.titleText}>Contratos</Text>
         <Text style={styles.listIntro}>
           {sincronizacao ? `Dados do Comprasnet · atualizado em ${sincronizacao}` : 'Dados do Comprasnet'}
         </Text>
@@ -140,17 +138,6 @@ export const ContratosScreen: React.FC<ContratosScreenProps> = ({
           </View>
         ) : (
           <>
-            <View style={styles.summaryStrip}>
-              <View style={styles.summaryLeft}>
-                <Text style={styles.summaryLabel}>Valor global · contratos ativos</Text>
-                <Text style={styles.summaryValue}>{formatarMoeda(resumo.valorAtivos, false)}</Text>
-              </View>
-              <View style={styles.summaryRight}>
-                <Text style={styles.summaryLabel}>Ativos</Text>
-                <Text style={[styles.summaryValue, { color: colors.blue }]}>{resumo.ativos}</Text>
-              </View>
-            </View>
-
             <View style={styles.searchBox}>
               <IconSearch size={19} color={colors.mutedLight} />
               <TextInput
@@ -182,12 +169,6 @@ export const ContratosScreen: React.FC<ContratosScreenProps> = ({
               })}
             </ScrollView>
 
-            <View style={styles.resultRow}>
-              <Text style={styles.resultCount}>
-                {filtrados.length} {filtrados.length === 1 ? 'contrato' : 'contratos'}
-              </Text>
-              <Text style={styles.resultSort}>Mais urgentes primeiro</Text>
-            </View>
 
             {filtrados.length > 0 ? (
               filtrados.map((item) => <ContratoCard key={item.uuid} item={item} onPress={setSelecionado} />)
@@ -213,23 +194,7 @@ export const ContratosScreen: React.FC<ContratosScreenProps> = ({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 28 },
-  titleText: { fontSize: 27, letterSpacing: -1, fontWeight: '800', color: colors.ink },
-  listIntro: { fontSize: 13, color: colors.muted, marginTop: 6, marginBottom: 18 },
-  summaryStrip: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 17,
-    padding: 17,
-    marginBottom: 16,
-  },
-  summaryLeft: { flex: 1 },
-  summaryRight: { borderLeftWidth: 1, borderLeftColor: colors.line, paddingLeft: 20, alignItems: 'flex-end' },
-  summaryLabel: { color: colors.muted, fontSize: 12 },
-  summaryValue: { fontSize: 23, fontWeight: '800', letterSpacing: -0.7, color: colors.ink, marginTop: 6 },
+  listIntro: { fontSize: 13, color: colors.muted, marginBottom: 14 },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -257,9 +222,6 @@ const styles = StyleSheet.create({
   chipSelected: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { fontSize: 13, color: colors.tagText, fontWeight: '600' },
   chipTextSelected: { color: colors.white, fontWeight: '700' },
-  resultRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  resultCount: { fontSize: 12, color: colors.muted },
-  resultSort: { fontSize: 12, color: colors.muted },
   emptyCard: {
     backgroundColor: colors.white,
     borderWidth: 1,

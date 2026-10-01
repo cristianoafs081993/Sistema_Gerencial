@@ -1,39 +1,34 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
 import { Text } from '../components/AppText';
-import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius } from '../constants/theme';
 import { formatarMoeda } from '../lib/format';
-import { IconWallet, IconDoc, IconLayers, IconCheck, IconClock, IconRight, IconFilter, IconChevronDown } from '../components/Icons';
+import { IconWallet, IconClock, IconRight, IconFilter } from '../components/Icons';
 import { GaugeChart } from '../components/GaugeChart';
-import { KpiCard } from '../components/KpiCard';
 import { FunnelCard, type EtapaFunil } from '../components/FunnelCard';
-import { MonthlyChart } from '../components/MonthlyChart';
-import type { OrcamentoSection } from './OrcamentoScreen';
-import { PtresFilterModal } from '../components/PtresFilterModal';
 import { Skeleton } from '../components/Skeleton';
 import { fetchDashboard, type DashboardData } from '../services/dashboard';
+import type { PtresItem } from '../types';
 
 interface DashboardScreenProps {
-  userName: string;
+  /** PTRES escolhido no filtro do header ('all' = todos). */
+  selectedPtres: string;
+  onSelectPtres: (code: string) => void;
+  /** Informa ao header quais PTRES existem para o filtro. */
+  onPtresOptions: (options: PtresItem[]) => void;
   onNavigateToContratosAlert: () => void;
   /** Se o usuário não pode abrir Contratos, o alerta some. */
   canOpenContratos?: boolean;
-  /** Abre uma seção da aba Orçamento (tocar nos indicadores). */
-  onOpenOrcamento?: (section: OrcamentoSection) => void;
-  orcamentoSections?: OrcamentoSection[];
 }
 
 const pct = (valor: number) => `${valor.toFixed(1).replace('.', ',')}%`;
 
-export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNavigateToContratosAlert, canOpenContratos = true, onOpenOrcamento, orcamentoSections = [] }) => {
-  const abrir = (section: OrcamentoSection) => (onOpenOrcamento && orcamentoSections.includes(section) ? () => onOpenOrcamento(section) : undefined);
+export const DashboardScreen: React.FC<DashboardScreenProps> = ({ selectedPtres, onSelectPtres, onPtresOptions, onNavigateToContratosAlert, canOpenContratos = true }) => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [selectedPtres, setSelectedPtres] = useState<string>('all');
-  const [isPtresModalOpen, setIsPtresModalOpen] = useState(false);
+  const carregouUmaVez = useRef(false);
 
   const carregar = useCallback(async (ptres: string, isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -50,13 +45,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
   }, []);
 
   useEffect(() => {
-    carregar('all');
-  }, [carregar]);
+    carregar(selectedPtres, carregouUmaVez.current);
+    carregouUmaVez.current = true;
+  }, [carregar, selectedPtres]);
 
-  const escolherPtres = (code: string) => {
-    setSelectedPtres(code);
-    carregar(code, true);
-  };
+  useEffect(() => {
+    if (data) onPtresOptions(data.ptres);
+  }, [data, onPtresOptions]);
 
   const metricas = data?.metricas;
   const etapas = useMemo<EtapaFunil[]>(() => {
@@ -67,6 +62,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
         value: metricas.planejado,
         ratio: metricas.planejado > 0 ? 100 : 0,
         caption: `${metricas.totalAtividades} ${metricas.totalAtividades === 1 ? 'atividade' : 'atividades'}`,
+        color: '#0D47A1',
+      },
+      {
+        label: 'Descentralizado',
+        value: metricas.descentralizado,
+        ratio: metricas.pctDescentralizado,
+        caption: `${pct(metricas.pctDescentralizado)} do planejado`,
         color: colors.blue,
       },
       {
@@ -74,7 +76,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
         value: metricas.empenhado,
         ratio: metricas.pctExecutado,
         caption: `${pct(metricas.pctExecutado)} do planejado`,
-        color: colors.sky,
+        color: '#42A5F5',
       },
       {
         label: 'Liquidado',
@@ -94,35 +96,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
   }, [metricas]);
 
   const ptresAtivo = data?.ptres.find((p) => p.code === selectedPtres);
-  const ptresLabel = selectedPtres === 'all' ? 'PTRES: Todos' : `PTRES ${selectedPtres}`;
   const aVencer = data?.contratos?.aVencer ?? 0;
-  const ano = new Date().getFullYear();
-
-  const cabecalho = (
-    <>
-      <Text style={styles.greeting}>Olá, {userName}</Text>
-      <View style={styles.titleRow}>
-        <View style={styles.titleBlock}>
-          <Text style={styles.titleText}>Visão geral</Text>
-          <Text style={styles.titleSub}>Execução orçamentária {ano}</Text>
-        </View>
-        <TouchableOpacity
-          style={[styles.ptresBadge, selectedPtres !== 'all' && styles.ptresBadgeActive]}
-          onPress={() => setIsPtresModalOpen(true)}
-          disabled={!data}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel={`Filtrar por PTRES. Atual: ${ptresLabel}`}
-        >
-          <IconFilter size={13} color={selectedPtres !== 'all' ? colors.white : colors.blue} />
-          <Text style={[styles.ptresBadgeText, selectedPtres !== 'all' && styles.ptresBadgeTextActive]} numberOfLines={1}>
-            {ptresLabel}
-          </Text>
-          <IconChevronDown size={12} color={selectedPtres !== 'all' ? colors.white : colors.mutedText} />
-        </TouchableOpacity>
-      </View>
-    </>
-  );
 
   return (
     <View style={styles.screen}>
@@ -134,8 +108,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
           <RefreshControl refreshing={refreshing} onRefresh={() => carregar(selectedPtres, true)} colors={[colors.blue]} tintColor={colors.blue} />
         }
       >
-        {cabecalho}
-
         {loading && !data ? <DashboardSkeleton /> : null}
 
         {erro ? (
@@ -158,7 +130,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
                     {ptresAtivo?.name || `PTRES ${selectedPtres}`}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => escolherPtres('all')} activeOpacity={0.7} accessibilityRole="button">
+                <TouchableOpacity onPress={() => onSelectPtres('all')} activeOpacity={0.7} accessibilityRole="button">
                   <Text style={styles.clearFilterText}>Ver todos ✕</Text>
                 </TouchableOpacity>
               </View>
@@ -171,9 +143,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
               </View>
             ) : null}
 
-            <LinearGradient colors={colors.gradientBalance} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+            <View style={styles.hero}>
               <View style={styles.heroEyebrow}>
-                <IconWallet size={16} color={colors.blueTextSubtle} />
+                <IconWallet size={16} color={colors.muted} />
                 <Text style={styles.heroEyebrowText}>Planejado</Text>
               </View>
               <Text style={styles.heroValue} adjustsFontSizeToFit numberOfLines={1}>
@@ -186,28 +158,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
               <View style={styles.heroBarBg}>
                 <View style={[styles.heroBarFill, { width: `${Math.min(metricas.pctDescentralizado, 100)}%` }]} />
               </View>
-
-              <View style={styles.heroFoot}>
-                <TouchableOpacity
-                  style={styles.heroFootItem}
-                  disabled={!abrir('descentralizacoes')}
-                  onPress={abrir('descentralizacoes')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Descentralizado. Toque para ver as descentralizações."
-                >
-                  <Text style={styles.heroFootLabel}>Descentralizado</Text>
-                  <Text style={styles.heroFootValue}>{formatarMoeda(metricas.descentralizado, false)}</Text>
-                  <Text style={styles.heroFootPct}>{pct(metricas.pctDescentralizado)} do planejado</Text>
-                </TouchableOpacity>
-                <View style={[styles.heroFootItem, styles.heroFootRight]}>
-                  <Text style={styles.heroFootLabel}>A descentralizar</Text>
-                  <Text style={styles.heroFootValue}>{formatarMoeda(Math.max(0, metricas.aDescentralizar), false)}</Text>
-                  <Text style={styles.heroFootPct}>
-                    {metricas.aDescentralizar < 0 ? 'Acima do planejado' : `${pct(Math.max(0, 100 - metricas.pctDescentralizado))} restante`}
-                  </Text>
-                </View>
-              </View>
-            </LinearGradient>
+            </View>
 
             <SectionTitle title="Velocímetros de execução" hint="sobre o descentralizado" />
             <View style={styles.gaugesCard}>
@@ -216,57 +167,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
               <GaugeChart label="Liquidado" caption={formatarMoeda(metricas.liquidado, false)} value={metricas.liquidado} total={metricas.descentralizado} />
             </View>
 
-            <SectionTitle title="Indicadores" />
-            <View style={styles.grid}>
-              <KpiCard
-                label="Empenhado"
-                value={formatarMoeda(metricas.empenhado, false)}
-                caption={`${pct(metricas.pctExecutado)} do planejado`}
-                progress={metricas.pctExecutado}
-                tone={colors.sky}
-                onPress={abrir('empenhos')}
-                icon={<IconDoc size={15} color={colors.sky} />}
-              />
-              <KpiCard
-                label="Crédito disponível"
-                value={formatarMoeda(metricas.creditoDisponivel, false)}
-                caption={`${pct(metricas.pctCreditoDescentralizado)} do descentralizado`}
-                progress={metricas.pctCreditoDescentralizado}
-                tone={colors.tealText}
-                onPress={abrir('credito')}
-                icon={<IconWallet size={15} color={colors.tealText} />}
-              />
-              <KpiCard
-                label="Liquidado"
-                value={formatarMoeda(metricas.liquidado, false)}
-                caption={`${pct(metricas.pctLiquidadoEmpenhado)} do empenhado`}
-                progress={metricas.pctLiquidadoEmpenhado}
-                tone="#0891B2"
-                onPress={abrir('empenhos')}
-                icon={<IconLayers size={15} color="#0891B2" />}
-              />
-              <KpiCard
-                label="Pago"
-                value={formatarMoeda(metricas.pago, false)}
-                caption={`${pct(metricas.pctPagoLiquidado)} do liquidado`}
-                progress={metricas.pctPagoLiquidado}
-                tone={colors.greenProgress}
-                onPress={abrir('empenhos')}
-                icon={<IconCheck size={15} color={colors.greenProgress} />}
-              />
-            </View>
-
-            <View style={styles.auxStrip}>
-              <IconClock size={15} color={colors.mutedText} />
-              <Text style={styles.auxLabel}>A pagar (liquidado − pago)</Text>
-              <Text style={styles.auxValue}>{formatarMoeda(metricas.aPagar, false)}</Text>
-            </View>
-
             <SectionTitle title="Funil de execução" hint="do planejado ao pago" />
             <FunnelCard etapas={etapas} />
-
-            <SectionTitle title="Execução por mês" hint="data do empenho" />
-            <MonthlyChart dados={metricas.mensal} />
 
             {canOpenContratos && aVencer > 0 ? (
               <TouchableOpacity style={styles.alertCard} onPress={onNavigateToContratosAlert} activeOpacity={0.85} accessibilityRole="button">
@@ -290,14 +192,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ userName, onNa
           </>
         ) : null}
       </ScrollView>
-
-      <PtresFilterModal
-        visible={isPtresModalOpen}
-        onClose={() => setIsPtresModalOpen(false)}
-        options={data?.ptres ?? []}
-        selectedCode={selectedPtres}
-        onSelect={escolherPtres}
-      />
     </View>
   );
 };
@@ -328,26 +222,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   container: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 32 },
-  greeting: { fontSize: 14, color: colors.muted, marginBottom: 2 },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 16, gap: 10 },
-  titleBlock: { flexShrink: 1 },
-  titleText: { fontSize: 28, fontWeight: '800', letterSpacing: -1.1, color: colors.ink },
-  titleSub: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  ptresBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 11,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.blueLight,
-    backgroundColor: colors.blueBg,
-    maxWidth: 170,
-  },
-  ptresBadgeActive: { backgroundColor: colors.blue, borderColor: colors.blue },
-  ptresBadgeText: { fontSize: 12.5, fontWeight: '800', color: colors.blue, flexShrink: 1 },
-  ptresBadgeTextActive: { color: colors.white },
   activeFilterBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -359,22 +233,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 14,
   },
+  hero: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.lg,
+    padding: 18,
+    gap: 4,
+    marginBottom: 6,
+  },
+  heroEyebrow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  heroEyebrowText: { fontSize: 13, fontWeight: '700', color: colors.muted },
+  heroValue: { fontSize: 30, fontWeight: '800', letterSpacing: -1.1, color: colors.blue, marginTop: 4 },
+  heroSub: { fontSize: 13, color: colors.muted },
+  heroBarBg: { height: 6, backgroundColor: colors.progressBg, borderRadius: 3, overflow: 'hidden', marginTop: 14 },
+  heroBarFill: { height: '100%', backgroundColor: colors.blue, borderRadius: 3 },
   activeFilterLeft: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
   activeFilterText: { fontSize: 12.5, fontWeight: '700', color: colors.blue, flexShrink: 1 },
   clearFilterText: { fontSize: 12.5, fontWeight: '800', color: colors.blue },
-  hero: { borderRadius: 22, padding: 20, gap: 4, marginBottom: 6 },
-  heroEyebrow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  heroEyebrowText: { fontSize: 14, fontWeight: '700', color: colors.blueTextSubtle },
-  heroValue: { fontSize: 36, fontWeight: '800', letterSpacing: -1.4, color: colors.white, marginTop: 6 },
-  heroSub: { fontSize: 13, color: colors.blueTextSubtle },
-  heroBarBg: { height: 6, backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 3, overflow: 'hidden', marginTop: 16 },
-  heroBarFill: { height: '100%', backgroundColor: colors.white, borderRadius: 3 },
-  heroFoot: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 14 },
-  heroFootItem: { flex: 1, gap: 2 },
-  heroFootRight: { alignItems: 'flex-end' },
-  heroFootLabel: { fontSize: 12, color: colors.blueTextSubtle },
-  heroFootValue: { fontSize: 16, fontWeight: '800', letterSpacing: -0.3, color: colors.white },
-  heroFootPct: { fontSize: 11.5, color: colors.blueTextSubtle },
   sectionHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 24, marginBottom: 10 },
   sectionTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.4, color: colors.ink },
   sectionHint: { fontSize: 12, color: colors.muted },
@@ -389,20 +265,6 @@ const styles = StyleSheet.create({
   },
   gaugeDivider: { width: 1, backgroundColor: colors.line, marginVertical: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  auxStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.md,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginTop: 10,
-  },
-  auxLabel: { flex: 1, fontSize: 12.5, color: colors.muted },
-  auxValue: { fontSize: 14, fontWeight: '800', color: colors.ink },
   alertCard: {
     flexDirection: 'row',
     alignItems: 'center',

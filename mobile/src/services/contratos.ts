@@ -6,13 +6,17 @@ import {
   faturaPendente,
   valorTotalDoHistorico,
 } from '../lib/contratosRules';
+import { validarChaveNfe } from '../lib/nfeChave';
 import { chunk, lerTudo, tabelaInexistente, type Row } from './query';
 import type {
   ContratoDetalhe,
   ContratoEmpenhoLinha,
+  ContratoDocumentoLinha,
   ContratoFaturaLinha,
+  ContratoGarantiaLinha,
   ContratoItem,
   ContratoItemLinha,
+  ContratoResponsavelLinha,
   ContratoTermoLinha,
 } from '../types';
 
@@ -24,6 +28,11 @@ import type {
  */
 
 const IN_CHUNK = 80;
+
+function textoOuNulo(valor: unknown): string | null {
+  const texto = String(valor ?? '').trim();
+  return texto ? texto : null;
+}
 const ESCOPO_LEGADO = ['ug_campus', 'reitoria_com_empenho_campus', 'reitoria_com_fatura_campus'];
 
 const CONTRATO_COLUNAS =
@@ -127,7 +136,8 @@ export async function fetchContratos(campusUasg: string = DEFAULT_CAMPUS_UASG, h
     const atual = empenhosPorContrato.get(e.contrato_api_id) ?? { empenhado: 0, aLiquidar: 0, liquidado: 0, pago: 0 };
     atual.empenhado += numero(e.valor_empenhado);
     atual.aLiquidar += numero(e.valor_a_liquidar);
-    atual.liquidado += numero(e.valor_liquidado);
+    // No Comprasnet o "liquidado" exclui o que ja foi pago; o total liquidado e liquidado + pago.
+    atual.liquidado += numero(e.valor_liquidado) + numero(e.valor_pago);
     atual.pago += numero(e.valor_pago);
     empenhosPorContrato.set(e.contrato_api_id, atual);
   }
@@ -182,7 +192,9 @@ export async function fetchContratos(campusUasg: string = DEFAULT_CAMPUS_UASG, h
 
 export async function fetchContratoDetalhe(contratoUuid: string, campusUasg: string = DEFAULT_CAMPUS_UASG): Promise<ContratoDetalhe> {
   const ids = [contratoUuid];
-  const [empenhos, faturas, itens, termos] = await Promise.all([
+  // Fiscais, garantias e documentos são complementares: se falharem, o restante do detalhe continua.
+  const opcional = (leitura: Promise<Row[]>) => leitura.catch(() => [] as Row[]);
+  const [empenhos, faturas, itens, termos, recursos, documentos] = await Promise.all([
     lerPorContratos(
       'contratos_api_empenhos',
       'id, numero, unidade_gestora, credor, data_emissao, natureza_despesa, valor_empenhado, valor_a_liquidar, valor_liquidado, valor_pago',
@@ -191,7 +203,7 @@ export async function fetchContratoDetalhe(contratoUuid: string, campusUasg: str
     ),
     lerPorContratos(
       'contratos_api_faturas',
-      'id, api_fatura_id, numero_instrumento_cobranca, mes_referencia, ano_referencia, situacao, valor_bruto, valor_liquido, data_vencimento, data_pagamento',
+      'id, api_fatura_id, numero_instrumento_cobranca, mes_referencia, ano_referencia, situacao, valor_bruto, valor_liquido, data_vencimento, data_pagamento, data_ateste, processo, chave_nfe, glosa, juros, multa, raw_data',
       ids,
       (q) => q.order('data_vencimento', { ascending: false, nullsFirst: false }),
     ),
@@ -207,6 +219,19 @@ export async function fetchContratoDetalhe(contratoUuid: string, campusUasg: str
       ids,
       (q) => q.order('data_assinatura', { ascending: false, nullsFirst: false }),
     ),
+    opcional(
+      lerPorContratos(
+        'contratos_api_recursos',
+        'id, tipo_recurso, titulo, descricao, situacao, data_inicio, data_fim, vencimento, valor, raw_data',
+        ids,
+        (q) => q.in('tipo_recurso', ['responsaveis', 'garantias']),
+      ),
+    ),
+    opcional(
+      lerPorContratos('contratos_api_compras_documentos', 'id, tipo, descricao, origem, url', ids, (q) =>
+        q.order('created_at', { ascending: false }),
+      ),
+    ),
   ]);
 
   const empenhosCampus: ContratoEmpenhoLinha[] = empenhos
@@ -219,11 +244,12 @@ export async function fetchContratoDetalhe(contratoUuid: string, campusUasg: str
       naturezaDespesa: e.natureza_despesa ?? null,
       empenhado: numero(e.valor_empenhado),
       aLiquidar: numero(e.valor_a_liquidar),
-      liquidado: numero(e.valor_liquidado),
+      liquidado: numero(e.valor_liquidado) + numero(e.valor_pago),
       pago: numero(e.valor_pago),
     }));
 
   const faturasLinhas: ContratoFaturaLinha[] = faturas.map((f) => {
+    const bruto: Row = f.raw_data && typeof f.raw_data === 'object' ? f.raw_data : {};
     const mes = String(f.mes_referencia ?? '').padStart(2, '0');
     return {
       id: f.id,
@@ -235,6 +261,25 @@ export async function fetchContratoDetalhe(contratoUuid: string, campusUasg: str
       valorLiquido: numero(f.valor_liquido),
       vencimento: f.data_vencimento ?? null,
       pagamento: f.data_pagamento ?? null,
+      chaveNfe: f.chave_nfe ? String(f.chave_nfe).trim() : null,
+      chaveValidacao: validarChaveNfe(f.chave_nfe, {
+        fornecedorCnpj: textoOuNulo(bruto.fornecedor_ic),
+        numeroDocumento: f.numero_instrumento_cobranca,
+      }),
+      dataAteste: f.data_ateste ?? null,
+      dataLiquidacao: textoOuNulo(bruto.data_liquidacao),
+      processo: f.processo ? String(f.processo).trim() : null,
+      empenhos: Array.from(
+        new Set(
+          (Array.isArray(bruto.dados_empenho) ? bruto.dados_empenho : [])
+            .map((e: Row) => String(e?.numero_empenho ?? '').trim())
+            .filter(Boolean),
+        ),
+      ) as string[],
+      ordemBancaria: textoOuNulo(bruto.sfadrao_id),
+      glosa: numero(f.glosa),
+      juros: numero(f.juros),
+      multa: numero(f.multa),
     };
   });
 
@@ -258,7 +303,59 @@ export async function fetchContratoDetalhe(contratoUuid: string, campusUasg: str
     observacao: t.observacao ? String(t.observacao).trim() : null,
   }));
 
-  return { empenhos: empenhosCampus, faturas: faturasLinhas, itens: itensLinhas, termos: termosLinhas };
+  const recursosDoTipo = (tipo: string) => recursos.filter((r) => r.tipo_recurso === tipo);
+
+  // Gestores e fiscais ativos primeiro, depois por data de início mais recente.
+  const responsaveisLinhas: ContratoResponsavelLinha[] = recursosDoTipo('responsaveis')
+    .map((r) => {
+      const bruto: Row = r.raw_data && typeof r.raw_data === 'object' ? r.raw_data : {};
+      return {
+        id: r.id,
+        funcao: textoOuNulo(bruto.funcao_id) ?? 'Responsável',
+        nome: (textoOuNulo(bruto.usuario) ?? textoOuNulo(r.titulo) ?? 'Não informado').replace(/^[-–—\s]+/, ''),
+        portaria: textoOuNulo(bruto.portaria) ?? textoOuNulo(r.descricao),
+        situacao: r.situacao ?? null,
+        dataInicio: r.data_inicio ?? null,
+        dataFim: r.data_fim ?? null,
+      };
+    })
+    .sort((a, b) => {
+      const ativoA = a.situacao === 'Ativo' ? 0 : 1;
+      const ativoB = b.situacao === 'Ativo' ? 0 : 1;
+      if (ativoA !== ativoB) return ativoA - ativoB;
+      return String(b.dataInicio ?? '').localeCompare(String(a.dataInicio ?? ''));
+    });
+
+  const garantiasLinhas: ContratoGarantiaLinha[] = recursosDoTipo('garantias').map((r) => {
+    const bruto: Row = r.raw_data && typeof r.raw_data === 'object' ? r.raw_data : {};
+    return {
+      id: r.id,
+      tipo: textoOuNulo(r.titulo) ?? textoOuNulo(bruto.tipo) ?? 'Garantia',
+      situacao: r.situacao ?? null,
+      vencimento: r.vencimento ?? r.data_fim ?? null,
+      valor: numero(r.valor),
+    };
+  });
+
+  const documentosLinhas: ContratoDocumentoLinha[] = documentos
+    .filter((d) => d.url)
+    .map((d) => ({
+      id: d.id,
+      tipo: textoOuNulo(d.tipo) ?? 'Documento',
+      descricao: textoOuNulo(d.descricao),
+      origem: textoOuNulo(d.origem),
+      url: String(d.url),
+    }));
+
+  return {
+    responsaveis: responsaveisLinhas,
+    garantias: garantiasLinhas,
+    documentos: documentosLinhas,
+    empenhos: empenhosCampus,
+    faturas: faturasLinhas,
+    itens: itensLinhas,
+    termos: termosLinhas,
+  };
 }
 
 /** Quando o servidor sincronizou os contratos pela última vez (mostra a "idade" do dado ao usuário). */

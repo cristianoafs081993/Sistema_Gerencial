@@ -1,39 +1,55 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text } from './AppText';
-import { colors } from '../constants/theme';
-import { IconBuilding, IconBell } from './Icons';
+import { colors, radius } from '../constants/theme';
+import { IconBell, IconChevronDown } from './Icons';
 import { BrandLogo } from './BrandLogo';
 
 interface HeaderProps {
   initials?: string;
-  campusName?: string;
   notificationCount?: number;
   onPressNotification?: () => void;
   onPressAvatar?: () => void;
+  /** Filtro de PTRES (só o dashboard informa); aparece na barra, antes do sino. */
+  ptresFilter?: { label: string; active: boolean; disabled?: boolean; onPress: () => void };
 }
 
 export const Header: React.FC<HeaderProps> = ({
   initials = 'CF',
-  campusName = 'Campus Currais Novos',
   notificationCount = 0,
   onPressNotification,
   onPressAvatar,
+  ptresFilter,
 }) => {
   return (
     <View style={styles.container}>
-      {/* Top Bar */}
       <View style={styles.topbar}>
         <View style={styles.brand}>
-          <BrandLogo size={32} />
+          <BrandLogo size={26} />
           <Text style={styles.brandText}>
-            siages
+            Siages
             <Text style={styles.brandDot}>.</Text>
           </Text>
         </View>
 
-        {/* Right side: Notification bell + Avatar */}
+        {/* Right side: PTRES filter (dashboard) + Notification bell + Avatar */}
         <View style={styles.rightActions}>
+          {ptresFilter ? (
+            <TouchableOpacity
+              style={[styles.ptresBadge, ptresFilter.active && styles.ptresBadgeActive]}
+              onPress={ptresFilter.onPress}
+              disabled={ptresFilter.disabled}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`Filtrar por PTRES. Atual: ${ptresFilter.label}`}
+            >
+              <Text style={[styles.ptresBadgeText, ptresFilter.active && styles.ptresBadgeTextActive]} numberOfLines={1}>
+                {ptresFilter.label}
+              </Text>
+              <IconChevronDown size={12} color={ptresFilter.active ? colors.white : colors.mutedText} />
+            </TouchableOpacity>
+          ) : null}
+
           <TouchableOpacity
             style={styles.bellButton}
             onPress={onPressNotification}
@@ -61,15 +77,6 @@ export const Header: React.FC<HeaderProps> = ({
           </TouchableOpacity>
         </View>
       </View>
-
-      {/* Campus subtitle */}
-      <View style={styles.campus}>
-        <IconBuilding size={14} color={colors.muted} />
-        <Text style={styles.campusText}>
-          IFRN <Text style={styles.campusSlash}>/</Text>{' '}
-          <Text style={styles.campusBold}>{campusName}</Text>
-        </Text>
-      </View>
     </View>
   );
 };
@@ -83,17 +90,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 19,
-    paddingTop: 14,
+    paddingTop: 12,
     paddingBottom: 10,
   },
   brand: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
+    gap: 7,
   },
   brandText: {
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: -0.7,
     color: colors.ink,
   },
@@ -103,7 +110,7 @@ const styles = StyleSheet.create({
   rightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   bellButton: {
     position: 'relative',
@@ -144,24 +151,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.blue,
   },
-  campus: {
+  ptresBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 19,
-    paddingBottom: 13,
-    paddingTop: 0,
     gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.blueLight,
+    backgroundColor: colors.blueBg,
+    maxWidth: 130,
   },
-  campusText: {
-    fontSize: 12,
-    color: colors.muted,
-  },
-  campusSlash: {
-    color: colors.mutedExtraLight,
-    paddingHorizontal: 3,
-  },
-  campusBold: {
-    fontWeight: '600',
-    color: colors.inkLight,
-  },
+  ptresBadgeActive: { backgroundColor: colors.blue, borderColor: colors.blue },
+  ptresBadgeText: { fontSize: 12, fontWeight: '800', color: colors.blue, flexShrink: 1 },
+  ptresBadgeTextActive: { color: colors.white },
 });

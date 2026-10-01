@@ -32,7 +32,7 @@ export const PtresBars: React.FC<PtresBarsProps> = ({ dados, nomes = {}, tone = 
             onPress={() => onSelect?.(item.ptres)}
             disabled={!onSelect}
             accessibilityRole="button"
-            accessibilityLabel={`PTRES ${item.ptres}: ${formatarMoeda(item.valor, false)}`}
+            accessibilityLabel={`PTRES ${item.ptres}: ${formatarMoeda(item.valor)}`}
             accessibilityState={{ selected: ativo }}
           >
             <View style={styles.head}>
@@ -40,7 +40,7 @@ export const PtresBars: React.FC<PtresBarsProps> = ({ dados, nomes = {}, tone = 
               <Text style={styles.name} numberOfLines={1}>
                 {nomes[item.ptres] ?? ''}
               </Text>
-              <Text style={styles.value}>{formatarMoeda(item.valor, false)}</Text>
+              <Text style={styles.value}>{formatarMoeda(item.valor)}</Text>
             </View>
             <View style={styles.barBg}>
               <View style={[styles.barFill, { width: `${(item.valor / maximo) * 100}%`, backgroundColor: tone }]} />
