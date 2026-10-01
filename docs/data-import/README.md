@@ -99,6 +99,7 @@ Arquivos reais de operacao presentes em [docs](/C:/Users/crist/OneDrive/Desktop/
 - o valor pago do exercicio vem de `DESPESAS PAGAS (CONTROLE EMPENHO)`
 - quando o CSV traz coluna de emissao do empenho (`Data Emissao`, `Data de Emissao`, `Dia Emissao` ou variacoes com prefixo `NE CCor -`), os fluxos manual e automatico gravam esse valor em `empenhos.data_empenho`
 - se o CSV SIAFI nao trouxer data de emissao, empenhos criados pelo reprocessamento usam `01/01` do ano da NE apenas como fallback; para o grafico de evolucao mensal ficar correto, reimporte com a coluna de emissao ou faca backfill de `empenhos.data_empenho`
+- enquanto isso, o grafico "Evolucao da execucao" do dashboard web trata `data_empenho` em `01/01` (sem data da API de contratos nem historico de operacoes que feche com o valor) como data ausente e **simula** o empenhado mensal: o valor do ano e distribuido na proporcao mensal do liquidado, um mes antes; o grafico exibe o aviso "empenhado mensal estimado pelo ritmo do liquidado" (provisorio, ate haver datas reais)
 - empenhos de exercicio ausentes no banco devem ser criados no reprocessamento, nao apenas os RAP
 
 ## Automacao por e-mail

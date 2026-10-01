@@ -46,6 +46,7 @@ type MensalResumo = {
   planejado: number;
   empenhado: number;
   liquidado: number;
+  empenhadoEstimado?: boolean;
 };
 
 type NaturezaResumo = {
@@ -263,7 +264,11 @@ export function DashboardCurrentTab({
         <ChartPanel
           className="h-full lg:col-span-2"
           title="Evolução da execução"
-          description="Acumulado mensal de planejado, empenhado e liquidado"
+          description={
+            dadosMensais.some((mes) => mes.empenhadoEstimado)
+              ? 'Acumulado mensal de planejado, empenhado e liquidado · empenhado mensal estimado pelo ritmo do liquidado'
+              : 'Acumulado mensal de planejado, empenhado e liquidado'
+          }
           loading={isLoading}
           actions={
             <div className="flex flex-wrap gap-3 text-xs font-semibold text-muted-foreground">

@@ -360,6 +360,8 @@ const getMonthlyBucket = (buckets: Map<string, MonthlyExecutionBucket>, date: Da
   return bucket;
 };
 
+const isFallbackDataEmpenho = (date: Date) => date.getUTCMonth() === 0 && date.getUTCDate() === 1;
+
 const monthStart = (date: Date) => new Date(date.getUTCFullYear(), date.getUTCMonth(), 1);
 
 const countProjectionMonths = (startDate: Date, endDate: Date, today = new Date()) => {
@@ -415,6 +417,7 @@ const buildDadosMensais = (
   },
 ) => {
   const buckets = new Map<string, MonthlyExecutionBucket>();
+  const empenhadoSemDataPorAno = new Map<number, number>();
   const apiEmpenhoDateMap = buildApiEmpenhoDateMap(contratosApiEmpenhos);
   const totalPlanejado = atividades.reduce((total, atividade) => total + (atividade.valorTotal || 0), 0);
   const totalLiquidadoOficial = empenhosCorrente.reduce(
@@ -454,6 +457,13 @@ const buildDadosMensais = (
 
     const dataEmpenho = toValidDate(empenho.dataEmpenho);
     if (!dataEmpenho) return;
+
+    // 01/01 e o fallback da importacao SIAFI quando o CSV nao traz a data de emissao da NE.
+    if (isFallbackDataEmpenho(dataEmpenho)) {
+      const ano = dataEmpenho.getUTCFullYear();
+      empenhadoSemDataPorAno.set(ano, (empenhadoSemDataPorAno.get(ano) || 0) + (empenho.valor || 0));
+      return;
+    }
 
     getMonthlyBucket(buckets, dataEmpenho).empenhado += empenho.valor || 0;
   });
@@ -505,6 +515,27 @@ const buildDadosMensais = (
     getMonthlyBucket(buckets, bucket.date).liquidado += bucket.valor * liquidadoScale;
   });
 
+  // Simulacao provisoria: sem a data real de emissao, o empenhado do ano e distribuido
+  // na mesma proporcao mensal do liquidado, um mes antes (o empenho precede a liquidacao).
+  let empenhadoEstimado = false;
+  empenhadoSemDataPorAno.forEach((valor, ano) => {
+    const liquidacoesDoAno = Array.from(liquidacaoBuckets.entries())
+      .map(([key, bucket]) => ({ ano: Number(key.slice(0, 4)), mes: Number(key.slice(5, 7)) - 1, valor: bucket.valor }))
+      .filter((bucket) => bucket.ano === ano && bucket.valor > 0);
+    const totalLiquidadoAno = liquidacoesDoAno.reduce((total, bucket) => total + bucket.valor, 0);
+
+    if (totalLiquidadoAno <= 0) {
+      getMonthlyBucket(buckets, new Date(Date.UTC(ano, 0, 1))).empenhado += valor;
+      return;
+    }
+
+    empenhadoEstimado = true;
+    liquidacoesDoAno.forEach((bucket) => {
+      getMonthlyBucket(buckets, new Date(Date.UTC(ano, Math.max(bucket.mes - 1, 0), 1))).empenhado +=
+        valor * (bucket.valor / totalLiquidadoAno);
+    });
+  });
+
   addEmptyMonthlyBuckets(buckets, options.startDate || null, options.endDate);
 
   const sortedBuckets = Array.from(buckets.values()).sort((left, right) => left.date.getTime() - right.date.getTime());
@@ -526,6 +557,7 @@ const buildDadosMensais = (
         planejado: accPlanejado,
         empenhado: accEmpenhado,
         liquidado: accLiquidado,
+        empenhadoEstimado,
       };
     });
 };

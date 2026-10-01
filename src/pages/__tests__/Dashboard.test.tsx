@@ -1195,6 +1195,71 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('current-mensal-liquidado')).toHaveTextContent('0,60,100,100');
   });
 
+  it('estima o empenhado mensal pelo ritmo do liquidado quando a data do empenho e o fallback 01/01', () => {
+    contratosApiLiquidacoesQueryData = [
+      {
+        empenho_numero: '2026NE000001',
+        data_liquidacao: '2026-03-05',
+        data_emissao: '2026-03-01',
+        valor_liquido: 30,
+        valor_bruto: 30,
+      },
+      {
+        empenho_numero: '2026NE000001',
+        data_liquidacao: '2026-04-15',
+        data_emissao: '2026-04-15',
+        valor_liquido: 20,
+        valor_bruto: 20,
+      },
+    ];
+
+    mockedUseData.mockReturnValue({
+      atividades: [],
+      empenhos: [
+        makeEmpenho({
+          id: 'empenho-sem-data-emissao',
+          numero: '2026NE000001',
+          tipo: 'exercicio',
+          valor: 100,
+          valorLiquidadoOficial: 50,
+          dataEmpenho: new Date('2026-01-01'),
+        }),
+      ],
+      descentralizacoes: [],
+      contaDescentralizacoes: [],
+      contratos: [],
+      contratosEmpenhos: [],
+      creditosDisponiveis: [],
+      isLoading: false,
+      addAtividade: vi.fn(),
+      updateAtividade: vi.fn(),
+      deleteAtividade: vi.fn(),
+      addEmpenho: vi.fn(),
+      updateEmpenho: vi.fn(),
+      deleteEmpenho: vi.fn(),
+      addDescentralizacao: vi.fn(),
+      updateDescentralizacao: vi.fn(),
+      deleteDescentralizacao: vi.fn(),
+      getResumoOrcamentario: vi.fn(),
+      getTotalPlanejado: vi.fn(),
+      getTotalEmpenhado: vi.fn(),
+      getTotalDescentralizado: vi.fn(),
+      getADescentralizar: vi.fn(),
+      getSaldoTotal: vi.fn(),
+      refreshData: vi.fn(),
+    });
+
+    render(<Dashboard />);
+
+    const labels = screen.getByTestId('current-mensal-labels').textContent?.split(',') ?? [];
+    const empenhado = screen.getByTestId('current-mensal-empenhado').textContent?.split(',').map(Number) ?? [];
+    const liquidado = screen.getByTestId('current-mensal-liquidado').textContent?.split(',').map(Number) ?? [];
+
+    expect(labels[0]).toBe('fev/26');
+    expect(empenhado.slice(0, 3)).toEqual([60, 100, 100]);
+    expect(liquidado.slice(0, 3)).toEqual([0, 30, 50]);
+  });
+
   it('ignora historico de operacoes quando ele nao fecha com o total empenhado do funil', () => {
     mockedUseData.mockReturnValue({
       atividades: [],
