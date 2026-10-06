@@ -384,6 +384,7 @@ export function CommandPalette({
       setApiContratos([]);
       return;
     }
+    if (!open) return;
 
     let isMounted = true;
     contratosApiService
@@ -397,7 +398,7 @@ export function CommandPalette({
     return () => {
       isMounted = false;
     };
-  }, [campusUasg, disableContractSearch]);
+  }, [open, campusUasg, disableContractSearch]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {

@@ -33,7 +33,7 @@ describe('SUAP process PDF AI extraction flow', () => {
     expect(serviceSource).toContain('forceUpdateProcessIds');
     expect(serviceSource).toContain('already_exists: true');
     expect(serviceSource).toContain('created: false');
-    expect(serviceSource).toContain('created: true');
+    expect(serviceSource).toContain('created: Boolean(inserted)');
     expect(serviceSource).toContain("status: 'pending_extraction'");
     expect(panelSource).toContain('processesToProcess = syncedProcesses.filter((proc) => proc.created)');
     expect(panelSource).toContain('Executar Fluxo Completo');

@@ -4,6 +4,14 @@ Este documento registra a politica minima de testes do repositorio.
 
 ## Prioridade
 
+Indisponibilidade do Supabase e concorrência do inventário SUAP:
+
+- `suapProcessInventoryConcurrency.test.ts`: duas sincronizações do mesmo processo convergem para uma linha, preservam extração/PDF, deduplicam entrada e isolam tenants.
+- `dataReadAvailability.test.ts`: as sete leituras centrais não repetem REST após timeout nem depois de um resultado vazio válido.
+- `supabaseRest.test.ts`: fallback mantém JWT/campus e interrompe leitura se a sessão falhar; fetch tem prazo máximo.
+- `DataContext.test.tsx` e `DataAvailabilityBoundary.test.tsx`: falha inicial não é apresentada como orçamento zerado; erro de atualização mantém cache, recuperação manual limpa o aviso e páginas de importação permanecem acessíveis.
+- `CommandPalette.test.tsx` e `suapCommandPaletteGlobal.test.ts`: busca nativa não consulta contratos enquanto fechada e consulta local da extensão só seleciona colunas existentes.
+
 Testes de regressao sao prioridade para qualquer mudanca que altere comportamento real do sistema.
 
 - Ao corrigir um bug, adicione ou ajuste um teste de regressao que cubra o caso corrigido.

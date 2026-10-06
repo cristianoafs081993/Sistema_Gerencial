@@ -6,6 +6,10 @@ Esta documentacao foi atualizada porque a mudanca altera comportamento visual re
 
 ## Blocos de pagina
 
+### `DataAvailabilityBoundary`
+
+Callout de indisponibilidade no Layout com `role="alert"` e botão de tentativa manual desabilitado enquanto uma leitura está em andamento. Impede que uma falha inicial seja exibida como orçamento zerado; em atualização com erro, preserva os resultados anteriores e avisa sobre possível desatualização. Páginas de importação/recuperação continuam acessíveis. Usa tokens de aviso existentes e não exibe detalhes técnicos do banco.
+
 ### `PageHeader`
 
 Cabeçalho padrão de página: eyebrow (módulo), título `h1`, descrição, `actions` e `toolbar`. Sem `title`/`eyebrow`, usa o nome da tela e do grupo de `appScreens` para a rota atual. Com `compact`, omite eyebrow, título visível e descrição e mostra `toolbar` e `actions` numa única linha (título `sr-only`). Ao ser montado dentro do `Layout`, registra-se para suprimir o `AutoPageHeader`.

@@ -1,10 +1,28 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { CommandPalette } from '@/components/CommandPalette';
 import { useAuth, useOptionalAuth } from '@/contexts/AuthContext';
 import type { Empenho, Contrato, Atividade, DocumentoDespesa } from '@/types';
+import { contratosApiService } from '@/services/contratosApi';
+
+vi.mock('@/services/contratosApi', () => ({ contratosApiService: { getContratosApi: vi.fn().mockResolvedValue([]) } }));
+
+it('loads contract search only when the command palette opens', async () => {
+  vi.mocked(useAuth).mockReturnValue({ canAccessScreen: () => true, session: null } as unknown as ReturnType<typeof useAuth>);
+  vi.mocked(useOptionalAuth).mockReturnValue(undefined);
+  const getContracts = vi.mocked(contratosApiService.getContratosApi);
+  getContracts.mockClear();
+  const { rerender } = render(<MemoryRouter><QueryClientProvider client={queryClient}>
+    <CommandPalette open={false} onOpenChange={vi.fn()} />
+  </QueryClientProvider></MemoryRouter>);
+  expect(getContracts).not.toHaveBeenCalled();
+  rerender(<MemoryRouter><QueryClientProvider client={queryClient}>
+    <CommandPalette open onOpenChange={vi.fn()} />
+  </QueryClientProvider></MemoryRouter>);
+  await waitFor(() => expect(getContracts).toHaveBeenCalledOnce());
+});
 
 const transparenciaMock = vi.hoisted(() => ({
   getDocumentosPorFavorecido: vi.fn(),

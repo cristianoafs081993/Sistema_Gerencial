@@ -49,6 +49,7 @@ import { CommandPalette } from '@/components/CommandPalette';
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import { LogoIcon } from './Logo';
 import { AutoPageHeader, usePageHeaderRegistry } from '@/components/design-system/PageHeader';
+import { DataAvailabilityBoundary } from '@/components/DataAvailabilityBoundary';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -783,7 +784,15 @@ export function Layout({ children }: LayoutProps) {
             >
               <PageHeaderProvider value={pageHeaderRegistry}>
                 {!isFullScreenPage && !hasPageHeader ? <AutoPageHeader /> : null}
-                {children}
+                <DataAvailabilityBoundary
+                  error={dataContext?.dataError}
+                  hasInitialDataError={dataContext?.hasInitialDataError}
+                  isRefreshing={dataContext?.isRefreshing}
+                  blocksContent={location.pathname === '/' || ['/planejamento/', '/empenhos', '/descentralizacoes', '/credito-disponivel', '/contratos'].some(path => location.pathname.startsWith(path))}
+                  onRetry={() => dataContext?.refreshData()}
+                >
+                  {children}
+                </DataAvailabilityBoundary>
               </PageHeaderProvider>
             </div>
           </main>

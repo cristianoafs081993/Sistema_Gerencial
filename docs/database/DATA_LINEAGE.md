@@ -284,6 +284,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
 
 - entrada: HTML das caixas SUAP lido por `SuapSyncPanel` e `suapScraperService`
 - persistencia: `processos` guarda dados, extrações e PDF; `suap_processo_caixas` guarda a presença atual por caixa
+- concorrência: cadastro usa `ON CONFLICT (tenant_id,suap_id) DO NOTHING`; a sincronização que encontra conflito lê e reutiliza o registro vencedor, preservando PDF/status/extração. IDs repetidos no mesmo inventário também reutilizam a linha recém-criada. Não é necessário remover a restrição única nem alterar o schema.
 - reconciliação: somente caixas selecionadas e lidas com sucesso removem vínculos de processos ausentes; processos e PDFs não são apagados
 - consumo: `suapProcessosService.getAll` retorna somente processos com vínculo ativo, agregando as caixas para a UI de `/suap`
 

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { assertSupabaseReadAvailable } from '@/lib/supabaseAvailability';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Descentralizacao } from '@/types';
 import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
@@ -63,6 +64,8 @@ export const descentralizacoesService = {
             .order('data_emissao', { ascending: false, nullsFirst: false });
 
         if (error) {
+            assertSupabaseReadAvailable(error);
+
             console.warn('descentralizacoesService.getAll: fallback para Supabase REST', error);
             const fallbackData = await fetchSupabaseRestRows<DescentralizacaoRow>('descentralizacoes', DESCENTRALIZACOES_SELECT, {
                 orderBy: 'data_emissao',
@@ -71,13 +74,7 @@ export const descentralizacoesService = {
             return fallbackData.map(mapDescentralizacaoRow);
         }
 
-        if (!data || data.length === 0) {
-            const fallbackData = await fetchSupabaseRestRows<DescentralizacaoRow>('descentralizacoes', DESCENTRALIZACOES_SELECT, {
-                orderBy: 'data_emissao',
-                filters: { campus_uasg: campusUasg },
-            });
-            return fallbackData.map(mapDescentralizacaoRow);
-        }
+        if (!data || data.length === 0) return [];
 
         return (data as DescentralizacaoRow[]).map(mapDescentralizacaoRow);
     },

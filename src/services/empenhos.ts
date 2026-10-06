@@ -1,5 +1,6 @@
 
 import { supabase } from '@/lib/supabase';
+import { assertSupabaseReadAvailable } from '@/lib/supabaseAvailability';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Empenho } from '@/types';
 import { normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
@@ -91,6 +92,7 @@ export const empenhosService = {
 
         if (error) {
             if (client !== supabase) throw error;
+            assertSupabaseReadAvailable(error);
             console.warn('empenhosService.getAll: fallback para Supabase REST', error);
             const fallbackData = await fetchSupabaseRestRows<EmpenhoRow>('empenhos', EMPENHOS_SELECT, {
                 orderBy: 'created_at',
@@ -99,15 +101,7 @@ export const empenhosService = {
             return fallbackData.map(mapEmpenhoRow);
         }
 
-        if (!data || data.length === 0) {
-            if (client !== supabase) return [];
-            console.warn('empenhosService.getAll: resultado vazio via supabase-js, consultando REST');
-            const fallbackData = await fetchSupabaseRestRows<EmpenhoRow>('empenhos', EMPENHOS_SELECT, {
-                orderBy: 'created_at',
-                filters: { campus_uasg: campusUasg },
-            });
-            return fallbackData.map(mapEmpenhoRow);
-        }
+        if (!data || data.length === 0) return [];
 
         return (data as EmpenhoRow[]).map(mapEmpenhoRow);
     },

@@ -613,19 +613,35 @@ export const suapScraperService = {
 
       const { data: inserted, error: insertError } = await client
         .from('processos')
-        .insert(payload)
-        .select('id')
-        .single();
+        .upsert(payload, { onConflict: 'tenant_id,suap_id', ignoreDuplicates: true })
+        .select('id, suap_id, status, num_processo, pdf_url')
+        .maybeSingle();
 
       if (insertError) throw insertError;
 
+      // Another synchronization may have created the process since the first read.
+      // ON CONFLICT DO NOTHING preserves its extraction state and canonical PDF.
+      let saved = inserted;
+      if (!saved) {
+        const { data: concurrent, error: concurrentError } = await client
+          .from('processos')
+          .select('id, suap_id, status, num_processo, pdf_url')
+          .eq('tenant_id', tenantId)
+          .eq('suap_id', proc.suapId)
+          .single();
+        if (concurrentError) throw concurrentError;
+        saved = concurrent;
+      }
+      existingMap.set(proc.suapId, saved);
+
       synced.push({
         ...proc,
-        processId: inserted.id,
-        already_exists: false,
-        created: true,
-        status: 'pending_extraction',
-        pdfUrl: null,
+        processId: saved.id,
+        already_exists: !inserted,
+        created: Boolean(inserted),
+        status: saved.status,
+        numProcesso: proc.numProcesso || saved.num_processo || undefined,
+        pdfUrl: saved.pdf_url,
       });
     }
 

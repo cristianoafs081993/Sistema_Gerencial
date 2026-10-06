@@ -14,56 +14,66 @@ export function useDataQueries() {
   const auth = useOptionalAuth();
   const campusUasg = auth?.userCampus.codigo ?? DEFAULT_IFRN_CAMPUS_UASG;
   const suapUnitCode = getSuapPlanUnitForCampus(campusUasg).value;
-  const { data: atividades = [], isLoading: isLoadingAtividades } = useQuery({
+  // Failed reads require an explicit retry; focus changes must not flood an outage.
+  const readOptions = { retry: false as const, staleTime: 60_000, refetchOnWindowFocus: false };
+  const atividadesQuery = useQuery({
+    ...readOptions,
     queryKey: [...dataQueryKeys.atividades, campusUasg, suapUnitCode],
     queryFn: () => atividadesService.getAll(campusUasg, suapUnitCode),
   });
 
-  const { data: empenhos = [], isLoading: isLoadingEmpenhos } = useQuery({
+  const empenhosQuery = useQuery({
+    ...readOptions,
     queryKey: [...dataQueryKeys.empenhos, campusUasg],
     queryFn: () => empenhosService.getAll(campusUasg),
   });
 
-  const { data: descentralizacoes = [], isLoading: isLoadingDescentralizacoes } = useQuery({
+  const descentralizacoesQuery = useQuery({
+    ...readOptions,
     queryKey: [...dataQueryKeys.descentralizacoes, campusUasg],
     queryFn: () => descentralizacoesService.getAll(campusUasg),
   });
 
-  const { data: contaDescentralizacoes = [], isLoading: isLoadingContaDescentralizacoes } = useQuery({
+  const contaDescentralizacoesQuery = useQuery({
+    ...readOptions,
     queryKey: [...dataQueryKeys.descentralizacoesContaSaldos, campusUasg],
     queryFn: () => descentralizacoesContaSaldosService.getAll(campusUasg),
   });
 
-  const { data: contratos = [], isLoading: isLoadingContratos } = useQuery({
+  const contratosQuery = useQuery({
+    ...readOptions,
     queryKey: [...dataQueryKeys.contratos, campusUasg],
     queryFn: () => contratosService.getContratos(campusUasg),
   });
 
-  const { data: contratosEmpenhos = [], isLoading: isLoadingContratosEmpenhos } = useQuery({
+  const contratosEmpenhosQuery = useQuery({
+    ...readOptions,
     queryKey: [...dataQueryKeys.contratosEmpenhos, campusUasg],
     queryFn: () => contratosService.getContratosEmpenhos(campusUasg),
   });
 
-  const { data: creditosDisponiveis = [], isLoading: isLoadingCreditos } = useQuery({
+  const creditosDisponiveisQuery = useQuery({
+    ...readOptions,
     queryKey: [...dataQueryKeys.creditosDisponiveis, campusUasg],
     queryFn: () => creditosDisponiveisService.getAll(campusUasg),
   });
 
+  const queries = [atividadesQuery, empenhosQuery, descentralizacoesQuery, contaDescentralizacoesQuery,
+    contratosQuery, contratosEmpenhosQuery, creditosDisponiveisQuery];
+  const names = ['atividades', 'empenhos', 'descentralizações', 'saldos de descentralização',
+    'contratos', 'vínculos de contratos', 'créditos disponíveis'];
+  const errors = queries.flatMap((query, index) => query.isError ? [names[index]] : []);
   return {
-    atividades,
-    empenhos,
-    descentralizacoes,
-    contaDescentralizacoes,
-    contratos,
-    contratosEmpenhos,
-    creditosDisponiveis,
-    isLoading:
-      isLoadingAtividades ||
-      isLoadingEmpenhos ||
-      isLoadingDescentralizacoes ||
-      isLoadingContaDescentralizacoes ||
-      isLoadingContratos ||
-      isLoadingContratosEmpenhos ||
-      isLoadingCreditos,
+    atividades: atividadesQuery.data ?? [],
+    empenhos: empenhosQuery.data ?? [],
+    descentralizacoes: descentralizacoesQuery.data ?? [],
+    contaDescentralizacoes: contaDescentralizacoesQuery.data ?? [],
+    contratos: contratosQuery.data ?? [],
+    contratosEmpenhos: contratosEmpenhosQuery.data ?? [],
+    creditosDisponiveis: creditosDisponiveisQuery.data ?? [],
+    isLoading: queries.some(query => query.isLoading),
+    isRefreshing: queries.some(query => query.isFetching),
+    dataError: errors.length ? `Não foi possível atualizar: ${errors.join(', ')}.` : null,
+    hasInitialDataError: queries.some(query => query.isError && query.data === undefined),
   };
 }

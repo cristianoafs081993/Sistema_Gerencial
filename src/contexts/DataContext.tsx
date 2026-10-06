@@ -34,6 +34,9 @@ interface DataContextType {
   contratosEmpenhos: ContratoEmpenho[];
   creditosDisponiveis: CreditoDisponivel[];
   isLoading: boolean;
+  isRefreshing?: boolean;
+  dataError?: string | null;
+  hasInitialDataError?: boolean;
   addAtividade: (atividade: Omit<Atividade, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateAtividade: (id: string, atividade: Partial<Atividade>) => void;
   deleteAtividade: (id: string) => void;
@@ -65,6 +68,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     contratosEmpenhos,
     creditosDisponiveis,
     isLoading,
+    isRefreshing,
+    dataError,
+    hasInitialDataError,
   } = useDataQueries();
 
   const atividadeMutations = useCrudMutations<
@@ -175,6 +181,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       contratosEmpenhos,
       creditosDisponiveis,
       isLoading,
+      isRefreshing,
+      dataError,
+      hasInitialDataError,
       addAtividade: atividadeMutations.add,
       updateAtividade: atividadeMutations.update,
       deleteAtividade: atividadeMutations.remove,
@@ -201,6 +210,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       contratosEmpenhos,
       creditosDisponiveis,
       isLoading,
+      isRefreshing,
+      dataError,
+      hasInitialDataError,
       atividadeMutations.add,
       atividadeMutations.update,
       atividadeMutations.remove,

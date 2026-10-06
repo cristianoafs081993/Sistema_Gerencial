@@ -1,4 +1,5 @@
 import { getSupabaseEnv } from './env';
+import { supabase } from './supabase';
 
 type RestQueryOptions = {
   orderBy?: string;
@@ -29,11 +30,14 @@ export async function fetchSupabaseRestRows<T>(
     url.searchParams.set(key, `eq.${value}`);
   }
 
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
   const response = await fetch(url.toString(), {
     headers: {
       apikey: supabaseAnonKey,
-      Authorization: `Bearer ${supabaseAnonKey}`,
+      Authorization: `Bearer ${sessionData.session?.access_token ?? supabaseAnonKey}`,
     },
+    signal: AbortSignal.timeout(15_000),
   });
 
   if (!response.ok) {

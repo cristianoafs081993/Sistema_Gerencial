@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { DataProvider, useData } from '@/contexts/DataContext';
 import { atividadesService } from '@/services/atividades';
 import { contratosService } from '@/services/contratos';
@@ -173,6 +173,28 @@ describe('DataContext', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('reports initial read failure instead of treating it as a successful empty dataset', async () => {
+    mockedAtividadesService.getAll.mockRejectedValue(new Error('upstream request timeout'));
+    const { result } = renderHook(() => useData(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.dataError).toContain('atividades'));
+    expect(result.current.hasInitialDataError).toBe(true);
+    expect(mockedAtividadesService.getAll).toHaveBeenCalledOnce();
+  });
+
+  it('preserves cached values and clears the warning after a successful manual retry', async () => {
+    const { result } = renderHook(() => useData(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    mockedAtividadesService.getAll.mockRejectedValue(new Error('upstream request timeout'));
+    await act(async () => { await result.current.refreshData(); });
+    expect(result.current.dataError).toContain('atividades');
+    expect(result.current.hasInitialDataError).toBe(false);
+    expect(result.current.getTotalPlanejado()).toBe(200);
+    mockedAtividadesService.getAll.mockResolvedValue([]);
+    await act(async () => { await result.current.refreshData(); });
+    expect(result.current.dataError).toBeNull();
+    expect(result.current.getTotalPlanejado()).toBe(0);
   });
 
   it('carrega os datasets principais e calcula os indicadores derivados ignorando empenhos cancelados', async () => {

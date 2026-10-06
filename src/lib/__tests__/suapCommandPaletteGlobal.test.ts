@@ -131,6 +131,8 @@ describe('paleta global da extensao Suape', () => {
     const input = openPalette();
     await flushMicrotasks();
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    const localContracts = requests.find(({ url }) => url.pathname.endsWith('/contratos'));
+    expect(localContracts?.url.searchParams.get('select')).toBe('id,numero,contratada,valor,data_inicio,data_termino');
 
     fireEvent.input(input, { target: { value: 'processo 123' } });
     expect(document.body.textContent).toContain('no SUAP Processos');

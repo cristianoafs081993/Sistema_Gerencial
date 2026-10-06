@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { assertSupabaseReadAvailable } from '@/lib/supabaseAvailability';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Contrato } from '@/types';
 import type { ContratoEmpenho } from '@/types';
@@ -231,6 +232,7 @@ export const contratosService = {
 
     if (error) {
       if (client !== supabase) throw error;
+      assertSupabaseReadAvailable(error);
       console.warn('contratosService.getContratos: fallback para Supabase REST', error);
       const fallbackData = await fetchSupabaseRestRows<ContratoRow>('contratos', CONTRATOS_SELECT, {
         orderBy: 'numero',
@@ -240,15 +242,7 @@ export const contratosService = {
       return fallbackData.map(mapContratoRow);
     }
 
-    if (!data || data.length === 0) {
-      if (client !== supabase) return [];
-      const fallbackData = await fetchSupabaseRestRows<ContratoRow>('contratos', CONTRATOS_SELECT, {
-        orderBy: 'numero',
-        ascending: true,
-        filters: { campus_uasg: campusUasg },
-      });
-      return fallbackData.map(mapContratoRow);
-    }
+    if (!data || data.length === 0) return [];
 
     return (data as ContratoRow[]).map(mapContratoRow);
   },
@@ -261,16 +255,13 @@ export const contratosService = {
 
     if (error) {
       if (client !== supabase) throw error;
+      assertSupabaseReadAvailable(error);
       console.warn('contratosService.getContratosEmpenhos: fallback para Supabase REST', error);
       const fallbackData = await fetchSupabaseRestRows<ContratoEmpenhoRow>('contratos_empenhos', CONTRATOS_EMPENHOS_SELECT, { filters: { campus_uasg: campusUasg } });
       return fallbackData.map(mapContratoEmpenhoRow);
     }
 
-    if (!data || data.length === 0) {
-      if (client !== supabase) return [];
-      const fallbackData = await fetchSupabaseRestRows<ContratoEmpenhoRow>('contratos_empenhos', CONTRATOS_EMPENHOS_SELECT, { filters: { campus_uasg: campusUasg } });
-      return fallbackData.map(mapContratoEmpenhoRow);
-    }
+    if (!data || data.length === 0) return [];
 
     return (data as ContratoEmpenhoRow[]).map(mapContratoEmpenhoRow);
   },

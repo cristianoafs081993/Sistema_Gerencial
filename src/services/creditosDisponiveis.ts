@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { assertSupabaseReadAvailable } from '@/lib/supabaseAvailability';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import type { CreditoDisponivel } from '@/types';
 import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
@@ -31,6 +32,8 @@ export const creditosDisponiveisService = {
       .order('ptres', { ascending: true });
 
     if (error) {
+      assertSupabaseReadAvailable(error);
+
       console.warn('creditosDisponiveisService.getAll: fallback para Supabase REST', error);
       const fallbackData = await fetchSupabaseRestRows<CreditoDisponivelRow>(
         'creditos_disponiveis',
@@ -40,14 +43,7 @@ export const creditosDisponiveisService = {
       return fallbackData.map(mapCreditoDisponivelRow);
     }
 
-    if (!data || data.length === 0) {
-      const fallbackData = await fetchSupabaseRestRows<CreditoDisponivelRow>(
-        'creditos_disponiveis',
-        CREDITOS_DISPONIVEIS_SELECT,
-        { orderBy: 'ptres', ascending: true, filters: { campus_uasg: campusUasg } },
-      );
-      return fallbackData.map(mapCreditoDisponivelRow);
-    }
+    if (!data || data.length === 0) return [];
 
     return (data as CreditoDisponivelRow[]).map(mapCreditoDisponivelRow);
   },

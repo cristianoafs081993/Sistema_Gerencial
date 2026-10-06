@@ -759,7 +759,7 @@
       const [empenhosData, contratosApiData, contratosLocaisData] = await Promise.allSettled([
         fetchFromSupabase('empenhos', 'select=id,numero,descricao,valor,natureza_despesa,plano_interno,favorecido_nome,favorecido_documento,valor_liquidado,valor_liquidado_oficial,valor_pago_oficial,valor_liquidado_a_pagar,status,tipo,rap_inscrito,rap_a_liquidar,rap_liquidado,rap_pago,saldo_rap_oficial,processo&order=numero.desc&limit=1500'),
         fetchFromSupabase('contratos_api', 'select=id,api_contrato_id,numero,fornecedor_nome,fornecedor_documento,unidade_codigo,unidade_nome,unidade_origem_codigo,unidade_origem_nome,objeto,processo,vigencia_inicio,vigencia_fim,vigencia_inicio_derivada,vigencia_fim_derivada,valor_global,valor_acumulado,situacao,situacao_derivada,campus_scope_reason,updated_at&situacao_derivada=eq.true&campus_scope_reason=in.(ug_campus,reitoria_com_empenho_campus,reitoria_com_fatura_campus)&order=numero.asc'),
-        fetchFromSupabase('contratos', 'select=id,numero,contratada,objeto,processo,valor,data_inicio,data_termino,status'),
+        fetchFromSupabase('contratos', 'select=id,numero,contratada,valor,data_inicio,data_termino'),
       ]);
 
       if (empenhosData.status === 'fulfilled') {

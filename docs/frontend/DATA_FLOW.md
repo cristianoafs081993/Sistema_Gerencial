@@ -59,6 +59,12 @@ O cadastro de fornecedores do modulo Pesquisa de Precos usa `suppliers` e `suppl
 
 ## Camada 2: origem do dado
 
+### Disponibilidade das leituras centrais
+
+`useDataQueries` preserva os últimos resultados em memória quando uma atualização falha e expõe `dataError`, `hasInitialDataError` e `isRefreshing` pelo `DataContext`. `DataAvailabilityBoundary`, no Layout, avisa que os dados estão indisponíveis e oferece tentativa manual. Quando a primeira leitura falha, as páginas centrais de orçamento/contratos não mostram indicadores ou tabelas vazias como se fossem um resultado válido; páginas de recuperação/importação continuam acessíveis. Com resultado anterior, ele permanece visível com aviso de possível desatualização. O cache mantém o recorte de campus/unidade e não persiste dados entre sessões.
+
+Essas sete consultas usam cache fresco por 60 segundos, sem repetição automática após falha nem atualização ao focar a janela. Timeout, indisponibilidade de conexão/pool ou HTTP 5xx não acionam uma segunda leitura REST ao mesmo backend. Resultado vazio bem-sucedido é aceito sem consulta duplicada. O fallback de compatibilidade restante usa o JWT da sessão ativa e limita o fetch a 15 segundos. A paleta nativa só carrega a busca de contratos quando aberta. Diagnóstico e recuperação: [SUPABASE_RECOVERY](../ops/SUPABASE_RECOVERY.md).
+
 O frontend hoje usa tres padroes principais:
 
 ### Padrao A: DataContext

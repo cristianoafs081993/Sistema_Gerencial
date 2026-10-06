@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { assertSupabaseReadAvailable } from '@/lib/supabaseAvailability';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import type { ContaDescentralizacaoSaldo } from '@/types';
 import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
@@ -39,6 +40,8 @@ export const descentralizacoesContaSaldosService = {
       .order('ptres', { ascending: true });
 
     if (error) {
+      assertSupabaseReadAvailable(error);
+
       console.warn('descentralizacoesContaSaldosService.getAll: fallback para Supabase REST', error);
       const fallbackData = await fetchSupabaseRestRows<ContaDescentralizacaoSaldoRow>(
         'descentralizacoes_conta_saldos',
@@ -48,14 +51,7 @@ export const descentralizacoesContaSaldosService = {
       return fallbackData.map(mapContaDescentralizacaoSaldoRow);
     }
 
-    if (!data || data.length === 0) {
-      const fallbackData = await fetchSupabaseRestRows<ContaDescentralizacaoSaldoRow>(
-        'descentralizacoes_conta_saldos',
-        CONTA_DESCENTRALIZACOES_SELECT,
-        { orderBy: 'ptres', ascending: true, filters: { campus_uasg: campusUasg } },
-      );
-      return fallbackData.map(mapContaDescentralizacaoSaldoRow);
-    }
+    if (!data || data.length === 0) return [];
 
     return (data as ContaDescentralizacaoSaldoRow[]).map(mapContaDescentralizacaoSaldoRow);
   },

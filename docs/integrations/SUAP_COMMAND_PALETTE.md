@@ -19,6 +19,8 @@ Enter abre a consulta na aba atual. `Ctrl+Enter` abre em uma nova aba. A consult
 
 ## Escopo e segurança
 
+A paleta global consulta contratos locais somente pelas colunas existentes (`id`, `numero`, `contratada`, `valor`, `data_inicio`, `data_termino`). Objeto, processo e situação derivados continuam vindo de `contratos_api`; a tabela local não fornece esses campos. A paleta nativa do SIAGES carrega a busca de contratos apenas ao abrir, reduzindo consultas no carregamento inicial.
+
 - A consulta não lê nem armazena dados do SUAP na página de origem.
 - A paleta global pode coexistir com o content script de redação de ETP no Comprasnet.
 - Ações contextuais de processos e comandos de sincronização não são liberados globalmente por esta funcionalidade.

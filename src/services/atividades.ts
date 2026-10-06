@@ -1,5 +1,6 @@
 
 import { supabase } from '@/lib/supabase';
+import { assertSupabaseReadAvailable } from '@/lib/supabaseAvailability';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Atividade } from '@/types';
 import { normalizeActivityName, normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
@@ -95,6 +96,8 @@ export const atividadesService = {
             .order('created_at', { ascending: false });
 
         if (error) {
+            assertSupabaseReadAvailable(error);
+
             console.warn('atividadesService.getAll: fallback para Supabase REST', error);
             const fallbackData = await fetchSupabaseRestRows<AtividadeRow>('atividades', ATIVIDADES_SELECT, {
                 orderBy: 'created_at',
@@ -103,14 +106,7 @@ export const atividadesService = {
             return filterAtividadeRowsForRead(fallbackData, suapUnitCode).map(mapAtividadeRow);
         }
 
-        if (!data || data.length === 0) {
-            console.warn('atividadesService.getAll: resultado vazio via supabase-js, consultando REST');
-            const fallbackData = await fetchSupabaseRestRows<AtividadeRow>('atividades', ATIVIDADES_SELECT, {
-                orderBy: 'created_at',
-                filters: { campus_uasg: campusUasg },
-            });
-            return filterAtividadeRowsForRead(fallbackData, suapUnitCode).map(mapAtividadeRow);
-        }
+        if (!data || data.length === 0) return [];
 
         return filterAtividadeRowsForRead(data as AtividadeRow[], suapUnitCode).map(mapAtividadeRow);
     },
