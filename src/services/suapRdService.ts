@@ -17,6 +17,7 @@ export type RdSyncRun = {
   id: string; runId: string; status: string; complete: boolean; summary: Record<string, number>;
   phase: string; sourceCount: number; processed: number; activitiesProcessed: number; activitiesTotal: number;
   busy?: boolean; error?: string;
+  captureMode?: 'extension' | 'backend'; nextUrl?: string | null;
 };
 
 export const suapRdService = {

@@ -894,4 +894,4 @@ Agendamento Automático:
 
 ## sync-suap-rds
 
-Coleta incremental de RDs e vínculos oficiais do Plano 8 por unidade; revisão incompleta nunca é aplicada. Compartilha a conexão cifrada de `sync-suap-plan`, valida o JWT e superadmin internamente (`verify_jwt=false`), e usa RPCs de aplicação/reversão restritas a service role. Deploy: `supabase functions deploy sync-suap-rds`. Operação: [SUAP_RD_SYNC](SUAP_RD_SYNC.md).
+Coleta incremental de RDs e vínculos oficiais do Plano 8 por unidade; revisão incompleta nunca é aplicada. A extensão fornece cada HTML de acordo com a próxima URL determinada pelo servidor (`sync-extension`/`sync-html`), sem conexão SUAP backend. `units` expõe o catálogo autorizado para o lote das 44 unidades; `sync` preserva compatibilidade com a sessão cifrada de `sync-suap-plan`. Valida JWT e superadmin internamente (`verify_jwt=false`) e usa RPCs de aplicação/reversão restritas a service role. Deploy: `supabase functions deploy sync-suap-rds`. Operação: [SUAP_RD_SYNC](SUAP_RD_SYNC.md).

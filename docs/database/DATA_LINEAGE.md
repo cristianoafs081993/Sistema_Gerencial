@@ -419,4 +419,4 @@ diretamente. Falhas não avançam as datas de sucesso. Ver [operação](../ops/P
 
 ## Linhagem de RDs SUAP
 
-Inventário paginado da unidade + Plano 8 + relação oficial atividade/RD + detalhe RD → `suap_rd_snapshots` → aplicação completa e atômica → `suap_requisicoes_despesa` → views de movimentos/vínculos → dashboard e detalhes do empenho. O ID da atividade vem da URL oficial, nunca do texto. Nenhuma linha dessa cadeia atualiza valores SIAFI. Conferências e limitações: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).
+Extensão na aba SUAP autenticada → inventário paginado da unidade + Plano 8 + relação oficial atividade/RD + detalhe RD → validação/parsing no backend → `suap_rd_snapshots` → aplicação completa e atômica por unidade → `suap_requisicoes_despesa` → views de movimentos/vínculos → dashboard e detalhes do empenho. O lote percorre as 44 unidades e preserva órgão/unidade/UASG em cada execução. O ID da atividade vem da URL oficial, nunca do texto. Nenhuma linha dessa cadeia atualiza valores SIAFI. Conferências e limitações: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

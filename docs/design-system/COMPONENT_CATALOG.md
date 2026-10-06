@@ -201,4 +201,4 @@ Consulte [o fluxo completo](../frontend/CONTRATOS_EMPENHOS_UI.md).
 
 ## RDs SUAP
 
-`SuapRdSyncCard` (Importação de dados) oferece coleta, retomada, prévia e reversão por unidade; `SuapRdPreview` pagina a conferência das RDs; `SuapRdMovements` usa `SectionPanel` no detalhe do empenho para os valores assinados, referências e pendências. Reutilizam os tokens e componentes atuais. Comportamento: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).
+`SuapRdSyncCard` (Importação de dados) acompanha a coleta da extensão e oferece atualização, prévia, aplicação e reversão por unidade; `SuapRdPreview` pagina a conferência das RDs; `SuapRdMovements` usa `SectionPanel` no detalhe do empenho para os valores assinados, referências e pendências. Reutilizam os tokens e componentes atuais. Comportamento: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

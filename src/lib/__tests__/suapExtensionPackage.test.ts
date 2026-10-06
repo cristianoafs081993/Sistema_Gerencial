@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.54');
+    expect(manifest.version).toBe('1.9.55');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms', 'cookies']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
@@ -179,6 +179,12 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(popup).toContain('id="btn-extension-sign-out"');
     expect(popup).toContain('id="btn-extract-en"');
     expect(popup).toContain('id="btn-extract-all"');
+    expect(popup).toContain('Sincronizar plano e RDs de todas as unidades');
+    expect(popup).toContain('id="btn-collect-all-rds"');
+    expect(popup).toContain('id="btn-apply-all-rds"');
+    expect(popupScript).toContain('await startRdCollection(activeTab, captured.unit)');
+    expect(popupScript).toContain('await startAllRdCollection(activeTab)');
+    expect(fs.readFileSync(extensionFixturePath('background.js'), 'utf8')).toContain("importScripts('rd-sync.js')");
     expect(popup).toContain('extension-auth-client.js');
     expect(popup).not.toContain('id="siages-app-origin"');
     expect(popup).not.toContain('id="btn-save-siages-app-origin"');

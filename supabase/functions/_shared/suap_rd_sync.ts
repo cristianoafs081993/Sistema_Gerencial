@@ -6,7 +6,8 @@ type HtmlParser = new () => { parseFromString(html: string, type: string): Docum
 export type RdDatabase = { from(table: string): any; rpc(name: string, args: Record<string, unknown>): PromiseLike<any> };
 type Source = { planId: number; activityId: string; activityName: string; sourceUrl: string };
 export type RdState = {
-  phase: 'inventory' | 'activities' | 'details' | 'verify' | 'ready';
+  phase: 'inventory' | 'plan' | 'activities' | 'details' | 'verify' | 'ready';
+  captureMode?: 'extension' | 'backend';
   nextUrl: string | null; inventory: SuapRdRef[]; total: number | null;
   activities: Array<{ id: string; name: string }>; activityCursor: number;
   activityNextUrl: string | null; sources: Record<string, Source[]>;
@@ -20,6 +21,30 @@ export function rdInventoryUrl(unit: string) { return `${SUAP_RD_ORIGIN}/admin/p
 export function initialRdState(unit: string): RdState {
   return { phase: 'inventory', nextUrl: rdInventoryUrl(unit), inventory: [], total: null,
     activities: [], activityCursor: 0, activityNextUrl: null, sources: {}, detailCursor: 0, verify: [], verifyTotal: null };
+}
+
+/** The server chooses every page; the extension supplies only that page's HTML. */
+export function nextRdCaptureUrl(run: RdRun): string | null {
+  const state = run.state;
+  if (state.phase === 'activities' && state.activityCursor >= state.activities.length) state.phase = 'details';
+  if (state.phase === 'details' && state.detailCursor >= state.inventory.length) {
+    state.phase = 'verify'; state.nextUrl = rdInventoryUrl(run.suap_unit_code);
+  }
+  if (state.phase === 'inventory' || state.phase === 'verify') return state.nextUrl;
+  if (state.phase === 'plan') return buildSuapPlanSourceUrl(run.suap_unit_code);
+  if (state.phase === 'activities') return state.activityNextUrl ?? `${SUAP_RD_ORIGIN}/plan_estrategico/listar_requisicoes_despesa/8/${state.activities[state.activityCursor].id}/`;
+  if (state.phase === 'details') return `${SUAP_RD_ORIGIN}/plan_estrategico/detalhar_requisicaodespesa/${state.inventory[state.detailCursor].rdId}/`;
+  return null;
+}
+
+export async function collectCapturedRdPage(db: RdDatabase, run: RdRun, html: unknown, sourceUrl: unknown, Parser: HtmlParser) {
+  const expected = nextRdCaptureUrl(structuredClone(run));
+  if (!expected || sourceUrl !== expected) throw new Error('Página diferente da etapa esperada; consulte o estado e retome a coleta.');
+  if (typeof html !== 'string' || !html.trim() || new TextEncoder().encode(html).byteLength > 15 * 1024 * 1024) throw new Error('HTML SUAP ausente ou maior que 15 MB.');
+  await collectRdChunk(db, run, async url => {
+    if (url !== expected) throw new Error('Etapa de captura divergente.');
+    return html;
+  }, Parser, 1);
 }
 
 export async function fetchSuapRdHtml(url: string, cookie: string, fetcher: typeof fetch = fetch): Promise<string> {
@@ -62,6 +87,8 @@ export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: str
   for (let index = 0; index < steps && state.phase !== 'ready' && Date.now() < deadline; index++) {
     const before = structuredClone(state);
     try {
+    const captureUrl = nextRdCaptureUrl(run);
+    if (!captureUrl) break;
     if (state.phase === 'inventory' || state.phase === 'verify') {
       const page = parseSuapRdList(await load(state.nextUrl!), state.nextUrl!, run.suap_unit_code, Parser);
       const verify = state.phase === 'verify';
@@ -74,17 +101,16 @@ export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: str
         if (verify) {
           if (signature(state.inventory) !== signature(state.verify)) throw new Error('RDs alteradas durante a coleta; inicie nova conferência.');
           state.phase = 'ready';
-        } else {
-          const url = buildSuapPlanSourceUrl(run.suap_unit_code);
-          const html = await load(url);
+        } else state.phase = 'plan';
+      }
+    } else if (state.phase === 'plan') {
+          const html = await load(captureUrl);
           const document = new Parser().parseFromString(html, 'text/html');
           const selected = document?.querySelector('#id_unidade_gestora option[selected]');
           if (!selected || selected.getAttribute('value') !== run.suap_unit_code) throw new Error('Plano retornou outra unidade SUAP.');
           const plan = parseSuapPlanHtml(html, Parser);
           state.activities = plan.activities.map(activity => ({ id: activity.suapActivityId, name: activity.atividade }));
           state.phase = 'activities';
-        }
-      }
     } else if (state.phase === 'activities') {
       const activity = state.activities[state.activityCursor];
       if (!activity) { state.phase = 'details'; continue; }

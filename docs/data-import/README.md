@@ -118,4 +118,4 @@ A página `/importacao-dados` possui uma **Central de Observabilidade** integrad
 
 ## Captura de RDs SUAP
 
-A página Importação de dados inclui `SuapRdSyncCard` para superadmin. Usa a conexão cifrada do planejamento, captura todas as páginas/situações e atividades do Plano 8 e oferece prévia, aplicação explícita e reversão. Não é um upload CSV/XLSX/PDF. Consulte [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).
+A extensão Suape 1.9.55 captura todas as páginas/situações e atividades do Plano 8 na aba autenticada, por unidade ou no lote das 44 unidades. A página Importação de dados inclui `SuapRdSyncCard` para superadmin acompanhar e atualizar a conferência, com prévia, aplicação explícita e reversão. Dispensa conexão SUAP no backend para a coleta por HTML. Não é um upload CSV/XLSX/PDF. Consulte [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

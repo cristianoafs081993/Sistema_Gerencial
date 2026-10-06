@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeAll } from 'vitest';
 beforeAll(() => { if (!AbortSignal.timeout) Object.defineProperty(AbortSignal, 'timeout', { value: () => new AbortController().signal, configurable:true }); });
-import { collectRdChunk, fetchSuapRdHtml, initialRdState, type RdRun } from '../../../supabase/functions/_shared/suap_rd_sync';
+import { collectCapturedRdPage, collectRdChunk, fetchSuapRdHtml, initialRdState, nextRdCaptureUrl, type RdRun } from '../../../supabase/functions/_shared/suap_rd_sync';
 import { activityUrl, detailHtml, listHtml, planHtml, rdListUrl } from './suapRdFixtures';
 
 const makeRun = (): RdRun => ({ id:'run',org_id:'org',user_id:'user',campus_uasg:'158366',suap_unit_code:'19',status:'collecting',state:initialRdState('19'),source_count:0,summary:{},complete:false });
@@ -17,10 +17,12 @@ describe('Coleta incremental de RDs', () => {
     expect(upsert).toHaveBeenCalledOnce();
     expect(upsert.mock.calls[0][0].payload.sources).toEqual([expect.objectContaining({ activityId:'32635',planId:8 })]);
   });
-  it('preserva o cursor anterior se o plano falhar após a última página; a retomada lê a página novamente', async () => {
+  it('preserva o inventário se a captura seguinte do plano falhar; a retomada pede somente o plano', async () => {
     const run = makeRun();
+    await collectRdChunk({ from:vi.fn(),rpc:vi.fn() },run,async()=>listHtml(),DOMParser,1);
     await expect(collectRdChunk({ from:vi.fn(),rpc:vi.fn() },run,async url => { if (url.includes('plano_concluido')) throw new Error('Sessão do SUAP expirada.'); return listHtml(); },DOMParser,1)).rejects.toThrow('Sessão');
-    expect(run.state).toEqual(initialRdState('19'));
+    expect(run.state.phase).toBe('plan'); expect(run.state.inventory).toHaveLength(1);
+    expect(nextRdCaptureUrl(run)).toContain('plano_concluido');
   });
   it('não conclui captura se uma página final muda ou repete RDs', async () => {
     const run = makeRun(); run.state.phase='verify'; run.state.inventory=[{rdId:'1',numero:'2026RD003731',situacao:'Concluída',tipo:'Reforço de empenho'}];
@@ -33,5 +35,22 @@ describe('Coleta incremental de RDs', () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(null,{status:302,headers:{location:'https://evil.test/'}}));
     await expect(fetchSuapRdHtml(rdListUrl,'session-test',fetcher)).rejects.toThrow('externo');
     fetcher.mockClear(); await expect(fetchSuapRdHtml('https://evil.test','session-test',fetcher)).rejects.toThrow('URL'); expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('aceita uma página por etapa da extensão e rejeita URL externa, de outro campus ou fora da ordem', async () => {
+    const run = makeRun(); const db = { from:vi.fn(),rpc:vi.fn() };
+    for (const url of ['https://evil.test/',rdListUrl.replace('19','25'),activityUrl]) {
+      await expect(collectCapturedRdPage(db,run,listHtml(),url,DOMParser)).rejects.toThrow('esperada');
+      expect(run.state).toEqual(initialRdState('19'));
+    }
+    await collectCapturedRdPage(db,run,listHtml(),rdListUrl,DOMParser);
+    expect(run.state.phase).toBe('plan'); expect(run.state.inventory).toHaveLength(1);
+    await expect(collectCapturedRdPage(db,run,listHtml(),rdListUrl,DOMParser)).rejects.toThrow('esperada');
+  });
+  it('não avança com HTML ausente, excessivo ou de outra unidade', async () => {
+    const run = makeRun(); const db = { from:vi.fn(),rpc:vi.fn() };
+    for (const html of ['', 'ç'.repeat(8*1024*1024), listHtml().replace('DG/CN','DG/JUC')]) {
+      await expect(collectCapturedRdPage(db,run,html,rdListUrl,DOMParser)).rejects.toThrow();
+      expect(run.state).toEqual(initialRdState('19'));
+    }
   });
 });

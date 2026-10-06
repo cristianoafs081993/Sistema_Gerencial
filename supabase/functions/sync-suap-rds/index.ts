@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { DOMParser } from 'npm:linkedom@0.18.13';
-import { getSuapPlanUnit } from '../../../src/lib/suapPlanUnits.ts';
-import { collectRdChunk, fetchSuapRdHtml, initialRdState, summarizeRdPreview, type RdRun } from '../_shared/suap_rd_sync.ts';
+import { getSuapPlanUnit, SUAP_PLAN_UNITS } from '../../../src/lib/suapPlanUnits.ts';
+import { collectCapturedRdPage, collectRdChunk, fetchSuapRdHtml, initialRdState, nextRdCaptureUrl, summarizeRdPreview, type RdRun } from '../_shared/suap_rd_sync.ts';
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization,apikey,content-type,x-client-info', 'Access-Control-Allow-Methods': 'POST,OPTIONS' };
 const reply = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
@@ -33,9 +33,11 @@ Deno.serve(async request => {
     if (roleError || !admin) return reply({ error:'Somente o superadministrador pode sincronizar RDs.' },403);
     const body = await request.json();
     const action = body.action ?? 'sync';
+    if (action === 'units') return reply({ units: SUAP_PLAN_UNITS });
     const unit = getSuapPlanUnit(body.suapUnitCode ?? '19');
     if (!unit || body.campusUasg && body.campusUasg !== unit.parentUasg) return reply({ error:'Campus e unidade SUAP incompatíveis.' },400);
-    if (!['sync','status','apply','discard','revert'].includes(action)) return reply({ error:'Ação inválida.' },400);
+    if (!['sync','sync-extension','sync-html','status','apply','discard','revert'].includes(action)) return reply({ error:'Ação inválida.' },400);
+    if (action === 'sync-html' && !body.runId) return reply({ error:'Informe a execução da captura.' },400);
     let query = service.from('suap_rd_sync_runs').select('*').eq('org_id',membership.org_id).eq('suap_unit_code',unit.value).eq('campus_uasg',unit.parentUasg).eq('user_id',user.id);
     if (body.runId) query = query.eq('id',body.runId);
     else query = query.order('started_at',{ ascending:false }).limit(1);
@@ -67,6 +69,7 @@ Deno.serve(async request => {
       if (error) throw error; return reply({ status:'reverted',runId:run.id,summary:data });
     }
     if (run?.status === 'preview') return reply(publicRun(run));
+    if (action === 'sync-html' && (!run || ['applied','failed','reverted'].includes(run.status))) return reply({ error:'Captura encerrada; inicie outra conferência.' },409);
     if (!run || ['applied','failed','reverted'].includes(run.status)) {
       const created = await service.from('suap_rd_sync_runs').insert({ org_id:membership.org_id,user_id:user.id,
         campus_uasg:unit.parentUasg,suap_unit_code:unit.value,state:initialRdState(unit.value) }).select('*').single();
@@ -78,12 +81,19 @@ Deno.serve(async request => {
       .eq('id',run.id).or(`lease_until.is.null,lease_until.lt.${new Date().toISOString()}`).select('id').maybeSingle();
     if (claimed.error) throw claimed.error;
     if (!claimed.data) { lease=null; return reply({ ...publicRun(run),busy:true }); }
+    if (action === 'sync-extension' || action === 'sync-html') {
+      run.state.captureMode = 'extension';
+      if (action === 'sync-html') await collectCapturedRdPage(service,run,body.html,body.sourceUrl,DOMParser as unknown as new()=>globalThis.DOMParser);
+      nextRdCaptureUrl(run);
+    } else {
+    if (run.state.captureMode === 'extension') throw new Error('Retome a captura pela extensão na aba autenticada do SUAP.');
     const { data:connection,error } = await service.from('suap_connections').select('session_ciphertext')
       .eq('user_id',user.id).eq('org_id',membership.org_id).is('revoked_at',null).gt('expires_at',new Date().toISOString()).order('expires_at',{ ascending:false }).limit(1).maybeSingle();
     if (error) throw error;
     if (!connection) throw new Error('Sessão do SUAP expirada. Conecte-se pelo cartão de planejamento.');
     const cookie = await decryptSession(connection.session_ciphertext);
     await collectRdChunk(service,run,url=>fetchSuapRdHtml(url,cookie),DOMParser as unknown as new()=>globalThis.DOMParser);
+    }
     const ready = run.state.phase === 'ready';
     const summary = ready ? await summarizeRdPreview(service,run) : run.summary;
     const saved = await service.from('suap_rd_sync_runs').update({ state:run.state,summary,source_count:run.state.inventory.length,
@@ -105,5 +115,6 @@ function publicRun(run: RdRun) {
   return { id:run.id,runId:run.id,status:run.status,complete:run.complete,summary:run.summary,
     error:run.error_message,startedAt:run.started_at,updatedAt:run.updated_at,
     phase:run.state.phase,sourceCount:run.state.inventory.length,processed:run.state.detailCursor,
+    captureMode:run.state.captureMode ?? 'backend',nextUrl:nextRdCaptureUrl(structuredClone(run)),
     activitiesProcessed:run.state.activityCursor,activitiesTotal:run.state.activities.length };
 }

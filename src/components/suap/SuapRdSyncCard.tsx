@@ -7,8 +7,8 @@ import { suapRdService, type RdSyncRun } from '@/services/suapRdService';
 import { SuapRdPreview } from './SuapRdPreview';
 import { formatCurrency } from '@/lib/utils';
 
-const labels: Record<string, string> = { collecting: 'Coletando', partial: 'Coleta incompleta', awaiting_auth: 'Reconecte-se ao SUAP', preview: 'Conferência pronta', applied: 'Aplicada', reverted: 'Revertida', failed: 'Descartada ou falhou' };
-const phases: Record<string, string> = { inventory: 'Inventário de RDs', activities: 'Relações oficiais de atividades', details: 'Detalhes das RDs', verify: 'Conferência final do inventário', ready: 'Captura completa' };
+const labels: Record<string, string> = { collecting: 'Captura em andamento ou aguardando retomada', partial: 'Coleta incompleta', awaiting_auth: 'Entre novamente no SUAP e retome pela extensão', preview: 'Conferência pronta', applied: 'Aplicada', reverted: 'Revertida', failed: 'Descartada ou falhou' };
+const phases: Record<string, string> = { inventory: 'Inventário de RDs', plan: 'Plano de atividades da unidade', activities: 'Relações oficiais de atividades', details: 'Detalhes das RDs', verify: 'Conferência final do inventário', ready: 'Captura completa' };
 export function SuapRdSyncCard({ campusUasg = '158366', onSynced }: { campusUasg?: string; onSynced: () => void }) {
   const auth = useOptionalAuth();
   const [unit, setUnit] = useState(getSuapPlanUnitForCampus(campusUasg).value);
@@ -16,7 +16,6 @@ export function SuapRdSyncCard({ campusUasg = '158366', onSynced }: { campusUasg
   const [appliedRun, setAppliedRun] = useState<RdSyncRun | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const stopped = useRef(false);
   const scope = useRef('');
   scope.current = `${campusUasg}:${unit}`;
   useEffect(() => { setUnit(getSuapPlanUnitForCampus(campusUasg).value); }, [campusUasg]);
@@ -24,31 +23,19 @@ export function SuapRdSyncCard({ campusUasg = '158366', onSynced }: { campusUasg
     let live = true; setRun(null); setAppliedRun(null); setMessage('');
     if (auth?.isSuperAdmin) suapRdService.action('status', unit, campusUasg).then(result => { if (live) { setRun(result.run ?? null); setAppliedRun(result.appliedRun ?? (result.run?.status === 'applied' ? result.run : null)); } })
       .catch(error => { if (live) setMessage(error.message); });
-    return () => { live = false; stopped.current = true; };
+    return () => { live = false; };
   }, [auth?.isSuperAdmin, unit, campusUasg]);
   if (!auth?.isSuperAdmin) return null;
-  const perform = async (action: 'sync' | 'apply' | 'discard' | 'revert') => {
+  const perform = async (action: 'status' | 'apply' | 'discard' | 'revert') => {
     const currentScope = scope.current;
-    stopped.current = false; setBusy(true); setMessage('');
+    setBusy(true); setMessage('');
     try {
-      let result = await suapRdService.action(action, unit, campusUasg, action === 'revert' ? appliedRun?.id : action === 'sync' && ['applied','failed','reverted'].includes(run?.status ?? '') ? undefined : run?.id);
+      if (action !== 'status') await suapRdService.action(action, unit, campusUasg, action === 'revert' ? appliedRun?.id : run?.id);
+      const status = await suapRdService.action('status', unit, campusUasg);
       if (scope.current !== currentScope) return;
-      if (action === 'sync') {
-        setRun(result);
-        while (result.status === 'collecting' && !stopped.current) {
-          if (result.busy) { setMessage('Outra coleta está em andamento. Retome após sua conclusão.'); break; }
-          result = await suapRdService.action('sync', unit, campusUasg, result.id);
-          if (scope.current !== currentScope) return;
-          setRun(result);
-        }
-        if (stopped.current) setMessage('Coleta pausada. Os detalhes já capturados serão reutilizados ao retomar.');
-      } else {
-        const status = await suapRdService.action('status', unit, campusUasg);
-        if (scope.current !== currentScope) return;
-        setRun(status.run ?? null);
-        setAppliedRun(status.appliedRun ?? (status.run?.status === 'applied' ? status.run : null));
-        if (action === 'apply' || action === 'revert') onSynced();
-      }
+      setRun(status.run ?? null);
+      setAppliedRun(status.appliedRun ?? (status.run?.status === 'applied' ? status.run : null));
+      if (action === 'apply' || action === 'revert' || action === 'status' && status.run?.status === 'applied') onSynced();
     } catch (error) {
       if (scope.current !== currentScope) return;
       setMessage(error instanceof Error ? error.message : 'Falha ao coletar RDs.');
@@ -57,7 +44,8 @@ export function SuapRdSyncCard({ campusUasg = '158366', onSynced }: { campusUasg
     } finally { setBusy(false); }
   };
   return <Card><CardHeader><CardTitle>Requisições de despesas — atividades e movimentações</CardTitle></CardHeader><CardContent className="space-y-4">
-    <p className="text-sm text-muted-foreground">Utiliza a conexão SUAP do cartão de planejamento. A coleta inclui todas as páginas e situações; somente RDs concluídas com linhas confirmadas compõem os valores. A aplicação substitui a captura anterior desta unidade e pode ser revertida.</p>
+    <p className="text-sm text-muted-foreground">Na extensão Suape, abra o SUAP autenticado e use Sincronizar Plano 8 e RDs da unidade ou Sincronizar plano e RDs de todas as unidades. A coleta utiliza a sessão da aba e pode ser retomada pela extensão. Depois, atualize esta conferência para revisar e aplicar as RDs de cada unidade.</p>
+    <p className="text-sm text-muted-foreground">A coleta inclui todas as páginas e situações; somente RDs concluídas com linhas confirmadas compõem os valores. A aplicação substitui a captura anterior desta unidade e pode ser revertida.</p>
     <label className="block text-sm">Unidade SUAP / campus
       <select className="mt-1 block w-full rounded-md border border-input bg-background p-2" disabled={busy} value={unit} onChange={e => setUnit(e.target.value)}>
         {SUAP_PLAN_UNITS.filter(item => item.parentUasg === campusUasg).map(item => <option key={item.value} value={item.value}>{item.code} — {item.label} · UASG {item.parentUasg}</option>)}
@@ -72,8 +60,7 @@ export function SuapRdSyncCard({ campusUasg = '158366', onSynced }: { campusUasg
     {run?.status === 'preview' && <SuapRdPreview key={run.id} runId={run.id} campus={campusUasg} unit={unit} />}
     {message && <p role="alert" className="text-sm text-status-warning">{message}</p>}
     <div className="flex flex-wrap gap-2">
-      <Button disabled={busy || run?.status === 'preview'} onClick={() => perform('sync')}>{['collecting','partial','awaiting_auth'].includes(run?.status ?? '') ? 'Retomar coleta de RDs' : 'Coletar RDs para conferência'}</Button>
-      {busy && <Button variant="outline" onClick={() => { stopped.current = true; }}>Pausar após esta etapa</Button>}
+      <Button disabled={busy} onClick={() => perform('status')}>Atualizar conferência das RDs</Button>
       {run?.status === 'preview' && <Button disabled={busy || !run.complete} onClick={() => perform('apply')}>Aplicar captura completa</Button>}
       {run && ['collecting','partial','awaiting_auth','preview'].includes(run.status) && <Button variant="outline" disabled={busy} onClick={() => perform('discard')}>Descartar conferência</Button>}
       {appliedRun && <Button variant="outline" disabled={busy} onClick={() => perform('revert')}>Reverter última aplicação</Button>}

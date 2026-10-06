@@ -15,6 +15,15 @@ const statusEl = document.getElementById('status');
 const btnExtractEn = document.getElementById('btn-extract-en');
 const btnExtractAll = document.getElementById('btn-extract-all');
 const btnApplyPlan = document.getElementById('btn-apply-plan');
+const btnCollectRds = document.getElementById('btn-collect-rds');
+const btnApplyRds = document.getElementById('btn-apply-rds');
+const btnPauseRds = document.getElementById('btn-pause-rds');
+const rdStatusEl = document.getElementById('rd-sync-status');
+const rdAllStatusEl = document.getElementById('rd-all-sync-status');
+const btnCollectAllRds = document.getElementById('btn-collect-all-rds');
+const btnApplyAllRds = document.getElementById('btn-apply-all-rds');
+const btnPauseAllRds = document.getElementById('btn-pause-all-rds');
+let rdUnit = null;
 const automationSecretInput = document.getElementById('automation-secret');
 const extensionAuthEmailInput = document.getElementById('extension-auth-email');
 const extensionAuthPasswordInput = document.getElementById('extension-auth-password');
@@ -166,11 +175,81 @@ async function capturePlanHtml(tab) {
   if (!tab?.id) throw new Error('Nao foi possivel acessar a aba do SUAP.');
   const results = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
-    func: () => ({ url: window.location.href, html: document.documentElement?.outerHTML || '' }),
+    func: () => ({ url: window.location.href, html: document.documentElement?.outerHTML || '', unit: document.querySelector('#id_unidade_gestora')?.value || new URL(window.location.href).searchParams.get('unidade_gestora') || '19' }),
   });
   const captured = results?.[0]?.result;
   if (!captured?.html) throw new Error('A pagina do SUAP ainda nao terminou de carregar. Recarregue e tente novamente.');
   return captured;
+}
+
+async function rdMessage(type, extra = {}) {
+  if (!rdUnit && extra.scope !== 'all') throw new Error('Abra o Plano 8 ou a lista de RDs da unidade no SUAP.');
+  const response = await chrome.runtime.sendMessage({ source: 'siages-extension-rd-sync', type, unit: rdUnit, ...extra });
+  if (!response?.ok) throw new Error(response?.error || 'Não foi possível acionar a coleta de RDs.');
+  return response;
+}
+
+async function updateAllRdStatus() {
+  const { status, running } = await rdMessage('status', { scope: 'all' });
+  const entries = status?.results || [];
+  const previews = entries.filter(entry => entry.run?.status === 'preview' && entry.run.complete);
+  const applied = entries.filter(entry => entry.run?.status === 'applied');
+  const failed = entries.filter(entry => entry.error);
+  btnApplyAllRds.hidden = !previews.length || running;
+  btnPauseAllRds.hidden = !running;
+  btnCollectAllRds.disabled = running;
+  btnApplyAllRds.textContent = `Aplicar RDs de ${previews.length} unidade(s) conferida(s)`;
+  const current = status?.currentUnit ? ` Unidade atual: ${status.currentUnit.code} (${status.currentUnit.parentUasg}).` : '';
+  const errors = failed.length ? ` Falhas: ${failed.map(entry => `${entry.code}: ${entry.error}`).join('; ')}` : '';
+  rdAllStatusEl.textContent = status?.error || (status
+    ? `${running ? 'Coletando' : status.paused ? 'Lote pausado' : 'Lote de RDs'}: ${entries.length}/${status.total || 0} unidades; ${previews.length} conferências completas; ${applied.length} aplicadas.${current}${errors} Confira cada unidade no SIAGES antes de aplicar.`
+    : 'Todas as unidades: captura separada por unidade e campus, com conferência antes da aplicação.');
+}
+
+async function updateRdStatus() {
+  if (!rdUnit) return;
+  const result = await rdMessage('status');
+  const status = result.status;
+  const run = status?.run;
+  const running = result.running;
+  btnApplyRds.hidden = run?.status !== 'preview' || !run?.complete || running;
+  btnPauseRds.hidden = !running;
+  btnCollectRds.disabled = running;
+  const totals = run?.summary;
+  const currency = value => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  rdStatusEl.textContent = status?.error || (run?.status === 'preview'
+    ? `Captura completa da unidade ${rdUnit}: ${totals?.rds || 0} RDs. Dotação ${currency(totals?.totalDotacao)}, reforços ${currency(totals?.totalReforco)}, anulações ${currency(totals?.totalAnulacao)}. Confira os detalhes no SIAGES antes de aplicar.`
+    : run?.status === 'applied' ? `RDs da unidade ${rdUnit} aplicadas no SIAGES.`
+    : run ? `${running ? 'Coletando' : 'Coleta pausada ou interrompida'} — unidade ${rdUnit}: ${run.processed || 0}/${run.sourceCount || 0} RDs; ${run.activitiesProcessed || 0}/${run.activitiesTotal || 0} atividades. ${running ? 'Mantenha a aba SUAP aberta.' : 'Clique em coletar / retomar.'}`
+    : `Unidade SUAP ${rdUnit}. A coleta usa sua sessão nesta aba.`);
+}
+
+async function startRdCollection(tab, unit) {
+  if (!/^\d+$/.test(String(unit))) throw new Error('Selecione a unidade SUAP antes de sincronizar.');
+  rdUnit = String(unit);
+  await rdMessage('start', { tabId: tab.id });
+  await updateRdStatus();
+  log('Coleta de RDs iniciada pela aba autenticada. O popup pode ser fechado; acompanhe e aplique a conferência das RDs ao reabri-lo ou no SIAGES.', 'info');
+}
+
+async function initializeRdControls() {
+  await updateAllRdStatus();
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.url || new URL(tab.url).origin !== 'https://suap.ifrn.edu.br') return;
+  const results = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => ({
+    unit: document.querySelector('#id_unidade_gestora')?.value || new URL(location.href).searchParams.get('unidade_gestora') || '',
+  }) });
+  const unit = results?.[0]?.result?.unit;
+  if (!/^\d+$/.test(String(unit))) return;
+  rdUnit = String(unit);
+  btnCollectRds.disabled = false;
+  await updateRdStatus();
+}
+
+async function startAllRdCollection(tab) {
+  await rdMessage('start', { scope: 'all', tabId: tab.id });
+  await updateAllRdStatus();
+  log('Coleta de RDs de todas as unidades iniciada pela aba SUAP autenticada. Falhas ficam identificadas por unidade; a aplicação continua explícita.', 'info');
 }
 
 async function sendCapturedPlanSync(captured) {
@@ -614,6 +693,7 @@ async function handleExtraction(scope = 'campus') {
       } else {
         log(`Sincronizacao concluida: ${result.inserted || 0} novas, ${result.updated || 0} atualizadas, ${result.archived || 0} arquivadas.`, 'success');
       }
+      await startRdCollection(activeTab, captured.unit);
       return;
     }
 
@@ -630,6 +710,7 @@ async function handleExtraction(scope = 'campus') {
       if (result.status === 'preview' || result.status === 'partial') {
         log('Prévia concluída. Clique em Aplicar conferencia para materializar os dados no SIAGES.', 'info');
       }
+      await startAllRdCollection(activeTab);
       return;
     }
 
@@ -671,3 +752,34 @@ siafiFillButton?.addEventListener('click', () => { void handleSiafiFill(); });
 
 void updatePlanPreviewButton();
 void initializeSiafiFiller();
+void initializeRdControls().catch(error => { rdStatusEl.textContent = formatExtensionAuthError(error); });
+chrome.storage.onChanged?.addListener((changes, area) => {
+  if (area === 'local' && rdUnit && changes[`siages-suap-rd-status:${rdUnit}`]) void updateRdStatus().catch(error => { rdStatusEl.textContent = formatExtensionAuthError(error); });
+  if (area === 'local' && changes['siages-suap-rd-status:all']) void updateAllRdStatus().catch(error => { rdAllStatusEl.textContent = formatExtensionAuthError(error); });
+});
+btnCollectRds.addEventListener('click', async () => {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    await startRdCollection(tab, rdUnit);
+  } catch (error) { rdStatusEl.textContent = formatExtensionAuthError(error); }
+});
+btnPauseRds.addEventListener('click', () => { void rdMessage('pause').catch(error => { rdStatusEl.textContent = formatExtensionAuthError(error); }); });
+btnApplyRds.addEventListener('click', async () => {
+  btnApplyRds.disabled = true;
+  try { await rdMessage('apply'); await updateRdStatus(); }
+  catch (error) { rdStatusEl.textContent = formatExtensionAuthError(error); }
+  finally { btnApplyRds.disabled = false; }
+});
+btnCollectAllRds.addEventListener('click', async () => {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    await startAllRdCollection(tab);
+  } catch (error) { rdAllStatusEl.textContent = formatExtensionAuthError(error); }
+});
+btnPauseAllRds.addEventListener('click', () => { void rdMessage('pause', { scope: 'all' }).catch(error => { rdAllStatusEl.textContent = formatExtensionAuthError(error); }); });
+btnApplyAllRds.addEventListener('click', async () => {
+  btnApplyAllRds.disabled = true;
+  try { await rdMessage('apply', { scope: 'all' }); await updateAllRdStatus(); }
+  catch (error) { rdAllStatusEl.textContent = formatExtensionAuthError(error); }
+  finally { btnApplyAllRds.disabled = false; }
+});

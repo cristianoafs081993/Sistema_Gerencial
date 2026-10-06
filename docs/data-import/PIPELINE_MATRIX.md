@@ -42,6 +42,6 @@
 
 | Entrada | Página / componente | Parser / integração | Destino |
 | --- | --- | --- | --- |
-| HTML autenticado do inventário, atividade e detalhe RD | `ImportacaoDados` / `SuapRdSyncCard` | `suapRdParser` / `sync-suap-rds` | `suap_rd_snapshots` e `suap_requisicoes_despesa`; views de movimentos e vínculos |
+| HTML autenticado do inventário, atividade e detalhe RD pela extensão (individual ou 44 unidades) | Popup Suape 1.9.55; `ImportacaoDados` / `SuapRdSyncCard` acompanha e confere | `suapRdParser` / `sync-suap-rds` | `suap_rd_snapshots` e `suap_requisicoes_despesa`; views de movimentos e vínculos |
 
 Prévia completa obrigatória, retomada, escopo campus/unidade e saldos preservados: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

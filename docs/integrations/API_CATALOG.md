@@ -776,4 +776,4 @@ Camada determinística de domínio e ferramentas agênticas baseadas no Model Co
 
 ## sync-suap-rds
 
-`POST /functions/v1/sync-suap-rds`: ações `sync`, `status`, `apply`, `discard`, `revert`, com JWT SIAGES validado internamente e permissão superadmin. Reutiliza `suap_connections` válido; só aceita unidade catalogada e UASG compatível. URLs SUAP são construídas pelo servidor. Contrato, tipos e prévia: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).
+`POST /functions/v1/sync-suap-rds`: ações `units`, `sync-extension`, `sync-html`, `status`, `apply`, `discard`, `revert` e `sync` (compatibilidade backend), com JWT SIAGES validado internamente e permissão superadmin. A extensão captura na aba SUAP autenticada; o backend determina a próxima URL e valida HTML, campus e cursor. O lote da extensão percorre as 44 unidades, com prévia/aplicação por unidade. A coleta por HTML dispensa `suap_connections`. Contrato, tipos e prévia: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

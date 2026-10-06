@@ -164,9 +164,21 @@
     Segredo de automação
     <input id="automation-secret" type="password" autocomplete="off" placeholder="AUTOMATION_EVENT_SECRET">
   </label>
-  <button id="btn-extract-en">Sincronizar Plano 8</button>
-  <button id="btn-extract-all" class="secondary">Sincronizar todas as unidades</button>
+  <button id="btn-extract-en">Sincronizar Plano 8 e RDs da unidade</button>
+  <button id="btn-extract-all" class="secondary">Sincronizar plano e RDs de todas as unidades</button>
   <button id="btn-apply-plan" class="secondary" type="button" hidden>Aplicar conferencia</button>
+  <section class="auth-card" aria-labelledby="rd-sync-title">
+    <h3 id="rd-sync-title">Requisições de despesas</h3>
+    <p id="rd-sync-status" aria-live="polite">Abra o Plano 8 ou a lista de RDs da unidade no SUAP. A captura inclui todas as situações e os detalhes de cada RD.</p>
+    <button id="btn-collect-rds" class="secondary" type="button" disabled>Coletar / retomar RDs desta unidade</button>
+    <button id="btn-pause-rds" class="secondary" type="button" hidden>Pausar coleta de RDs</button>
+    <button id="btn-apply-rds" type="button" hidden>Aplicar conferência das RDs</button>
+    <a href="https://www.siages.com.br/importacao-dados" target="_blank" rel="noopener noreferrer">Conferir RDs no SIAGES</a>
+    <p id="rd-all-sync-status" aria-live="polite">Todas as unidades: captura separada por unidade e campus, com conferência antes da aplicação.</p>
+    <button id="btn-collect-all-rds" class="secondary" type="button">Coletar / retomar RDs de todas as unidades</button>
+    <button id="btn-pause-all-rds" class="secondary" type="button" hidden>Pausar lote de RDs</button>
+    <button id="btn-apply-all-rds" type="button" hidden>Aplicar RDs das unidades conferidas</button>
+  </section>
   <div id="status"></div>
   <script src="extension-auth-client.js"></script>
   <script src="popup.js"></script>

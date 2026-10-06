@@ -1,4 +1,5 @@
 if (typeof importScripts === 'function') importScripts('scheduled-process-sync.js');
+if (typeof importScripts === 'function') importScripts('rd-sync.js');
 
 const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
@@ -326,6 +327,16 @@ async function handleProcessRegistryMessage(message, sender) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.source === 'siages-extension-rd-sync') {
+    if (sender?.url !== chrome.runtime.getURL('popup.html')) {
+      sendResponse({ ok: false, error: 'Acione a coleta pelo popup da extensão.' });
+      return undefined;
+    }
+    void handleRdSyncMessage(message)
+      .then(result => sendResponse({ ok: true, ...result }))
+      .catch(error => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Falha na coleta de RDs.' }));
+    return true;
+  }
   if (
     (message?.source === 'suape-process-document' || message?.source === CLICK_HINTS_SOURCE || message?.source === 'siages-upload') &&
     (message.type === 'open-new-tab' || message.type === 'open-tab')
@@ -366,6 +377,106 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   return undefined;
 });
+
+const rdJobs = new Map();
+const RD_STATUS_KEY = 'siages-suap-rd-status';
+async function postRdAction(body) {
+  const session = await refreshSessionIfNeeded();
+  if (!session?.accessToken) throw new Error('Entre no SIAGES no popup da extensão.');
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-suap-rds`, {
+    method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body), signal: AbortSignal.timeout(60000),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `Falha no sincronizador de RDs (HTTP ${response.status}).`);
+  return payload;
+}
+async function saveRdStatus(unit, value) {
+  const key = `${RD_STATUS_KEY}:${unit}`;
+  await chrome.storage.local.set({ [key]: { ...value, unit, updatedAt: new Date().toISOString() } });
+}
+async function applyRdRun(unit, runId) {
+  if (!runId) throw new Error('Identificador da conferência ausente. Retome a coleta.');
+  const latest = await postRdAction({ action: 'status', suapUnitCode: unit, runId });
+  if (latest.run?.status === 'applied') return latest.run;
+  if (latest.run?.status !== 'preview' || !latest.run.complete) throw new Error('A conferência foi alterada ou está incompleta. Atualize o estado antes de aplicar.');
+  const result = await postRdAction({ action: 'apply', suapUnitCode: unit, runId });
+  return { ...latest.run, status: result.status };
+}
+async function handleRdSyncMessage(message) {
+  const unit = message.scope === 'all' ? 'all' : String(message.unit || '');
+  if (unit !== 'all' && !/^\d+$/.test(unit)) throw new Error('Unidade SUAP inválida.');
+  if (message.type === 'pause') {
+    const job = rdJobs.get(unit); if (job) job.stopped = true;
+    return {};
+  }
+  if (message.type === 'status') {
+    const stored = await chrome.storage.local.get(`${RD_STATUS_KEY}:${unit}`);
+    return { status: stored[`${RD_STATUS_KEY}:${unit}`] || null, running: rdJobs.has(unit) };
+  }
+  if (message.type === 'apply') {
+    if (rdJobs.size) throw new Error('Aguarde a conclusão da coleta.');
+    if (unit === 'all') {
+      const stored = await chrome.storage.local.get(`${RD_STATUS_KEY}:all`);
+      const status = stored[`${RD_STATUS_KEY}:all`];
+      const results = [];
+      for (const entry of status?.results || []) {
+        if (entry.run?.status !== 'preview' || !entry.run.complete) { results.push(entry); continue; }
+        try {
+          const runId = entry.run.id || entry.run.runId;
+          const run = await applyRdRun(entry.unit, runId);
+          results.push({ ...entry, run, error: undefined });
+          await saveRdStatus(entry.unit, { run, running: false });
+        } catch (error) { results.push({ ...entry, error: error instanceof Error ? error.message : 'Aplicação interrompida.' }); }
+        // Persist per-unit success so reopening the popup does not apply it twice.
+        await saveRdStatus('all', { ...status, results: [...results, ...status.results.slice(results.length)], running: false });
+      }
+      await saveRdStatus('all', { ...status, results, running: false });
+      return { results };
+    }
+    const stored = await chrome.storage.local.get(`${RD_STATUS_KEY}:${unit}`);
+    const runId = stored[`${RD_STATUS_KEY}:${unit}`]?.run?.id || stored[`${RD_STATUS_KEY}:${unit}`]?.run?.runId;
+    if (!runId) throw new Error('Retome a coleta para carregar a conferência antes de aplicar.');
+    const run = await applyRdRun(unit, runId);
+    await saveRdStatus(unit, { run, running: false });
+    return { status: run.status };
+  }
+  if (message.type !== 'start') throw new Error('Ação RD inválida.');
+  if (rdJobs.size) throw new Error('Outra coleta de RDs está em andamento. Aguarde ou pause antes de iniciar.');
+  const tab = await chrome.tabs.get(message.tabId);
+  if (!tab?.url || new URL(tab.url).origin !== 'https://suap.ifrn.edu.br') throw new Error('Abra o SUAP autenticado antes de coletar as RDs.');
+  const job = { stopped: false };
+  rdJobs.set(unit, job);
+  // Execution belongs to the worker, so closing the popup does not cancel it.
+  const capture = async url => {
+      const results = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: globalThis.SuapeRdSync.capturePage, args: [url] });
+      const captured = results?.[0]?.result;
+      if (!captured) throw new Error('Não foi possível ler a aba SUAP. Faça login e retome.');
+      return captured;
+  };
+  const collect = unit === 'all' ? (async () => {
+    const { units } = await postRdAction({ action: 'units' });
+    if (!Array.isArray(units) || !units.length) throw new Error('Catálogo de unidades SUAP indisponível.');
+    return globalThis.SuapeRdSync.collectAll({ units, post: postRdAction, capture, stopped: () => job.stopped,
+      progress: async status => {
+        if (status.unit && status.run) await saveRdStatus(status.unit.value, { run: status.run, running: true });
+        const { unit: currentUnit, ...batchStatus } = status;
+        await saveRdStatus('all', { ...batchStatus, currentUnit });
+      },
+    });
+  })() : globalThis.SuapeRdSync.collect({ unit, post: postRdAction, capture, stopped: () => job.stopped, progress: run => saveRdStatus(unit, { run, running: true }) });
+  void collect.then(async result => {
+    if (unit === 'all') {
+      for (const entry of result.results) await saveRdStatus(entry.unit, { run: entry.run, error: entry.error, running: false });
+      await saveRdStatus('all', result);
+    } else await saveRdStatus(unit, { run: result, running: false, paused: job.stopped });
+  })
+    .catch(async error => {
+      const latest = unit === 'all' ? null : await postRdAction({ action: 'status', suapUnitCode: unit }).catch(() => null);
+      await saveRdStatus(unit, { run: latest?.run, running: false, error: error instanceof Error ? error.message : 'Coleta interrompida. Retome pela extensão.' });
+    }).finally(() => rdJobs.delete(unit));
+  return { started: true };
+}
 
 if (chrome?.tabs?.onActivated) {
   chrome.tabs.onActivated.addListener(async (activeInfo) => {

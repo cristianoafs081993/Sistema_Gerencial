@@ -36,14 +36,15 @@ it('mostra quantidade na lista e abre o detalhe sem disparar o clique da linha',
   const onOpen=vi.fn(),onRow=vi.fn();renderUi(<div onClick={onRow}><SuapRdMovementBadge empenho={emp} onOpen={onOpen} /></div>);
   fireEvent.click(await screen.findByRole('button',{name:'1 reforço · 1 anulação (RD)'}));expect(onOpen).toHaveBeenCalledOnce();expect(onRow).not.toHaveBeenCalled();
 });
-it('superadmin coleta em etapas, confere e aplica somente após captura completa',async()=>{
-  vi.mocked(suapRdService.action).mockImplementation(async action=>action==='status' ? { ...run,run:null } : action==='sync' ? run : { ...run,status:'applied' });
+it('superadmin atualiza a captura da extensão e aplica somente após conferência completa',async()=>{
+  vi.mocked(suapRdService.action).mockImplementation(async action=>action==='status' ? { ...run,run } : { ...run,status:'applied' });
   const onSynced=vi.fn();renderUi(<SuapRdSyncCard onSynced={onSynced} />);
   await waitFor(()=>expect(suapRdService.action).toHaveBeenCalledWith('status','19','158366'));
-  fireEvent.click(screen.getByRole('button',{name:'Coletar RDs para conferência'}));
+  fireEvent.click(screen.getByRole('button',{name:'Atualizar conferência das RDs'}));
   fireEvent.click(await screen.findByRole('button',{name:'Aplicar captura completa'}));
   await waitFor(()=>expect(suapRdService.action).toHaveBeenCalledWith('apply','19','158366','run'));
   await waitFor(()=>expect(onSynced).toHaveBeenCalledOnce());
+  expect(vi.mocked(suapRdService.action).mock.calls.some(([action])=>action==='sync')).toBe(false);
 });
 it('não oferece escrita de RDs para usuário sem papel superadmin',()=>{
   state.admin=false;renderUi(<SuapRdSyncCard onSynced={vi.fn()} />);expect(screen.queryByRole('button')).not.toBeInTheDocument();expect(suapRdService.action).not.toHaveBeenCalled();

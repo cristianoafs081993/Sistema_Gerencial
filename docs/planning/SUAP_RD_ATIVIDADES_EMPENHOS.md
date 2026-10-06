@@ -2,7 +2,7 @@
 
 Data da investigação: 05/10/2026. Escopo inicial: DG/CN, unidade SUAP `19`, UASG `158366`.
 
-**Estado: implementação entregue no código, migration aplicada no Supabase remoto e function `sync-suap-rds` publicada em 05/10/2026.** A primeira coleta real depende de conectar o SUAP no cartão de planejamento: não havia conexão válida no backend. O frontend ainda requer publicação. O contrato implementado e suas limitações estão em [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md); as seções abaixo preservam a investigação e o desenho original, com nomes de tabelas propostos que foram ajustados na implementação.
+**Estado: implementação entregue no código, migration aplicada no Supabase remoto e function `sync-suap-rds` publicada inicialmente em 05/10/2026.** Em 06/10/2026, a coleta passou à extensão Suape 1.9.55, usando a aba autenticada, individualmente ou nas 44 unidades; dispensa conexão SUAP no backend. A primeira coleta real ainda exige as sessões SUAP/SIAGES e conferência antes da aplicação. O frontend requer publicação. O contrato implementado e suas limitações estão em [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md); as seções abaixo preservam a investigação e o desenho original, com nomes de tabelas propostos que foram ajustados na implementação.
 
 ## 1. Decisão principal
 
