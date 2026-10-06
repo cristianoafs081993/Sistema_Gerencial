@@ -201,6 +201,8 @@ Consulte [o fluxo completo](../frontend/CONTRATOS_EMPENHOS_UI.md).
 
 ## RDs SUAP
 
+`SuapRdCaptureNotice` explica coleta incompleta e prévia ainda não aplicada no dashboard e no detalhe de empenho, antes de mostrar ausência específica de RD. Compartilha cache por órgão/campus/unidade e usa os tokens de texto/alerta existentes; falha de metadados não é interpretada como ausência de aplicação. Não cria ações de coleta ou aplicação nessas telas.
+
 A 1.9.57 acrescenta `Revalidar tudo na próxima coleta (mais demorado)` como checkbox opcional no bloco de RDs, desligado por padrão, para unidade ou lote. Popup e `SuapRdSyncCard` mostram quantidades reaproveitadas/relidas e relações reaproveitadas, explicam concluídas permanentes e pendentes atualizadas. O cartão usa `Aplicar conferência das RDs`. Não associa esses controles ao fluxo de atividades.
 
 O popup Suape 1.9.56 separa atividades e RDs em seções nomeadas. As RDs têm grupos por unidade e todas as unidades, com descrição, progresso, coleta/retomada e pausa/aplicação condicionadas ao estado. O log de atividades fica no bloco do plano e o progresso de RDs nos respectivos grupos; as ações não desabilitam controles do outro fluxo. Os botões de aplicação identificam explicitamente o dado e o escopo.

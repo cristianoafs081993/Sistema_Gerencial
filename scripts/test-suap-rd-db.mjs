@@ -57,4 +57,18 @@ await assert.rejects(apply(first),/permission denied/);
 await assert.rejects(db.exec("update suap_requisicoes_despesa set active=false"),/permission denied/);
 await db.exec("reset role; set rd.campus='158366'; set role authenticated;");
 assert.equal((await db.query('select * from suap_rd_movimentacoes')).rows.length,2);
+// Concrete user regression: official energy activity 35206 / RD000016 / NE000001.
+await db.exec('reset role');
+const energyActivity='00000000-0000-0000-0000-000000000005',energyNe='00000000-0000-0000-0000-000000000006';
+await db.query("insert into atividades values($1,$2,'158366','19',8,'35206')",[energyActivity,org]);
+await db.query("insert into empenhos values($1,$2,'158366','2026NE000001',null,9112.56)",[energyNe,org]);
+const energyPayload={...payload,rdId:'5351',numero:'2026RD000016',tipo:'dotacao',sources:[{planId:8,activityId:'35206'}],
+  linhas:[{...payload.linhas[0],valor:9112.56,empenhoNumero:'2026NE000001',empenhoCompleto:'158366264352026NE000001'}]};
+const energyRun=await run();
+await db.query("insert into suap_rd_snapshots(run_id,org_id,campus_uasg,suap_unit_code,suap_rd_id,payload,checksum) values($1,$2,'158366','19','5351',$3,'energy')",[energyRun,org,JSON.stringify(energyPayload)]);
+await apply(energyRun);
+const energyMovement=(await db.query("select * from suap_rd_movimentacoes where suap_rd_id='5351'")).rows[0];
+assert.equal(energyMovement.empenho_id,energyNe);assert.equal(energyMovement.atividade_id,energyActivity);
+assert.equal(energyMovement.resolution,'resolvido');assert.equal(energyMovement.confirmed,true);
+assert.equal((await db.query("select * from atividade_empenho_vinculos where suap_activity_id='35206'")).rows[0].empenho_id,energyNe);
 await db.close(); console.log('RD SQL: aplicação atômica/idempotente, captura parcial, campus/unidade, conflito manual/múltiplo, reversão, saldos preservados e RLS aprovados.');

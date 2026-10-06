@@ -21,3 +21,24 @@ it('envia somente ação, campus/unidade e identificador opaco de execução',as
   mocks.invoke.mockResolvedValue({data:{status:'preview'},error:null});await suapRdService.action('sync','19','158366','run');
   expect(mocks.invoke).toHaveBeenCalledWith('sync-suap-rds',{body:{action:'sync',suapUnitCode:'19',campusUasg:'158366',runId:'run'}});
 });
+it('consulta coleta e aplicação com RLS e filtros de órgão/campus/unidade, sem carregar snapshots',async()=>{
+  const query={select:vi.fn(),eq:vi.fn(),order:vi.fn(),limit:vi.fn(),maybeSingle:vi.fn()};
+  for(const method of ['select','eq','order','limit'] as const) query[method].mockReturnValue(query);
+  query.maybeSingle.mockResolvedValueOnce({data:{status:'partial',source_count:500,processed:'1',reused:null,refreshed:null},error:null})
+    .mockResolvedValueOnce({data:null,error:null});mocks.from.mockReturnValue(query);
+  expect(await suapRdService.captureStatus('org','158366','19')).toEqual({hasApplied:false,latest:{status:'partial',sourceCount:500,processed:1}});
+  for(const filter of [['org_id','org'],['campus_uasg','158366'],['suap_unit_code','19']]) expect(query.eq.mock.calls.filter(call=>call[0]===filter[0])).toEqual([filter,filter]);
+  expect(mocks.from.mock.calls).toEqual([['suap_rd_sync_runs'],['suap_rd_sync_runs']]);
+});
+it('conta detalhes reaproveitados e preserva a aplicação anterior quando uma nova coleta falha',async()=>{
+  const query={select:vi.fn(),eq:vi.fn(),order:vi.fn(),limit:vi.fn(),maybeSingle:vi.fn()};
+  for(const method of ['select','eq','order','limit'] as const) query[method].mockReturnValue(query);
+  query.maybeSingle.mockResolvedValueOnce({data:{status:'partial',source_count:500,processed:'0',reused:'450',refreshed:'12'},error:null})
+    .mockResolvedValueOnce({data:{status:'applied'},error:null});mocks.from.mockReturnValue(query);
+  expect(await suapRdService.captureStatus('org','158366','19')).toEqual({hasApplied:true,latest:{status:'partial',sourceCount:500,processed:462}});
+});
+it('falha de leitura do estado não é interpretada como ausência de aplicação',async()=>{
+  const query={select:vi.fn(),eq:vi.fn(),order:vi.fn(),limit:vi.fn(),maybeSingle:vi.fn().mockResolvedValue({data:null,error:new Error('Sem permissão')})};
+  for(const method of ['select','eq','order','limit'] as const) query[method].mockReturnValue(query);
+  mocks.from.mockReturnValue(query);await expect(suapRdService.captureStatus('org','158366','19')).rejects.toThrow('Sem permissão');
+});

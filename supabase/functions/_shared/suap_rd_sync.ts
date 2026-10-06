@@ -14,6 +14,8 @@ export type RdState = {
   activityNextUrl: string | null; sources: Record<string, Source[]>;
   detailCursor: number; verify: SuapRdRef[]; verifyTotal: number | null;
   reuse?: RdReuse;
+  rowFingerprintVersion?: number;
+  mutableRdIds?: string[]; detailRechecks?: string[]; verificationRetries?: number;
 };
 export type RdRun = { id: string; org_id: string; user_id: string; campus_uasg: string; suap_unit_code: string;
   status: string; state: RdState; source_count: number; summary: Record<string, number>; complete: boolean;
@@ -22,7 +24,8 @@ export type RdRun = { id: string; org_id: string; user_id: string; campus_uasg: 
 export function rdInventoryUrl(unit: string) { return `${SUAP_RD_ORIGIN}/admin/plan_estrategico/requisicaodespesa/?unidade_gestora=${unit}&tab=tab_any_data`; }
 export function initialRdState(unit: string): RdState {
   return { phase: 'inventory', nextUrl: rdInventoryUrl(unit), inventory: [], total: null,
-    activities: [], activityCursor: 0, activityNextUrl: null, sources: {}, detailCursor: 0, verify: [], verifyTotal: null };
+    activities: [], activityCursor: 0, activityNextUrl: null, sources: {}, detailCursor: 0, verify: [], verifyTotal: null,
+    rowFingerprintVersion: 2 };
 }
 
 /** The server chooses every page; the extension supplies only that page's HTML. */
@@ -31,14 +34,14 @@ export function nextRdCaptureUrl(run: RdRun): string | null {
   while (state.phase === 'activities' && state.activities[state.activityCursor]?.reused) state.activityCursor++;
   if (state.phase === 'activities' && state.activityCursor >= state.activities.length) state.phase = 'details';
   const reused = new Set(state.reuse?.reusedIds ?? []);
-  while (state.phase === 'details' && reused.has(state.inventory[state.detailCursor]?.rdId)) state.detailCursor++;
-  if (state.phase === 'details' && state.detailCursor >= state.inventory.length) {
+  while (state.phase === 'details' && !state.detailRechecks?.length && reused.has(state.inventory[state.detailCursor]?.rdId)) state.detailCursor++;
+  if (state.phase === 'details' && !state.detailRechecks?.length && state.detailCursor >= state.inventory.length) {
     state.phase = 'verify'; state.nextUrl = rdInventoryUrl(run.suap_unit_code);
   }
   if (state.phase === 'inventory' || state.phase === 'verify') return state.nextUrl;
   if (state.phase === 'plan') return buildSuapPlanSourceUrl(run.suap_unit_code);
   if (state.phase === 'activities') return state.activityNextUrl ?? `${SUAP_RD_ORIGIN}/plan_estrategico/listar_requisicoes_despesa/8/${state.activities[state.activityCursor].id}/`;
-  if (state.phase === 'details') return `${SUAP_RD_ORIGIN}/plan_estrategico/detalhar_requisicaodespesa/${state.inventory[state.detailCursor].rdId}/`;
+  if (state.phase === 'details') return `${SUAP_RD_ORIGIN}/plan_estrategico/detalhar_requisicaodespesa/${state.detailRechecks?.[0] ?? state.inventory[state.detailCursor].rdId}/`;
   return null;
 }
 
@@ -83,8 +86,30 @@ function addPage(existing: SuapRdRef[], incoming: SuapRdRef[], expected: number 
   if (incoming.some(rd => ids.has(rd.rdId))) throw new Error('Paginação instável ou repetida; inicie nova conferência.');
   existing.push(...incoming);
 }
-const signature = (refs: SuapRdRef[]) => JSON.stringify([...refs].sort((a,b) => Number(a.rdId)-Number(b.rdId))
-  .map(ref => [ref.rdId,ref.numero,ref.situacao,ref.tipo,ref.rowFingerprint ?? null]));
+/** Only mutable RDs can be reread after the final inventory changes, with bounded retries. */
+function reconcileRdInventory(state: RdState) {
+  const current = new Map(state.verify.map(ref => [ref.rdId,ref]));
+  if (current.size !== state.inventory.length) throw new Error('RDs alteradas durante a coleta; inicie nova conferência.');
+  const mutable = new Set(state.mutableRdIds ?? []);
+  const changed = state.inventory.filter(ref => {
+    const next = current.get(ref.rdId);
+    if (!next || ref.numero !== next.numero || foldRdText(ref.tipo) !== foldRdText(next.tipo)) throw new Error('RDs alteradas durante a coleta; inicie nova conferência.');
+    const different = foldRdText(ref.situacao) !== foldRdText(next.situacao) ||
+      state.rowFingerprintVersion === 2 && ref.rowFingerprint && ref.rowFingerprint !== next.rowFingerprint;
+    if (different && foldRdText(ref.situacao) === 'concluida' && !mutable.has(ref.rdId)) throw new Error('RDs alteradas durante a coleta; inicie nova conferência.');
+    return different;
+  });
+  if (!changed.length) { state.phase = 'ready'; return; }
+  if ((state.verificationRetries ?? 0) >= 3) throw new Error('RDs pendentes continuam mudando; retome a conferência quando o SUAP estabilizar.');
+  state.verificationRetries = (state.verificationRetries ?? 0) + 1;
+  for (const ref of changed) {
+    mutable.add(ref.rdId);
+    Object.assign(ref,current.get(ref.rdId));
+  }
+  state.mutableRdIds = [...mutable];
+  state.detailRechecks = changed.map(ref => ref.rdId);
+  state.verify = []; state.verifyTotal = null; state.phase = 'details';
+}
 
 /** Performs only bounded reads; active records are changed exclusively by the apply RPC. */
 export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: string) => Promise<string>, Parser: HtmlParser, steps = 6) {
@@ -106,8 +131,7 @@ export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: str
         const records = verify ? state.verify : state.inventory;
         if (records.length !== page.total) throw new Error('Inventário SUAP incompleto.');
         if (verify) {
-          if (signature(state.inventory) !== signature(state.verify)) throw new Error('RDs alteradas durante a coleta; inicie nova conferência.');
-          state.phase = 'ready';
+          reconcileRdInventory(state);
         } else state.phase = 'plan';
       }
     } else if (state.phase === 'plan') {
@@ -142,11 +166,16 @@ export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: str
         } else { activity.checkedAt = new Date().toISOString(); state.activityCursor++; }
       }
     } else if (state.phase === 'details') {
-      const ref = state.inventory[state.detailCursor];
+      const ref = state.detailRechecks?.length ? state.inventory.find(ref => ref.rdId === state.detailRechecks![0])! : state.inventory[state.detailCursor];
       if (!ref) { state.phase = 'verify'; state.nextUrl = rdInventoryUrl(run.suap_unit_code); continue; }
       const url = `${SUAP_RD_ORIGIN}/plan_estrategico/detalhar_requisicaodespesa/${ref.rdId}/`;
       const detail = parseSuapRdDetail(await load(url), ref.rdId, run.suap_unit_code, Parser);
-      if (detail.numero !== ref.numero || foldRdText(detail.situacao) !== foldRdText(ref.situacao) || foldRdText(detail.tipoRaw) !== foldRdText(ref.tipo)) throw new Error('RD alterada durante a captura; inicie nova conferência.');
+      if (detail.numero !== ref.numero || foldRdText(detail.tipoRaw) !== foldRdText(ref.tipo) ||
+        foldRdText(detail.situacao) !== foldRdText(ref.situacao) && foldRdText(ref.situacao) === 'concluida') throw new Error('RD alterada durante a captura; inicie nova conferência.');
+      if (foldRdText(ref.situacao) !== 'concluida') {
+        state.mutableRdIds = [...new Set([...(state.mutableRdIds ?? []),ref.rdId])];
+        ref.situacao = detail.situacao;
+      }
       const sources = state.sources[ref.rdId] ?? [];
       if (sources.some(source => foldRdText(source.activityName) !== foldRdText(detail.activityName))) throw new Error('Atividade da RD diverge da relação oficial.');
       const payload = { ...detail, sources };
@@ -155,8 +184,16 @@ export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: str
         campus_uasg: run.campus_uasg, suap_unit_code: run.suap_unit_code, suap_rd_id: ref.rdId, payload, checksum,
         captured_at: new Date().toISOString() }, { onConflict: 'run_id,suap_rd_id' });
       if (error) throw error;
-      state.detailCursor++;
-      if (state.reuse) state.reuse.refreshedDetails++;
+      const recheck = Boolean(state.detailRechecks?.length);
+      if (recheck) state.detailRechecks!.shift(); else state.detailCursor++;
+      if (state.reuse) {
+        const copied = state.reuse.reusedIds?.includes(ref.rdId);
+        if (copied) {
+          state.reuse.reusedIds = state.reuse.reusedIds!.filter(id => id !== ref.rdId);
+          state.reuse.reusedDetails--;
+        }
+        if (!recheck || copied) state.reuse.refreshedDetails++;
+      }
     }
     nextRdCaptureUrl(run);
     if (state.phase === 'details') { await prepareRdDetails(db,run); nextRdCaptureUrl(run); }

@@ -9,7 +9,7 @@ import { suapRdService, type RdMovement, type RdSyncRun } from '@/services/suapR
 import type { Empenho } from '@/types';
 const state = vi.hoisted(()=>({admin:true}));
 vi.mock('@/contexts/AuthContext',()=>({useOptionalAuth:()=>({isSuperAdmin:state.admin,userOrg:{id:'org'},userCampus:{codigo:'158366'}}),useAuth:()=>({isSuperAdmin:state.admin,userOrg:{id:'org'},userCampus:{codigo:'158366'}})}));
-vi.mock('@/services/suapRdService',async importOriginal=>({ ...await importOriginal<typeof import('@/services/suapRdService')>(),suapRdService:{ read:vi.fn(),action:vi.fn(),preview:vi.fn().mockResolvedValue([]) } }));
+vi.mock('@/services/suapRdService',async importOriginal=>({ ...await importOriginal<typeof import('@/services/suapRdService')>(),suapRdService:{ read:vi.fn(),action:vi.fn(),preview:vi.fn().mockResolvedValue([]),captureStatus:vi.fn() } }));
 const renderUi=(ui:ReactElement)=>render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}>{ui}</QueryClientProvider>);
 const emp={id:'e',numero:'2026NE000014',valor:150} as Empenho;
 const movement={org_id:'org',campus_uasg:'158366',suap_unit_code:'19',run_id:'run',suap_rd_id:'1',rd_numero:'2026RD000001',tipo:'dotacao',rd_situacao:'Concluída',source_url:'https://suap.ifrn.edu.br/plan_estrategico/detalhar_requisicaodespesa/1/',atividade_nome:'Almoxarifado',line_index:1,valor:100,empenho_id:'e',empenho_numero:emp.numero,linha_situacao:'Confirmada',confirmed:true,resolution:'resolvido',captured_at:'2026-10-05T12:00:00Z'} as RdMovement;
@@ -22,7 +22,23 @@ it('informa reaproveitamento e orienta revalidar tudo sem iniciar coleta no fron
   expect(screen.getByText(/Para reconferir tudo imediatamente/)).toHaveTextContent('reaproveita permanentemente RDs concluídas');
   expect(vi.mocked(suapRdService.action).mock.calls.some(([action])=>action==='sync')).toBe(false);
 });
-beforeEach(()=>{ vi.clearAllMocks();state.admin=true;vi.mocked(suapRdService.action).mockResolvedValue({ ...run,run:null });vi.mocked(suapRdService.read).mockResolvedValue([]); });
+beforeEach(()=>{ vi.clearAllMocks();state.admin=true;vi.mocked(suapRdService.action).mockResolvedValue({ ...run,run:null });vi.mocked(suapRdService.read).mockResolvedValue([]);vi.mocked(suapRdService.captureStatus).mockResolvedValue({hasApplied:true,latest:null}); });
+it('mostra coleta parcial em vez de afirmar que não existe RD para o empenho',async()=>{
+  vi.mocked(suapRdService.captureStatus).mockResolvedValue({hasApplied:false,latest:{status:'partial',processed:1,sourceCount:500}});
+  renderUi(<SuapRdMovements empenho={emp} enabled />);
+  expect(await screen.findByText(/Coleta de RDs incompleta/)).toHaveTextContent('1/500');
+  expect(screen.queryByText(/Nenhuma RD aplicada corresponde/)).not.toBeInTheDocument();
+});
+it('explica que a prévia precisa ser aplicada e não consulta status de outro campus',async()=>{
+  vi.mocked(suapRdService.captureStatus).mockResolvedValue({hasApplied:false,latest:{status:'preview',processed:500,sourceCount:500}});
+  renderUi(<SuapRdMovements empenho={emp} enabled />);
+  expect(await screen.findByText(/conferência ainda não foi aplicada/)).toBeInTheDocument();
+  expect(suapRdService.captureStatus).toHaveBeenCalledWith('org','158366','19');
+});
+it('mantém ausência específica de empenho quando já existe conferência aplicada',async()=>{
+  renderUi(<SuapRdMovements empenho={emp} enabled />);
+  expect(await screen.findByText(/Nenhuma RD aplicada corresponde/)).toBeInTheDocument();
+});
 it('mostra reforço e anulação negativa, exclui cancelada dos totais e não duplica linha com conflito',async()=>{
   vi.mocked(suapRdService.read).mockResolvedValue([movement,{...movement,suap_rd_id:'2',rd_numero:'2026RD000002',tipo:'reforco',valor:60},
     {...movement,suap_rd_id:'3',rd_numero:'2026RD000003',tipo:'anulacao',valor:-10},

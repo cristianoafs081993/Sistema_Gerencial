@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { SectionPanel } from '@/components/design-system/SectionPanel';
 import { suapRdService, rdResolutionLabel, uniqueRdMovements, type RdMovement } from '@/services/suapRdService';
 import type { Empenho } from '@/types';
+import { SuapRdCaptureNotice } from './SuapRdCaptureNotice';
 
 export function SuapRdMovements({ empenho, enabled }: { empenho: Empenho; enabled: boolean }) {
   const auth = useOptionalAuth();
@@ -23,7 +24,7 @@ export function SuapRdMovements({ empenho, enabled }: { empenho: Empenho; enable
   return <SectionPanel title="Movimentações do empenho — RDs do SUAP">
     <div className="space-y-3 p-4 text-sm">
       <p className="text-muted-foreground">{unit.code} · UASG {campus}. Valores das linhas confirmadas; datas de captura não representam datas contábeis.</p>
-      {query.isLoading ? <p role="status">Consultando movimentações…</p> : query.isError ? <div role="alert">Não foi possível consultar as RDs. <Button variant="outline" size="sm" onClick={() => query.refetch()}>Tentar novamente</Button></div> : rows.length === 0 ? <p>Nenhuma RD capturada para este empenho. A coleta é realizada em Importação de dados.</p> : <>
+      {query.isLoading ? <p role="status">Consultando movimentações…</p> : query.isError ? <div role="alert">Não foi possível consultar as RDs. <Button variant="outline" size="sm" onClick={() => query.refetch()}>Tentar novamente</Button></div> : rows.length === 0 ? <SuapRdCaptureNotice campus={campus} unit={unit.value} enabled={enabled} fallback={<p>Nenhuma RD aplicada corresponde a este empenho nesta unidade.</p>} /> : <>
         <div className="flex flex-wrap gap-4">
           {(['dotacao', 'reforco', 'anulacao'] as const).map(tipo => <p key={tipo}>{({ dotacao: 'Dotação', reforco: 'Reforços', anulacao: 'Anulações' })[tipo]}: <strong>{formatCurrency(confirmed.filter(row => row.tipo === tipo).reduce((sum, row) => sum + row.valor, 0))}</strong></p>)}
           <p>Líquido das RDs: <strong>{formatCurrency(total)}</strong></p>

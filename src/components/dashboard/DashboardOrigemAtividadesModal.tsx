@@ -40,6 +40,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useOptionalAuth } from '@/contexts/AuthContext';
 import { getSuapPlanUnitForCampus } from '@/lib/suapPlanUnits';
 import { suapRdService, type RdLink } from '@/services/suapRdService';
+import { SuapRdCaptureNotice } from '@/components/suap/SuapRdCaptureNotice';
 
 const NAO_ASSOCIADOS_KEY = '__nao_associados__';
 
@@ -269,6 +270,7 @@ export function DashboardOrigemAtividadesModal({
               </div>
             </div>
 
+            {!rdQuery.isLoading && !rdQuery.isError && !rdQuery.data?.length && <SuapRdCaptureNotice campus={campus} unit={unit} enabled={open} />}
             {/* KPI Cards da selecao atual */}
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-lg border border-border-default/70 bg-slate-50/50 p-3 dark:bg-slate-900/30">

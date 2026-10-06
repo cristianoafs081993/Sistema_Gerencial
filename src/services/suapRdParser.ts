@@ -100,7 +100,7 @@ export function parseSuapRdList(html: string, sourceUrl: string, unitCode: strin
     assertRdUnit(rowUnit, unitCode);
     // The collector hashes this canonical row before persisting it; action links are not data.
     const rowFingerprint = JSON.stringify(headers.flatMap((header,index) =>
-      !header || /^(#|acoes|opcoes)$/.test(header) ? [] : [[header,cells[index] ?? '']]));
+      !header || header.includes('situacao') || /^(#|acoes|opcoes)$/.test(header) ? [] : [[header,cells[index] ?? '']]));
     refs.push({ rdId, numero, situacao: cells[col('situacao')] ?? '', tipo: cells[col('tipo')] ?? '', rowFingerprint });
   }
   if (new Set(refs.map(rd => rd.rdId)).size !== refs.length) throw new Error('RD duplicada na página.');

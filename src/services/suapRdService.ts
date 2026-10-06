@@ -20,8 +20,22 @@ export type RdSyncRun = {
   busy?: boolean; error?: string;
   captureMode?: 'extension' | 'backend'; nextUrl?: string | null;
 };
+export type RdCaptureStatus = { hasApplied: boolean; latest: { status: string; processed: number; sourceCount: number } | null };
 
 export const suapRdService = {
+  async captureStatus(org: string, campus: string, unit: string): Promise<RdCaptureStatus> {
+    const scoped = () => supabase.from('suap_rd_sync_runs').select('status,source_count,processed:state->>detailCursor,reused:state->reuse->>reusedDetails,refreshed:state->reuse->>refreshedDetails')
+      .eq('org_id',org).eq('campus_uasg',campus).eq('suap_unit_code',unit);
+    const [latest,applied] = await Promise.all([
+      scoped().order('started_at',{ascending:false}).limit(1).maybeSingle(),
+      scoped().eq('status','applied').eq('complete',true).limit(1).maybeSingle(),
+    ]);
+    if (latest.error) throw latest.error;
+    if (applied.error) throw applied.error;
+    const data = latest.data as { status: string; source_count: number; processed: string | null; reused: string | null; refreshed: string | null } | null;
+    return {hasApplied:!!applied.data,latest:data ? {status:data.status,sourceCount:data.source_count,
+      processed:Math.min(data.source_count,data.refreshed !== null ? Number(data.refreshed)+Number(data.reused) : Number(data.processed))} : null};
+  },
   async preview(runId: string, org: string, campus: string, unit: string) {
     const rows: Array<{ payload: SuapRdDetail & { sources: Array<{ activityId: string; planId: number }> } }> = [];
     for (let offset = 0; ; offset += 500) {

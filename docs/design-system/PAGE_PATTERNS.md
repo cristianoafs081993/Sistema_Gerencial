@@ -143,6 +143,8 @@ A listagem de Contratos continua sendo tabela. O detalhe aberto pelo contrato se
 
 ## Prévia e movimentos de RDs
 
+Dashboard e detalhe do empenho distinguem ausência de associação após aplicação, coleta ainda incompleta e conferência pronta sem aplicação. O aviso de captura informa progresso e orienta retomar pela extensão/concluir/aplicar em Importação de dados, preservando os controles próprios de cada fluxo.
+
 Na 1.9.57, o bloco de RDs oferece a opção excepcional de revalidar tudo antes de iniciar unidade/lote. A coleta normal reaproveita concluídas permanentemente e consulta novas/pendentes; canceladas passam por conferência periódica. Progresso distingue detalhes relidos/reaproveitados e relações reaproveitadas. A prévia continua completa e exige aplicação explícita, mesmo com snapshots copiados.
 
 O popup da extensão 1.9.56 apresenta blocos separados `Atividades — Plano 8` e `RDs — Requisições de despesas`. Cada bloco explica os dados atualizados e oferece ações da unidade atual ou de todas as unidades. As RDs agrupam coleta/retomada, pausa e aplicação por escopo, com progresso próprio. A aplicação de atividades também identifica unidade ou lote. Os controles de um fluxo permanecem disponíveis durante a execução do outro; nenhum botão inicia os dois. A conferência no SIAGES fica como link no bloco de RDs.
