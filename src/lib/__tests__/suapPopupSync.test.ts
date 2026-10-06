@@ -20,7 +20,8 @@ describe('popup da extensao: sincronizacao do Plano 8', () => {
     expect(popup).toContain('sendAllPlanSync()');
     expect(popup).toContain('result.completedCount');
     expect(popup).toContain('result.failedCount');
-    expect(popup).toContain('Clique em Aplicar conferencia');
+    expect(popup).toContain('Clique em Aplicar atividades desta unidade');
+    expect(popup).toContain('Clique em Aplicar atividades das unidades conferidas');
     expect(popup).toContain('result.applied');
     expect(popup).not.toContain("files: ['content.js']");
     expect(popup).not.toContain("chrome.tabs.create({ url: 'https://www.siages.com.br/planejamento/campus' })");

@@ -43,6 +43,24 @@
       background: #182230;
       color: #eef4f8;
     }
+    .sync-description, .sync-scope p {
+      margin: 8px 0 12px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #b8c5d1;
+    }
+    .sync-scope + .sync-scope {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid #334155;
+    }
+    .sync-scope h4 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: #eef4f8;
+    }
+    .sync-link { display: inline-block; margin-top: 12px; color: #93c5fd; font-size: 12px; }
+    [hidden] { display: none !important; }
     select {
       box-sizing: border-box;
       width: 100%;
@@ -164,22 +182,33 @@
     Segredo de automação
     <input id="automation-secret" type="password" autocomplete="off" placeholder="AUTOMATION_EVENT_SECRET">
   </label>
-  <button id="btn-extract-en">Sincronizar Plano 8 e RDs da unidade</button>
-  <button id="btn-extract-all" class="secondary">Sincronizar plano e RDs de todas as unidades</button>
-  <button id="btn-apply-plan" class="secondary" type="button" hidden>Aplicar conferencia</button>
-  <section class="auth-card" aria-labelledby="rd-sync-title">
-    <h3 id="rd-sync-title">Requisições de despesas</h3>
-    <p id="rd-sync-status" aria-live="polite">Abra o Plano 8 ou a lista de RDs da unidade no SUAP. A captura inclui todas as situações e os detalhes de cada RD.</p>
-    <button id="btn-collect-rds" class="secondary" type="button" disabled>Coletar / retomar RDs desta unidade</button>
-    <button id="btn-pause-rds" class="secondary" type="button" hidden>Pausar coleta de RDs</button>
-    <button id="btn-apply-rds" type="button" hidden>Aplicar conferência das RDs</button>
-    <a href="https://www.siages.com.br/importacao-dados" target="_blank" rel="noopener noreferrer">Conferir RDs no SIAGES</a>
-    <p id="rd-all-sync-status" aria-live="polite">Todas as unidades: captura separada por unidade e campus, com conferência antes da aplicação.</p>
-    <button id="btn-collect-all-rds" class="secondary" type="button">Coletar / retomar RDs de todas as unidades</button>
-    <button id="btn-pause-all-rds" class="secondary" type="button" hidden>Pausar lote de RDs</button>
-    <button id="btn-apply-all-rds" type="button" hidden>Aplicar RDs das unidades conferidas</button>
+  <section class="auth-card" aria-labelledby="plan-sync-title">
+    <h3 id="plan-sync-title">Atividades — Plano 8</h3>
+    <p class="sync-description">Coleta as atividades e os saldos do plano para conferência. Depois, aplique a prévia no SIAGES. Escolha esta unidade ou todas as unidades.</p>
+    <button id="btn-extract-en" type="button">Sincronizar atividades desta unidade</button>
+    <button id="btn-extract-all" class="secondary" type="button">Sincronizar atividades de todas as unidades</button>
+    <button id="btn-apply-plan" class="secondary" type="button" hidden>Aplicar conferência das atividades</button>
+    <div id="status" aria-live="polite"></div>
   </section>
-  <div id="status"></div>
+  <section class="auth-card" aria-labelledby="rd-sync-title">
+    <h3 id="rd-sync-title">RDs — Requisições de despesas</h3>
+    <p class="sync-description">Coleta RDs, reforços, anulações e vínculos oficiais para conferência. Percorre os detalhes e pode ser pausada e retomada. Depois, aplique a prévia no SIAGES.</p>
+    <div class="sync-scope">
+      <h4>Unidade selecionada no SUAP</h4>
+      <p id="rd-sync-status" aria-live="polite">Abra o Plano 8 ou a lista de RDs da unidade no SUAP.</p>
+      <button id="btn-collect-rds" type="button" disabled>Coletar / retomar RDs desta unidade</button>
+      <button id="btn-pause-rds" class="secondary" type="button" hidden>Pausar RDs desta unidade</button>
+      <button id="btn-apply-rds" class="secondary" type="button" hidden>Aplicar RDs desta unidade</button>
+    </div>
+    <div class="sync-scope">
+      <h4>Todas as unidades</h4>
+      <p id="rd-all-sync-status" aria-live="polite">Cada unidade mantém sua própria conferência e associação ao campus.</p>
+      <button id="btn-collect-all-rds" type="button">Coletar / retomar RDs de todas as unidades</button>
+      <button id="btn-pause-all-rds" class="secondary" type="button" hidden>Pausar RDs de todas as unidades</button>
+      <button id="btn-apply-all-rds" class="secondary" type="button" hidden>Aplicar RDs das unidades conferidas</button>
+    </div>
+    <a class="sync-link" href="https://www.siages.com.br/importacao-dados" target="_blank" rel="noopener noreferrer">Conferir RDs no SIAGES</a>
+  </section>
   <script src="extension-auth-client.js"></script>
   <script src="popup.js"></script>
 </body>

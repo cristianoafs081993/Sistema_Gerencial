@@ -44,7 +44,7 @@ export function SuapRdSyncCard({ campusUasg = '158366', onSynced }: { campusUasg
     } finally { setBusy(false); }
   };
   return <Card><CardHeader><CardTitle>Requisições de despesas — atividades e movimentações</CardTitle></CardHeader><CardContent className="space-y-4">
-    <p className="text-sm text-muted-foreground">Na extensão Suape, abra o SUAP autenticado e use Sincronizar Plano 8 e RDs da unidade ou Sincronizar plano e RDs de todas as unidades. A coleta utiliza a sessão da aba e pode ser retomada pela extensão. Depois, atualize esta conferência para revisar e aplicar as RDs de cada unidade.</p>
+    <p className="text-sm text-muted-foreground">Na extensão Suape, abra o SUAP autenticado e use o bloco RDs — Requisições de despesas para coletar esta unidade ou todas as unidades. Atividades e RDs têm controles independentes. A coleta utiliza a sessão da aba e pode ser retomada pela extensão. Depois, atualize esta conferência para revisar e aplicar as RDs de cada unidade.</p>
     <p className="text-sm text-muted-foreground">A coleta inclui todas as páginas e situações; somente RDs concluídas com linhas confirmadas compõem os valores. A aplicação substitui a captura anterior desta unidade e pode ser revertida.</p>
     <label className="block text-sm">Unidade SUAP / campus
       <select className="mt-1 block w-full rounded-md border border-input bg-background p-2" disabled={busy} value={unit} onChange={e => setUnit(e.target.value)}>

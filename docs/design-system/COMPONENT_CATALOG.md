@@ -201,4 +201,6 @@ Consulte [o fluxo completo](../frontend/CONTRATOS_EMPENHOS_UI.md).
 
 ## RDs SUAP
 
+O popup Suape 1.9.56 separa atividades e RDs em seções nomeadas. As RDs têm grupos por unidade e todas as unidades, com descrição, progresso, coleta/retomada e pausa/aplicação condicionadas ao estado. O log de atividades fica no bloco do plano e o progresso de RDs nos respectivos grupos; as ações não desabilitam controles do outro fluxo. Os botões de aplicação identificam explicitamente o dado e o escopo.
+
 `SuapRdSyncCard` (Importação de dados) acompanha a coleta da extensão e oferece atualização, prévia, aplicação e reversão por unidade; `SuapRdPreview` pagina a conferência das RDs; `SuapRdMovements` usa `SectionPanel` no detalhe do empenho para os valores assinados, referências e pendências. Reutilizam os tokens e componentes atuais. Comportamento: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

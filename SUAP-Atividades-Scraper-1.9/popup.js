@@ -220,7 +220,7 @@ async function updateRdStatus() {
   rdStatusEl.textContent = status?.error || (run?.status === 'preview'
     ? `Captura completa da unidade ${rdUnit}: ${totals?.rds || 0} RDs. Dotação ${currency(totals?.totalDotacao)}, reforços ${currency(totals?.totalReforco)}, anulações ${currency(totals?.totalAnulacao)}. Confira os detalhes no SIAGES antes de aplicar.`
     : run?.status === 'applied' ? `RDs da unidade ${rdUnit} aplicadas no SIAGES.`
-    : run ? `${running ? 'Coletando' : 'Coleta pausada ou interrompida'} — unidade ${rdUnit}: ${run.processed || 0}/${run.sourceCount || 0} RDs; ${run.activitiesProcessed || 0}/${run.activitiesTotal || 0} atividades. ${running ? 'Mantenha a aba SUAP aberta.' : 'Clique em coletar / retomar.'}`
+    : run ? `${running ? 'Coletando RDs' : 'Coleta pausada ou interrompida'} — unidade ${rdUnit}: ${run.processed || 0}/${run.sourceCount || 0} detalhes; ${run.activitiesProcessed || 0}/${run.activitiesTotal || 0} relações oficiais verificadas. ${running ? 'Mantenha a aba SUAP aberta.' : 'Clique em coletar / retomar.'}`
     : `Unidade SUAP ${rdUnit}. A coleta usa sua sessão nesta aba.`);
 }
 
@@ -229,7 +229,6 @@ async function startRdCollection(tab, unit) {
   rdUnit = String(unit);
   await rdMessage('start', { tabId: tab.id });
   await updateRdStatus();
-  log('Coleta de RDs iniciada pela aba autenticada. O popup pode ser fechado; acompanhe e aplique a conferência das RDs ao reabri-lo ou no SIAGES.', 'info');
 }
 
 async function initializeRdControls() {
@@ -249,7 +248,6 @@ async function initializeRdControls() {
 async function startAllRdCollection(tab) {
   await rdMessage('start', { scope: 'all', tabId: tab.id });
   await updateAllRdStatus();
-  log('Coleta de RDs de todas as unidades iniciada pela aba SUAP autenticada. Falhas ficam identificadas por unidade; a aplicação continua explícita.', 'info');
 }
 
 async function sendCapturedPlanSync(captured) {
@@ -376,6 +374,7 @@ async function updatePlanPreviewButton() {
     }
   }
   const hasPreview = Boolean(preview?.runId || preview?.id || batchPreview?.batchId || batchPreview?.id);
+  btnApplyPlan.textContent = batchPreview?.batchId || batchPreview?.id ? 'Aplicar atividades das unidades conferidas' : 'Aplicar atividades desta unidade';
   btnApplyPlan.hidden = !hasPreview;
   btnApplyPlan.disabled = !hasPreview;
 }
@@ -689,11 +688,10 @@ async function handleExtraction(scope = 'campus') {
       if (result.status === 'preview') {
         log(`${result.sourceCount || 0} atividades encontradas: ${result.inserted || 0} novas, ${result.updated || 0} atualizadas, ${result.archived || 0} serao arquivadas.`, 'success');
         await setPlanPreview(result);
-        log('A captura foi registrada em modo de conferencia. Clique em Aplicar conferencia para atualizar o SIAGES.', 'info');
+        log('Atividades capturadas para conferência. Clique em Aplicar atividades desta unidade para atualizar o SIAGES.', 'info');
       } else {
         log(`Sincronizacao concluida: ${result.inserted || 0} novas, ${result.updated || 0} atualizadas, ${result.archived || 0} arquivadas.`, 'success');
       }
-      await startRdCollection(activeTab, captured.unit);
       return;
     }
 
@@ -708,9 +706,8 @@ async function handleExtraction(scope = 'campus') {
       const suffix = failedCount ? ` ${failedCount} falharam.` : '';
       log(`Lote concluído: ${processedCount} unidade(s) processada(s).${suffix}`, result.status === 'partial' ? 'error' : 'success');
       if (result.status === 'preview' || result.status === 'partial') {
-        log('Prévia concluída. Clique em Aplicar conferencia para materializar os dados no SIAGES.', 'info');
+        log('Prévia das atividades concluída. Clique em Aplicar atividades das unidades conferidas para atualizar o SIAGES.', 'info');
       }
-      await startAllRdCollection(activeTab);
       return;
     }
 
@@ -732,7 +729,7 @@ btnApplyPlan.addEventListener('click', async () => {
   try {
     btnApplyPlan.disabled = true;
     statusEl.innerHTML = '';
-    log('Aplicando a conferencia no SIAGES...', 'info');
+    log('Aplicando a conferência das atividades no SIAGES...', 'info');
     const result = await applyPlanPreview();
     const applied = Array.isArray(result.applied) ? result.applied : [];
     const inserted = Number(result.inserted) || applied.reduce((total, item) => total + (Number(item.inserted) || 0), 0);
