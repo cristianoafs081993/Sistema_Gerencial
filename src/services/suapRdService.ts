@@ -14,6 +14,7 @@ export type RdLink = Pick<RdMovement, 'org_id' | 'campus_uasg' | 'suap_unit_code
   valor_rd: number; rds: string[]; resolved: boolean; captured_at: string;
 };
 export type RdSyncRun = {
+  syncMode?: 'full' | 'incremental'; reusedDetails?: number; refreshedDetails?: number; reusedActivities?: number; canceledReuseMaxAgeDays?: number;
   id: string; runId: string; status: string; complete: boolean; summary: Record<string, number>;
   phase: string; sourceCount: number; processed: number; activitiesProcessed: number; activitiesTotal: number;
   busy?: boolean; error?: string;

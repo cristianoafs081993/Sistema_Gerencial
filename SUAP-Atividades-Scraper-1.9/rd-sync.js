@@ -31,8 +31,8 @@
     return { html, sourceUrl };
   }
 
-  async function collect({ unit, post, capture, progress, stopped = () => false }) {
-    let run = await post({ action: 'sync-extension', suapUnitCode: unit });
+  async function collect({ unit, post, capture, progress, stopped = () => false, forceFull = false }) {
+    let run = await post({ action: 'sync-extension', suapUnitCode: unit, ...(forceFull ? { forceFull:true } : {}) });
     await progress(run);
     while (run.status === 'collecting' && !stopped()) {
       if (run.busy) throw new Error('Outra coleta está em andamento. Retome após sua conclusão.');
@@ -46,12 +46,12 @@
     return run;
   }
 
-  async function collectAll({ units, post, capture, progress, stopped = () => false }) {
+  async function collectAll({ units, post, capture, progress, stopped = () => false, forceFull = false }) {
     const results = [];
     for (const unit of units) {
       if (stopped()) break;
       try {
-        const run = await collect({ unit: unit.value, post, capture, stopped,
+        const run = await collect({ unit: unit.value, post, capture, stopped, forceFull,
           progress: run => progress({ unit, run, results: [...results], total: units.length, running: true }),
         });
         results.push({ unit: unit.value, code: unit.code, campusUasg: unit.parentUasg, run });

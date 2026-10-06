@@ -1,6 +1,7 @@
 import { parseSuapPlanHtml } from '../../../src/services/suapPlanParser.ts';
 import { buildSuapPlanSourceUrl, getSuapPlanUnit } from '../../../src/lib/suapPlanUnits.ts';
 import { foldRdText, isAllowedSuapRdUrl, parseSuapRdDetail, parseSuapRdList, SUAP_RD_ORIGIN, type SuapRdRef, type SuapRdDetail } from '../../../src/services/suapRdParser.ts';
+import { prepareRdActivities, prepareRdDetails, rdChecksum, type RdActivity, type RdReuse } from './suap_rd_reuse.ts';
 
 type HtmlParser = new () => { parseFromString(html: string, type: string): Document | null };
 export type RdDatabase = { from(table: string): any; rpc(name: string, args: Record<string, unknown>): PromiseLike<any> };
@@ -9,9 +10,10 @@ export type RdState = {
   phase: 'inventory' | 'plan' | 'activities' | 'details' | 'verify' | 'ready';
   captureMode?: 'extension' | 'backend';
   nextUrl: string | null; inventory: SuapRdRef[]; total: number | null;
-  activities: Array<{ id: string; name: string }>; activityCursor: number;
+  activities: RdActivity[]; activityCursor: number;
   activityNextUrl: string | null; sources: Record<string, Source[]>;
   detailCursor: number; verify: SuapRdRef[]; verifyTotal: number | null;
+  reuse?: RdReuse;
 };
 export type RdRun = { id: string; org_id: string; user_id: string; campus_uasg: string; suap_unit_code: string;
   status: string; state: RdState; source_count: number; summary: Record<string, number>; complete: boolean;
@@ -26,7 +28,10 @@ export function initialRdState(unit: string): RdState {
 /** The server chooses every page; the extension supplies only that page's HTML. */
 export function nextRdCaptureUrl(run: RdRun): string | null {
   const state = run.state;
+  while (state.phase === 'activities' && state.activities[state.activityCursor]?.reused) state.activityCursor++;
   if (state.phase === 'activities' && state.activityCursor >= state.activities.length) state.phase = 'details';
+  const reused = new Set(state.reuse?.reusedIds ?? []);
+  while (state.phase === 'details' && reused.has(state.inventory[state.detailCursor]?.rdId)) state.detailCursor++;
   if (state.phase === 'details' && state.detailCursor >= state.inventory.length) {
     state.phase = 'verify'; state.nextUrl = rdInventoryUrl(run.suap_unit_code);
   }
@@ -78,7 +83,8 @@ function addPage(existing: SuapRdRef[], incoming: SuapRdRef[], expected: number 
   if (incoming.some(rd => ids.has(rd.rdId))) throw new Error('Paginação instável ou repetida; inicie nova conferência.');
   existing.push(...incoming);
 }
-const signature = (refs: SuapRdRef[]) => JSON.stringify([...refs].sort((a,b) => Number(a.rdId)-Number(b.rdId)));
+const signature = (refs: SuapRdRef[]) => JSON.stringify([...refs].sort((a,b) => Number(a.rdId)-Number(b.rdId))
+  .map(ref => [ref.rdId,ref.numero,ref.situacao,ref.tipo,ref.rowFingerprint ?? null]));
 
 /** Performs only bounded reads; active records are changed exclusively by the apply RPC. */
 export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: string) => Promise<string>, Parser: HtmlParser, steps = 6) {
@@ -91,6 +97,7 @@ export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: str
     if (!captureUrl) break;
     if (state.phase === 'inventory' || state.phase === 'verify') {
       const page = parseSuapRdList(await load(state.nextUrl!), state.nextUrl!, run.suap_unit_code, Parser);
+      for (const ref of page.refs) if (ref.rowFingerprint) ref.rowFingerprint = await rdChecksum(ref.rowFingerprint);
       const verify = state.phase === 'verify';
       addPage(verify ? state.verify : state.inventory, page.refs, verify ? state.verifyTotal : state.total, page.total);
       if (verify) state.verifyTotal = page.total; else state.total = page.total;
@@ -109,7 +116,7 @@ export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: str
           const selected = document?.querySelector('#id_unidade_gestora option[selected]');
           if (!selected || selected.getAttribute('value') !== run.suap_unit_code) throw new Error('Plano retornou outra unidade SUAP.');
           const plan = parseSuapPlanHtml(html, Parser);
-          state.activities = plan.activities.map(activity => ({ id: activity.suapActivityId, name: activity.atividade }));
+          await prepareRdActivities(state,plan.activities);
           state.phase = 'activities';
     } else if (state.phase === 'activities') {
       const activity = state.activities[state.activityCursor];
@@ -123,8 +130,17 @@ export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: str
         if (!sources.some(source => source.activityId === activity.id)) sources.push({ planId: 8, activityId: activity.id, activityName: page.activityName, sourceUrl: url });
         state.sources[rd.rdId] = sources;
       }
+      activity.seenRdIds = [...new Set([...(activity.seenRdIds ?? []),...page.refs.map(ref => ref.rdId)])];
       state.activityNextUrl = page.nextUrl;
-      if (!page.nextUrl) state.activityCursor++;
+      if (!page.nextUrl) {
+        const changedRelation = JSON.stringify([...(activity.previousRdIds ?? [])].sort()) !== JSON.stringify([...activity.seenRdIds].sort());
+        if (changedRelation && state.activities.some(item => item.reused)) {
+          // A hidden reassignment can leave the inventory/plan totals unchanged. Recheck every ID.
+          for (const item of state.activities) { item.reused = false; item.seenRdIds = []; }
+          state.sources = {}; state.activityCursor = 0;
+          if (state.reuse) state.reuse.reusedActivities = 0;
+        } else { activity.checkedAt = new Date().toISOString(); state.activityCursor++; }
+      }
     } else if (state.phase === 'details') {
       const ref = state.inventory[state.detailCursor];
       if (!ref) { state.phase = 'verify'; state.nextUrl = rdInventoryUrl(run.suap_unit_code); continue; }
@@ -134,13 +150,16 @@ export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: str
       const sources = state.sources[ref.rdId] ?? [];
       if (sources.some(source => foldRdText(source.activityName) !== foldRdText(detail.activityName))) throw new Error('Atividade da RD diverge da relação oficial.');
       const payload = { ...detail, sources };
-      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(payload)));
-      const checksum = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2,'0')).join('');
+      const checksum = await rdChecksum(payload);
       const { error } = await db.from('suap_rd_snapshots').upsert({ run_id: run.id, org_id: run.org_id,
-        campus_uasg: run.campus_uasg, suap_unit_code: run.suap_unit_code, suap_rd_id: ref.rdId, payload, checksum }, { onConflict: 'run_id,suap_rd_id' });
+        campus_uasg: run.campus_uasg, suap_unit_code: run.suap_unit_code, suap_rd_id: ref.rdId, payload, checksum,
+        captured_at: new Date().toISOString() }, { onConflict: 'run_id,suap_rd_id' });
       if (error) throw error;
       state.detailCursor++;
+      if (state.reuse) state.reuse.refreshedDetails++;
     }
+    nextRdCaptureUrl(run);
+    if (state.phase === 'details') { await prepareRdDetails(db,run); nextRdCaptureUrl(run); }
     } catch (error) {
       Object.assign(state, before);
       throw error;

@@ -492,4 +492,4 @@ Nenhuma chave privilegiada é enviada ao frontend. Ver [ativação](PNCP_CONTRAC
 
 ## Sessão para RDs SUAP
 
-`sync-suap-rds` utiliza `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`. A extensão Suape 1.9.55 captura o HTML na aba autenticada e dispensa conexão SUAP no backend para `sync-extension`/`sync-html`, individualmente ou em todas as unidades. O mesmo `SUAP_SESSION_ENCRYPTION_KEY` opcional de `sync-suap-plan` é usado apenas pelo coletor backend de compatibilidade (`sync`). Nenhuma variável nova de frontend. Veja [SUAP_RD_SYNC](SUAP_RD_SYNC.md).
+`sync-suap-rds` utiliza `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`. A extensão Suape 1.9.57 captura o HTML na aba autenticada e dispensa conexão SUAP no backend para `sync-extension`/`sync-html`, individualmente ou em todas as unidades. O reaproveitamento de concluídas usa snapshots aplicados do servidor e a opção `forceFull` permite revalidar tudo. O mesmo `SUAP_SESSION_ENCRYPTION_KEY` opcional de `sync-suap-plan` é usado apenas pelo coletor backend de compatibilidade (`sync`). Nenhuma variável nova de frontend ou backend. Veja [SUAP_RD_SYNC](SUAP_RD_SYNC.md).

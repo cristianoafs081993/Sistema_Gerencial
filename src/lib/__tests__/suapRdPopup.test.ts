@@ -5,10 +5,10 @@ import { extensionFixturePath } from '@/test/extensionFixtures';
 import { planHtml } from '@/services/__tests__/suapRdFixtures';
 const popupHtml=readFileSync(extensionFixturePath('popup.html'),'utf8');
 const popupScript=readFileSync(extensionFixturePath('popup.js'),'utf8');
-function popup(results:unknown[]=[], rdRunning=false) {
+function popup(results:unknown[]=[], rdRunning=false, runOverrides:Record<string,unknown>={}) {
   document.body.innerHTML=popupHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i)![1];
   const stored:Record<string,unknown>={};
-  const sendMessage=vi.fn(async(message:{source:string;type:string;scope?:string})=>({ok:true,running:rdRunning,status:message.scope==='all'?{results,total:44}:rdRunning?{run:{status:'collecting',processed:3,sourceCount:500,activitiesProcessed:3,activitiesTotal:335}}:null}));
+  const sendMessage=vi.fn(async(message:{source:string;type:string;scope?:string})=>({ok:true,running:rdRunning,status:message.scope==='all'?{results,total:44}:rdRunning?{run:{status:'collecting',processed:3,sourceCount:500,activitiesProcessed:3,activitiesTotal:335,...runOverrides}}:null}));
   const response=(payload:unknown)=>({ok:true,json:async()=>payload});
   const fetcher=vi.fn(async(_url:string,options?:{body:string})=>{
     const {action}=JSON.parse(options?.body||'{}');
@@ -27,6 +27,19 @@ function popup(results:unknown[]=[], rdRunning=false) {
 }
 afterEach(async()=>{await new Promise(resolve=>setTimeout(resolve,0));document.body.innerHTML='';vi.unstubAllGlobals();});
 const button=(id:string)=>document.getElementById(id) as HTMLButtonElement;
+it.each([['btn-collect-rds',undefined],['btn-collect-all-rds','all']])('envia a opção de revalidar tudo apenas ao iniciar RDs em %s',async(id,scope)=>{
+  const {sendMessage,actions}=popup();
+  await waitFor(()=>expect(document.getElementById('rd-sync-status')?.textContent).toContain('Unidade SUAP 19'));
+  (document.getElementById('rd-force-full') as HTMLInputElement).checked=true;
+  button(id!).click();
+  await waitFor(()=>expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({type:'start',forceFull:true,...(scope?{scope}:{})})));
+  expect(actions().every(action=>action==='status')).toBe(true);
+});
+it('mostra quantas RDs e relações foram reaproveitadas sem bloquear atividades',async()=>{
+  popup([],true,{syncMode:'incremental',reusedDetails:450,refreshedDetails:12,reusedActivities:300});
+  await waitFor(()=>expect(document.getElementById('rd-sync-status')?.textContent).toContain('450 RDs reaproveitadas; 12 relidas; 300 relações'));
+  expect(button('btn-extract-en').disabled).toBe(false);
+});
 it.each([
   ['btn-extract-en','sync-html','apply','Aplicar atividades desta unidade'],
   ['btn-extract-all','sync-all','apply-batch','Aplicar atividades das unidades conferidas'],

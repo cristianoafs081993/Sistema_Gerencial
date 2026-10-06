@@ -143,6 +143,8 @@ A listagem de Contratos continua sendo tabela. O detalhe aberto pelo contrato se
 
 ## Prévia e movimentos de RDs
 
+Na 1.9.57, o bloco de RDs oferece a opção excepcional de revalidar tudo antes de iniciar unidade/lote. A coleta normal reaproveita concluídas permanentemente e consulta novas/pendentes; canceladas passam por conferência periódica. Progresso distingue detalhes relidos/reaproveitados e relações reaproveitadas. A prévia continua completa e exige aplicação explícita, mesmo com snapshots copiados.
+
 O popup da extensão 1.9.56 apresenta blocos separados `Atividades — Plano 8` e `RDs — Requisições de despesas`. Cada bloco explica os dados atualizados e oferece ações da unidade atual ou de todas as unidades. As RDs agrupam coleta/retomada, pausa e aplicação por escopo, com progresso próprio. A aplicação de atividades também identifica unidade ou lote. Os controles de um fluxo permanecem disponíveis durante a execução do outro; nenhum botão inicia os dois. A conferência no SIAGES fica como link no bloco de RDs.
 
 Importação de RDs acompanha a captura iniciada pela extensão (unidade atual ou todas as unidades), mostrando unidade/campus, atualização do progresso persistido, prévia paginada e aplicação somente da captura completa. O detalhe do empenho usa a aba Itens e movimentações na apresentação em página; na apresentação em diálogo a seção permanece visível. Estados de carregamento, erro de consulta e ausência de RD são distintos. Veja [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

@@ -1529,8 +1529,8 @@ Consumido por:
 | Objeto | Uso |
 | --- | --- |
 | `suap_rd_units` | Catálogo de unidade SUAP / UASG |
-| `suap_rd_sync_runs` | Cobertura, cursores, resumo e lease |
-| `suap_rd_snapshots` | Revisões estruturadas por execução, com fontes e checksum |
+| `suap_rd_sync_runs` | Cobertura, cursores, resumo e lease; `state.reuse` guarda versão, base aplicada e contadores de reaproveitamento por usuário/órgão/campus/unidade |
+| `suap_rd_snapshots` | Revisões estruturadas por execução, com fontes e checksum; cópias de evidências mantêm `captured_at` original |
 | `suap_requisicoes_despesa` | Revisão ativa de cada RD |
 | `suap_rd_movimentacoes` | Linhas, NE/RO e resolução local; view security_invoker |
 | `atividade_empenho_vinculos` | Líquido confirmado por atividade / NE; view security_invoker |

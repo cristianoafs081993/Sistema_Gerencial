@@ -60,6 +60,8 @@
       color: #eef4f8;
     }
     .sync-link { display: inline-block; margin-top: 12px; color: #93c5fd; font-size: 12px; }
+    .sync-option { display: flex; gap: 8px; align-items: center; line-height: 1.5; }
+    .sync-option input { width: auto; margin: 0; }
     [hidden] { display: none !important; }
     select {
       box-sizing: border-box;
@@ -193,6 +195,8 @@
   <section class="auth-card" aria-labelledby="rd-sync-title">
     <h3 id="rd-sync-title">RDs — Requisições de despesas</h3>
     <p class="sync-description">Coleta RDs, reforços, anulações e vínculos oficiais para conferência. Percorre os detalhes e pode ser pausada e retomada. Depois, aplique a prévia no SIAGES.</p>
+    <p class="sync-description">Após a primeira aplicação, reaproveita RDs concluídas e seus vínculos. Busca RDs novas e relê as pendentes. Canceladas passam por conferência periódica.</p>
+    <label class="sync-option"><input id="rd-force-full" type="checkbox">Revalidar tudo na próxima coleta (mais demorado)</label>
     <div class="sync-scope">
       <h4>Unidade selecionada no SUAP</h4>
       <p id="rd-sync-status" aria-live="polite">Abra o Plano 8 ou a lista de RDs da unidade no SUAP.</p>

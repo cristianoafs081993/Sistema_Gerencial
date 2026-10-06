@@ -457,14 +457,14 @@ async function handleRdSyncMessage(message) {
   const collect = unit === 'all' ? (async () => {
     const { units } = await postRdAction({ action: 'units' });
     if (!Array.isArray(units) || !units.length) throw new Error('Catálogo de unidades SUAP indisponível.');
-    return globalThis.SuapeRdSync.collectAll({ units, post: postRdAction, capture, stopped: () => job.stopped,
+    return globalThis.SuapeRdSync.collectAll({ units, post: postRdAction, capture, stopped: () => job.stopped, forceFull:message.forceFull === true,
       progress: async status => {
         if (status.unit && status.run) await saveRdStatus(status.unit.value, { run: status.run, running: true });
         const { unit: currentUnit, ...batchStatus } = status;
         await saveRdStatus('all', { ...batchStatus, currentUnit });
       },
     });
-  })() : globalThis.SuapeRdSync.collect({ unit, post: postRdAction, capture, stopped: () => job.stopped, progress: run => saveRdStatus(unit, { run, running: true }) });
+  })() : globalThis.SuapeRdSync.collect({ unit, post: postRdAction, capture, stopped: () => job.stopped, forceFull:message.forceFull === true, progress: run => saveRdStatus(unit, { run, running: true }) });
   void collect.then(async result => {
     if (unit === 'all') {
       for (const entry of result.results) await saveRdStatus(entry.unit, { run: entry.run, error: entry.error, running: false });

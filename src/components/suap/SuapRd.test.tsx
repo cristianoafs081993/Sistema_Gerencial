@@ -14,6 +14,14 @@ const renderUi=(ui:ReactElement)=>render(<QueryClientProvider client={new QueryC
 const emp={id:'e',numero:'2026NE000014',valor:150} as Empenho;
 const movement={org_id:'org',campus_uasg:'158366',suap_unit_code:'19',run_id:'run',suap_rd_id:'1',rd_numero:'2026RD000001',tipo:'dotacao',rd_situacao:'Concluída',source_url:'https://suap.ifrn.edu.br/plan_estrategico/detalhar_requisicaodespesa/1/',atividade_nome:'Almoxarifado',line_index:1,valor:100,empenho_id:'e',empenho_numero:emp.numero,linha_situacao:'Confirmada',confirmed:true,resolution:'resolvido',captured_at:'2026-10-05T12:00:00Z'} as RdMovement;
 const run={id:'run',runId:'run',status:'preview',complete:true,summary:{rds:4,movimentos:3},phase:'ready',sourceCount:4,processed:4,activitiesProcessed:1,activitiesTotal:1} as RdSyncRun;
+it('informa reaproveitamento e orienta revalidar tudo sem iniciar coleta no frontend',async()=>{
+  const incremental={...run,syncMode:'incremental' as const,reusedDetails:3,refreshedDetails:1,reusedActivities:1};
+  vi.mocked(suapRdService.action).mockResolvedValue({...incremental,run:incremental});
+  renderUi(<SuapRdSyncCard onSynced={vi.fn()} />);
+  expect(await screen.findByText('3 RDs reaproveitadas · 1 relidas · 1 relações de atividades reaproveitadas.')).toBeInTheDocument();
+  expect(screen.getByText(/Para reconferir tudo imediatamente/)).toHaveTextContent('reaproveita permanentemente RDs concluídas');
+  expect(vi.mocked(suapRdService.action).mock.calls.some(([action])=>action==='sync')).toBe(false);
+});
 beforeEach(()=>{ vi.clearAllMocks();state.admin=true;vi.mocked(suapRdService.action).mockResolvedValue({ ...run,run:null });vi.mocked(suapRdService.read).mockResolvedValue([]); });
 it('mostra reforço e anulação negativa, exclui cancelada dos totais e não duplica linha com conflito',async()=>{
   vi.mocked(suapRdService.read).mockResolvedValue([movement,{...movement,suap_rd_id:'2',rd_numero:'2026RD000002',tipo:'reforco',valor:60},
@@ -41,7 +49,7 @@ it('superadmin atualiza a captura da extensão e aplica somente após conferênc
   const onSynced=vi.fn();renderUi(<SuapRdSyncCard onSynced={onSynced} />);
   await waitFor(()=>expect(suapRdService.action).toHaveBeenCalledWith('status','19','158366'));
   fireEvent.click(screen.getByRole('button',{name:'Atualizar conferência das RDs'}));
-  fireEvent.click(await screen.findByRole('button',{name:'Aplicar captura completa'}));
+  fireEvent.click(await screen.findByRole('button',{name:'Aplicar conferência das RDs'}));
   await waitFor(()=>expect(suapRdService.action).toHaveBeenCalledWith('apply','19','158366','run'));
   await waitFor(()=>expect(onSynced).toHaveBeenCalledOnce());
   expect(vi.mocked(suapRdService.action).mock.calls.some(([action])=>action==='sync')).toBe(false);

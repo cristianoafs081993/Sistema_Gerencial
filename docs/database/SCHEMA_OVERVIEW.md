@@ -226,3 +226,5 @@ A migration `20260812100000_create_suap_document_reviews.sql` cria `suap_documen
 ## RDs SUAP (05/10/2026)
 
 A migration `20261005120000` acrescenta catálogo de unidades, execuções, snapshots e projeção de RDs, com RLS por órgão/campus. As views `suap_rd_movimentacoes` e `atividade_empenho_vinculos` resolvem os IDs oficiais dinamicamente. Não alteram vínculos manuais ou saldos SIAFI. Contrato: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).
+
+O reaproveitamento da 1.9.57 utiliza o `state` JSONB existente das execuções e copia snapshots da última aplicação completa no mesmo usuário/órgão/campus/unidade. Guarda base, versão, hashes e contadores; preserva `captured_at` nas cópias. Concluídas não expiram; pendentes são relidas e canceladas têm auditoria/prazo. Não acrescenta migration nem modifica RPCs/RLS.

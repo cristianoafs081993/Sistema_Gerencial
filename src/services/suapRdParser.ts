@@ -2,7 +2,7 @@ import { getSuapPlanUnit, SUAP_PLAN_UNITS } from '../lib/suapPlanUnits.ts';
 
 export const SUAP_RD_ORIGIN = 'https://suap.ifrn.edu.br';
 export type SuapRdType = 'dotacao' | 'reforco' | 'anulacao';
-export type SuapRdRef = { rdId: string; numero: string; situacao: string; tipo: string };
+export type SuapRdRef = { rdId: string; numero: string; situacao: string; tipo: string; rowFingerprint?: string };
 export type SuapRdLine = {
   naturezaDespesa: string; valor: number; empenhoCompleto: string | null;
   empenhoNumero: string | null; ug: string | null; gestao: string | null;
@@ -98,7 +98,10 @@ export function parseSuapRdList(html: string, sourceUrl: string, unitCode: strin
     if (!rdId || !/^\d{4}RD\d{6}$/.test(numero)) throw new Error('Identidade de RD inválida.');
     const rowUnit = cells[col('unidade')] ?? '';
     assertRdUnit(rowUnit, unitCode);
-    refs.push({ rdId, numero, situacao: cells[col('situacao')] ?? '', tipo: cells[col('tipo')] ?? '' });
+    // The collector hashes this canonical row before persisting it; action links are not data.
+    const rowFingerprint = JSON.stringify(headers.flatMap((header,index) =>
+      !header || /^(#|acoes|opcoes)$/.test(header) ? [] : [[header,cells[index] ?? '']]));
+    refs.push({ rdId, numero, situacao: cells[col('situacao')] ?? '', tipo: cells[col('tipo')] ?? '', rowFingerprint });
   }
   if (new Set(refs.map(rd => rd.rdId)).size !== refs.length) throw new Error('RD duplicada na página.');
   const currentPage = Number(url.searchParams.get('p') || 1);

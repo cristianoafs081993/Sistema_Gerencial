@@ -41,6 +41,16 @@ assert.equal((await db.query("select count(*)::int n from atividade_empenho_vinc
 await assert.rejects(revert(first),/mais recente/); await revert(second); await revert(second);
 assert.equal((await db.query("select run_id from suap_requisicoes_despesa where active and suap_unit_code='19'")).rows[0].run_id,first);
 assert.equal(Number((await db.query('select valor from empenhos')).rows[0].valor),55229.43);
+// A reused snapshot must keep its actual read date and remain atomic/idempotent on apply/revert.
+const originalCapture=(await db.query('select captured_at from suap_rd_snapshots where run_id=$1',[first])).rows[0].captured_at;
+const incremental=await run();
+await db.query(`insert into suap_rd_snapshots(run_id,org_id,campus_uasg,suap_unit_code,suap_rd_id,payload,checksum,captured_at)
+  select $1,org_id,campus_uasg,suap_unit_code,suap_rd_id,payload,checksum,captured_at from suap_rd_snapshots where run_id=$2`,[incremental,first]);
+await apply(incremental);await apply(incremental);
+assert.equal(new Date((await db.query("select captured_at from suap_requisicoes_despesa where suap_unit_code='19' and active")).rows[0].captured_at).getTime(),new Date(originalCapture).getTime());
+assert.equal(Number((await db.query("select valor_rd from atividade_empenho_vinculos where suap_unit_code='19'")).rows[0].valor_rd),20242.46);
+await revert(incremental);
+assert.equal((await db.query("select run_id from suap_requisicoes_despesa where active and suap_unit_code='19'")).rows[0].run_id,first);
 await db.exec(`set rd.org='${org}'; set rd.campus='158371'; set role authenticated;`);
 assert.equal((await db.query('select * from suap_rd_movimentacoes')).rows.length,0);
 await assert.rejects(apply(first),/permission denied/);

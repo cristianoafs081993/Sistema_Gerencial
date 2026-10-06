@@ -23,6 +23,7 @@ const rdAllStatusEl = document.getElementById('rd-all-sync-status');
 const btnCollectAllRds = document.getElementById('btn-collect-all-rds');
 const btnApplyAllRds = document.getElementById('btn-apply-all-rds');
 const btnPauseAllRds = document.getElementById('btn-pause-all-rds');
+const rdForceFull = document.getElementById('rd-force-full');
 let rdUnit = null;
 const automationSecretInput = document.getElementById('automation-secret');
 const extensionAuthEmailInput = document.getElementById('extension-auth-email');
@@ -195,6 +196,7 @@ async function updateAllRdStatus() {
   const previews = entries.filter(entry => entry.run?.status === 'preview' && entry.run.complete);
   const applied = entries.filter(entry => entry.run?.status === 'applied');
   const failed = entries.filter(entry => entry.error);
+  const reused = entries.reduce((sum,entry) => sum + (entry.run?.reusedDetails || 0),0);
   btnApplyAllRds.hidden = !previews.length || running;
   btnPauseAllRds.hidden = !running;
   btnCollectAllRds.disabled = running;
@@ -202,7 +204,7 @@ async function updateAllRdStatus() {
   const current = status?.currentUnit ? ` Unidade atual: ${status.currentUnit.code} (${status.currentUnit.parentUasg}).` : '';
   const errors = failed.length ? ` Falhas: ${failed.map(entry => `${entry.code}: ${entry.error}`).join('; ')}` : '';
   rdAllStatusEl.textContent = status?.error || (status
-    ? `${running ? 'Coletando' : status.paused ? 'Lote pausado' : 'Lote de RDs'}: ${entries.length}/${status.total || 0} unidades; ${previews.length} conferências completas; ${applied.length} aplicadas.${current}${errors} Confira cada unidade no SIAGES antes de aplicar.`
+    ? `${running ? 'Coletando' : status.paused ? 'Lote pausado' : 'Lote de RDs'}: ${entries.length}/${status.total || 0} unidades; ${previews.length} conferências completas; ${applied.length} aplicadas; ${reused} RDs reaproveitadas.${current}${errors} Confira cada unidade no SIAGES antes de aplicar.`
     : 'Todas as unidades: captura separada por unidade e campus, com conferência antes da aplicação.');
 }
 
@@ -216,18 +218,19 @@ async function updateRdStatus() {
   btnPauseRds.hidden = !running;
   btnCollectRds.disabled = running;
   const totals = run?.summary;
+  const reuse = run?.syncMode === 'incremental' ? ` ${run.reusedDetails || 0} RDs reaproveitadas; ${run.refreshedDetails || 0} relidas; ${run.reusedActivities || 0} relações de atividades reaproveitadas.` : '';
   const currency = value => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   rdStatusEl.textContent = status?.error || (run?.status === 'preview'
-    ? `Captura completa da unidade ${rdUnit}: ${totals?.rds || 0} RDs. Dotação ${currency(totals?.totalDotacao)}, reforços ${currency(totals?.totalReforco)}, anulações ${currency(totals?.totalAnulacao)}. Confira os detalhes no SIAGES antes de aplicar.`
+    ? `Conferência completa da unidade ${rdUnit}: ${totals?.rds || 0} RDs.${reuse} Dotação ${currency(totals?.totalDotacao)}, reforços ${currency(totals?.totalReforco)}, anulações ${currency(totals?.totalAnulacao)}. Confira os detalhes no SIAGES antes de aplicar.`
     : run?.status === 'applied' ? `RDs da unidade ${rdUnit} aplicadas no SIAGES.`
-    : run ? `${running ? 'Coletando RDs' : 'Coleta pausada ou interrompida'} — unidade ${rdUnit}: ${run.processed || 0}/${run.sourceCount || 0} detalhes; ${run.activitiesProcessed || 0}/${run.activitiesTotal || 0} relações oficiais verificadas. ${running ? 'Mantenha a aba SUAP aberta.' : 'Clique em coletar / retomar.'}`
+    : run ? `${running ? 'Coletando RDs' : 'Coleta pausada ou interrompida'} — unidade ${rdUnit}: ${run.processed || 0}/${run.sourceCount || 0} RDs conferidas; ${run.activitiesProcessed || 0}/${run.activitiesTotal || 0} relações oficiais verificadas.${reuse} ${running ? 'Mantenha a aba SUAP aberta.' : 'Clique em coletar / retomar.'}`
     : `Unidade SUAP ${rdUnit}. A coleta usa sua sessão nesta aba.`);
 }
 
 async function startRdCollection(tab, unit) {
   if (!/^\d+$/.test(String(unit))) throw new Error('Selecione a unidade SUAP antes de sincronizar.');
   rdUnit = String(unit);
-  await rdMessage('start', { tabId: tab.id });
+  await rdMessage('start', { tabId: tab.id, ...(rdForceFull?.checked ? { forceFull:true } : {}) });
   await updateRdStatus();
 }
 
@@ -246,7 +249,7 @@ async function initializeRdControls() {
 }
 
 async function startAllRdCollection(tab) {
-  await rdMessage('start', { scope: 'all', tabId: tab.id });
+  await rdMessage('start', { scope: 'all', tabId: tab.id, ...(rdForceFull?.checked ? { forceFull:true } : {}) });
   await updateAllRdStatus();
 }
 

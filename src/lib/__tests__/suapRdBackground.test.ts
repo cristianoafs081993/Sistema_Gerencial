@@ -4,7 +4,7 @@ import { extensionFixturePath } from '@/test/extensionFixtures';
 import { rdListUrl } from '@/services/__tests__/suapRdFixtures';
 
 type Values=Record<string, unknown>;
-type Message={type:string;unit?:string;scope?:string;tabId?:number};
+type Message={type:string;unit?:string;scope?:string;tabId?:number;forceFull?:boolean};
 const popupUrl='chrome-extension://test/popup.html';
 beforeAll(()=>{if(!AbortSignal.timeout)Object.defineProperty(AbortSignal,'timeout',{value:()=>new AbortController().signal,configurable:true});});
 function worker(fetcher:ReturnType<typeof vi.fn>) {
@@ -26,6 +26,17 @@ function worker(fetcher:ReturnType<typeof vi.fn>) {
 }
 const response=(data:unknown)=>({ok:true,json:async()=>data});
 describe('worker de RDs',()=>{
+  it.each([{unit:'19'},{scope:'all'}])('encaminha a opção de revalidação completa em %o',async scope=>{
+    const fetcher=vi.fn(async(_url:string,options:{body:string})=>{
+      const body=JSON.parse(options.body);
+      return response(body.action==='units'?{units:[{value:'19',code:'DG/CN',parentUasg:'158366'}]}:{runId:'r',status:'preview',complete:true,nextUrl:null});
+    });
+    const instance=worker(fetcher);
+    await instance.send({type:'start',tabId:5,forceFull:true,...scope});
+    await vi.waitFor(()=>expect(fetcher.mock.calls.some(([,options])=>{
+      const body=JSON.parse(options.body);return body.action==='sync-extension' && body.forceFull===true && body.suapUnitCode==='19';
+    })).toBe(true));
+  });
   it('continua após responder ao popup e captura na aba, sem enviar cookies ou refresh token',async()=>{
     const fetcher=vi.fn(async(_url:string,options:{body:string})=>{
       const body=JSON.parse(options.body);

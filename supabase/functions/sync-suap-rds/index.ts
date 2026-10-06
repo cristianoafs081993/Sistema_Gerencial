@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { DOMParser } from 'npm:linkedom@0.18.13';
 import { getSuapPlanUnit, SUAP_PLAN_UNITS } from '../../../src/lib/suapPlanUnits.ts';
 import { collectCapturedRdPage, collectRdChunk, fetchSuapRdHtml, initialRdState, nextRdCaptureUrl, summarizeRdPreview, type RdRun } from '../_shared/suap_rd_sync.ts';
+import { RD_CANCELED_REUSE_MAX_AGE_DAYS, seedRdReuse } from '../_shared/suap_rd_reuse.ts';
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization,apikey,content-type,x-client-info', 'Access-Control-Allow-Methods': 'POST,OPTIONS' };
 const reply = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
@@ -33,6 +34,7 @@ Deno.serve(async request => {
     if (roleError || !admin) return reply({ error:'Somente o superadministrador pode sincronizar RDs.' },403);
     const body = await request.json();
     const action = body.action ?? 'sync';
+    if (body.forceFull !== undefined && typeof body.forceFull !== 'boolean') return reply({ error:'Opção de coleta completa inválida.' },400);
     if (action === 'units') return reply({ units: SUAP_PLAN_UNITS });
     const unit = getSuapPlanUnit(body.suapUnitCode ?? '19');
     if (!unit || body.campusUasg && body.campusUasg !== unit.parentUasg) return reply({ error:'Campus e unidade SUAP incompatíveis.' },400);
@@ -68,14 +70,28 @@ Deno.serve(async request => {
       const { data,error } = await service.rpc('revert_suap_rd_snapshot',{ p_run_id:run.id,p_user_id:user.id });
       if (error) throw error; return reply({ status:'reverted',runId:run.id,summary:data });
     }
-    if (run?.status === 'preview') return reply(publicRun(run));
+    if (run?.status === 'preview') {
+      if (body.forceFull) return reply({ error:'Aplique ou descarte a conferência pronta antes de iniciar uma coleta completa.' },409);
+      return reply(publicRun(run));
+    }
     if (action === 'sync-html' && (!run || ['applied','failed','reverted'].includes(run.status))) return reply({ error:'Captura encerrada; inicie outra conferência.' },409);
     if (!run || ['applied','failed','reverted'].includes(run.status)) {
+      const state = initialRdState(unit.value);
+      let base: RdRun | null = null;
+      if (!body.forceFull) {
+        const previous = await service.from('suap_rd_sync_runs').select('*').eq('org_id',membership.org_id)
+          .eq('user_id',user.id).eq('campus_uasg',unit.parentUasg).eq('suap_unit_code',unit.value)
+          .eq('status','applied').eq('complete',true).order('applied_at',{ ascending:false }).limit(1).maybeSingle();
+        if (previous.error) throw previous.error;
+        base = previous.data;
+      }
+      seedRdReuse(state,{org_id:membership.org_id,user_id:user.id,campus_uasg:unit.parentUasg,suap_unit_code:unit.value},base,body.forceFull === true);
       const created = await service.from('suap_rd_sync_runs').insert({ org_id:membership.org_id,user_id:user.id,
-        campus_uasg:unit.parentUasg,suap_unit_code:unit.value,state:initialRdState(unit.value) }).select('*').single();
+        campus_uasg:unit.parentUasg,suap_unit_code:unit.value,state }).select('*').single();
       if (created.error) throw created.error; run = created.data;
     }
     if (!run) throw new Error('Execução RD não iniciada.');
+    if (body.forceFull && run.state.reuse?.mode === 'incremental') return reply({ error:'Descarte a coleta incremental antes de iniciar uma coleta completa.' },409);
     lease = crypto.randomUUID();
     const claimed = await service.from('suap_rd_sync_runs').update({ lease_token:lease,lease_until:new Date(Date.now()+120000).toISOString(),status:'collecting' })
       .eq('id',run.id).or(`lease_until.is.null,lease_until.lt.${new Date().toISOString()}`).select('id').maybeSingle();
@@ -114,7 +130,11 @@ Deno.serve(async request => {
 function publicRun(run: RdRun) {
   return { id:run.id,runId:run.id,status:run.status,complete:run.complete,summary:run.summary,
     error:run.error_message,startedAt:run.started_at,updatedAt:run.updated_at,
-    phase:run.state.phase,sourceCount:run.state.inventory.length,processed:run.state.detailCursor,
+    phase:run.state.phase,sourceCount:run.state.inventory.length,
+    processed:run.state.reuse ? run.state.reuse.refreshedDetails + run.state.reuse.reusedDetails : run.state.detailCursor,
     captureMode:run.state.captureMode ?? 'backend',nextUrl:nextRdCaptureUrl(structuredClone(run)),
-    activitiesProcessed:run.state.activityCursor,activitiesTotal:run.state.activities.length };
+    activitiesProcessed:run.state.activityCursor,activitiesTotal:run.state.activities.length,
+    syncMode:run.state.reuse?.mode ?? 'full',reusedDetails:run.state.reuse?.reusedDetails ?? 0,
+    refreshedDetails:run.state.reuse?.refreshedDetails ?? run.state.detailCursor,
+    reusedActivities:run.state.reuse?.reusedActivities ?? 0,canceledReuseMaxAgeDays:RD_CANCELED_REUSE_MAX_AGE_DAYS };
 }
