@@ -1,4 +1,5 @@
 import type { Atividade, Empenho } from '@/types';
+import type { RdLink } from '@/services/suapRdService';
 
 /**
  * Normaliza strings para comparação textual:
@@ -220,7 +221,9 @@ export type MatchEmpenhosResult = {
 export function matchEmpenhosToAtividades(
   atividades: Atividade[],
   empenhos: Empenho[],
+  officialLinks?: RdLink[],
 ): MatchEmpenhosResult {
+  if (officialLinks !== undefined) return matchOfficialEmpenhos(atividades, empenhos, officialLinks);
   const map = new Map<string, AtividadeEmpenhoMatchSummary>();
   const unmatchedEmpenhos: Empenho[] = [];
 
@@ -260,4 +263,30 @@ export function matchEmpenhosToAtividades(
     empenhosPorAtividadeMap: map,
     unmatchedEmpenhos,
   };
+}
+
+/** Official identifiers take precedence. Text scores are only available for legacy callers. */
+export function matchOfficialEmpenhos(atividades: Atividade[], empenhos: Empenho[], links: RdLink[]): MatchEmpenhosResult {
+  const map = new Map<string, AtividadeEmpenhoMatchSummary>(atividades.map(a => [a.id, { total: 0, count: 0, empenhos: [] }]));
+  const unmatchedEmpenhos: Empenho[] = [];
+  const add = (id: string, emp: Empenho, value: number) => {
+    const summary = map.get(id)!;
+    summary.total += value; summary.count++; summary.empenhos.push(emp);
+  };
+  for (const emp of empenhos.filter(e => e.status !== 'cancelado')) {
+    const candidates = links.filter(row => row.empenho_id === emp.id || row.empenho_numero === emp.numero.trim().toUpperCase());
+    if (emp.atividadeId && map.has(emp.atividadeId)) { add(emp.atividadeId, emp, emp.valor || 0); continue; }
+    // A manual association outside the current activity scope must never be reassigned.
+    if (emp.atividadeId) { unmatchedEmpenhos.push(emp); continue; }
+    const valid = candidates.length > 0 && candidates.every(row => row.resolved && row.empenho_id === emp.id && row.atividade_id && map.has(row.atividade_id)
+      && atividades.some(a => a.id === row.atividade_id && a.campusUasg === row.campus_uasg && a.suapUnitCode === row.suap_unit_code
+        && a.suapPlanId === row.suap_plan_id && a.suapActivityId === row.suap_activity_id));
+    const allocations = new Map<string, number>();
+    if (valid) for (const row of candidates) allocations.set(row.atividade_id!, (allocations.get(row.atividade_id!) || 0) + Number(row.valor_rd));
+    if (!valid || allocations.size > 1 && Math.abs([...allocations.values()].reduce((sum, value) => sum + value, 0) - emp.valor) > 0.01) {
+      unmatchedEmpenhos.push(emp); continue;
+    }
+    for (const [id, value] of allocations) add(id, emp, value);
+  }
+  return { empenhosPorAtividadeMap: map, unmatchedEmpenhos };
 }

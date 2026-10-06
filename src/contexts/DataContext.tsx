@@ -157,6 +157,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       ['dashboard-liquidacoes-por-empenho'],
       ['dashboard-contratos-api-liquidacoes'],
       ['dashboard-contratos-api-empenhos'],
+      ['suap-rds'],
     ];
 
     await Promise.all(

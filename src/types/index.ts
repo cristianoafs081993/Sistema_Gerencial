@@ -4,6 +4,10 @@ export type TipoAtividade = 'campus' | 'sistemico' | 'emendas-parlamentares';
 
 export interface Atividade {
   id: string;
+  campusUasg?: string;
+  suapUnitCode?: string;
+  suapPlanId?: number;
+  suapActivityId?: string;
   dimensao: string;
   dimensaoId?: string;
   componenteFuncional: string;

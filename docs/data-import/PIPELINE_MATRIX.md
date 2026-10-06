@@ -38,5 +38,10 @@
 - Na aba Restos a Pagar, o filtro `Pendente` usa saldo RAP operacional estritamente maior que zero; empenhos com saldo zerado por pagamento ou cancelamento ficam fora dele.
 - Todos os uploads manuais agora registram início, métricas de linhas processadas e eventuais falhas na tabela `data_import_runs`, consumida pela Central de Observabilidade na rota `/importacao-dados`.
 
+## Pipeline de RDs SUAP
 
+| Entrada | Página / componente | Parser / integração | Destino |
+| --- | --- | --- | --- |
+| HTML autenticado do inventário, atividade e detalhe RD | `ImportacaoDados` / `SuapRdSyncCard` | `suapRdParser` / `sync-suap-rds` | `suap_rd_snapshots` e `suap_requisicoes_despesa`; views de movimentos e vínculos |
 
+Prévia completa obrigatória, retomada, escopo campus/unidade e saldos preservados: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

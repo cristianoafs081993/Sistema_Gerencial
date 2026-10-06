@@ -416,3 +416,7 @@ PNCP → sync-contratos-pncp-documentos → contratos_api_documentos e
 contratos_api_instrumentos_cobranca → ContratoApiDetailsSheet.
 O navegador solicita a atualização autenticada; não persiste respostas públicas
 diretamente. Falhas não avançam as datas de sucesso. Ver [operação](../ops/PNCP_CONTRACT_SYNC.md).
+
+## Linhagem de RDs SUAP
+
+Inventário paginado da unidade + Plano 8 + relação oficial atividade/RD + detalhe RD → `suap_rd_snapshots` → aplicação completa e atômica → `suap_requisicoes_despesa` → views de movimentos/vínculos → dashboard e detalhes do empenho. O ID da atividade vem da URL oficial, nunca do texto. Nenhuma linha dessa cadeia atualiza valores SIAFI. Conferências e limitações: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

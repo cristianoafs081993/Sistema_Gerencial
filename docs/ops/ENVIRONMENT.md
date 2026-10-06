@@ -489,3 +489,7 @@ Separar conceitualmente:
 A função usa SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no servidor. O cron requer
 a chave service_role no Vault, com nome pncp_sync_service_role_key (ou service_role_key).
 Nenhuma chave privilegiada é enviada ao frontend. Ver [ativação](PNCP_CONTRACT_SYNC.md).
+
+## Sessão para RDs SUAP
+
+`sync-suap-rds` utiliza `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` e o mesmo `SUAP_SESSION_ENCRYPTION_KEY` opcional de `sync-suap-plan`. Não há variável nova de frontend. É necessária uma conexão SUAP válida no backend; a aba Chrome aberta não a substitui. Veja [SUAP_RD_SYNC](SUAP_RD_SYNC.md).

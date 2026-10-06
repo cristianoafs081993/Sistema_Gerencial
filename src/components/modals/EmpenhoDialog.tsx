@@ -1,4 +1,5 @@
 import { RecordDetailsPage } from '@/components/records/RecordDetailsPage';
+import { SuapRdMovements } from '@/components/suap/SuapRdMovements';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SectionPanel } from '@/components/design-system/SectionPanel';
 import { useState, useEffect, useMemo } from 'react';
@@ -178,7 +179,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave,
             {pageMode && <>
               <TabsList aria-label="Detalhes do empenho" className="h-auto flex-wrap">
                 <TabsTrigger value="resumo">Resumo</TabsTrigger>
-                <TabsTrigger value="movimentos">Itens e histórico</TabsTrigger>
+                <TabsTrigger value="movimentos">Itens e movimentações</TabsTrigger>
               </TabsList>
             </>}
             <TabsContent value="resumo" forceMount hidden={pageMode && detailTab !== 'resumo'} className="space-y-6">
@@ -279,6 +280,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave,
             </SectionPanel>}
             </TabsContent>
             <TabsContent value="movimentos" forceMount hidden={pageMode && detailTab !== 'movimentos'} className="space-y-6">
+            <SuapRdMovements empenho={empenho} enabled={open} />
             {/* Subitens do Portal da Transparencia */}
             <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
               <div className="px-5 py-3 border-b border-border/60 bg-muted/40 flex justify-between items-center">
@@ -366,7 +368,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave,
                               </Badge>
                             </td>
                             <td className={`px-5 py-3 text-right font-black ${op.operacao === 'ANULACAO' ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                              {op.operacao === 'ANULACAO' ? '-' : '+'}{formatCurrency(op.valorTotal)}
+                              {op.operacao === 'ANULACAO' ? '-' : '+'}{formatCurrency(Math.abs(op.valorTotal))}
                             </td>
                           </tr>
                         ))}

@@ -1524,3 +1524,15 @@ Consumido por:
 - [mobile/src/services/api.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/mobile/src/services/api.ts)
 - [ParticipantesModal.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/mobile/src/components/ParticipantesModal.tsx)
 
+## Requisições de despesas SUAP
+
+| Objeto | Uso |
+| --- | --- |
+| `suap_rd_units` | Catálogo de unidade SUAP / UASG |
+| `suap_rd_sync_runs` | Cobertura, cursores, resumo e lease |
+| `suap_rd_snapshots` | Revisões estruturadas por execução, com fontes e checksum |
+| `suap_requisicoes_despesa` | Revisão ativa de cada RD |
+| `suap_rd_movimentacoes` | Linhas, NE/RO e resolução local; view security_invoker |
+| `atividade_empenho_vinculos` | Líquido confirmado por atividade / NE; view security_invoker |
+
+Chaves, autorização e RPCs de aplicação/reversão: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

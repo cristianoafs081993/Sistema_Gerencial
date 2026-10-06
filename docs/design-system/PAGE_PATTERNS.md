@@ -140,3 +140,7 @@ A tela de mapeamento operacional de processos adota arquitetura de estúdio inte
 ## Detalhe de contrato (`ContratoApiDetailsSheet`, modo página)
 
 A listagem de Contratos continua sendo tabela. O detalhe aberto pelo contrato segue a organização do app mobile, em abas: **Resumo** (objeto, indicadores, execução financeira com barra de progresso e prazo de vigência, gestão e fiscalização — gestores, fiscais, prepostos e garantias — e itens do contrato), **Empenhos** (empenhos vinculados ao campus, incluindo RAP), **Faturas** (faturas e NF-e/instrumentos de cobrança), **Termos** (histórico do contrato) e **Documentos e ocorrências** (ocorrências, despesas acessórias, terceirizados e anexos PNCP/Compras.gov.br). O cronograma contratual não é exibido. Cada fatura é um bloco limpo com número, situação, referência, valor líquido, datas (emissão, vencimento, ateste, liquidação, pagamento), empenho, Doc. SIAFI (`raw_data.sfadrao_id`), processo e chave da NF-e (`chave_nfe`); glosa, juros, multa e repactuação só aparecem quando existem. O cabeçalho mostra o status Vigente / A vencer (até 90 dias) / Encerrado. O modo diálogo mantém o layout único em acordeões.
+
+## Prévia e movimentos de RDs
+
+Importação de RDs mostra unidade/campus, progresso persistido, prévia paginada e aplicação somente da captura completa. O detalhe do empenho usa a aba Itens e movimentações na apresentação em página; na apresentação em diálogo a seção permanece visível. Estados de carregamento, erro de consulta e ausência de RD são distintos. Veja [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

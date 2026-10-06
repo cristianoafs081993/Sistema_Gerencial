@@ -238,3 +238,6 @@ Ver [cenários e validação remota](ops/PNCP_CONTRACT_SYNC.md).
   - O isolamento contra estilos hostis do SUAP cobre formulário, campos, caixas de usuário e botões de ação.
 - A suite `src/lib/__tests__/suapProcessDocumentExtension.test.ts` valida o isolamento de layout, a alternância de estado de login/logout e as regras de estilo de títulos de seção.
 
+## Regressões de RDs SUAP
+
+`suapRdParser.test.ts` cobre a estrutura real (TH de situação, cancelada sem coluna situação, lista vazia oficial), valores negativos, total e escopo. `suapRdSync.test.ts` cobre retomada, inventário final e redirecionamentos. `suapRdService.test.ts` cobre paginação e filtros autenticados. `suapRdMatching.test.ts` cobre IDs oficiais, ausência de inferência, vínculos manuais e NE compartilhada. `SuapRd.test.tsx` cobre movimentos, exclusão de canceladas dos totais, falha explícita de consulta e coleta/aplicação. `scripts/test-suap-rd-db.mjs` valida o SQL em PostgreSQL/WASM descartável, inclusive RLS, isolamento e reversão. Instruções: [SUAP_RD_SYNC](ops/SUAP_RD_SYNC.md).

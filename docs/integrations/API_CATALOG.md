@@ -773,3 +773,7 @@ Camada determinística de domínio e ferramentas agênticas baseadas no Model Co
   - `conciliacao.ts`: conciliação trilateral forense (`conciliarPtresCompleto`), cruzamento contrato x orçamento (`conciliarContratoComOrcamento`), rastreabilidade da despesa ponta a ponta (`rastrearTrilhaDespesa`) e varredura preventiva (`auditarSaudeOrcamentariaCampus`).
   - `mcp/tools.ts`: definições com JSON Schema das ferramentas agênticas (`conciliar_saldo_ptres`, `consultar_painel_orcamentario`, `consultar_ficha_empenho`, `pesquisar_empenhos`, `consultar_extrato_descentralizacoes`, `consultar_ficha_contrato`, `projetar_necessidade_contrato`, `conciliar_contrato_orcamento`, `rastrear_trilha_despesa`, `auditar_inconsistencias_orcamentarias`) e despachante universal `dispatchMcpTool`.
 - **Integração com Assistente Gerencial**: a Edge Function `assistente-gerencial` identifica menções a códigos de PTRES (ex: `231798`), executa a conciliação trilateral direta de dados do banco e fundamenta o diagnóstico do Gemini, eliminando alucinações sobre supostos déficits orçamentários quando se trata de mero descompasso com o cadastro de atividades no SUAP.
+
+## sync-suap-rds
+
+`POST /functions/v1/sync-suap-rds`: ações `sync`, `status`, `apply`, `discard`, `revert`, com JWT SIAGES validado internamente e permissão superadmin. Reutiliza `suap_connections` válido; só aceita unidade catalogada e UASG compatível. URLs SUAP são construídas pelo servidor. Contrato, tipos e prévia: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

@@ -28,6 +28,9 @@ vi.mock('@/components/ui/scroll-area', () => ({
 vi.mock('@/components/ui/card', () => ({
   Card: ({ children, ...props }: { children: ReactNode }) => <div {...props}>{children}</div>,
   CardContent: ({ children, ...props }: { children: ReactNode }) => <div {...props}>{children}</div>,
+  CardHeader: ({ children, ...props }: { children: ReactNode }) => <div {...props}>{children}</div>,
+  CardTitle: ({ children }: { children: ReactNode }) => <h3>{children}</h3>,
+  CardDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>,
 }));
 
 vi.mock('@/components/ui/badge', () => ({

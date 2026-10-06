@@ -29,6 +29,7 @@ import { ContratosSyncDialog } from '@/components/modals/ContratosSyncDialog';
 import { PFImportDialog } from '@/components/modals/PFImportDialog';
 import { ObservabilityCenter } from '@/components/observabilidade/ObservabilityCenter';
 import { SuapPlanSyncCard } from '@/components/suap/SuapPlanSyncCard';
+import { SuapRdSyncCard } from '@/components/suap/SuapRdSyncCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1113,6 +1114,7 @@ export default function ImportacaoDados() {
               />
 
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="md:col-span-2 lg:col-span-3"><SuapRdSyncCard campusUasg={campusUasg} onSynced={() => { void refreshData(); }} /></div>
                 {/* Card: Descentralizações */}
                 <Card className="flex flex-col justify-between border-border-default shadow-sm transition-all hover:border-primary/40">
                   <CardHeader className="space-y-2">

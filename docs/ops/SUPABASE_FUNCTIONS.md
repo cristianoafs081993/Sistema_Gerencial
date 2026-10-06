@@ -891,3 +891,7 @@ Agendamento Automático:
 
 - agendada no `pg_cron` via migration `20260905110000_schedule_daily_sync_precos_referencia.sql`
 - job `sync-precos-referencia-daily` roda diariamente às 04:00 UTC via extensão `pg_net`
+
+## sync-suap-rds
+
+Coleta incremental de RDs e vínculos oficiais do Plano 8 por unidade; revisão incompleta nunca é aplicada. Compartilha a conexão cifrada de `sync-suap-plan`, valida o JWT e superadmin internamente (`verify_jwt=false`), e usa RPCs de aplicação/reversão restritas a service role. Deploy: `supabase functions deploy sync-suap-rds`. Operação: [SUAP_RD_SYNC](SUAP_RD_SYNC.md).

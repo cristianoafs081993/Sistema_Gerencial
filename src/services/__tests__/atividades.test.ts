@@ -92,7 +92,7 @@ describe('isolamento do planejamento SUAP na leitura', () => {
   it('aplica o filtro também no retorno principal do serviço', async () => {
     mocks.orderMock.mockResolvedValue({
       data: [
-        row({ id: 'ativo-currais', suap_unit_code: '19' }),
+        row({ id: 'ativo-currais', suap_unit_code: '19', suap_plan_id: 8, suap_activity_id: '32635' }),
         row({ id: 'outra-unidade', suap_unit_code: '36' }),
         row({ id: 'arquivada', sync_active: false }),
       ],
@@ -102,6 +102,8 @@ describe('isolamento do planejamento SUAP na leitura', () => {
     const result = await atividadesService.getAll('158366', '19');
 
     expect(result.map((item) => item.id)).toEqual(['ativo-currais']);
+    expect(result[0]).toMatchObject({ campusUasg: '158366', suapUnitCode:'19',suapPlanId:8,suapActivityId:'32635' });
+    expect(mocks.selectMock).toHaveBeenCalledWith(expect.stringContaining('suap_activity_id'));
   });
 
   it('aplica o mesmo filtro quando o cliente Supabase cai para REST', async () => {

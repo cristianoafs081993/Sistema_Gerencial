@@ -198,3 +198,7 @@ módulos de consulta; o padrão continua sendo modal nos demais consumidores.
 Empenhos adota `DataTablePanel`, colunas financeiras separadas e edição explícita.
 Contratos adota lista compacta, filtros de prazo/faturas e abas de detalhes.
 Consulte [o fluxo completo](../frontend/CONTRATOS_EMPENHOS_UI.md).
+
+## RDs SUAP
+
+`SuapRdSyncCard` (Importação de dados) oferece coleta, retomada, prévia e reversão por unidade; `SuapRdPreview` pagina a conferência das RDs; `SuapRdMovements` usa `SectionPanel` no detalhe do empenho para os valores assinados, referências e pendências. Reutilizam os tokens e componentes atuais. Comportamento: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

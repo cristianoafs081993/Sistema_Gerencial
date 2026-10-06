@@ -49,6 +49,7 @@ Este indice organiza a documentacao operacional do repositorio por dominio.
 
 ## Planejamento de produto e licitações
 
+- [Integração determinística SUAP: atividades, RDs e empenhos](planning/SUAP_RD_ATIVIDADES_EMPENHOS.md)
 - [LICITACAO_SEVERIANO_MELO_2026.md](planning/LICITACAO_SEVERIANO_MELO_2026.md)
 - [FASE_4_PATRIMONIO_ALMOXARIFADO_FROTA_OBRAS.md](planning/FASE_4_PATRIMONIO_ALMOXARIFADO_FROTA_OBRAS.md)
 
@@ -63,3 +64,7 @@ Este indice organiza a documentacao operacional do repositorio por dominio.
 ## Documentacao legada
 
 - [docs/llm/README.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/llm/README.md)
+
+## Integração de RDs SUAP
+
+Contrato implementado, operação, modelos, segurança e limitações: [SUAP_RD_SYNC](ops/SUAP_RD_SYNC.md).

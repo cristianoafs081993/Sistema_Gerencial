@@ -8,7 +8,7 @@ import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 import { DEFAULT_SUAP_PLAN_UNIT, getSuapPlanUnitForCampus } from '@/lib/suapPlanUnits';
 
 const SUAP_PLAN_SYNC_SOURCE = 'suap_plan_8';
-const ATIVIDADES_SELECT = 'id,campus_uasg,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,tipo_atividade,atividade,descricao,valor_total,saldo_disponivel,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,sync_source,suap_unit_code,sync_active,created_at,updated_at';
+const ATIVIDADES_SELECT = 'id,campus_uasg,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,tipo_atividade,atividade,descricao,valor_total,saldo_disponivel,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,sync_source,suap_unit_code,suap_plan_id,suap_activity_id,sync_active,created_at,updated_at';
 
 type AtividadeRow = {
     id: string;
@@ -30,6 +30,8 @@ type AtividadeRow = {
     plano_interno: string;
     sync_source?: string | null;
     suap_unit_code?: string | null;
+    suap_plan_id?: number | null;
+    suap_activity_id?: string | null;
     sync_active?: boolean | null;
     created_at: string;
     updated_at: string;
@@ -57,6 +59,10 @@ export function filterAtividadeRowsForRead(
 
 const mapAtividadeRow = (item: AtividadeRow): Atividade => ({
     id: item.id,
+    campusUasg: item.campus_uasg || undefined,
+    suapUnitCode: item.suap_unit_code || undefined,
+    suapPlanId: item.suap_plan_id ?? undefined,
+    suapActivityId: item.suap_activity_id || undefined,
     dimensao: item.dimensao,
     dimensaoId: item.dimensao_id || undefined,
     componenteFuncional: normalizeFunctionalComponentName(item.componente_funcional),
@@ -191,5 +197,3 @@ export const atividadesService = {
         if (error) throw error;
     },
 };
-
-

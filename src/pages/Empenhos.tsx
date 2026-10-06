@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
+import { SuapRdMovementBadge } from '@/components/suap/SuapRdMovementBadge';
 import { PageHeader } from '@/components/design-system/PageHeader';
 import { SegmentedControl } from '@/components/design-system/SegmentedControl';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
@@ -548,6 +549,7 @@ function EmpenhoRow({
           >
             {empenho.numero}
           </button>
+          <SuapRdMovementBadge empenho={empenho} onOpen={() => handleOpenDialog(empenho)} />
           {empenho.processo && (
             <span className="text-xs text-muted-foreground whitespace-nowrap" title="Processo">
               {empenho.processo}

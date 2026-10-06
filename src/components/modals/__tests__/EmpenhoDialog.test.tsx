@@ -126,7 +126,7 @@ describe('EmpenhoDialog', () => {
     expect(screen.getByRole('heading', { name: empenhoBase.numero })).toBeVisible();
     expect(screen.getByText('Saldo a liquidar')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Salvar Alterações' })).not.toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Itens e histórico' }), { button: 0, ctrlKey: false });
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Itens e movimentações' }), { button: 0, ctrlKey: false });
     expect(screen.getByText('Histórico de Operações')).toBeVisible();
     expect(screen.getByText('Saldo a liquidar')).not.toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Editar dados estratégicos' }));

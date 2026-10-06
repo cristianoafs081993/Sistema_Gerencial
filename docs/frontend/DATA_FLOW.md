@@ -473,3 +473,7 @@ sync-contratos-pncp-documentos → contratos_api_documentos / contratos_api_inst
 Atualizações retornam somente recursos persistidos; falhas preservam a tela e são
 exibidas. Checagens negativas expiram e respostas de outro contrato são ignoradas.
 Ver [operação](../ops/PNCP_CONTRACT_SYNC.md).
+
+## Atividades, empenhos e RDs oficiais
+
+`SuapRdSyncCard` → `suapRdService.action` → `sync-suap-rds` → prévia/aplicação → invalidação de `suap-rds`. `DashboardOrigemAtividadesModal` consulta `atividade_empenho_vinculos` com órgão/campus/unidade e resolve vínculos oficiais antes do filtro de origem; pontuação textual não atribui valores nessa tela. `SuapRdMovements` consulta movimentos confirmados e pendentes no detalhe do empenho, separado do histórico de outros pipelines. `atividadesService` preserva IDs oficiais necessários para a conferência. Contrato: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

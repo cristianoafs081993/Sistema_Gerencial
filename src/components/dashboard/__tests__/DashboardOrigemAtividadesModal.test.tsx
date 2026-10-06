@@ -1,4 +1,7 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render as renderBase, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
+const render = (ui: ReactElement) => renderBase(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>);
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardOrigemAtividadesModal } from '../DashboardOrigemAtividadesModal';
 import type { Atividade, Empenho } from '@/types';
@@ -293,7 +296,7 @@ describe('DashboardOrigemAtividadesModal', () => {
     expect(lista).not.toHaveTextContent('2024NE000101');
   });
 
-  it('correlaciona empenhos SIAFI sem atividadeId por processo, descrição e siglas garantindo saldos corretos', () => {
+  it('mantém empenhos SIAFI sem RD ou vínculo manual como não associados mesmo com processo, descrição e siglas', () => {
     const atividadesSiafi: Atividade[] = [
       {
         id: 'atv-pafe-siafi',
@@ -366,10 +369,10 @@ describe('DashboardOrigemAtividadesModal', () => {
       />,
     );
 
-    // PAFE deve exibir saldo de R$ 56.900,00 (110.000 - 53.100) e NÃO R$ 110.000,00
-    expect(screen.getByText(/R\$\s*56\.900,00/i)).toBeInTheDocument();
-    // Auxílio transporte deve exibir saldo de R$ 11.119,12 (94.377,12 - 83.258)
-    expect(screen.getByText(/R\$\s*11\.119,12/i)).toBeInTheDocument();
+    // Sem evidência RD, processo/descrição/siglas não determinam valores por atividade.
+    expect(screen.queryByText(/R\$\s*56\.900,00/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/R\$\s*11\.119,12/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/R\$\s*136\.358,00/i).length).toBeGreaterThanOrEqual(1);
     // O código do PI deve ser exibido de forma limpa
     expect(screen.getAllByText(/PI:\s*L2994P23AEN/i).length).toBeGreaterThanOrEqual(1);
   });

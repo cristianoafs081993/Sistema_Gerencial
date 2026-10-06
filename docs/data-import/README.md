@@ -116,3 +116,6 @@ A página `/importacao-dados` possui uma **Central de Observabilidade** integrad
 - **Matriz de Datasets**: Exibe a data/hora e tempo relativo da última atualização de cada base, os canais suportados (Manual, E-mail, API) e alerta visual caso haja falha recente ou falta de dados por mais de 7 dias.
 - **Exportação e Auditoria**: Permite filtrar execuções por canal, status, módulo ou termo de busca e exportar todo o histórico em formato CSV.
 
+## Captura de RDs SUAP
+
+A página Importação de dados inclui `SuapRdSyncCard` para superadmin. Usa a conexão cifrada do planejamento, captura todas as páginas/situações e atividades do Plano 8 e oferece prévia, aplicação explícita e reversão. Não é um upload CSV/XLSX/PDF. Consulte [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

@@ -36,6 +36,10 @@ import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
 import { formatCurrency } from '@/lib/utils';
 import { extractPlanoInternoCode, matchEmpenhosToAtividades } from '@/utils/atividadeEmpenhoMatching';
 import type { Atividade, Empenho } from '@/types';
+import { useQuery } from '@tanstack/react-query';
+import { useOptionalAuth } from '@/contexts/AuthContext';
+import { getSuapPlanUnitForCampus } from '@/lib/suapPlanUnits';
+import { suapRdService, type RdLink } from '@/services/suapRdService';
 
 const NAO_ASSOCIADOS_KEY = '__nao_associados__';
 
@@ -113,6 +117,13 @@ export function DashboardOrigemAtividadesModal({
   empenhos = [],
   onSuccessAtividade,
 }: DashboardOrigemAtividadesModalProps) {
+  const auth = useOptionalAuth();
+  const org = auth?.userOrg?.id;
+  const campus = auth?.userCampus.codigo ?? '158366';
+  const unit = getSuapPlanUnitForCampus(campus).value;
+  const rdQuery = useQuery({ queryKey: ['suap-rds', 'links', org, campus, unit],
+    queryFn: () => suapRdService.read<RdLink>('atividade_empenho_vinculos', org!, campus, unit),
+    enabled: open && !!org, staleTime: 60000, retry: false });
   const [selectedAtividadeForDialog, setSelectedAtividadeForDialog] = useState<Atividade | null>(null);
   const [isAtividadeDialogOpen, setIsAtividadeDialogOpen] = useState(false);
   const [empenhosPopoverAtividadeId, setEmpenhosPopoverAtividadeId] = useState<string | null>(null);
@@ -132,11 +143,13 @@ export function DashboardOrigemAtividadesModal({
     return empenhos.filter((e) => (e.origemRecurso || 'Sem origem') === origem && e.status !== 'cancelado');
   }, [empenhos, origem]);
 
-  // Correlaciona de forma inteligente os empenhos às atividades da origem
+  // Resolve before filtering by origin so classification differences cannot reassign official links.
   const { empenhosPorAtividadeMap, unmatchedEmpenhos } = useMemo(() => {
     if (!origem) return { empenhosPorAtividadeMap: new Map(), unmatchedEmpenhos: [] as Empenho[] };
-    return matchEmpenhosToAtividades(atividadesDaOrigem, empenhosDaOrigem);
-  }, [atividadesDaOrigem, empenhosDaOrigem, origem]);
+    const resolved = matchEmpenhosToAtividades(atividades, empenhos, rdQuery.data ?? []);
+    return { empenhosPorAtividadeMap: resolved.empenhosPorAtividadeMap,
+      unmatchedEmpenhos: resolved.unmatchedEmpenhos.filter(e => empenhosDaOrigem.some(item => item.id === e.id)) };
+  }, [atividades, empenhos, rdQuery.data, empenhosDaOrigem, origem]);
 
   const totalEmpenhadoOrigem = useMemo(
     () => empenhosDaOrigem.reduce((total, empenho) => total + (empenho.valor || 0), 0),
@@ -231,6 +244,8 @@ export function DashboardOrigemAtividadesModal({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-6xl flex-col gap-0 overflow-hidden border border-border-default bg-surface-card p-0 shadow-2xl">
+          <p className="px-6 pt-3 text-xs text-muted-foreground">Empenhos identificados por vínculo manual ou pelas RDs oficiais do SUAP. Pendências permanecem sem associação.</p>
+          {rdQuery.isError && <p className="px-6 text-xs text-status-warning" role="alert">Não foi possível consultar os vínculos oficiais das RDs.</p>}
           {/* Header */}
           <DialogHeader className="border-b border-border-default/60 px-6 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3 pr-6">
