@@ -18,9 +18,10 @@ export function SuapRdMovements({ empenho, enabled }: { empenho: Empenho; enable
   const campus = auth?.userCampus.codigo ?? '158366';
   const org = auth?.userOrg?.id;
   const unit = getSuapPlanUnitForCampus(campus);
+  const empenhoNumero = empenho.numero.trim().toUpperCase();
   const query = useQuery({
-    queryKey: ['suap-rds', 'movements', org, campus, unit.value],
-    queryFn: () => suapRdService.read<RdMovement>('suap_rd_movimentacoes', org!, campus, unit.value),
+    queryKey: ['suap-rds', 'movements', org, campus, unit.value, empenho.id, empenhoNumero],
+    queryFn: () => suapRdService.readMovementsForEmpenho(org!, campus, unit.value, empenhoNumero),
     enabled: enabled && !!org, staleTime: 60000, retry: false,
   });
   const rows = uniqueRdMovements(query.data ?? []).filter(row => row.empenho_id === empenho.id || row.empenho_numero === empenho.numero.trim().toUpperCase() || row.empenho_completo === empenho.numero.trim().toUpperCase());

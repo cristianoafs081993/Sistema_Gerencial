@@ -8,7 +8,7 @@ import { suapRdService, type RdMovement, type RdSyncRun } from '@/services/suapR
 import type { Empenho } from '@/types';
 const state = vi.hoisted(()=>({admin:true}));
 vi.mock('@/contexts/AuthContext',()=>({useOptionalAuth:()=>({isSuperAdmin:state.admin,userOrg:{id:'org'},userCampus:{codigo:'158366'}}),useAuth:()=>({isSuperAdmin:state.admin,userOrg:{id:'org'},userCampus:{codigo:'158366'}})}));
-vi.mock('@/services/suapRdService',async importOriginal=>({ ...await importOriginal<typeof import('@/services/suapRdService')>(),suapRdService:{ read:vi.fn(),action:vi.fn(),preview:vi.fn().mockResolvedValue([]),captureStatus:vi.fn() } }));
+vi.mock('@/services/suapRdService',async importOriginal=>({ ...await importOriginal<typeof import('@/services/suapRdService')>(),suapRdService:{ read:vi.fn(),readMovementsForEmpenho:vi.fn(),action:vi.fn(),preview:vi.fn().mockResolvedValue([]),captureStatus:vi.fn() } }));
 const renderUi=(ui:ReactElement)=>render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}>{ui}</QueryClientProvider>);
 const emp={id:'e',numero:'2026NE000014',valor:150} as Empenho;
 const movement={org_id:'org',campus_uasg:'158366',suap_unit_code:'19',run_id:'run',suap_rd_id:'1',rd_numero:'2026RD000001',tipo:'dotacao',rd_situacao:'Concluída',source_url:'https://suap.ifrn.edu.br/plan_estrategico/detalhar_requisicaodespesa/1/',atividade_nome:'Almoxarifado',line_index:1,valor:100,empenho_id:'e',empenho_numero:emp.numero,linha_situacao:'Confirmada',confirmed:true,resolution:'resolvido',data_cadastro:'2026-02-26',captured_at:'2026-10-05T12:00:00Z'} as RdMovement;
@@ -21,7 +21,7 @@ it('informa reaproveitamento e orienta revalidar tudo sem iniciar coleta no fron
   expect(screen.getByText(/Cada RD fica disponível automaticamente/)).toHaveTextContent('RDs concluídas capturadas e seus vínculos são reaproveitados');
   expect(vi.mocked(suapRdService.action).mock.calls.some(([action])=>action==='sync')).toBe(false);
 });
-beforeEach(()=>{ vi.clearAllMocks();state.admin=true;vi.mocked(suapRdService.action).mockResolvedValue({ ...run,run:null });vi.mocked(suapRdService.read).mockResolvedValue([]);vi.mocked(suapRdService.captureStatus).mockResolvedValue({hasApplied:true,latest:null}); });
+beforeEach(()=>{ vi.clearAllMocks();state.admin=true;vi.mocked(suapRdService.action).mockResolvedValue({ ...run,run:null });vi.mocked(suapRdService.read).mockResolvedValue([]);vi.mocked(suapRdService.readMovementsForEmpenho).mockResolvedValue([]);vi.mocked(suapRdService.captureStatus).mockResolvedValue({hasApplied:true,latest:null}); });
 it('mostra coleta parcial em vez de afirmar que não existe RD para o empenho',async()=>{
   vi.mocked(suapRdService.captureStatus).mockResolvedValue({hasApplied:false,latest:{status:'partial',processed:1,sourceCount:500}});
   renderUi(<SuapRdMovements empenho={emp} enabled />);
@@ -39,7 +39,7 @@ it('mantém ausência específica de empenho quando já existe conferência apli
   expect(await screen.findByText(/Nenhuma RD aplicada corresponde/)).toBeInTheDocument();
 });
 it('mostra reforço e anulação negativa, exclui cancelada dos totais e não duplica linha com conflito',async()=>{
-  vi.mocked(suapRdService.read).mockResolvedValue([movement,{...movement,suap_rd_id:'2',rd_numero:'2026RD000002',tipo:'reforco',valor:60},
+  vi.mocked(suapRdService.readMovementsForEmpenho).mockResolvedValue([movement,{...movement,suap_rd_id:'2',rd_numero:'2026RD000002',tipo:'reforco',valor:60},
     {...movement,suap_rd_id:'3',rd_numero:'2026RD000003',tipo:'anulacao',valor:-10},
     {...movement,suap_rd_id:'4',rd_numero:'2026RD000004',tipo:'reforco',valor:5000,confirmed:false,rd_situacao:'Cancelada'},movement]);
   renderUi(<SuapRdMovements empenho={emp} enabled />);
@@ -49,13 +49,13 @@ it('mostra reforço e anulação negativa, exclui cancelada dos totais e não du
   expect(title.parentElement?.parentElement).toContainElement(screen.getByTestId('rd-movement-summary'));
   expect(screen.getAllByRole('link')).toHaveLength(4);
   expect(screen.getByText('Não contabilizada nas RDs')).toBeInTheDocument();
-  expect(suapRdService.read).toHaveBeenCalledWith('suap_rd_movimentacoes','org','158366','19');
+  expect(suapRdService.readMovementsForEmpenho).toHaveBeenCalledWith('org','158366','19',emp.numero);
   const negative=screen.getByText('Anulação').closest('tr')!;
   expect(negative.querySelector('td:last-child')).toHaveClass('text-status-error');
   expect(within(negative).getByText(/10,00/)).toBeInTheDocument();
 });
 it('mantém a tabela de movimentos enxuta para linhas normais',async()=>{
-  vi.mocked(suapRdService.read).mockResolvedValue([movement]);
+  vi.mocked(suapRdService.readMovementsForEmpenho).mockResolvedValue([movement]);
   renderUi(<SuapRdMovements empenho={emp} enabled />);
   expect(await screen.findByRole('heading',{name:'HISTÓRICO DE OPERAÇÕES'})).toBeInTheDocument();
   const row=await screen.findByRole('link',{name:'2026RD000001'}).then(link=>link.closest('tr')!);
@@ -70,7 +70,7 @@ it('mantém a tabela de movimentos enxuta para linhas normais',async()=>{
   expect(screen.queryByRole('columnheader', { name: 'Atividade / conferência' })).not.toBeInTheDocument();
 });
 it('não mascara erro de leitura como ausência de movimentos',async()=>{
-  vi.mocked(suapRdService.read).mockRejectedValue(new Error('offline'));renderUi(<SuapRdMovements empenho={emp} enabled />);
+  vi.mocked(suapRdService.readMovementsForEmpenho).mockRejectedValue(new Error('offline'));renderUi(<SuapRdMovements empenho={emp} enabled />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível consultar');
 });
 it('superadmin pode concluir manualmente uma prévia legada e atualiza os dados aplicados',async()=>{

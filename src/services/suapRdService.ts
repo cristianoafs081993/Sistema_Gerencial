@@ -59,6 +59,22 @@ export const suapRdService = {
       if (data.length < 500) return rows;
     }
   },
+  async readMovementsForEmpenho(org: string, campus: string, unit: string, empenhoNumero: string): Promise<RdMovement[]> {
+    const numero = empenhoNumero.trim().toUpperCase().match(/^(?:\d{11})?(\d{4}NE\d{6})$/)?.[1];
+    if (!numero) return [];
+
+    const rows: RdMovement[] = [];
+    for (let offset = 0; ; offset += 500) {
+      const { data, error } = await supabase.from('suap_rd_movimentacoes').select('*')
+        .eq('org_id', org).eq('campus_uasg', campus).eq('suap_unit_code', unit)
+        .eq('empenho_numero', numero)
+        .order('suap_rd_id').order('line_index').order('suap_activity_id')
+        .range(offset, offset + 499);
+      if (error) throw error;
+      rows.push(...data as RdMovement[]);
+      if (data.length < 500) return rows;
+    }
+  },
   async action(action: 'sync' | 'status' | 'apply' | 'apply-partial' | 'discard' | 'revert' | 'revert-partial', unit: string, campus: string, runId?: string) {
     const { data, error } = await supabase.functions.invoke('sync-suap-rds', { body: { action, suapUnitCode: unit, campusUasg: campus, ...(runId ? { runId } : {}) } });
     if (error) {

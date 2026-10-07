@@ -12,6 +12,20 @@ it('pagina leituras autenticadas, limita órgão/campus/unidade e não para em 5
   expect(query.eq.mock.calls).toEqual(expect.arrayContaining([['org_id','org'],['campus_uasg','158366'],['suap_unit_code','19']]));
   expect(query.range.mock.calls).toEqual([[0,499],[500,999]]);
 });
+it('filtra movimentos pela NE antes de paginar o histórico', async()=>{
+  const query={select:vi.fn(),eq:vi.fn(),order:vi.fn(),range:vi.fn()};
+  for(const method of ['select','eq','order'] as const) query[method].mockReturnValue(query);
+  query.range.mockResolvedValueOnce({data:[{rd_numero:'2026RD000001'}],error:null});mocks.from.mockReturnValue(query);
+  const rows=await suapRdService.readMovementsForEmpenho('org','158366','19','2026NE000014');
+  expect(rows).toEqual([{rd_numero:'2026RD000001'}]);
+  expect(query.eq.mock.calls).toEqual(expect.arrayContaining([['org_id','org'],['campus_uasg','158366'],['suap_unit_code','19']]));
+  expect(query.eq).toHaveBeenCalledWith('empenho_numero','2026NE000014');
+  expect(query.range).toHaveBeenCalledWith(0,499);
+});
+it('ignora identificador de empenho fora do formato antes de consultar o banco',async()=>{
+  expect(await suapRdService.readMovementsForEmpenho('org','158366','19','2026NE000014,or(foo.eq.bar)')).toEqual([]);
+  expect(mocks.from).not.toHaveBeenCalled();
+});
 it('mantém erro de autorização explícito sem fallback anônimo',async()=>{
   const query={select:vi.fn(),eq:vi.fn(),order:vi.fn(),range:vi.fn().mockResolvedValue({data:null,error:new Error('Sem permissão')})};
   for (const method of ['select','eq','order'] as const) query[method].mockReturnValue(query);
