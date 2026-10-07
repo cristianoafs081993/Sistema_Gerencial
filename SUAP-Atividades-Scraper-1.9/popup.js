@@ -39,6 +39,9 @@ const siafiListInfo = document.getElementById('siafi-list-info');
 const siafiRefreshButton = document.getElementById('btn-siafi-refresh');
 const siafiFillButton = document.getElementById('btn-siafi-fill');
 const siafiFillStatus = document.getElementById('siafi-fill-status');
+const syncSection = document.getElementById('sync-section');
+let canViewSync = false;
+let authStatusRequest = 0;
 
 let siafiLists = [];
 let siafiBatchProgress = null;
@@ -56,7 +59,45 @@ function renderExtensionAccount(session) {
   extensionAuthBadge.dataset.state = connected ? 'connected' : 'disconnected';
   extensionAuthUserEmail.textContent = connected ? session.user?.email || 'Conta SIAGES conectada' : '';
   if (connected) extensionAuthPasswordInput.value = '';
+  updateSyncAccess(session);
 }
+
+function updateSyncAccess(session) {
+  // Mesmo contrato de src/lib/authz.ts; user_metadata não concede privilégios.
+  const user = session?.user;
+  const allowed = Boolean(session?.accessToken && user && (
+    String(user.email || '').trim().toLowerCase() === 'cristiano.cnrn@gmail.com' ||
+    user.app_metadata?.role === 'superadmin' || user.app_metadata?.is_superadmin === true
+  ));
+  const wasAllowed = canViewSync;
+  canViewSync = allowed;
+  syncSection.hidden = !allowed;
+  if (!allowed) {
+    rdUnit = null;
+    processBoxSyncStatus.textContent = '';
+    rdStatusEl.textContent = '';
+    rdAllStatusEl.textContent = '';
+    statusEl.replaceChildren();
+    statusEl.style.display = 'none';
+    document.getElementById('plan-sync-panel').open = false;
+    document.getElementById('rd-sync-panel').open = false;
+    btnApplyPlan.hidden = true;
+    btnCollectRds.disabled = true;
+  } else if (!wasAllowed) {
+    updateProcessBoxSyncStatus();
+    void updatePlanPreviewButton();
+    void initializeRdControls().catch(error => {
+      if (canViewSync) rdStatusEl.textContent = formatExtensionAuthError(error);
+    });
+  }
+}
+
+// Controles ocultos também não podem iniciar ações por clique programático.
+syncSection.addEventListener('click', (event) => {
+  if (canViewSync) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}, true);
 
 function isExtensionContextInvalidated(error) {
   return String(error?.message || error || '').toLowerCase().includes('extension context invalidated');
@@ -73,8 +114,11 @@ async function getStoredExtensionSession() {
 }
 
 async function updateExtensionAuthStatus() {
+  const request = ++authStatusRequest;
+  updateSyncAccess(null);
   try {
     const session = await getStoredExtensionSession();
+    if (request !== authStatusRequest) return;
     renderExtensionAccount(session);
     if (session?.accessToken) {
       setExtensionAuthStatus('Sua sessão é renovada automaticamente.');
@@ -82,6 +126,7 @@ async function updateExtensionAuthStatus() {
       setExtensionAuthStatus('Use sua conta SIAGES para acessar os recursos da extensão.');
     }
   } catch (error) {
+    if (request !== authStatusRequest) return;
     extensionAuthForm.hidden = !extensionAuthUser.hidden;
     extensionAuthBadge.textContent = 'Verificar acesso';
     extensionAuthBadge.dataset.state = 'unknown';
@@ -97,10 +142,12 @@ function formatLocalScheduleDate(value) {
 }
 
 function updateProcessBoxSyncStatus() {
-  if (!processBoxSyncStatus || !chrome?.runtime?.sendMessage) return;
+  if (!canViewSync || !processBoxSyncStatus || !chrome?.runtime?.sendMessage) return;
+  const request = authStatusRequest;
   chrome.runtime.sendMessage(
     { source: 'siages-extension-process-box-sync', type: 'get-status' },
     (response) => {
+      if (!canViewSync || request !== authStatusRequest) return;
       if (chrome.runtime.lastError || !response?.ok) {
         processBoxSyncStatus.textContent = 'Não foi possível consultar a sincronização. Reabra a extensão para tentar novamente.';
         return;
@@ -134,6 +181,7 @@ async function signInExtension() {
     setExtensionAuthStatus('Autenticando a extensão...');
     if (!globalThis.SiagesExtensionAuth?.signIn) throw new Error('O serviço de autenticação da extensão não está disponível.');
     const session = await globalThis.SiagesExtensionAuth.signIn(email, password);
+    authStatusRequest += 1;
     renderExtensionAccount(session);
     setExtensionAuthStatus('Você entrou no SIAGES. Sua sessão é renovada automaticamente.');
     extensionAuthPasswordInput.value = '';
@@ -149,6 +197,8 @@ extensionAuthForm.addEventListener('submit', (event) => {
   if (!extensionSignInButton.disabled) void signInExtension();
 });
 extensionSignOutButton.addEventListener('click', async () => {
+  authStatusRequest += 1;
+  updateSyncAccess(null);
   try {
     extensionSignOutButton.disabled = true;
     if (!globalThis.SiagesExtensionAuth?.signOut) throw new Error('O serviço de autenticação da extensão não está disponível.');
@@ -164,13 +214,13 @@ extensionSignOutButton.addEventListener('click', async () => {
   }
 });
 void updateExtensionAuthStatus();
-updateProcessBoxSyncStatus();
 chrome?.storage?.onChanged?.addListener((changes, areaName) => {
   if (areaName === 'local' && changes['siages-process-box-sync-state']) updateProcessBoxSyncStatus();
   if (areaName === 'local' && changes['siages-extension-session']) void updateExtensionAuthStatus();
 });
 
 function log(msg, type = 'info') {
+  if (!canViewSync) return;
   document.getElementById('plan-sync-panel').open = true;
   statusEl.style.display = 'block';
   const div = document.createElement('div');
@@ -209,6 +259,7 @@ async function capturePlanHtml(tab) {
 }
 
 async function rdMessage(type, extra = {}) {
+  if (!canViewSync) throw new Error('Sincronização disponível apenas para o superadministrador.');
   if (!rdUnit && extra.scope !== 'all') throw new Error('Abra o Plano 8 ou a lista de RDs da unidade no SUAP.');
   const response = await chrome.runtime.sendMessage({ source: 'siages-extension-rd-sync', type, unit: rdUnit, ...extra });
   if (!response?.ok) throw new Error(response?.error || 'Não foi possível acionar a coleta de RDs.');
@@ -216,7 +267,9 @@ async function rdMessage(type, extra = {}) {
 }
 
 async function updateAllRdStatus() {
+  if (!canViewSync) return;
   const { status, running } = await rdMessage('status', { scope: 'all' });
+  if (!canViewSync) return;
   const entries = status?.results || [];
   const previews = entries.filter(entry => entry.run?.status === 'preview' && entry.run.complete);
   const applied = entries.filter(entry => entry.run?.status === 'applied');
@@ -237,8 +290,9 @@ async function updateAllRdStatus() {
 }
 
 async function updateRdStatus() {
-  if (!rdUnit) return;
+  if (!canViewSync || !rdUnit) return;
   const result = await rdMessage('status');
+  if (!canViewSync) return;
   const status = result.status;
   const run = status?.run;
   const running = result.running;
@@ -265,13 +319,17 @@ async function startRdCollection(tab, unit) {
 }
 
 async function initializeRdControls() {
+  if (!canViewSync) return;
   await updateAllRdStatus();
+  if (!canViewSync) return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!canViewSync) return;
   if (!tab?.url || new URL(tab.url).origin !== 'https://suap.ifrn.edu.br') return;
   const results = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => ({
     unit: document.querySelector('#id_unidade_gestora')?.value || new URL(location.href).searchParams.get('unidade_gestora') || '',
   }) });
   const unit = results?.[0]?.result?.unit;
+  if (!canViewSync) return;
   if (!/^\d+$/.test(String(unit))) return;
   rdUnit = String(unit);
   btnCollectRds.disabled = false;
@@ -375,14 +433,16 @@ async function setPlanPreview(run) {
 }
 
 async function updatePlanPreviewButton() {
+  if (!canViewSync) return;
   const stored = await chrome.storage.local.get(PLAN_PREVIEW_STORAGE_KEY);
   let preview = stored[PLAN_PREVIEW_STORAGE_KEY];
   const batchStored = await chrome.storage.local.get(PLAN_BATCH_PREVIEW_STORAGE_KEY);
   let batchPreview = batchStored[PLAN_BATCH_PREVIEW_STORAGE_KEY];
+  if (!canViewSync) return;
   if (!preview?.runId && !batchPreview?.batchId) {
     try {
       const session = await getStoredExtensionSession();
-      if (session?.accessToken) {
+      if (canViewSync && session?.accessToken) {
         const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-suap-plan`, {
           method: 'POST',
           headers: {
@@ -393,6 +453,7 @@ async function updatePlanPreviewButton() {
           body: JSON.stringify({ action: 'status' }),
         });
         const payload = await response.json().catch(() => ({}));
+        if (!canViewSync) return;
         if (response.ok && payload?.run?.status === 'preview') {
           preview = { ...payload.run, runId: payload.run.id };
           await chrome.storage.local.set({ [PLAN_PREVIEW_STORAGE_KEY]: preview });
@@ -406,6 +467,7 @@ async function updatePlanPreviewButton() {
       // O botao continua oculto quando nao ha sessao ou a consulta de status falha.
     }
   }
+  if (!canViewSync) return;
   const hasPreview = Boolean(preview?.runId || preview?.id || batchPreview?.batchId || batchPreview?.id);
   btnApplyPlan.textContent = batchPreview?.batchId || batchPreview?.id ? 'Aplicar atividades das unidades conferidas' : 'Aplicar atividades desta unidade';
   btnApplyPlan.hidden = !hasPreview;
@@ -781,10 +843,9 @@ siafiListSelect?.addEventListener('change', updateSiafiListInfo);
 siafiRefreshButton?.addEventListener('click', () => { void loadSiafiLists(); });
 siafiFillButton?.addEventListener('click', () => { void handleSiafiFill(); });
 
-void updatePlanPreviewButton();
 void initializeSiafiFiller();
-void initializeRdControls().catch(error => { rdStatusEl.textContent = formatExtensionAuthError(error); });
 chrome.storage.onChanged?.addListener((changes, area) => {
+  if (!canViewSync) return;
   if (area === 'local' && rdUnit && changes[`siages-suap-rd-status:${rdUnit}`]) void updateRdStatus().catch(error => { rdStatusEl.textContent = formatExtensionAuthError(error); });
   if (area === 'local' && changes['siages-suap-rd-status:all']) void updateAllRdStatus().catch(error => { rdAllStatusEl.textContent = formatExtensionAuthError(error); });
 });

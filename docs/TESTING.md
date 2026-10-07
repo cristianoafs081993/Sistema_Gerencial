@@ -239,7 +239,8 @@ Ver [cenários e validação remota](ops/PNCP_CONTRACT_SYNC.md).
 
 ## Extensão SUAP - Painel do Processo e Configurações
 
-- Popup SIAGES 1.9.62: `suapPopupAccount.test.ts` cobre login por formulário, sessão ativa sem campos de credenciais, logout, limpeza de senha, erros e atualização reativa da sessão, além da separação de autenticação/sincronização e remoção do segredo de automação. Contrato visual e operacional: [EXTENSION_POPUP](frontend/EXTENSION_POPUP.md).
+- Popup SIAGES 1.9.63: `suapPopupAccount.test.ts` cobre login por formulário, sessão ativa sem campos de credenciais, logout, limpeza de senha, erros e atualização reativa da sessão, além da separação de autenticação/sincronização e remoção do segredo de automação. Contrato visual e operacional: [EXTENSION_POPUP](frontend/EXTENSION_POPUP.md).
+- Popup 1.9.63: a mesma suíte garante que agenda, atividades e RDs só aparecem e são consultadas para superadmin, sem exposição durante carregamento ou erro de sessão; testa os critérios de `authz.ts`, nega `user_metadata`/admin comum e impede que respostas atrasadas restaurem acesso após logout/troca de conta. A suíte de RDs usa sessão superadmin e aguarda a liberação da seção antes de acionar controles.
 
 - Os títulos de seções estáticas do painel de configurações (`Aparência`, `Acesso ao SIAGES`) e mensagens de estado mantêm espaçamento (`padding: 10px 12px 9px !important`), borda divisória inferior e display em bloco, impedindo que encostem nas bordas do card.
 - A tela de autenticação da extensão na aba de configurações alterna de forma reativa:

@@ -19,7 +19,7 @@ function popup(results:unknown[]=[], rdRunning=false, runOverrides:Record<string
     tabs:{query:vi.fn().mockResolvedValue([{id:7,url:'https://suap.ifrn.edu.br/plan_estrategico/plano_concluido/8/'}])},
     scripting:{executeScript:vi.fn().mockResolvedValue([{result:{url:'https://suap.ifrn.edu.br/plan_estrategico/plano_concluido/8/',html:planHtml,unit:'19'}}])},
   });
-  vi.stubGlobal('SiagesExtensionAuth',{getSession:vi.fn().mockResolvedValue({accessToken:'jwt'})});
+  vi.stubGlobal('SiagesExtensionAuth',{getSession:vi.fn().mockResolvedValue({accessToken:'jwt',user:{app_metadata:{role:'superadmin'}}})});
   vi.stubGlobal('fetch',fetcher);
   new Function(popupScript)();
   const actions=()=>fetcher.mock.calls.map(([,options])=>JSON.parse(options?.body||'{}').action);
@@ -45,6 +45,7 @@ it.each([
   ['btn-extract-all','sync-all','apply-batch','Aplicar atividades das unidades conferidas'],
 ])('sincroniza e aplica somente atividades em %s',async(id,action,applyAction,caption)=>{
   const {sendMessage,actions}=popup();
+  await waitFor(()=>expect(document.getElementById('sync-section')?.hidden).toBe(false));
   button(id).click();
   await waitFor(()=>expect(button('btn-apply-plan').hidden).toBe(false));
   expect(actions()).toContain(action);

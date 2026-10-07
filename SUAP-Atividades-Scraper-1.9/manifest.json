@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SIAGES",
-  "version": "1.9.62",
+  "version": "1.9.63",
   "description": "Paleta Ctrl+K, resumo de processos, caminho BPMN, dados financeiros, atalhos e documentos com IA no SIAGES, SUAP e Comprasnet.",
   "permissions": [
     "activeTab",
@@ -15,7 +15,19 @@
     "<all_urls>"
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "logo-transparent.png",
+      "32": "logo-transparent.png",
+      "48": "logo-transparent.png",
+      "128": "logo-transparent.png"
+    }
+  },
+  "icons": {
+    "16": "logo-transparent.png",
+    "32": "logo-transparent.png",
+    "48": "logo-transparent.png",
+    "128": "logo-transparent.png"
   },
   "commands": {
     "open-process-paste": {
