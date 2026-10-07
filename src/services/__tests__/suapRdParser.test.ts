@@ -16,6 +16,13 @@ describe('Contratos reais das RDs SUAP', () => {
     expect(parseSuapRdDetail(detailHtml({ status: 'Cancelada', withStatus: false, ne: '-' }), '5381','19').linhas[0].situacao).toBe('');
     expect(() => parseSuapRdDetail(detailHtml({ withStatus: false }), '9083','19')).toThrow('Cabeçalhos');
   });
+  it('aceita RD cancelada sem natureza de despesa e não cria movimentos', () => {
+    const html = detailHtml({ status: 'Cancelada' })
+      .replace(/<table>[\s\S]*?<\/table>/, '<p class="alert alert-warning">Nenhuma natureza de despesa cadastrada.</p>');
+    expect(parseSuapRdDetail(html, '4676', '19')).toMatchObject({ situacao: 'Cancelada', linhas: [] });
+    expect(() => parseSuapRdDetail(html.replace('Cancelada', 'Concluída'), '4676', '19')).toThrow('Detalhamento da despesa ausente');
+    expect(() => parseSuapRdDetail(html.replace('Nenhuma natureza de despesa cadastrada.', 'Aviso indisponível.'), '4676', '19')).toThrow('Detalhamento da despesa ausente');
+  });
   it('rejeita divergências de campus, UG, totais e números abreviados', () => {
     expect(() => parseSuapRdDetail(detailHtml(), '9083','25')).toThrow('unidade');
     expect(() => parseSuapRdDetail(detailHtml({ ne: '158371264352026NE000014' }), '9083','19')).toThrow('UG');

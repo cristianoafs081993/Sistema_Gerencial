@@ -131,11 +131,13 @@ export function parseSuapRdDetail(html: string, rdId: string, unitCode: string, 
   const tipoRaw = box('Tipo da requisição');
   const tipo: SuapRdType | null = ({ 'dotacao para empenho': 'dotacao', 'reforco de empenho': 'reforco', 'anulacao de empenho': 'anulacao' } as const)[foldRdText(tipoRaw)] ?? null;
   const table = [...root.querySelectorAll('table')].find(t => foldRdText(t.querySelector('thead')?.textContent ?? '').includes('numero do empenho'));
-  if (!table) throw new Error('Detalhamento da despesa ausente.');
-  const headers = [...table.querySelectorAll('thead th')].map(th => foldRdText(th.textContent ?? ''));
+  const canceledWithoutExpenseNature = !table && foldRdText(situacao) === 'cancelada'
+    && foldRdText(root.textContent ?? '').includes('nenhuma natureza de despesa cadastrada');
+  if (!table && !canceledWithoutExpenseNature) throw new Error('Detalhamento da despesa ausente.');
+  const headers = table ? [...table.querySelectorAll('thead th')].map(th => foldRdText(th.textContent ?? '')) : [];
   const col = (needle: string) => headers.findIndex(h => h.includes(needle));
-  if (['natureza', 'valor', 'numero do empenho'].some(h => col(h) < 0) || foldRdText(situacao) === 'concluida' && col('situacao') < 0) throw new Error('Cabeçalhos de despesa inválidos.');
-  const linhas = [...table.querySelectorAll('tbody tr')].map(tr => {
+  if (table && (['natureza', 'valor', 'numero do empenho'].some(h => col(h) < 0) || foldRdText(situacao) === 'concluida' && col('situacao') < 0)) throw new Error('Cabeçalhos de despesa inválidos.');
+  const linhas = table ? [...table.querySelectorAll('tbody tr')].map(tr => {
     const cells = [...tr.querySelectorAll('td,th')].map(td => clean(td.textContent));
     const ne = parseFullSuapNe(cells[col('numero do empenho')]);
     if (ne && ne.ug !== unit.parentUasg) throw new Error('UG da NE fora do campus da RD.');
@@ -146,9 +148,9 @@ export function parseSuapRdDetail(html: string, rdId: string, unitCode: string, 
     return { naturezaDespesa: cells[col('natureza')], valor, empenhoCompleto: ne?.completo ?? null,
       empenhoNumero: ne?.numero ?? null, ug: ne?.ug ?? null, gestao: ne?.gestao ?? null,
       ro: ro && ro !== '-' ? ro : null, situacao: cells[col('situacao')] ?? '' };
-  });
-  const totalCell = table.querySelector('tfoot tr')?.querySelectorAll('td,th')[1];
-  if (!totalCell || Math.abs(Math.round(linhas.reduce((sum, line) => sum + line.valor, 0) * 100) - Math.round(parseRdMoney(totalCell.textContent ?? '') * 100)) > 1) throw new Error('Total da RD não fecha com as linhas.');
+  }) : [];
+  const totalCell = table?.querySelector('tfoot tr')?.querySelectorAll('td,th')[1];
+  if (table && (!totalCell || Math.abs(Math.round(linhas.reduce((sum, line) => sum + line.valor, 0) * 100) - Math.round(parseRdMoney(totalCell.textContent ?? '') * 100)) > 1)) throw new Error('Total da RD não fecha com as linhas.');
   const processLink = field(root, 'Processo administrativo')?.querySelector('a');
   const cdoLink = field(root, 'CDO')?.querySelector('a');
   return { rdId, numero, situacao, tipo, tipoRaw, suapUnitCode: unitCode, campusUasg: unit.parentUasg,

@@ -248,6 +248,8 @@ Ver [cenários e validação remota](ops/PNCP_CONTRACT_SYNC.md).
 
 ## Regressões de RDs SUAP
 
+O parser cobre a RD cancelada 2025RD004586 sem linhas de empenho quando o aviso de ausência de natureza está presente, e ainda rejeita página concluída ou aviso ausente sem a tabela.
+
 Associações e coleta interrompida (06/10): regressões de `suapRdSync.test.ts` cobrem pendente concluindo durante o detalhe, retomada legada com hashes novos, mudanças posteriores com reconferência seletiva, limite de três rodadas e bloqueio de identidade/tipo/situação alterados de concluídas. `suapRdService.test.ts` e `SuapRd.test.tsx` distinguem captura incompleta, prévia sem aplicação, aplicação anterior preservada e falhas de leitura, mantendo o escopo autenticado. O SQL descartável inclui `2026RD000016` / `2026NE000001` / atividade oficial `35206`, validando as duas FKs e as views após aplicação.
 
 Reaproveitamento na 1.9.57: `suapRdReuse.test.ts` valida segunda coleta de concluídas (23→3 páginas no fixture de 10 RDs), ausência de expiração/auditoria de concluídas, preservação de payload/data, pendentes em cada execução e transição para conclusão, novas RDs, relações oficiais alteradas, nomes renomeados sem trocar IDs, canceladas com auditoria/prazo, bases legadas, snapshots ausentes, JSONB reordenado, falha/retomada e isolamento por usuário/órgão/campus/unidade. Popup/background cobrem `forceFull` nos dois escopos e contadores sem bloquear atividades. O teste SQL descartável também aplica/reverte snapshots copiados, preserva `captured_at` e verifica idempotência e líquidos.
