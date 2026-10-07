@@ -214,6 +214,68 @@ describe('modo de atalhos mnemônicos da extensão Suape', () => {
     expect(clickedCtrlKey).toBe(true);
   });
 
+  it('gera uma única dica para o badge SUAP com filhos que herdam o cursor e aciona o botão', () => {
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', () => undefined);
+    installGeometry();
+    document.body.innerHTML = `
+      <span id="badge" class="suape-process-id-badge" role="button" tabindex="0" style="cursor: pointer;">
+        <span id="hash" style="cursor: pointer;">#</span>
+        <span id="number" style="cursor: pointer;">463799</span>
+      </span>
+    `;
+    const badge = document.getElementById('badge')!;
+    setRect(badge, 20, 20, 80, 28);
+    setRect(document.getElementById('hash')!, 24, 20, 12, 28);
+    setRect(document.getElementById('number')!, 36, 20, 60, 28);
+    const onCopy = vi.fn();
+    badge.addEventListener('click', onCopy);
+
+    window.eval(contentScript);
+    fireEvent.keyDown(document, { key: ';', code: 'Semicolon', ctrlKey: true });
+    expect(Array.from(document.querySelectorAll('.suape-click-hint')).map((hint) => hint.textContent)).toEqual(['46']);
+    fireEvent.keyDown(document, { key: '4' });
+    fireEvent.keyDown(document, { key: '6' });
+    fireEvent.keyDown(document, { key: 'Enter' });
+    expect(onCopy).toHaveBeenCalledTimes(1);
+  });
+
+  it('mantém uma dica no combobox Select2 e uma no botão independente de limpar', () => {
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', () => undefined);
+    installGeometry();
+    document.body.innerHTML = `
+      <span id="selection" class="select2-selection" role="combobox" tabindex="0" style="cursor: pointer;">
+        <span id="value" class="select2-selection__rendered" role="textbox" aria-readonly="true" style="cursor: pointer;">
+          <span id="clear" role="button" aria-label="Limpar" style="cursor: pointer;"></span>
+          <span id="placeholder" style="cursor: pointer;">Escolha uma opção</span>
+        </span>
+        <span id="arrow" role="presentation" style="cursor: pointer;"></span>
+      </span>
+    `;
+    setRect(document.getElementById('selection')!, 20, 20, 200, 36);
+    setRect(document.getElementById('value')!, 24, 22, 190, 32);
+    setRect(document.getElementById('clear')!, 190, 26, 20, 20);
+    setRect(document.getElementById('placeholder')!, 28, 26, 140, 20);
+    setRect(document.getElementById('arrow')!, 212, 26, 8, 20);
+    const onClear = vi.fn();
+    document.getElementById('clear')!.addEventListener('click', onClear);
+
+    window.eval(contentScript);
+    fireEvent.keyDown(document, { key: ';', code: 'Semicolon', ctrlKey: true });
+    expect(Array.from(document.querySelectorAll('.suape-click-hint')).map((hint) => hint.textContent)).toEqual(['EO', 'LI']);
+    fireEvent.keyDown(document, { key: 'l' });
+    fireEvent.keyDown(document, { key: 'i' });
+    fireEvent.keyDown(document, { key: 'Enter' });
+    expect(onClear).toHaveBeenCalledTimes(1);
+  });
+
   it('mostra uma dica para links com o mesmo destino quando as áreas se sobrepõem e ativa o representante visual', () => {
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0);

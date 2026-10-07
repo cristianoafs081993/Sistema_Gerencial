@@ -144,6 +144,24 @@
     return candidates.some((candidate) => candidate !== element && element.contains(candidate) && isSpecificControl(candidate));
   }
 
+  function isRedundantControlChild(element) {
+    let parent = element.parentElement;
+    while (parent && !isSpecificControl(parent) && !parent.hasAttribute('onclick')) {
+      parent = parent.parentElement;
+    }
+    if (!parent) return false;
+    if (parent.matches('a[href], button, summary')) return true;
+
+    // A pointer cursor inherited from an ARIA control does not make its label or icon a separate action.
+    if (!isSpecificControl(element) && !element.hasAttribute('onclick')) return true;
+
+    // Select2 exposes its displayed value as a readonly textbox inside the actual combobox.
+    return parent.getAttribute('role') === 'combobox'
+      && element.getAttribute('role') === 'textbox'
+      && element.getAttribute('aria-readonly') === 'true'
+      && !element.matches(FORM_SELECTOR);
+  }
+
   function compareByScreenPosition(left, right) {
     const leftRect = left.element.getBoundingClientRect();
     const rightRect = right.element.getBoundingClientRect();
@@ -218,10 +236,7 @@
     const candidates = Array.from(elements)
       .filter((element) => isCandidate(element))
       .filter((element, _, all) => !hasMoreSpecificDescendant(element, all))
-      .filter((element) => {
-        const parentControl = element.parentElement?.closest('a[href], button, summary');
-        return !parentControl || parentControl === element;
-      });
+      .filter((element) => !isRedundantControlChild(element));
 
     const nextHints = candidates.map((element, order) => {
       const label = getVisibleLabel(element);
@@ -304,6 +319,9 @@
     if (rootEl) return;
     rootEl = document.createElement('div');
     rootEl.id = ROOT_ID;
+    if (typeof chrome !== 'undefined' && chrome.runtime?.getManifest) {
+      rootEl.dataset.extensionVersion = chrome.runtime.getManifest().version;
+    }
     rootEl.hidden = true;
     rootEl.innerHTML = `
       <div class="suape-click-hints-labels" aria-hidden="true"></div>
