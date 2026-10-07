@@ -154,6 +154,57 @@
     return left.order - right.order;
   }
 
+  function overlapRatio(left, right) {
+    const leftRect = left.element.getBoundingClientRect();
+    const rightRect = right.element.getBoundingClientRect();
+    const intersectionWidth = Math.max(0, Math.min(leftRect.right, rightRect.right) - Math.max(leftRect.left, rightRect.left));
+    const intersectionHeight = Math.max(0, Math.min(leftRect.bottom, rightRect.bottom) - Math.max(leftRect.top, rightRect.top));
+    const intersectionArea = intersectionWidth * intersectionHeight;
+    const smallerArea = Math.min(leftRect.width * leftRect.height, rightRect.width * rightRect.height);
+    return smallerArea > 0 ? intersectionArea / smallerArea : 0;
+  }
+
+  function collapseOverlappingDestinationHints(nextHints) {
+    const hintsByDestination = new Map();
+    const independentHints = [];
+
+    nextHints.forEach((hint) => {
+      hint.destination = findLinkUrl(hint.element, true);
+      if (!hint.destination) {
+        independentHints.push(hint);
+        return;
+      }
+      const group = hintsByDestination.get(hint.destination) || [];
+      group.push(hint);
+      hintsByDestination.set(hint.destination, group);
+    });
+
+    const representatives = [...independentHints];
+    hintsByDestination.forEach((group) => {
+      group.sort(compareByScreenPosition);
+      const remaining = new Set(group);
+
+      while (remaining.size) {
+        const first = group.find((hint) => remaining.has(hint));
+        remaining.delete(first);
+        const queue = [first];
+
+        while (queue.length) {
+          const current = queue.shift();
+          Array.from(remaining).forEach((candidate) => {
+            if (overlapRatio(current, candidate) < 0.5) return;
+            remaining.delete(candidate);
+            queue.push(candidate);
+          });
+        }
+
+        representatives.push(first);
+      }
+    });
+
+    return representatives.sort((left, right) => left.order - right.order);
+  }
+
   function getDocumentCandidates() {
     const elements = new Set(document.querySelectorAll(CANDIDATE_SELECTOR));
     document.querySelectorAll('*').forEach((element) => {
@@ -172,7 +223,7 @@
         return !parentControl || parentControl === element;
       });
 
-    return candidates.map((element, order) => {
+    const nextHints = candidates.map((element, order) => {
       const label = getVisibleLabel(element);
       return {
         element,
@@ -182,6 +233,8 @@
         order,
       };
     });
+
+    return collapseOverlappingDestinationHints(nextHints);
   }
 
   function assignInitialCodes(nextHints) {
@@ -361,7 +414,7 @@
     else openHints();
   }
 
-  function findLinkUrl(element) {
+  function findLinkUrl(element, allowFragments = false) {
     if (!element || !(element instanceof Element)) return null;
 
     const anchor = element.closest('a[href]')
@@ -370,7 +423,7 @@
 
     if (anchor) {
       const rawHref = anchor.getAttribute('href') || anchor.href;
-      if (rawHref && !rawHref.startsWith('#') && !rawHref.toLowerCase().startsWith('javascript:')) {
+      if (rawHref && (allowFragments || !rawHref.startsWith('#')) && !rawHref.toLowerCase().startsWith('javascript:')) {
         try {
           return new URL(rawHref, window.location.href).href;
         } catch {
@@ -383,7 +436,7 @@
 
     const datasetElement = element.closest('[data-href], [data-url]') || element;
     const dataUrl = datasetElement.getAttribute('data-href') || datasetElement.getAttribute('data-url');
-    if (dataUrl && !dataUrl.startsWith('#') && !dataUrl.toLowerCase().startsWith('javascript:')) {
+    if (dataUrl && (allowFragments || !dataUrl.startsWith('#')) && !dataUrl.toLowerCase().startsWith('javascript:')) {
       try {
         return new URL(dataUrl, window.location.href).href;
       } catch {
@@ -394,7 +447,7 @@
     const onclick = element.getAttribute('onclick') || '';
     if (onclick) {
       const match = onclick.match(/(?:window\.open|location\.href\s*=)\s*['"]([^'"]+)['"]/);
-      if (match && match[1] && !match[1].startsWith('#') && !match[1].toLowerCase().startsWith('javascript:')) {
+      if (match && match[1] && (allowFragments || !match[1].startsWith('#')) && !match[1].toLowerCase().startsWith('javascript:')) {
         try {
           return new URL(match[1], window.location.href).href;
         } catch {

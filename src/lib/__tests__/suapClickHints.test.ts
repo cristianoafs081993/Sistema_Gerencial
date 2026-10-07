@@ -213,4 +213,82 @@ describe('modo de atalhos mnemônicos da extensão Suape', () => {
 
     expect(clickedCtrlKey).toBe(true);
   });
+
+  it('mostra uma dica para links com o mesmo destino quando as áreas se sobrepõem e ativa o representante visual', () => {
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', () => undefined);
+    installGeometry();
+
+    const duplicateDestination = new URL('/processo/1', window.location.href).href;
+    document.body.innerHTML = `
+      <a id="first" href="/processo/1">Detalhes</a>
+      <a id="duplicate" href="${duplicateDestination}">Detalhes</a>
+    `;
+    const first = document.getElementById('first')!;
+    const duplicate = document.getElementById('duplicate')!;
+    setRect(first, 20, 20, 100, 28);
+    setRect(duplicate, 24, 21, 90, 28);
+    const firstClick = vi.fn((event: MouseEvent) => event.preventDefault());
+    const duplicateClick = vi.fn((event: MouseEvent) => event.preventDefault());
+    first.addEventListener('click', firstClick);
+    duplicate.addEventListener('click', duplicateClick);
+
+    window.eval(contentScript);
+    fireEvent.keyDown(document, { key: ';', code: 'Semicolon', ctrlKey: true });
+
+    expect(Array.from(document.querySelectorAll('.suape-click-hint')).map((hint) => hint.textContent)).toEqual(['DE']);
+    fireEvent.keyDown(document, { key: 'd' });
+    fireEvent.keyDown(document, { key: 'e' });
+    fireEvent.keyDown(document, { key: 'Enter' });
+    expect(firstClick).toHaveBeenCalledTimes(1);
+    expect(duplicateClick).not.toHaveBeenCalled();
+  });
+
+  it('mantém dicas separadas para links iguais em áreas distintas e para destinos diferentes sobrepostos', () => {
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', () => undefined);
+    installGeometry();
+
+    const repeatedDestination = new URL('/processo/1', window.location.href).href;
+    document.body.innerHTML = `
+      <a id="same-near" href="/processo/1">Detalhes</a>
+      <a id="same-far" href="${repeatedDestination}">Detalhes</a>
+      <a id="different" href="/processo/2">Detalhes</a>
+    `;
+    setRect(document.getElementById('same-near')!, 20, 20, 100, 28);
+    setRect(document.getElementById('same-far')!, 250, 20, 100, 28);
+    setRect(document.getElementById('different')!, 24, 21, 90, 28);
+
+    window.eval(contentScript);
+    fireEvent.keyDown(document, { key: ';', code: 'Semicolon', ctrlKey: true });
+
+    expect(Array.from(document.querySelectorAll('.suape-click-hint')).map((hint) => hint.textContent).sort()).toEqual(['DE1', 'DE2', 'DE3']);
+  });
+
+  it('considera o fragmento parte do destino ao agrupar links', () => {
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', () => undefined);
+    installGeometry();
+
+    document.body.innerHTML = `
+      <a id="section-one" href="#section-one">Detalhes</a>
+      <a id="section-two" href="#section-two">Detalhes</a>
+    `;
+    setRect(document.getElementById('section-one')!, 20, 20, 100, 28);
+    setRect(document.getElementById('section-two')!, 24, 21, 90, 28);
+
+    window.eval(contentScript);
+    fireEvent.keyDown(document, { key: ';', code: 'Semicolon', ctrlKey: true });
+
+    expect(Array.from(document.querySelectorAll('.suape-click-hint')).map((hint) => hint.textContent)).toEqual(['DE1', 'DE2']);
+  });
 });
