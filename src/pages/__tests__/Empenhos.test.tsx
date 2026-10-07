@@ -199,6 +199,28 @@ describe('Empenhos', () => {
     expect(screen.queryByText(/^PI:/i)).not.toBeInTheDocument();
   });
 
+  it('oculta resumos de movimentos RD e histórico de operações na lista, mantendo abertura do empenho', () => {
+    const current = mockedUseData();
+    mockedUseData.mockReturnValue({
+      ...current,
+      empenhos: [createEmpenho({ historicoOperacoes: [
+        { data: '2026-01-01', operacao: 'INCLUSAO', quantidade: 1, valorUnitario: 100, valorTotal: 100 },
+        { data: '2026-02-01', operacao: 'REFORCO', quantidade: 1, valorUnitario: 50, valorTotal: 50 },
+      ] })],
+    });
+    renderEmpenhos();
+
+    const row = screen.getByRole('button', { name: '2026NE000001' }).closest('tr')!;
+    expect(within(row).queryByText(/ops$/)).not.toBeInTheDocument();
+    expect(within(row).queryByText(/reforços|anulações|\(RD\)/i)).not.toBeInTheDocument();
+
+    fireEvent.click(row);
+    expect(mockedEmpenhoDialog).toHaveBeenCalledWith(expect.objectContaining({
+      open: true,
+      empenho: expect.objectContaining({ numero: '2026NE000001' }),
+    }));
+  });
+
   it('alterna entre as abas de execucao e restos a pagar usando o layout folder tab', () => {
     renderEmpenhos();
 

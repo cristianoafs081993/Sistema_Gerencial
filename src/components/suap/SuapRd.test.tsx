@@ -4,7 +4,6 @@ import type { ReactElement } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { SuapRdMovements } from './SuapRdMovements';
 import { SuapRdSyncCard } from './SuapRdSyncCard';
-import { SuapRdMovementBadge } from './SuapRdMovementBadge';
 import { suapRdService, type RdMovement, type RdSyncRun } from '@/services/suapRdService';
 import type { Empenho } from '@/types';
 const state = vi.hoisted(()=>({admin:true}));
@@ -64,11 +63,6 @@ it('mantém a tabela de movimentos enxuta para linhas normais',async()=>{
 it('não mascara erro de leitura como ausência de movimentos',async()=>{
   vi.mocked(suapRdService.read).mockRejectedValue(new Error('offline'));renderUi(<SuapRdMovements empenho={emp} enabled />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível consultar');
-});
-it('mostra quantidade na lista e abre o detalhe sem disparar o clique da linha',async()=>{
-  vi.mocked(suapRdService.read).mockResolvedValue([{...movement,tipo:'reforco'}, {...movement,tipo:'reforco',line_index:2}, {...movement,suap_rd_id:'2',tipo:'anulacao',valor:-10}]);
-  const onOpen=vi.fn(),onRow=vi.fn();renderUi(<div onClick={onRow}><SuapRdMovementBadge empenho={emp} onOpen={onOpen} /></div>);
-  fireEvent.click(await screen.findByRole('button',{name:'1 reforço · 1 anulação (RD)'}));expect(onOpen).toHaveBeenCalledOnce();expect(onRow).not.toHaveBeenCalled();
 });
 it('superadmin pode concluir manualmente uma prévia legada e atualiza os dados aplicados',async()=>{
   vi.mocked(suapRdService.action).mockImplementation(async action=>action==='status' ? { ...run,run } : { ...run,status:'applied' });

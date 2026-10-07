@@ -1,7 +1,7 @@
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 
-import { Plus, Pencil, Search, Filter, Calendar, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Layers, X, Star, History } from 'lucide-react';
+import { Plus, Pencil, Search, Filter, Calendar, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Layers, X, Star } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Empenho, DIMENSOES, COMPONENTES_POR_DIMENSAO } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
-import { SuapRdMovementBadge } from '@/components/suap/SuapRdMovementBadge';
 import { PageHeader } from '@/components/design-system/PageHeader';
 import { SegmentedControl } from '@/components/design-system/SegmentedControl';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
@@ -549,16 +548,9 @@ function EmpenhoRow({
           >
             {empenho.numero}
           </button>
-          <SuapRdMovementBadge empenho={empenho} onOpen={() => handleOpenDialog(empenho)} />
           {empenho.processo && (
             <span className="text-xs text-muted-foreground whitespace-nowrap" title="Processo">
               {empenho.processo}
-            </span>
-          )}
-          {empenho.historicoOperacoes && empenho.historicoOperacoes.length > 1 && (
-            <span className="text-[10px] text-action-primary flex items-center gap-0.5" title="Empenho com histórico de alterações">
-              <History className="h-3 w-3" />
-              {empenho.historicoOperacoes.length} ops
             </span>
           )}
         </div>
