@@ -39,11 +39,15 @@ export async function rdChecksum(value: unknown) {
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2,'0')).join('');
 }
 
-/** Only an applied, complete snapshot from this exact user/tenant/unit can be a baseline. */
+/** A complete application or fully captured immutable details from this exact scope can be a baseline. */
 export function seedRdReuse(state: RdState, scope: Scope, base: RdRun | null, forceFull = false) {
   if (base && Object.keys(scope).some(key => base[key as keyof Scope] !== scope[key as keyof Scope])) throw new Error('Base de RDs fora do usuário, órgão ou campus/unidade.');
-  const eligible = !forceFull && base?.status === 'applied' && base.complete && base.state.phase === 'ready'
-    && (!base.state.reuse || base.state.reuse.version === RD_REUSE_VERSION);
+  const completeApplied = base?.status === 'applied' && base.complete && base.state.phase === 'ready';
+  const detailsCaptured = base?.status === 'partial' && base.state.phase === 'verify'
+    && base.state.inventory.length === base.source_count && base.state.detailCursor >= base.state.inventory.length
+    && !base.state.detailRechecks?.length;
+  const eligible = Boolean(base && !forceFull && (completeApplied || detailsCaptured)
+    && (!base.state.reuse || base.state.reuse.version === RD_REUSE_VERSION));
   state.reuse = { version: RD_REUSE_VERSION,mode: eligible ? 'incremental' : 'full',
     reusedDetails: 0,refreshedDetails: 0,reusedActivities: 0 };
   if (!eligible || !base) return;

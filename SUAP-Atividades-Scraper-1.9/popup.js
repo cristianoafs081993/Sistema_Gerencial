@@ -197,6 +197,8 @@ async function updateAllRdStatus() {
   const applied = entries.filter(entry => entry.run?.status === 'applied');
   const failed = entries.filter(entry => entry.error);
   const reused = entries.reduce((sum,entry) => sum + (entry.run?.reusedDetails || 0),0);
+  const published = entries.reduce((sum,entry) => sum + (entry.run?.appliedSnapshots || 0),0);
+  const captured = entries.reduce((sum,entry) => sum + (entry.run?.snapshotCount || 0),0);
   btnApplyAllRds.hidden = !previews.length || running;
   btnPauseAllRds.hidden = !running;
   btnCollectAllRds.disabled = running;
@@ -204,8 +206,8 @@ async function updateAllRdStatus() {
   const current = status?.currentUnit ? ` Unidade atual: ${status.currentUnit.code} (${status.currentUnit.parentUasg}).` : '';
   const errors = failed.length ? ` Falhas: ${failed.map(entry => `${entry.code}: ${entry.error}`).join('; ')}` : '';
   rdAllStatusEl.textContent = status?.error || (status
-    ? `${running ? 'Coletando' : status.paused ? 'Lote pausado' : 'Lote de RDs'}: ${entries.length}/${status.total || 0} unidades; ${previews.length} conferências completas; ${applied.length} aplicadas; ${reused} RDs reaproveitadas.${current}${errors} Confira cada unidade no SIAGES antes de aplicar.`
-    : 'Todas as unidades: captura separada por unidade e campus, com conferência antes da aplicação.');
+    ? `${running ? 'Coletando' : status.paused ? 'Lote pausado' : 'Lote de RDs'}: ${entries.length}/${status.total || 0} unidades; ${published}/${captured} RDs capturadas já disponíveis; ${previews.length} conferências completas; ${applied.length} unidades reconciliadas; ${reused} RDs reaproveitadas.${current}${errors}`
+    : 'Todas as unidades: captura independente por unidade e campus; RDs validadas ficam disponíveis automaticamente.');
 }
 
 async function updateRdStatus() {
@@ -219,11 +221,12 @@ async function updateRdStatus() {
   btnCollectRds.disabled = running;
   const totals = run?.summary;
   const reuse = run?.syncMode === 'incremental' ? ` ${run.reusedDetails || 0} RDs reaproveitadas; ${run.refreshedDetails || 0} relidas; ${run.reusedActivities || 0} relações de atividades reaproveitadas.` : '';
+  const publication = Number.isInteger(run?.snapshotCount) ? ` ${run.appliedSnapshots || 0}/${run.snapshotCount} RDs capturadas já disponíveis.` : '';
   const currency = value => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   rdStatusEl.textContent = status?.error || (run?.status === 'preview'
-    ? `Conferência completa da unidade ${rdUnit}: ${totals?.rds || 0} RDs.${reuse} Dotação ${currency(totals?.totalDotacao)}, reforços ${currency(totals?.totalReforco)}, anulações ${currency(totals?.totalAnulacao)}. Confira os detalhes no SIAGES antes de aplicar.`
-    : run?.status === 'applied' ? `RDs da unidade ${rdUnit} aplicadas no SIAGES.`
-    : run ? `${running ? 'Coletando RDs' : 'Coleta pausada ou interrompida'} — unidade ${rdUnit}: ${run.processed || 0}/${run.sourceCount || 0} RDs conferidas; ${run.activitiesProcessed || 0}/${run.activitiesTotal || 0} relações oficiais verificadas.${reuse} ${running ? 'Mantenha a aba SUAP aberta.' : 'Clique em coletar / retomar.'}`
+    ? `Conferência completa da unidade ${rdUnit}: ${totals?.rds || 0} RDs.${reuse} Dotação ${currency(totals?.totalDotacao)}, reforços ${currency(totals?.totalReforco)}, anulações ${currency(totals?.totalAnulacao)}. Confira os detalhes no SIAGES.`
+    : run?.status === 'applied' ? `RDs da unidade ${rdUnit} aplicadas no SIAGES.${publication}`
+    : run ? `${running ? 'Coletando RDs' : 'Coleta pausada ou interrompida'} — unidade ${rdUnit}: ${run.processed || 0}/${run.sourceCount || 0} RDs conferidas; ${run.activitiesProcessed || 0}/${run.activitiesTotal || 0} relações oficiais verificadas.${publication}${reuse} ${running ? 'Mantenha a aba SUAP aberta.' : 'Clique em coletar / retomar.'}`
     : `Unidade SUAP ${rdUnit}. A coleta usa sua sessão nesta aba.`);
 }
 

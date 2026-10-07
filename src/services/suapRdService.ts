@@ -15,6 +15,7 @@ export type RdLink = Pick<RdMovement, 'org_id' | 'campus_uasg' | 'suap_unit_code
 };
 export type RdSyncRun = {
   syncMode?: 'full' | 'incremental'; reusedDetails?: number; refreshedDetails?: number; reusedActivities?: number; canceledReuseMaxAgeDays?: number;
+  snapshotCount?: number; appliedSnapshots?: number;
   id: string; runId: string; status: string; complete: boolean; summary: Record<string, number>;
   phase: string; sourceCount: number; processed: number; activitiesProcessed: number; activitiesTotal: number;
   busy?: boolean; error?: string;
@@ -57,14 +58,15 @@ export const suapRdService = {
       if (data.length < 500) return rows;
     }
   },
-  async action(action: 'sync' | 'status' | 'apply' | 'discard' | 'revert', unit: string, campus: string, runId?: string) {
+  async action(action: 'sync' | 'status' | 'apply' | 'apply-partial' | 'discard' | 'revert' | 'revert-partial', unit: string, campus: string, runId?: string) {
     const { data, error } = await supabase.functions.invoke('sync-suap-rds', { body: { action, suapUnitCode: unit, campusUasg: campus, ...(runId ? { runId } : {}) } });
     if (error) {
       const response = (error as { context?: Response }).context;
       const payload = response ? await response.clone().json().catch(() => null) : null;
       throw new Error(payload?.error ?? error.message);
     }
-    return data as RdSyncRun & { run?: RdSyncRun | null; appliedRun?: RdSyncRun | null };
+    return data as RdSyncRun & { run?: RdSyncRun | null; appliedRun?: RdSyncRun | null;
+      appliedNow?: number; appliedSnapshots?: number; pendingSnapshots?: number; snapshotCount?: number; automaticallyApplied?: boolean };
   },
 };
 

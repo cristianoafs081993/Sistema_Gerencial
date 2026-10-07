@@ -93,12 +93,16 @@ describe('Coleta incremental de RDs', () => {
     await expect((async()=>{while(run.state.phase!=='ready') await collectRdChunk({from:()=>({upsert}),rpc:vi.fn()},run,load,DOMParser,1);})()).rejects.toThrow('continuam mudando');
     expect(run.state.phase).toBe('verify');expect(run.state.verificationRetries).toBe(3);expect(run.complete).toBe(false);
   });
-  it('não conclui captura se uma página final muda ou repete RDs', async () => {
+  it('reinicia o inventário quando a lista muda e limita tentativas se a paginação continua instável', async () => {
     const run = makeRun(); run.state.phase='verify'; run.state.inventory=[{rdId:'1',numero:'2026RD003731',situacao:'Concluída',tipo:'Reforço de empenho'}];
-    await expect(collectRdChunk({from:vi.fn(),rpc:vi.fn()},run,async()=>listHtml(),DOMParser,1)).rejects.toThrow('alteradas');
-    expect(run.state.phase).toBe('verify'); expect(run.state.verify).toEqual([]);
+    await collectRdChunk({from:vi.fn(),rpc:vi.fn()},run,async()=>listHtml(),DOMParser,1);
+    expect(run.state.phase).toBe('inventory');expect(run.state.inventoryRetries).toBe(1);expect(run.state.nextUrl).toBe(rdListUrl);
     run.state.phase='inventory'; run.state.total=2; run.state.inventory=[{rdId:'9083',numero:'2026RD003731',situacao:'Concluída',tipo:'Reforço de empenho'}];
-    await expect(collectRdChunk({from:vi.fn(),rpc:vi.fn()},run,async()=>listHtml({count:2}),DOMParser,1)).rejects.toThrow('repetida');
+    await collectRdChunk({from:vi.fn(),rpc:vi.fn()},run,async()=>listHtml({count:2}),DOMParser,1);
+    expect(run.state.phase).toBe('inventory');expect(run.state.inventoryRetries).toBe(2);
+    await collectRdChunk({from:vi.fn(),rpc:vi.fn()},run,async()=>listHtml({count:2}),DOMParser,1);
+    expect(run.state.inventoryRetries).toBe(3);
+    await expect(collectRdChunk({from:vi.fn(),rpc:vi.fn()},run,async()=>listHtml({count:2}),DOMParser,1)).rejects.toThrow('continua mudando');
   });
   it('bloqueia redirecionamentos e URLs fora do escopo sem enviar a sessão', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(null,{status:302,headers:{location:'https://evil.test/'}}));

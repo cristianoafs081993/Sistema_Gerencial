@@ -93,6 +93,17 @@ const detailIds = (data:ReturnType<typeof fixture>) => data.load.mock.calls.flat
 beforeEach(()=>{vi.useFakeTimers();vi.setSystemTime(now);});
 afterEach(()=>vi.useRealTimers());
 describe('reaproveitamento entre coletas completas de RDs',()=>{
+  it('pode reaproveitar detalhes de uma captura incompleta quando todas as RDs do inventário já foram capturadas',()=>{
+    const completed=run('captured');
+    completed.status='partial';completed.complete=false;completed.state.phase='verify';
+    completed.state.inventory=Array.from({length:3},(_,index)=>({rdId:String(index+1),numero:number(index+1),situacao:'Concluída',tipo:'Reforço de empenho'}));
+    completed.state.detailCursor=3;completed.source_count=3;
+    const state=initialRdState('19');seedRdReuse(state,scope,completed);
+    expect(state.reuse).toMatchObject({mode:'incremental',baseRunId:'captured'});
+    const unfinished={...completed,state:{...completed.state,detailCursor:2}};
+    const fresh=initialRdState('19');seedRdReuse(fresh,scope,unfinished);
+    expect(fresh.reuse?.mode).toBe('full');
+  });
   it('na segunda coleta de concluídas reduz 23 páginas a 3, mantendo todos os snapshots e datas originais',async()=>{
     const {db,first,data}=await baseline();
     const second=await finish(db,run('second',first),data);

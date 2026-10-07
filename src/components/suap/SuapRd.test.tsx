@@ -19,7 +19,7 @@ it('informa reaproveitamento e orienta revalidar tudo sem iniciar coleta no fron
   vi.mocked(suapRdService.action).mockResolvedValue({...incremental,run:incremental});
   renderUi(<SuapRdSyncCard onSynced={vi.fn()} />);
   expect(await screen.findByText('3 RDs reaproveitadas · 1 relidas · 1 relações de atividades reaproveitadas.')).toBeInTheDocument();
-  expect(screen.getByText(/Para reconferir tudo imediatamente/)).toHaveTextContent('reaproveita permanentemente RDs concluídas');
+  expect(screen.getByText(/Cada RD fica disponível automaticamente/)).toHaveTextContent('RDs concluídas capturadas e seus vínculos são reaproveitados');
   expect(vi.mocked(suapRdService.action).mock.calls.some(([action])=>action==='sync')).toBe(false);
 });
 beforeEach(()=>{ vi.clearAllMocks();state.admin=true;vi.mocked(suapRdService.action).mockResolvedValue({ ...run,run:null });vi.mocked(suapRdService.read).mockResolvedValue([]);vi.mocked(suapRdService.captureStatus).mockResolvedValue({hasApplied:true,latest:null}); });
@@ -60,7 +60,7 @@ it('mostra quantidade na lista e abre o detalhe sem disparar o clique da linha',
   const onOpen=vi.fn(),onRow=vi.fn();renderUi(<div onClick={onRow}><SuapRdMovementBadge empenho={emp} onOpen={onOpen} /></div>);
   fireEvent.click(await screen.findByRole('button',{name:'1 reforço · 1 anulação (RD)'}));expect(onOpen).toHaveBeenCalledOnce();expect(onRow).not.toHaveBeenCalled();
 });
-it('superadmin atualiza a captura da extensão e aplica somente após conferência completa',async()=>{
+it('superadmin pode concluir manualmente uma prévia legada e atualiza os dados aplicados',async()=>{
   vi.mocked(suapRdService.action).mockImplementation(async action=>action==='status' ? { ...run,run } : { ...run,status:'applied' });
   const onSynced=vi.fn();renderUi(<SuapRdSyncCard onSynced={onSynced} />);
   await waitFor(()=>expect(suapRdService.action).toHaveBeenCalledWith('status','19','158366'));
@@ -69,6 +69,16 @@ it('superadmin atualiza a captura da extensão e aplica somente após conferênc
   await waitFor(()=>expect(suapRdService.action).toHaveBeenCalledWith('apply','19','158366','run'));
   await waitFor(()=>expect(onSynced).toHaveBeenCalledOnce());
   expect(vi.mocked(suapRdService.action).mock.calls.some(([action])=>action==='sync')).toBe(false);
+});
+it('informa aplicação automática durante coleta e oferece recuperação somente para snapshots pendentes',async()=>{
+  const collecting={...run,status:'collecting',complete:false,snapshotCount:500,appliedSnapshots:498};
+  vi.mocked(suapRdService.action).mockImplementation(async action=>action==='status' ? {...collecting,run:collecting} : {...collecting,status:'collecting'});
+  const onSynced=vi.fn();renderUi(<SuapRdSyncCard onSynced={onSynced} />);
+  expect(await screen.findByText('Disponíveis automaticamente: 498/500 RDs capturadas.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Tentar publicar RDs pendentes (2)'}));
+  await waitFor(()=>expect(suapRdService.action).toHaveBeenCalledWith('apply-partial','19','158366','run'));
+  expect(await screen.findByText(/Cada RD fica disponível automaticamente/)).toBeInTheDocument();
+  await waitFor(()=>expect(onSynced).toHaveBeenCalledOnce());
 });
 it('não oferece escrita de RDs para usuário sem papel superadmin',()=>{
   state.admin=false;renderUi(<SuapRdSyncCard onSynced={vi.fn()} />);expect(screen.queryByRole('button')).not.toBeInTheDocument();expect(suapRdService.action).not.toHaveBeenCalled();

@@ -776,7 +776,7 @@ Camada determinística de domínio e ferramentas agênticas baseadas no Model Co
 
 ## sync-suap-rds
 
-`POST /functions/v1/sync-suap-rds`: ações `units`, `sync-extension`, `sync-html`, `status`, `apply`, `discard`, `revert` e `sync` (compatibilidade backend), com JWT SIAGES validado internamente e permissão superadmin. A extensão captura na aba SUAP autenticada; o backend determina a próxima URL e valida HTML, campus e cursor. O lote da extensão percorre as 44 unidades, com prévia/aplicação por unidade. A coleta por HTML dispensa `suap_connections`. Contrato, tipos e prévia: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).
+`POST /functions/v1/sync-suap-rds`: ações `units`, `sync-extension`, `sync-html`, `status`, `apply`, `apply-partial`, `discard`, `revert`, `revert-partial` e `sync` (compatibilidade backend), com JWT SIAGES validado internamente e permissão superadmin. A extensão captura na aba SUAP autenticada; o backend determina a próxima URL, valida HTML, campus e cursor e publica automaticamente os snapshots validados durante a coleta. A conferência completa reconcilia toda a unidade. O lote da extensão percorre as 44 unidades, com aplicação por unidade e suporte de reversão parcial. A coleta por HTML dispensa `suap_connections`. Contrato, tipos e prévia: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).
 
 O parser aceita, sem linhas de empenho, somente RDs canceladas em que o detalhe SUAP exiba explicitamente “Nenhuma natureza de despesa cadastrada”. Outros detalhes sem tabela permanecem erro para proteger a cobertura da conferência. Para dotações provisórias canceladas, também lê o valor sob o rótulo “Valor provisório”.
 

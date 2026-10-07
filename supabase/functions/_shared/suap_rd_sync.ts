@@ -15,7 +15,7 @@ export type RdState = {
   detailCursor: number; verify: SuapRdRef[]; verifyTotal: number | null;
   reuse?: RdReuse;
   rowFingerprintVersion?: number;
-  mutableRdIds?: string[]; detailRechecks?: string[]; verificationRetries?: number;
+  mutableRdIds?: string[]; detailRechecks?: string[]; verificationRetries?: number; inventoryRetries?: number;
 };
 export type RdRun = { id: string; org_id: string; user_id: string; campus_uasg: string; suap_unit_code: string;
   status: string; state: RdState; source_count: number; summary: Record<string, number>; complete: boolean;
@@ -81,15 +81,39 @@ export async function fetchSuapRdHtml(url: string, cookie: string, fetcher: type
 }
 
 function addPage(existing: SuapRdRef[], incoming: SuapRdRef[], expected: number | null, total: number) {
-  if (expected !== null && expected !== total) throw new Error('Inventário mudou durante a coleta; inicie nova conferência.');
+  if (expected !== null && expected !== total) return false;
   const ids = new Set(existing.map(rd => rd.rdId));
-  if (incoming.some(rd => ids.has(rd.rdId))) throw new Error('Paginação instável ou repetida; inicie nova conferência.');
+  if (incoming.some(rd => ids.has(rd.rdId))) return false;
   existing.push(...incoming);
+  return true;
 }
-/** Only mutable RDs can be reread after the final inventory changes, with bounded retries. */
-function reconcileRdInventory(state: RdState) {
+/** Restart list paging when new rows shift offsets; keep validated snapshots for idempotent reuse. */
+function restartInventorySweep(run: RdRun) {
+  const state=run.state;
+  if ((state.inventoryRetries ?? 0) >= 3) throw new Error('Inventário SUAP continua mudando; as RDs já capturadas estão preservadas. Retome a coleta quando estabilizar.');
+  const previousInventory=structuredClone(state.inventory);
+  if (!state.reuse) state.reuse={version:1,mode:'incremental',reusedDetails:0,refreshedDetails:0,reusedActivities:0};
+  if (!state.reuse.baseRunId) {
+    state.reuse.baseRunId=run.id;
+    state.reuse.previousInventory=previousInventory;
+  } else if (state.reuse.baseRunId===run.id) state.reuse.previousInventory=previousInventory;
+  state.reuse.prepared=false;state.reuse.reusedIds=[];state.reuse.reusedDetails=0;
+  state.reuse.refreshedDetails=0;state.reuse.reusedActivities=0;
+  state.inventoryRetries=(state.inventoryRetries ?? 0)+1;
+  state.phase='inventory';state.nextUrl=rdInventoryUrl(run.suap_unit_code);
+  state.inventory=[];state.total=null;state.verify=[];state.verifyTotal=null;
+  state.activityCursor=0;state.activityNextUrl=null;state.detailCursor=0;
+  state.detailRechecks=[];state.mutableRdIds=[];state.verificationRetries=0;
+}
+/** Inventory identity changes restart the scan; mutable pending rows use targeted detail retries. */
+function reconcileRdInventory(run: RdRun) {
+  const state=run.state;
   const current = new Map(state.verify.map(ref => [ref.rdId,ref]));
-  if (current.size !== state.inventory.length) throw new Error('RDs alteradas durante a coleta; inicie nova conferência.');
+  const previousIds=new Set(state.inventory.map(ref=>ref.rdId));
+  if (current.size !== previousIds.size || [...current.keys()].some(id=>!previousIds.has(id))) {
+    restartInventorySweep(run);
+    return;
+  }
   const mutable = new Set(state.mutableRdIds ?? []);
   const changed = state.inventory.filter(ref => {
     const next = current.get(ref.rdId);
@@ -124,14 +148,15 @@ export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: str
       const page = parseSuapRdList(await load(state.nextUrl!), state.nextUrl!, run.suap_unit_code, Parser);
       for (const ref of page.refs) if (ref.rowFingerprint) ref.rowFingerprint = await rdChecksum(ref.rowFingerprint);
       const verify = state.phase === 'verify';
-      addPage(verify ? state.verify : state.inventory, page.refs, verify ? state.verifyTotal : state.total, page.total);
+      const added=addPage(verify ? state.verify : state.inventory,page.refs,verify ? state.verifyTotal : state.total,page.total);
+      if (!added) { restartInventorySweep(run); continue; }
       if (verify) state.verifyTotal = page.total; else state.total = page.total;
       state.nextUrl = page.nextUrl;
       if (!page.nextUrl) {
         const records = verify ? state.verify : state.inventory;
-        if (records.length !== page.total) throw new Error('Inventário SUAP incompleto.');
+        if (records.length !== page.total) { restartInventorySweep(run); continue; }
         if (verify) {
-          reconcileRdInventory(state);
+          reconcileRdInventory(run);
         } else state.phase = 'plan';
       }
     } else if (state.phase === 'plan') {

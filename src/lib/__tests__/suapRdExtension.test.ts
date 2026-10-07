@@ -30,7 +30,7 @@ function fixtureServer() {
 }
 afterEach(()=>vi.unstubAllGlobals());
 describe('RDs pela sessão da extensão',()=>{
-  it('percorre inventário, plano, relação, detalhe e inventário final com HTML e sem cookie ou aplicação automática',async()=>{
+  it('percorre inventário, plano, relação, detalhe e inventário final sem enviar cookies ou gravar diretamente',async()=>{
     const server=fixtureServer(); const progress=vi.fn().mockResolvedValue(undefined);
     const result=await api.collect({unit:'19',...server,progress});
     expect(result).toMatchObject({status:'preview',complete:true,nextUrl:null});
@@ -39,6 +39,16 @@ describe('RDs pela sessão da extensão',()=>{
     expect(server.upsert.mock.calls[0][0]).toMatchObject({campus_uasg:'158366',suap_unit_code:'19',payload:{sources:[expect.objectContaining({activityId:'32635'})]}});
     expect(server.post.mock.calls.map(([body])=>body.action)).toEqual(['sync-extension',...Array(5).fill('sync-html')]);
     expect(JSON.stringify(server.post.mock.calls)).not.toContain('sessionId');
+  });
+  it('reconhece como sucesso o estado aplicado automaticamente após fechar a conferência',async()=>{
+    const server=fixtureServer();
+    server.post.mockImplementation(async(body:Request)=>{
+      if(body.action==='sync-html') await collectCapturedRdPage({from:()=>({upsert:server.upsert}),rpc:vi.fn()},server.run,body.html,body.sourceUrl,DOMParser);
+      nextRdCaptureUrl(server.run);
+      return server.run.state.phase==='ready' ? {runId:server.run.id,status:'applied',complete:true,nextUrl:null} : publicRun(server.run);
+    });
+    const result=await api.collect({unit:'19',...server,progress:async()=>{}});
+    expect(result).toMatchObject({status:'applied',complete:true,nextUrl:null});
   });
   it('retoma a etapa que falhou sem recapturar as páginas já confirmadas',async()=>{
     const server=fixtureServer(); const goodCapture=server.capture;

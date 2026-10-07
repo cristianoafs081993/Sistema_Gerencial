@@ -38,7 +38,7 @@ Deno.serve(async request => {
     if (action === 'units') return reply({ units: SUAP_PLAN_UNITS });
     const unit = getSuapPlanUnit(body.suapUnitCode ?? '19');
     if (!unit || body.campusUasg && body.campusUasg !== unit.parentUasg) return reply({ error:'Campus e unidade SUAP incompatíveis.' },400);
-    if (!['sync','sync-extension','sync-html','status','apply','discard','revert'].includes(action)) return reply({ error:'Ação inválida.' },400);
+    if (!['sync','sync-extension','sync-html','status','apply','apply-partial','discard','revert','revert-partial'].includes(action)) return reply({ error:'Ação inválida.' },400);
     if (action === 'sync-html' && !body.runId) return reply({ error:'Informe a execução da captura.' },400);
     let query = service.from('suap_rd_sync_runs').select('*').eq('org_id',membership.org_id).eq('suap_unit_code',unit.value).eq('campus_uasg',unit.parentUasg).eq('user_id',user.id);
     if (body.runId) query = query.eq('id',body.runId);
@@ -52,7 +52,17 @@ Deno.serve(async request => {
         .eq('user_id',user.id).eq('suap_unit_code',unit.value).eq('campus_uasg',unit.parentUasg)
         .eq('status','applied').order('applied_at',{ ascending:false }).limit(1).maybeSingle();
       if (applied.error) throw applied.error;
-      return reply({ run:run ? publicRun(run) : null,appliedRun:applied.data ? publicRun(applied.data) : null });
+      if (!run) return reply({ run:null,appliedRun:applied.data ? publicRun(applied.data) : null });
+      const [snapshots,backups] = await Promise.all([
+        service.from('suap_rd_snapshots').select('suap_rd_id,checksum').eq('run_id',run.id),
+        service.from('suap_rd_partial_apply_backups').select('suap_rd_id,applied_checksum').eq('run_id',run.id),
+      ]);
+      if (snapshots.error) throw snapshots.error;
+      if (backups.error) throw backups.error;
+      const appliedChecksums = new Map((backups.data ?? []).map(row => [row.suap_rd_id,row.applied_checksum]));
+      const appliedSnapshots = (snapshots.data ?? []).filter(row => appliedChecksums.get(row.suap_rd_id) === row.checksum).length;
+      return reply({ run:{ ...publicRun(run),snapshotCount:snapshots.data?.length ?? 0,appliedSnapshots },
+        appliedRun:applied.data ? publicRun(applied.data) : null });
     }
     if (action === 'discard') {
       if (!run || !['collecting','partial','awaiting_auth','preview'].includes(run.status)) return reply({ error:'Prévia não disponível para descartar.' },409);
@@ -65,9 +75,19 @@ Deno.serve(async request => {
       const { data,error } = await service.rpc('apply_suap_rd_snapshot',{ p_run_id:run.id,p_user_id:user.id });
       if (error) throw error; return reply({ status:'applied',runId:run.id,summary:data });
     }
+    if (action === 'apply-partial') {
+      if (!run) return reply({ error:'Execução não encontrada.' },404);
+      const { data,error } = await service.rpc('apply_suap_rd_partial_snapshots',{ p_run_id:run.id,p_user_id:user.id });
+      if (error) throw error; return reply({ status:run.status,runId:run.id,...data });
+    }
     if (action === 'revert') {
       if (!run) return reply({ error:'Execução não encontrada.' },404);
       const { data,error } = await service.rpc('revert_suap_rd_snapshot',{ p_run_id:run.id,p_user_id:user.id });
+      if (error) throw error; return reply({ status:'reverted',runId:run.id,summary:data });
+    }
+    if (action === 'revert-partial') {
+      if (!run) return reply({ error:'Execução não encontrada.' },404);
+      const { data,error } = await service.rpc('revert_suap_rd_partial_snapshots',{ p_run_id:run.id,p_user_id:user.id });
       if (error) throw error; return reply({ status:'reverted',runId:run.id,summary:data });
     }
     if (run?.status === 'preview') {
@@ -81,9 +101,19 @@ Deno.serve(async request => {
       if (!body.forceFull) {
         const previous = await service.from('suap_rd_sync_runs').select('*').eq('org_id',membership.org_id)
           .eq('user_id',user.id).eq('campus_uasg',unit.parentUasg).eq('suap_unit_code',unit.value)
-          .eq('status','applied').eq('complete',true).order('applied_at',{ ascending:false }).limit(1).maybeSingle();
+          .in('status',['applied','partial']).order('updated_at',{ ascending:false }).limit(20);
         if (previous.error) throw previous.error;
-        base = previous.data;
+        for (const candidate of previous.data ?? []) {
+          const fullyApplied = candidate.status === 'applied' && candidate.complete && candidate.state?.phase === 'ready';
+          const fullyCaptured = candidate.status === 'partial' && candidate.state?.phase === 'verify'
+            && candidate.state?.inventory?.length === candidate.source_count
+            && candidate.state?.detailCursor >= candidate.state.inventory.length && !candidate.state?.detailRechecks?.length;
+          if (fullyApplied) { base = candidate; break; }
+          if (!fullyCaptured) continue;
+          const { count,error } = await service.from('suap_rd_snapshots').select('suap_rd_id',{ count:'exact',head:true }).eq('run_id',candidate.id);
+          if (error) throw error;
+          if (count === candidate.state.inventory.length) { base = candidate; break; }
+        }
       }
       seedRdReuse(state,{org_id:membership.org_id,user_id:user.id,campus_uasg:unit.parentUasg,suap_unit_code:unit.value},base,body.forceFull === true);
       const created = await service.from('suap_rd_sync_runs').insert({ org_id:membership.org_id,user_id:user.id,
@@ -111,13 +141,28 @@ Deno.serve(async request => {
     await collectRdChunk(service,run,url=>fetchSuapRdHtml(url,cookie),DOMParser as unknown as new()=>globalThis.DOMParser);
     }
     const ready = run.state.phase === 'ready';
+    let partialApplication: Record<string, number> | null = null;
+    if (action === 'sync-html' || action === 'sync') {
+      const { data,error } = await service.rpc('apply_suap_rd_partial_snapshots',{ p_run_id:run.id,p_user_id:user.id });
+      if (error) throw error;
+      partialApplication = data;
+    }
     const summary = ready ? await summarizeRdPreview(service,run) : run.summary;
     const saved = await service.from('suap_rd_sync_runs').update({ state:run.state,summary,source_count:run.state.inventory.length,
       complete:ready,status:ready?'preview':'collecting',error_message:null,lease_token:null,lease_until:null,updated_at:new Date().toISOString() })
       .eq('id',run.id).eq('lease_token',lease).select('id').maybeSingle();
     if (saved.error) throw saved.error;
     if (!saved.data) throw new Error('A execução foi retomada por outra chamada; consulte o estado atual.');
-    return reply(publicRun({ ...run,status:ready?'preview':'collecting',complete:ready,summary,error_message:null }));
+    if (ready) {
+      const { error:applyError } = await service.rpc('apply_suap_rd_snapshot',{ p_run_id:run.id,p_user_id:user.id });
+      if (applyError) return reply({ ...publicRun({ ...run,status:'preview',complete:true,summary,error_message:applyError.message }),
+        error:`Conferência completa; a aplicação automática falhou. Use Aplicar conferência das RDs para tentar novamente. ${applyError.message}`,
+        partialApplication,snapshotCount:partialApplication?.snapshotCount,appliedSnapshots:partialApplication?.appliedSnapshots },500);
+      return reply({ ...publicRun({ ...run,status:'applied',complete:true,summary,error_message:null }),partialApplication,
+        snapshotCount:partialApplication?.snapshotCount,appliedSnapshots:partialApplication?.appliedSnapshots,automaticallyApplied:true });
+    }
+    return reply({ ...publicRun({ ...run,status:'collecting',complete:false,summary,error_message:null }),partialApplication,
+      snapshotCount:partialApplication?.snapshotCount,appliedSnapshots:partialApplication?.appliedSnapshots });
   } catch (error) {
     const message = error instanceof Error ? error.message : typeof error === 'object' && error && 'message' in error ? String(error.message) : 'Falha na sincronização de RDs.';
     const reauth = message.includes('Sessão do SUAP');

@@ -42,7 +42,7 @@
       run = await post({ action: 'sync-html', suapUnitCode: unit, runId: run.runId, ...captured });
       await progress(run);
     }
-    if (run.status !== 'preview' && !stopped()) throw new Error(run.error || 'Captura incompleta. Retome pela extensão.');
+    if (!['preview','applied'].includes(run.status) && !stopped()) throw new Error(run.error || 'Captura incompleta. Retome pela extensão.');
     return run;
   }
 
