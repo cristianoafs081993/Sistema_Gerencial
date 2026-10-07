@@ -461,6 +461,26 @@ describe('process-document 1.9', () => {
     expect(finance?.textContent).not.toMatch(/pago|pagamento/i);
   });
 
+  it('lista no financeiro somente os empenhos com saldo', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    const summary = financeSummary();
+    summary.empenhos.push(
+      { numero: '2024NE000320', empenhado: 150231.99, saldo: 0, liquidacoes: [] },
+      { numero: '2024NE000321', empenhado: 79999.84, saldo: 0, liquidacoes: [] },
+    );
+    api.renderFinanceSummary(summary);
+    api.selectTab('finance');
+
+    const finance = document.getElementById('siages-suap-finance-panel');
+    expect(finance?.querySelectorAll('article')).toHaveLength(1);
+    // Os cards de totais (Empenhado / Saldo) nao sao exibidos no topo da aba.
+    expect(finance?.querySelector('section.suape-section')?.children).toHaveLength(2);
+    expect(finance).toHaveTextContent('2026NE000001');
+    expect(finance).not.toHaveTextContent('2024NE000320');
+    expect(finance).not.toHaveTextContent('2024NE000321');
+  });
+
   it('mantem o gerador em modal e nao duplica a abertura', async () => {
     const api = loadProcessScript();
     await api.installToolkit();

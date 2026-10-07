@@ -756,7 +756,7 @@
         </header>
         <nav class="suape-tabs" role="tablist" aria-label="Ferramentas">
           <button class="suape-tab" role="tab" data-tab="summary" aria-selected="true">Resumo</button>
-          <button class="suape-tab" role="tab" data-tab="finance" aria-selected="false">Financeiro</button>
+          <button class="suape-tab" role="tab" data-tab="finance" aria-selected="false">Orçamentário</button>
           <button class="suape-tab" role="tab" data-tab="shortcuts" aria-selected="false">Atalhos</button>
           <button class="suape-tab" role="tab" data-tab="ai" aria-selected="false">IA</button>
           <button class="suape-tab" role="tab" data-tab="settings" aria-selected="false">Config.</button>
@@ -1141,11 +1141,6 @@
     const finance = ensureFinancePanel(); finance.innerHTML = '';
     const section = createElement('section', 'suape-section'); section.append(createElement('h3', 'suape-section-title', 'SIAGES - Empenhos'), createElement('div', 'suape-empty', message)); finance.appendChild(section);
   }
-  function renderMetric(label, value, colors) {
-    const cell = document.createElement('div'); Object.assign(cell.style, { border: `1px solid ${colors.metricBorder}`, borderRadius: '8px', padding: '8px', background: colors.metricBg });
-    const small = createElement('span', '', label); Object.assign(small.style, { display: 'block', color: colors.mutedText, fontSize: '11px', marginBottom: '3px' });
-    const strong = createElement('strong', '', formatCurrency(value)); Object.assign(strong.style, { display: 'block', color: colors.panelText, fontSize: '13px' }); cell.append(small, strong); return cell;
-  }
   function renderFinanceSummary(summary) {
     state.financeSummary = summary;
     state.hasFinanceSummary = true;
@@ -1158,9 +1153,8 @@
     const header = document.createElement('div'); Object.assign(header.style, { padding: '12px', borderBottom: `1px solid ${colors.metricBorder}` });
     const beneficiary = createElement('span', '', summary.beneficiario?.nome || summary.beneficiario?.documento || 'Beneficiário identificado'); Object.assign(beneficiary.style, { display: 'block', marginTop: '4px', color: colors.panelText }); header.append(beneficiary);
     if (summary.contrato?.numero) { const chip = createElement('span', '', `Filtrado pelo contrato ${summary.contrato.numero}`); Object.assign(chip.style, { display: 'inline-block', marginTop: '7px', padding: '3px 7px', borderRadius: '999px', background: colors.chipBg, color: colors.chipText, fontSize: '11px', fontWeight: '700' }); header.appendChild(chip); }
-    const totals = document.createElement('div'); Object.assign(totals.style, { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: '8px', padding: '10px 12px' }); totals.append(renderMetric('Empenhado', summary.totais?.empenhado, colors), renderMetric('Saldo', summary.totais?.saldo, colors));
     const list = document.createElement('div'); Object.assign(list.style, { padding: '0 12px 12px', display: 'grid', gap: '8px' });
-    (summary.empenhos || []).slice(0, 6).forEach((commitment) => {
+    (summary.empenhos || []).filter((commitment) => Number(commitment.saldo) > 0).forEach((commitment) => {
       const item = document.createElement('article'); Object.assign(item.style, { border: `1px solid ${colors.metricBorder}`, borderRadius: '9px', padding: '9px', background: colors.itemBg });
       const number = createElement('strong', '', commitment.numero || 'Empenho sem \u00famero');
       const balance = createElement('span', '', `Saldo ${formatCurrency(commitment.saldo)}`); Object.assign(balance.style, { color: colors.accent, fontWeight: '700' });
@@ -1181,8 +1175,7 @@
       }
       list.appendChild(item);
     });
-    if ((summary.empenhos || []).length > 6) list.appendChild(createElement('div', 'suape-empty', `+${summary.empenhos.length - 6} empenho(s) adicional(is)`));
-    wrapper.append(header, totals, list); finance.appendChild(wrapper);
+    wrapper.append(header, list); finance.appendChild(wrapper);
     persistProcessState();
   }
 
