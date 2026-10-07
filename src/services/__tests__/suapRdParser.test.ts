@@ -36,11 +36,11 @@ describe('Contratos reais das RDs SUAP', () => {
   });
   it('percorre paginação 1-based preservando escopo e exige contagem', () => {
     const parsed = parseSuapRdList(listHtml({ count: 499, next: '?p=2&tab=tab_any_data&unidade_gestora=19' }), rdListUrl, '19');
-    expect(parsed.total).toBe(499); expect(parsed.nextUrl).toContain('p=2'); expect(parsed.refs[0].rdId).toBe('9083');
+    expect(parsed.total).toBe(499); expect(parsed.nextUrl).toContain('p=2'); expect(parsed.refs[0]).toMatchObject({ rdId: '9083', dataCadastro: '2026-02-26' });
     expect(() => parseSuapRdList(listHtml().replace('Mostrando 1 Requisições de despesas',''),rdListUrl,'19')).toThrow('Contagem');
   });
   it('usa ID da URL oficial e reconhece somente o aviso oficial de atividade vazia', () => {
-    expect(parseSuapRdList(listHtml({ activity: true }),activityUrl,'19').activityId).toBe('32635');
+    expect(parseSuapRdList(listHtml({ activity: true }),activityUrl,'19')).toMatchObject({ activityId: '32635', refs: [{ dataCadastro: null }] });
     const empty = '<main id="content"><dl><dt>Unidade administrativa</dt><dd>DG/CN</dd><dt>Atividade</dt><dd>Sem despesa</dd></dl><p class="alert alert-warning">Nenhuma requisição de despesa cadastrada.</p></main>';
     expect(parseSuapRdList(empty,activityUrl,'19').refs).toEqual([]);
     expect(() => parseSuapRdList(empty.replace('Nenhuma','Alguma'),activityUrl,'19')).toThrow('Tabela');

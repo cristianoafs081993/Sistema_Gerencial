@@ -203,7 +203,7 @@ export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: str
       }
       const sources = state.sources[ref.rdId] ?? [];
       if (sources.some(source => foldRdText(source.activityName) !== foldRdText(detail.activityName))) throw new Error('Atividade da RD diverge da relação oficial.');
-      const payload = { ...detail, sources };
+      const payload = { ...detail, dataCadastro: ref.dataCadastro ?? null, sources };
       const checksum = await rdChecksum(payload);
       const { error } = await db.from('suap_rd_snapshots').upsert({ run_id: run.id, org_id: run.org_id,
         campus_uasg: run.campus_uasg, suap_unit_code: run.suap_unit_code, suap_rd_id: ref.rdId, payload, checksum,

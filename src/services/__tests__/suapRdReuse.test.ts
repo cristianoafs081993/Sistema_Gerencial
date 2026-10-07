@@ -117,6 +117,16 @@ describe('reaproveitamento entre coletas completas de RDs',()=>{
     expect([...db.rows.values()].filter(row=>row.run_id==='second')).toHaveLength(10);
     expect(db.filters).toContainEqual({run_id:'first',org_id:'org',campus_uasg:'158366',suap_unit_code:'19'});
   });
+  it('preenche a data de cadastro do inventário ao reaproveitar snapshots legados',async()=>{
+    const {db,first,data}=await baseline();
+    for(const [key,row] of db.rows) if(row.run_id==='first') {
+      const payload={...row.payload}; delete payload.dataCadastro;
+      db.rows.set(key,{...row,payload});
+    }
+    const second=await finish(db,run('second',first),data);
+    expect(second.state.reuse?.reusedDetails).toBe(10);
+    expect(db.rows.get('second:1')!.payload.dataCadastro).toBe('2026-02-26');
+  });
   it('confere o inventário mesmo após o JSONB reordenar as propriedades persistidas',async()=>{
     const {db,first,data}=await baseline();
     first.state.inventory=first.state.inventory.map(ref=>Object.fromEntries(Object.entries(ref).sort(([a],[b])=>a.localeCompare(b))) as typeof ref);

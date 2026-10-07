@@ -7,6 +7,7 @@ export type RdMovement = {
   source_url: string; atividade_nome: string; processo: string; line_index: number;
   natureza_despesa: string; valor: number; empenho_numero: string | null; empenho_completo: string | null;
   gestao: string | null; ro: string | null; linha_situacao: string; captured_at: string;
+  data_cadastro: string | null;
   suap_activity_id: string | null; suap_plan_id: number | null; atividade_id: string | null;
   empenho_id: string | null; resolution: string; confirmed: boolean;
 };

@@ -16,11 +16,12 @@ create function current_user_campus_uasg() returns text language sql as $$select
 grant select on atividades,empenhos to authenticated,service_role;`);
 await db.exec(await readFile(new URL('../supabase/migrations/20261005120000_create_suap_rd_integration.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../supabase/migrations/20261007120000_apply_partial_suap_rd_snapshots.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../supabase/migrations/20261007130000_add_rd_registration_date_to_movements.sql',import.meta.url),'utf8'));
 const org='00000000-0000-0000-0000-000000000001', user='00000000-0000-0000-0000-000000000002', activity='00000000-0000-0000-0000-000000000003', ne='00000000-0000-0000-0000-000000000004';
 await db.query('insert into orgs values($1)',[org]); await db.query('insert into auth.users values($1)',[user]);
 await db.query("insert into atividades values($1,$2,'158366','19',8,'32635')",[activity,org]);
 await db.query("insert into empenhos values($1,$2,'158366','2026NE000014',null,55229.43)",[ne,org]);
-const payload = { rdId:'9083',suapUnitCode:'19',campusUasg:'158366',numero:'2026RD003731',tipo:'reforco',situacao:'Concluída',sources:[{planId:8,activityId:'32635'}],linhas:[{valor:20242.46,ug:'158366',gestao:'26435',empenhoNumero:'2026NE000014',empenhoCompleto:'158366264352026NE000014',situacao:'Confirmada'}] };
+const payload = { rdId:'9083',suapUnitCode:'19',campusUasg:'158366',numero:'2026RD003731',tipo:'reforco',situacao:'Concluída',dataCadastro:'2026-02-26',sources:[{planId:8,activityId:'32635'}],linhas:[{valor:20242.46,ug:'158366',gestao:'26435',empenhoNumero:'2026NE000014',empenhoCompleto:'158366264352026NE000014',situacao:'Confirmada'}] };
 const run = async (unit='19',status='preview',complete=true) => (await db.query("insert into suap_rd_sync_runs(org_id,user_id,campus_uasg,suap_unit_code,status,complete,source_count) values($1,$2,'158366',$3,$4,$5,1) returning id",[org,user,unit,status,complete])).rows[0].id;
 const snap = async (id,p=payload) => db.query("insert into suap_rd_snapshots values($1,$2,'158366',$3,$4,$5,$6,now())",[id,org,p.suapUnitCode,p.rdId ?? '9083',JSON.stringify(p),`checksum-${p.rdId ?? '9083'}-${p.linhas[0]?.valor ?? 0}`]);
 const apply = id => db.query('select apply_suap_rd_snapshot($1,$2)',[id,user]);
@@ -30,6 +31,7 @@ const revertPartial = id => db.query('select revert_suap_rd_partial_snapshots($1
 const first=await run(); await snap(first); await apply(first); await apply(first);
 assert.equal((await db.query('select count(*)::int n from suap_requisicoes_despesa where active')).rows[0].n,1);
 assert.equal((await db.query('select resolution from suap_rd_movimentacoes')).rows[0].resolution,'resolvido');
+assert.equal((await db.query('select data_cadastro from suap_rd_movimentacoes')).rows[0].data_cadastro,'2026-02-26');
 assert.equal(Number((await db.query('select valor_rd from atividade_empenho_vinculos')).rows[0].valor_rd),20242.46);
 await db.query('update empenhos set atividade_id=$1',[user]);
 assert.equal((await db.query('select resolution from suap_rd_movimentacoes')).rows[0].resolution,'conflito_manual');

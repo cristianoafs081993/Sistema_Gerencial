@@ -83,6 +83,24 @@ const renderDialog = (children: ReactNode) => {
 };
 
 describe('EmpenhoDialog', () => {
+  it('remove a tabela antiga de histórico de operações do empenho', () => {
+    renderDialog(
+      <EmpenhoDialog
+        open
+        onOpenChange={vi.fn()}
+        atividades={[]}
+        onSave={vi.fn()}
+        empenho={{
+          ...baseEmpenho(),
+          historicoOperacoes: [{ data: '31/12/2099', operacao: 'INCLUSAO', quantidade: 1, valorUnitario: 9876.54, valorTotal: 9876.54 }],
+        }}
+      />,
+    );
+
+    expect(screen.queryByText('31/12/2099')).not.toBeInTheDocument();
+    expect(screen.queryByText('Histórico de Operações')).not.toBeInTheDocument();
+  });
+
   it('mostra metricas de RAP usando base vigente, liquidado no ano e saldo atual', () => {
     renderDialog(
       <EmpenhoDialog

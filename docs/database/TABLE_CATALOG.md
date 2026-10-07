@@ -1533,7 +1533,7 @@ Consumido por:
 | `suap_rd_snapshots` | Revisões estruturadas por execução, com fontes e checksum; cópias de evidências mantêm `captured_at` original |
 | `suap_rd_partial_apply_backups` | Estado anterior de cada RD publicada durante coleta incompleta; permite atualização idempotente e reversão parcial |
 | `suap_requisicoes_despesa` | Revisão ativa de cada RD |
-| `suap_rd_movimentacoes` | Linhas, NE/RO e resolução local; view security_invoker |
+| `suap_rd_movimentacoes` | Linhas, NE/RO, resolução local e `data_cadastro` de origem SUAP; view security_invoker |
 | `atividade_empenho_vinculos` | Líquido confirmado por atividade / NE; view security_invoker |
 
 Chaves, autorização e RPCs de aplicação/reversão: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).

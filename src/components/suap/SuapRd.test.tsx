@@ -11,7 +11,7 @@ vi.mock('@/contexts/AuthContext',()=>({useOptionalAuth:()=>({isSuperAdmin:state.
 vi.mock('@/services/suapRdService',async importOriginal=>({ ...await importOriginal<typeof import('@/services/suapRdService')>(),suapRdService:{ read:vi.fn(),action:vi.fn(),preview:vi.fn().mockResolvedValue([]),captureStatus:vi.fn() } }));
 const renderUi=(ui:ReactElement)=>render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}>{ui}</QueryClientProvider>);
 const emp={id:'e',numero:'2026NE000014',valor:150} as Empenho;
-const movement={org_id:'org',campus_uasg:'158366',suap_unit_code:'19',run_id:'run',suap_rd_id:'1',rd_numero:'2026RD000001',tipo:'dotacao',rd_situacao:'Concluída',source_url:'https://suap.ifrn.edu.br/plan_estrategico/detalhar_requisicaodespesa/1/',atividade_nome:'Almoxarifado',line_index:1,valor:100,empenho_id:'e',empenho_numero:emp.numero,linha_situacao:'Confirmada',confirmed:true,resolution:'resolvido',captured_at:'2026-10-05T12:00:00Z'} as RdMovement;
+const movement={org_id:'org',campus_uasg:'158366',suap_unit_code:'19',run_id:'run',suap_rd_id:'1',rd_numero:'2026RD000001',tipo:'dotacao',rd_situacao:'Concluída',source_url:'https://suap.ifrn.edu.br/plan_estrategico/detalhar_requisicaodespesa/1/',atividade_nome:'Almoxarifado',line_index:1,valor:100,empenho_id:'e',empenho_numero:emp.numero,linha_situacao:'Confirmada',confirmed:true,resolution:'resolvido',data_cadastro:'2026-02-26',captured_at:'2026-10-05T12:00:00Z'} as RdMovement;
 const run={id:'run',runId:'run',status:'preview',complete:true,summary:{rds:4,movimentos:3},phase:'ready',sourceCount:4,processed:4,activitiesProcessed:1,activitiesTotal:1} as RdSyncRun;
 it('informa reaproveitamento e orienta revalidar tudo sem iniciar coleta no frontend',async()=>{
   const incremental={...run,syncMode:'incremental' as const,reusedDetails:3,refreshedDetails:1,reusedActivities:1};
@@ -48,12 +48,17 @@ it('mostra reforço e anulação negativa, exclui cancelada dos totais e não du
   expect(screen.getAllByRole('link')).toHaveLength(4);
   expect(screen.getByText('Não contabilizada nas RDs')).toBeInTheDocument();
   expect(suapRdService.read).toHaveBeenCalledWith('suap_rd_movimentacoes','org','158366','19');
-  const negative=screen.getByText('Anulação').closest('tr')!;expect(within(negative).getByText(/-.*10,00/)).toBeInTheDocument();
+  const negative=screen.getByText('Anulação').closest('tr')!;
+  expect(negative.querySelector('td:last-child')).toHaveClass('text-status-error');
+  expect(within(negative).getByText(/10,00/)).toBeInTheDocument();
 });
 it('mantém a tabela de movimentos enxuta para linhas normais',async()=>{
   vi.mocked(suapRdService.read).mockResolvedValue([movement]);
   renderUi(<SuapRdMovements empenho={emp} enabled />);
+  expect(await screen.findByRole('heading',{name:'HISTÓRICO DE OPERAÇÕES'})).toBeInTheDocument();
   const row=await screen.findByRole('link',{name:'2026RD000001'}).then(link=>link.closest('tr')!);
+  expect(within(row).getByText('26/02/2026')).toBeInTheDocument();
+  expect(row.querySelector('td:last-child')).toHaveClass('text-status-success');
   expect(screen.queryByText(/Valores das linhas confirmadas/)).not.toBeInTheDocument();
   expect(within(row).queryByText(/Captura:/)).not.toBeInTheDocument();
   expect(within(row).queryByText(/Concluída|Confirmada/)).not.toBeInTheDocument();

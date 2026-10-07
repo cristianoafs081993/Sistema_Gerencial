@@ -2,7 +2,7 @@ import { getSuapPlanUnit, SUAP_PLAN_UNITS } from '../lib/suapPlanUnits.ts';
 
 export const SUAP_RD_ORIGIN = 'https://suap.ifrn.edu.br';
 export type SuapRdType = 'dotacao' | 'reforco' | 'anulacao';
-export type SuapRdRef = { rdId: string; numero: string; situacao: string; tipo: string; rowFingerprint?: string };
+export type SuapRdRef = { rdId: string; numero: string; situacao: string; tipo: string; dataCadastro?: string | null; rowFingerprint?: string };
 export type SuapRdLine = {
   naturezaDespesa: string; valor: number; empenhoCompleto: string | null;
   empenhoNumero: string | null; ug: string | null; gestao: string | null;
@@ -10,6 +10,7 @@ export type SuapRdLine = {
 };
 export type SuapRdDetail = {
   rdId: string; numero: string; situacao: string; tipo: SuapRdType | null;
+  dataCadastro?: string | null;
   tipoRaw: string; suapUnitCode: string; campusUasg: string; activityName: string;
   origemRecurso: string; planoInterno: string; processo: string; processoUrl: string | null;
   finalidade: string; cdo: string | null; cdoUrl: string | null;
@@ -18,6 +19,16 @@ export type SuapRdDetail = {
 type ParserConstructor = new () => { parseFromString(html: string, type: string): Document | null };
 const clean = (value: string | null | undefined) => (value ?? '').replace(/\s+/g, ' ').trim();
 export const foldRdText = (value: string) => clean(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+function parseRdCreationDate(value: string): string | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})(?:\s+\d{2}:\d{2}(?::\d{2})?)?$/.exec(clean(value));
+  if (!match) return null;
+  const [, dayText, monthText, yearText] = match;
+  const day = Number(dayText), month = Number(monthText), year = Number(yearText);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return null;
+  return `${yearText}-${monthText}-${dayText}`;
+}
 
 export function parseRdMoney(value: string): number {
   const text = clean(value).replace(/^R\$\s*/, '');
@@ -98,10 +109,12 @@ export function parseSuapRdList(html: string, sourceUrl: string, unitCode: strin
     if (!rdId || !/^\d{4}RD\d{6}$/.test(numero)) throw new Error('Identidade de RD inválida.');
     const rowUnit = cells[col('unidade')] ?? '';
     assertRdUnit(rowUnit, unitCode);
+    const dateColumn = col('data do cadastro');
     // The collector hashes this canonical row before persisting it; action links are not data.
     const rowFingerprint = JSON.stringify(headers.flatMap((header,index) =>
       !header || header.includes('situacao') || /^(#|acoes|opcoes)$/.test(header) ? [] : [[header,cells[index] ?? '']]));
-    refs.push({ rdId, numero, situacao: cells[col('situacao')] ?? '', tipo: cells[col('tipo')] ?? '', rowFingerprint });
+    refs.push({ rdId, numero, situacao: cells[col('situacao')] ?? '', tipo: cells[col('tipo')] ?? '',
+      dataCadastro: dateColumn >= 0 ? parseRdCreationDate(cells[dateColumn] ?? '') : null, rowFingerprint });
   }
   if (new Set(refs.map(rd => rd.rdId)).size !== refs.length) throw new Error('RD duplicada na página.');
   const currentPage = Number(url.searchParams.get('p') || 1);

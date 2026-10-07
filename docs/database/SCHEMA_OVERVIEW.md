@@ -232,3 +232,5 @@ O reaproveitamento da 1.9.57 utiliza o `state` JSONB existente das execuções e
 O mesmo JSONB persiste hash versão 2, IDs mutáveis, fila de reconferência de detalhes e limite de rodadas para pendentes que mudam durante a captura. As telas consultam metadados das execuções pela RLS existente para distinguir coleta parcial de ausência de movimentos. As views continuam consumindo somente a projeção aplicada.
 
 A migration `20261007120000_apply_partial_suap_rd_snapshots.sql` cria `suap_rd_partial_apply_backups`, restrita ao `service_role`, para guardar a versão anterior de cada RD publicada durante a coleta. A função aplica snapshots validados incrementalmente; a função de aplicação completa reconcilia a unidade ao final e limpa esses backups. A RPC `revert_suap_rd_partial_snapshots` restaura os valores anteriores ou remove RDs que ainda não existiam.
+
+A migration `20261007130000_add_rd_registration_date_to_movements.sql` acrescenta `data_cadastro` à view `suap_rd_movimentacoes`, obtida da coluna original `Data do cadastro` do inventário SUAP e propagada no payload da RD. Esse campo não usa `captured_at`.

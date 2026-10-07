@@ -101,6 +101,7 @@ export async function prepareRdDetails(db: RdDatabase, run: RdRun, now = Date.no
     rows.push(...data); if (data.length < 500) break;
   }
   const oldRefs = new Map((reuse.previousInventory ?? []).map(ref => [ref.rdId,ref]));
+  const currentRefs = new Map(run.state.inventory.map(ref => [ref.rdId,ref]));
   const snapshots = new Map(rows.map(row => [row.payload.rdId,row]));
   const candidates = run.state.inventory.flatMap(ref => {
     const old = oldRefs.get(ref.rdId), row = snapshots.get(ref.rdId), payload = row?.payload;
@@ -119,7 +120,9 @@ export async function prepareRdDetails(db: RdDatabase, run: RdRun, now = Date.no
   const cached = candidates.filter(candidate => !audit.has(candidate.id));
   for (let offset = 0; offset < cached.length; offset += 100) {
     const values = await Promise.all(cached.slice(offset,offset+100).map(async candidate => {
-      const payload = candidate.immutable ? candidate.row.payload : { ...candidate.row.payload,sources:run.state.sources[candidate.id] ?? [] };
+      const payload = { ...candidate.row.payload,
+        dataCadastro: currentRefs.get(candidate.id)?.dataCadastro ?? candidate.row.payload.dataCadastro ?? null,
+        ...(candidate.immutable ? {} : { sources:run.state.sources[candidate.id] ?? [] }) };
       return { run_id:run.id,org_id:run.org_id,campus_uasg:run.campus_uasg,suap_unit_code:run.suap_unit_code,
         suap_rd_id:candidate.id,payload,checksum:await rdChecksum(payload),captured_at:candidate.row.captured_at };
     }));

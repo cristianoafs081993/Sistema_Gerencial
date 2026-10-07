@@ -16,6 +16,7 @@ describe('Coleta incremental de RDs', () => {
     expect(run.state.detailCursor).toBe(1); expect(run.state.verify).toEqual(run.state.inventory);
     expect(upsert).toHaveBeenCalledOnce();
     expect(upsert.mock.calls[0][0].payload.sources).toEqual([expect.objectContaining({ activityId:'32635',planId:8 })]);
+    expect(upsert.mock.calls[0][0].payload.dataCadastro).toBe('2026-02-26');
   });
   it('preserva o inventário se a captura seguinte do plano falhar; a retomada pede somente o plano', async () => {
     const run = makeRun();

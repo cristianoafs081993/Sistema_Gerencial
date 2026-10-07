@@ -86,9 +86,7 @@ Quando não há dados aplicados, `SuapRdCaptureNotice` consulta metadados com RL
 
 Somente `RD Concluída + linha Confirmada + tipo dotação/reforço/anulação + UG do campus` compõe os totais de RDs. Anulações conservam o sinal negativo. RDs canceladas com NE são exibidas, mas não anulam a NE nem entram nesses totais. Valor inicial, autorização e valor final da linha são diferentes fontes; o valor confirmado da linha é o valor do movimento.
 
-Os detalhes do empenho mostram dotação, reforços, anulações, líquido, divergência para o valor SIAGES, RD, RO, natureza, atividade, estado e horário de captura. Histórico importado por outros pipelines permanece separado para impedir somas duplicadas. O horário de captura não é apresentado como data da operação SIAFI.
-
-Na lista de empenhos, `SuapRdMovementBadge` indica a quantidade de reforços/anulações confirmados por RD/RO e abre o detalhe. Linhas de natureza da mesma RD/RO não multiplicam a contagem nem as linhas da NE. Compartilha a consulta/cache de movimentos com o detalhe.
+Os detalhes do empenho mostram dotação, reforços, anulações, líquido, divergência para o valor SIAGES e uma tabela `HISTÓRICO DE OPERAÇÕES` com data de cadastro, RD, tipo de movimento, RO, natureza, atividade e valor. Dotação/reforço são verdes e anulação é vermelha. A data vem da coluna `Data do cadastro` do inventário SUAP, nunca de `captured_at`. A antiga tabela de histórico SIAFI no detalhe foi removida e nenhum resumo de movimentos RD é consultado na lista de empenhos.
 
 No dashboard, vínculos manuais continuam válidos. Os vínculos oficiais são resolvidos antes do filtro de origem e exigem os IDs oficiais e a unidade da atividade. Sem evidência, o empenho fica não associado; as antigas pontuações textuais não entram nos totais dessa tela. Uma NE compartilhada por atividades distribui apenas os líquidos oficiais e exige que a soma feche com o valor do empenho; divergências ficam pendentes. Saldos oficiais do Plano 8 continuam prevalecendo.
 

@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Pencil, History, DollarSign, Receipt, CheckCircle2, Landmark, Loader2 } from 'lucide-react';
+import { Pencil, DollarSign, Receipt, CheckCircle2, Landmark, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { contratosApiService, type ContratoApiPublicLiquidacaoRow } from '@/services/contratosApi';
 import { transparenciaService, type PortalTransparenciaItemEmpenho } from '@/services/transparencia';
@@ -50,12 +50,6 @@ interface EmpenhoDialogProps {
   atividades: Atividade[];
   onSave: (id: string, data: Partial<Empenho>) => void;
 }
-
-const getOperacaoLabel = (operacao: string) =>
-  operacao
-    .replace('INCLUSAO', 'Inclusão')
-    .replace('REFORCO', 'Reforço')
-    .replace('ANULACAO', 'Anulação');
 
 const formatDateCell = (value?: string) => {
   if (!value) return '-';
@@ -324,59 +318,6 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave,
                 )}
               </div>
             </div>
-
-            {/* Histórico de Operações */}
-            {empenho.historicoOperacoes && empenho.historicoOperacoes.length > 0 && (
-              <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-                <div className="px-5 py-3 border-b border-border/60 bg-muted/40 flex justify-between items-center">
-                    <h3 className={pageMode ? "text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-2" : "text-[11px] font-black uppercase tracking-wider text-foreground flex items-center gap-2"}>
-                        <History className="w-3 h-3 text-primary" />
-                        Histórico de Operações
-                    </h3>
-                </div>
-                <div className="p-0 overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className={pageMode ? "bg-muted/30 text-xs uppercase font-bold text-muted-foreground" : "bg-muted/30 text-[9px] uppercase font-bold text-muted-foreground"}>
-                      <tr>
-                        <th className="px-5 py-2">Data</th>
-                        <th className="px-5 py-2 text-center">Operação</th>
-                        <th className="px-5 py-2 text-right">Valor</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...empenho.historicoOperacoes]
-                        .sort((a, b) => {
-                          const parseDate = (d: string) => {
-                            const parts = d.split('/');
-                            return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0])).getTime();
-                          };
-                          return parseDate(a.data) - parseDate(b.data);
-                        })
-                        .map((op, idx) => (
-                          <tr key={idx} className="border-t border-border/40 hover:bg-muted/30 transition-colors">
-                            <td className="px-5 py-3 font-mono text-muted-foreground">{op.data}</td>
-                            <td className="px-5 py-3 text-center">
-                              <Badge
-                                variant="outline"
-                                className={`text-[8px] px-1.5 py-0 border-none font-black uppercase ${
-                                  op.operacao === 'INCLUSAO' ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400' :
-                                  op.operacao === 'REFORCO' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' :
-                                  op.operacao === 'ANULACAO' ? 'bg-red-500/15 text-red-600 dark:text-red-400' : 'bg-muted text-foreground'
-                                }`}
-                              >
-                                {getOperacaoLabel(op.operacao)}
-                              </Badge>
-                            </td>
-                            <td className={`px-5 py-3 text-right font-black ${op.operacao === 'ANULACAO' ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                              {op.operacao === 'ANULACAO' ? '-' : '+'}{formatCurrency(Math.abs(op.valorTotal))}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
 
             {/* Formulário de Edição */}
             {showLegacyLiquidacoesApiSection && (
