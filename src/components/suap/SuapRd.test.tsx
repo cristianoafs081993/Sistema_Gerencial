@@ -51,6 +51,16 @@ it('mostra reforço e anulação negativa, exclui cancelada dos totais e não du
   expect(suapRdService.read).toHaveBeenCalledWith('suap_rd_movimentacoes','org','158366','19');
   const negative=screen.getByText('Anulação').closest('tr')!;expect(within(negative).getByText(/-.*10,00/)).toBeInTheDocument();
 });
+it('mantém a tabela de movimentos enxuta para linhas normais',async()=>{
+  vi.mocked(suapRdService.read).mockResolvedValue([movement]);
+  renderUi(<SuapRdMovements empenho={emp} enabled />);
+  const row=await screen.findByRole('link',{name:'2026RD000001'}).then(link=>link.closest('tr')!);
+  expect(screen.queryByText(/Valores das linhas confirmadas/)).not.toBeInTheDocument();
+  expect(within(row).queryByText(/Captura:/)).not.toBeInTheDocument();
+  expect(within(row).queryByText(/Concluída|Confirmada/)).not.toBeInTheDocument();
+  expect(within(row).queryByText('Vínculo oficial')).not.toBeInTheDocument();
+  expect(within(row).getByText('Almoxarifado')).toBeInTheDocument();
+});
 it('não mascara erro de leitura como ausência de movimentos',async()=>{
   vi.mocked(suapRdService.read).mockRejectedValue(new Error('offline'));renderUi(<SuapRdMovements empenho={emp} enabled />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível consultar');
