@@ -27,6 +27,8 @@ O worker da extensão continua quando o popup é fechado. Se o Chrome encerrar o
 
 RDs canceladas que exibem no SUAP o aviso “Nenhuma natureza de despesa cadastrada” não têm linhas de empenho. O parser registra esses detalhes com `linhas: []` para completar a cobertura sem inventar movimentos; páginas concluídas ou detalhes sem a tabela e sem esse aviso explícito continuam falhando.
 
+Em RDs canceladas com dotação provisória, o SUAP pode exibir o valor no campo “Valor provisório” em vez de “Valor”. Ambos os rótulos alimentam o valor do snapshot.
+
 O lote consulta o catálogo autenticado das 44 unidades e percorre cada uma sequencialmente. Falhas não bloqueiam as unidades seguintes. O estado agregado do lote fica em `chrome.storage.local`; as execuções e prévias individuais permanecem no banco. A retomada reutiliza prévias completas existentes e os cursores incompletos. Uma nova coleta após aplicação inicia nova revisão daquela unidade com base elegível da aplicação anterior. Não há aplicação automática nem transação única entre os 44 campi/unidades: cada aplicação é atômica por unidade, e o popup informa aplicações e falhas separadamente.
 
 Capturas incompletas, falhas de sessão ou de parsing não substituem a projeção ativa. A retomada reutiliza cursores e snapshots. Alterações de identidade, adição/remoção de RD e mudanças em concluídas exigem nova conferência. Mudanças de pendentes são tratadas conforme a reconferência abaixo. Ausências só desativam RDs anteriores depois de uma captura completa da mesma unidade.

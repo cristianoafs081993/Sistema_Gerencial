@@ -153,11 +153,12 @@ export function parseSuapRdDetail(html: string, rdId: string, unitCode: string, 
   if (table && (!totalCell || Math.abs(Math.round(linhas.reduce((sum, line) => sum + line.valor, 0) * 100) - Math.round(parseRdMoney(totalCell.textContent ?? '') * 100)) > 1)) throw new Error('Total da RD não fecha com as linhas.');
   const processLink = field(root, 'Processo administrativo')?.querySelector('a');
   const cdoLink = field(root, 'CDO')?.querySelector('a');
+  const valorProvisorio = box('Valor provisório');
   return { rdId, numero, situacao, tipo, tipoRaw, suapUnitCode: unitCode, campusUasg: unit.parentUasg,
     activityName: get('Atividade'), origemRecurso: get('Origem de recurso'), planoInterno: get('Plano interno'),
     processo: clean(processLink?.textContent), processoUrl: processLink ? new URL(processLink.getAttribute('href')!, SUAP_RD_ORIGIN).href : null,
     finalidade: get('Finalidade'), cdo: clean(cdoLink?.textContent) || null, cdoUrl: cdoLink ? new URL(cdoLink.getAttribute('href')!, SUAP_RD_ORIGIN).href : null,
-    valorInicial: parseRdMoney(box('Valor inicial')), valor: parseRdMoney(box('Valor')), linhas,
+    valorInicial: parseRdMoney(box('Valor inicial')), valor: parseRdMoney(box('Valor') || valorProvisorio), linhas,
     sourceUrl: `${SUAP_RD_ORIGIN}/plan_estrategico/detalhar_requisicaodespesa/${rdId}/` };
 }
 

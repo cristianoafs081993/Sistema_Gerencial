@@ -23,6 +23,10 @@ describe('Contratos reais das RDs SUAP', () => {
     expect(() => parseSuapRdDetail(html.replace('Cancelada', 'Concluída'), '4676', '19')).toThrow('Detalhamento da despesa ausente');
     expect(() => parseSuapRdDetail(html.replace('Nenhuma natureza de despesa cadastrada.', 'Aviso indisponível.'), '4676', '19')).toThrow('Detalhamento da despesa ausente');
   });
+  it('lê valor provisório em RD cancelada quando o SUAP não exibe o campo Valor', () => {
+    const html = detailHtml({ status: 'Cancelada' }).replace('<h4>Valor</h4>', '<h4>Valor provisório</h4>');
+    expect(parseSuapRdDetail(html, '569', '19')).toMatchObject({ situacao: 'Cancelada', valor: 20242.46 });
+  });
   it('rejeita divergências de campus, UG, totais e números abreviados', () => {
     expect(() => parseSuapRdDetail(detailHtml(), '9083','25')).toThrow('unidade');
     expect(() => parseSuapRdDetail(detailHtml({ ne: '158371264352026NE000014' }), '9083','19')).toThrow('UG');

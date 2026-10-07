@@ -900,4 +900,6 @@ O helper `_shared/suap_rd_reuse.ts` seleciona evidências da última aplicação
 
 Correção de 07/10: o parser aceita RD cancelada somente quando o SUAP informa explicitamente “Nenhuma natureza de despesa cadastrada”; grava snapshot sem linhas de empenho e continua sem gerar movimentos. A 2025RD004586 (ID 4676) validou esse caso no ponto em que a execução da unidade 19 havia parado (cursor 216 de 500). Deploy de `sync-suap-rds`; sem migration ou atualização da extensão.
 
+Correção adicional de 07/10: RDs canceladas com dotação provisória identificam seu montante como “Valor provisório”. O parser aceita esse rótulo quando “Valor” não está presente. A 2025RD000480 (ID 569) reproduz o erro no cursor 476. Republicar `sync-suap-rds`; sem migration ou atualização da extensão.
+
 Correção de 06/10: `_shared/suap_rd_sync.ts` aceita conclusão de pendentes durante a captura e mantém fila persistida de reconferência de detalhes, limitada a três rodadas com inventário final completo. Hash versão 2 separa situação dos demais campos; execuções legadas retomam sem exigir hashes inexistentes. A function foi republicada; o contrato de aplicação atômica e as proteções de identidade/campus/concluídas permanecem. Não exige migration ou atualização da extensão 1.9.57.
