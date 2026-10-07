@@ -26,16 +26,19 @@ export function SuapRdMovements({ empenho, enabled }: { empenho: Empenho; enable
   const rows = uniqueRdMovements(query.data ?? []).filter(row => row.empenho_id === empenho.id || row.empenho_numero === empenho.numero.trim().toUpperCase() || row.empenho_completo === empenho.numero.trim().toUpperCase());
   const confirmed = rows.filter(row => row.confirmed);
   const total = confirmed.reduce((sum, row) => sum + row.valor, 0);
-  return <SectionPanel title="HISTÓRICO DE OPERAÇÕES">
+  const summary = !query.isLoading && !query.isError && rows.length > 0 ? (
+    <div data-testid="rd-movement-summary" className="flex max-w-full flex-wrap justify-end gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      {(['dotacao', 'reforco', 'anulacao'] as const).map(tipo => <p key={tipo} className="whitespace-nowrap">{({ dotacao: 'Dotação', reforco: 'Reforços', anulacao: 'Anulações' })[tipo]}: <strong className="text-foreground">{formatCurrency(confirmed.filter(row => row.tipo === tipo).reduce((sum, row) => sum + row.valor, 0))}</strong></p>)}
+      <p className="whitespace-nowrap">Líquido das RDs: <strong className="text-foreground">{formatCurrency(total)}</strong></p>
+    </div>
+  ) : undefined;
+
+  return <SectionPanel title="HISTÓRICO DE OPERAÇÕES" actions={summary}>
     <div className="space-y-3 p-4 text-sm">
       {query.isLoading ? <p role="status">Consultando movimentações…</p> : query.isError ? <div role="alert">Não foi possível consultar as RDs. <Button variant="outline" size="sm" onClick={() => query.refetch()}>Tentar novamente</Button></div> : rows.length === 0 ? <SuapRdCaptureNotice campus={campus} unit={unit.value} enabled={enabled} fallback={<p>Nenhuma RD aplicada corresponde a este empenho nesta unidade.</p>} /> : <>
-        <div className="flex flex-wrap gap-4">
-          {(['dotacao', 'reforco', 'anulacao'] as const).map(tipo => <p key={tipo}>{({ dotacao: 'Dotação', reforco: 'Reforços', anulacao: 'Anulações' })[tipo]}: <strong>{formatCurrency(confirmed.filter(row => row.tipo === tipo).reduce((sum, row) => sum + row.valor, 0))}</strong></p>)}
-          <p>Líquido das RDs: <strong>{formatCurrency(total)}</strong></p>
-        </div>
         {Math.abs(total - empenho.valor) > 0.01 && <p className="text-status-warning">Diferença para o valor do empenho no SIAGES: {formatCurrency(total - empenho.valor)}. Os valores contábeis são preservados.</p>}
         <div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="bg-muted/30 text-xs uppercase font-bold text-muted-foreground"><tr>
-          {['Data', 'RD / origem', 'Movimento', 'RO / natureza', 'Atividade / conferência', 'Valor'].map(title => <th key={title} className="p-2">{title}</th>)}
+          {['Data', 'RD / origem', 'Movimento', 'RO / natureza', 'Atividade', 'Valor'].map(title => <th key={title} className="p-2">{title}</th>)}
         </tr></thead><tbody>{[...rows].sort((a,b) => (a.data_cadastro ?? '9999-99-99').localeCompare(b.data_cadastro ?? '9999-99-99') || a.rd_numero.localeCompare(b.rd_numero) || a.line_index-b.line_index).map(row => <tr key={`${row.suap_rd_id}:${row.line_index}`} className="border-t border-border">
           <td className="p-2 font-mono text-muted-foreground">{formatRdRegistrationDate(row.data_cadastro)}</td>
           <td className="p-2"><a className="text-primary underline" href={row.source_url} target="_blank" rel="noreferrer">{row.rd_numero}</a></td>

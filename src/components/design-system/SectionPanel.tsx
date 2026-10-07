@@ -34,7 +34,7 @@ export function SectionPanel({
                 {description ? <CardDescription className="table-description">{description}</CardDescription> : null}
               </div>
             ) : null}
-            {actions ? <div className="shrink-0 ml-auto">{actions}</div> : null}
+            {actions ? <div className="min-w-0 max-w-full ml-auto">{actions}</div> : null}
           </div>
         </CardHeader>
       )}

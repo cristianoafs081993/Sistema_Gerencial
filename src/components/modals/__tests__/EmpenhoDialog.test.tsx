@@ -127,7 +127,7 @@ describe('EmpenhoDialog', () => {
     expect(screen.getByText('Saldo a liquidar')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Salvar Alterações' })).not.toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Itens e movimentações' }), { button: 0, ctrlKey: false });
-    expect(screen.getByText('Histórico de Operações')).toBeVisible();
+    expect(screen.getByText(/HISTÓRICO DE OPERAÇÕES/i)).toBeVisible();
     expect(screen.getByText('Saldo a liquidar')).not.toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Editar dados estratégicos' }));
     expect(screen.getByRole('button', { name: 'Salvar Alterações' })).toBeVisible();
@@ -145,7 +145,7 @@ describe('EmpenhoDialog', () => {
     await waitFor(() => expect(mockedTransparenciaService.getItensEmpenhoPortal).toHaveBeenCalled());
   });
 
-  it('renderiza historico de operacoes e liquidacoes da API de contratos', async () => {
+  it('mantém as liquidações da API de contratos sem exibir o histórico SIAFI removido', async () => {
     renderDialog([
       {
         contrato_api_id: 22024,
@@ -167,8 +167,8 @@ describe('EmpenhoDialog', () => {
       },
     ]);
 
-    expect(screen.getByText((content) => content.includes('Inclus'))).toBeInTheDocument();
-    expect(screen.getByText('+R$ 14.200,00')).toBeInTheDocument();
+    expect(screen.queryByText((content) => content.includes('Inclus'))).not.toBeInTheDocument();
+    expect(screen.queryByText('+R$ 14.200,00')).not.toBeInTheDocument();
     expect(screen.queryByText((content) => content.includes('Documentos h'))).not.toBeInTheDocument();
 
     await waitFor(() => {
@@ -220,6 +220,9 @@ describe('EmpenhoDialog', () => {
     });
 
     expect(await screen.findByText('Subitens do Empenho')).toBeInTheDocument();
+    const liquidationsHeading = screen.getByText('Liquidações');
+    const subitemsHeading = screen.getByText('Subitens do Empenho');
+    expect(liquidationsHeading.compareDocumentPosition(subitemsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText('Subitem 01')).toBeInTheDocument();
     expect(screen.getByText('BOLSAS DE ESTUDO NO PAIS')).toBeInTheDocument();
     expect(screen.getByText('Recurso para pagamento de auxilio transporte.')).toBeInTheDocument();

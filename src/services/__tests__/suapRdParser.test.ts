@@ -39,6 +39,10 @@ describe('Contratos reais das RDs SUAP', () => {
     expect(parsed.total).toBe(499); expect(parsed.nextUrl).toContain('p=2'); expect(parsed.refs[0]).toMatchObject({ rdId: '9083', dataCadastro: '2026-02-26' });
     expect(() => parseSuapRdList(listHtml().replace('Mostrando 1 Requisições de despesas',''),rdListUrl,'19')).toThrow('Contagem');
   });
+  it('captura a data em variantes de cabeçalho e formato ISO', () => {
+    const parsed = parseSuapRdList(listHtml({ dateHeader: 'Data de cadastro', dateValue: '2026-02-26T13:45:38' }), rdListUrl, '19');
+    expect(parsed.refs[0].dataCadastro).toBe('2026-02-26');
+  });
   it('usa ID da URL oficial e reconhece somente o aviso oficial de atividade vazia', () => {
     expect(parseSuapRdList(listHtml({ activity: true }),activityUrl,'19')).toMatchObject({ activityId: '32635', refs: [{ dataCadastro: null }] });
     const empty = '<main id="content"><dl><dt>Unidade administrativa</dt><dd>DG/CN</dd><dt>Atividade</dt><dd>Sem despesa</dd></dl><p class="alert alert-warning">Nenhuma requisição de despesa cadastrada.</p></main>';

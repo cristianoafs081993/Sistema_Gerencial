@@ -275,50 +275,6 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave,
             </TabsContent>
             <TabsContent value="movimentos" forceMount hidden={pageMode && detailTab !== 'movimentos'} className="space-y-6">
             <SuapRdMovements empenho={empenho} enabled={open} />
-            {/* Subitens do Portal da Transparencia */}
-            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-              <div className="px-5 py-3 border-b border-border/60 bg-muted/40 flex justify-between items-center">
-                <h3 className={pageMode ? "text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-2" : "text-[11px] font-black uppercase tracking-wider text-foreground flex items-center gap-2"}>
-                  <Receipt className="w-3 h-3 text-primary" />
-                  Subitens do Empenho
-                </h3>
-                {isLoadingItensPortal && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
-              </div>
-              <div className="divide-y divide-border/40">
-                {isLoadingItensPortal ? (
-                  <div className={pageMode ? "px-5 py-6 text-center text-xs text-muted-foreground italic" : "px-5 py-6 text-center text-[10px] text-muted-foreground italic"}>
-                    Carregando subitens do Portal da Transparência...
-                  </div>
-                ) : isItensPortalError ? (
-                  <div className={pageMode ? "px-5 py-6 text-center text-xs text-status-warning italic" : "px-5 py-6 text-center text-[10px] text-status-warning italic"}>
-                    Não foi possível consultar os subitens no Portal da Transparência agora.
-                  </div>
-                ) : itensPortal.length > 0 ? (
-                  itensPortal.map((item) => (
-                    <div key={`${item.codigoItemEmpenho}-${item.sequencial}`} className="px-5 py-3">
-                      <div className="mb-1 flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className={pageMode ? "text-xs px-1.5 py-0 border-border font-semibold uppercase bg-muted/60 text-foreground" : "text-[8px] px-1.5 py-0 border-border font-black uppercase bg-muted/60 text-foreground"}>
-                          Subitem {item.codigoSubelemento || item.sequencial || '-'}
-                        </Badge>
-                        {item.descricaoSubelemento ? (
-                          <span className={pageMode ? "text-xs font-bold uppercase tracking-wide text-muted-foreground" : "text-[10px] font-bold uppercase tracking-wide text-muted-foreground"}>
-                            {item.descricaoSubelemento}
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className={pageMode ? "text-xs leading-relaxed text-foreground" : "text-[11px] leading-relaxed text-foreground"}>
-                        {item.descricao || 'Descrição não informada no Portal da Transparência.'}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <div className={pageMode ? "px-5 py-6 text-center text-xs text-muted-foreground italic" : "px-5 py-6 text-center text-[10px] text-muted-foreground italic"}>
-                    Nenhum subitem encontrado no Portal da Transparência para este empenho.
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Formulário de Edição */}
             {showLegacyLiquidacoesApiSection && (
             <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
@@ -469,6 +425,50 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave,
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            {/* Subitens do Portal da Transparencia */}
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+              <div className="px-5 py-3 border-b border-border/60 bg-muted/40 flex justify-between items-center">
+                <h3 className={pageMode ? "text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-2" : "text-[11px] font-black uppercase tracking-wider text-foreground flex items-center gap-2"}>
+                  <Receipt className="w-3 h-3 text-primary" />
+                  Subitens do Empenho
+                </h3>
+                {isLoadingItensPortal && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+              </div>
+              <div className="divide-y divide-border/40">
+                {isLoadingItensPortal ? (
+                  <div className={pageMode ? "px-5 py-6 text-center text-xs text-muted-foreground italic" : "px-5 py-6 text-center text-[10px] text-muted-foreground italic"}>
+                    Carregando subitens do Portal da Transparência...
+                  </div>
+                ) : isItensPortalError ? (
+                  <div className={pageMode ? "px-5 py-6 text-center text-xs text-status-warning italic" : "px-5 py-6 text-center text-[10px] text-status-warning italic"}>
+                    Não foi possível consultar os subitens no Portal da Transparência agora.
+                  </div>
+                ) : itensPortal.length > 0 ? (
+                  itensPortal.map((item) => (
+                    <div key={`${item.codigoItemEmpenho}-${item.sequencial}`} className="px-5 py-3">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className={pageMode ? "text-xs px-1.5 py-0 border-border font-semibold uppercase bg-muted/60 text-foreground" : "text-[8px] px-1.5 py-0 border-border font-black uppercase bg-muted/60 text-foreground"}>
+                          Subitem {item.codigoSubelemento || item.sequencial || '-'}
+                        </Badge>
+                        {item.descricaoSubelemento ? (
+                          <span className={pageMode ? "text-xs font-bold uppercase tracking-wide text-muted-foreground" : "text-[10px] font-bold uppercase tracking-wide text-muted-foreground"}>
+                            {item.descricaoSubelemento}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className={pageMode ? "text-xs leading-relaxed text-foreground" : "text-[11px] leading-relaxed text-foreground"}>
+                        {item.descricao || 'Descrição não informada no Portal da Transparência.'}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className={pageMode ? "px-5 py-6 text-center text-xs text-muted-foreground italic" : "px-5 py-6 text-center text-[10px] text-muted-foreground italic"}>
+                    Nenhum subitem encontrado no Portal da Transparência para este empenho.
+                  </div>
+                )}
               </div>
             </div>
 

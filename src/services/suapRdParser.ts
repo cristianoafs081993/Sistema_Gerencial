@@ -21,9 +21,13 @@ const clean = (value: string | null | undefined) => (value ?? '').replace(/\s+/g
 export const foldRdText = (value: string) => clean(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 function parseRdCreationDate(value: string): string | null {
-  const match = /^(\d{2})\/(\d{2})\/(\d{4})(?:\s+\d{2}:\d{2}(?::\d{2})?)?$/.exec(clean(value));
-  if (!match) return null;
-  const [, dayText, monthText, yearText] = match;
+  const text = clean(value);
+  const localized = /^(\d{2})\/(\d{2})\/(\d{4})(?:[,\s]+\d{2}:\d{2}(?::\d{2})?)?$/.exec(text);
+  const iso = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s]+\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?$/.exec(text);
+  if (!localized && !iso) return null;
+  const [yearText, monthText, dayText] = localized
+    ? [localized[3], localized[2], localized[1]]
+    : [iso![1], iso![2], iso![3]];
   const day = Number(dayText), month = Number(monthText), year = Number(yearText);
   const parsed = new Date(Date.UTC(year, month - 1, day));
   if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return null;
@@ -109,7 +113,7 @@ export function parseSuapRdList(html: string, sourceUrl: string, unitCode: strin
     if (!rdId || !/^\d{4}RD\d{6}$/.test(numero)) throw new Error('Identidade de RD inválida.');
     const rowUnit = cells[col('unidade')] ?? '';
     assertRdUnit(rowUnit, unitCode);
-    const dateColumn = col('data do cadastro');
+    const dateColumn = headers.findIndex(header => header.includes('data') && /cadastro|criacao/.test(header));
     // The collector hashes this canonical row before persisting it; action links are not data.
     const rowFingerprint = JSON.stringify(headers.flatMap((header,index) =>
       !header || header.includes('situacao') || /^(#|acoes|opcoes)$/.test(header) ? [] : [[header,cells[index] ?? '']]));

@@ -45,6 +45,8 @@ it('mostra reforço e anulação negativa, exclui cancelada dos totais e não du
   renderUi(<SuapRdMovements empenho={emp} enabled />);
   await screen.findAllByText('Reforço'); await screen.findByText('Anulação');
   expect(screen.getByText('Líquido das RDs:').textContent).toContain('150,00');
+  const title=screen.getByRole('heading',{name:'HISTÓRICO DE OPERAÇÕES'});
+  expect(title.parentElement?.parentElement).toContainElement(screen.getByTestId('rd-movement-summary'));
   expect(screen.getAllByRole('link')).toHaveLength(4);
   expect(screen.getByText('Não contabilizada nas RDs')).toBeInTheDocument();
   expect(suapRdService.read).toHaveBeenCalledWith('suap_rd_movimentacoes','org','158366','19');
@@ -64,6 +66,8 @@ it('mantém a tabela de movimentos enxuta para linhas normais',async()=>{
   expect(within(row).queryByText(/Concluída|Confirmada/)).not.toBeInTheDocument();
   expect(within(row).queryByText('Vínculo oficial')).not.toBeInTheDocument();
   expect(within(row).getByText('Almoxarifado')).toBeInTheDocument();
+  expect(screen.getByRole('columnheader', { name: 'Atividade' })).toBeInTheDocument();
+  expect(screen.queryByRole('columnheader', { name: 'Atividade / conferência' })).not.toBeInTheDocument();
 });
 it('não mascara erro de leitura como ausência de movimentos',async()=>{
   vi.mocked(suapRdService.read).mockRejectedValue(new Error('offline'));renderUi(<SuapRdMovements empenho={emp} enabled />);
