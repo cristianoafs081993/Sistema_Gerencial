@@ -284,6 +284,32 @@ describe('process-document 1.9', () => {
     expect(summary?.querySelectorAll('.suape-copy').length).toBeGreaterThan(8);
   });
 
+  it('permite copiar CPF/CNPJ somente com dígitos além do valor original', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const api = loadProcessScript();
+    await api.installToolkit();
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-snapshot', version: 1, payload: {
+        fallback: { suapId: '321', processNumber: '23035.000001.2026-11' },
+        process: { suapId: '321', numProcesso: '23035.000001.2026-11', status: 'success', beneficiario: 'Fornecedor Alfa', cpfCnpj: '10.877.412/0011-30', dadosCompletos: {} },
+      } },
+    }));
+
+    const row = await waitFor(() => {
+      const cpfCnpjRow = [...document.querySelectorAll('.suape-data-row')]
+        .find((item) => item.querySelector('span')?.textContent === 'CPF/CNPJ');
+      expect(cpfCnpjRow).toBeTruthy();
+      return cpfCnpjRow!;
+    });
+    expect(row.querySelectorAll('.suape-copy')).toHaveLength(2);
+    (row.querySelector('[aria-label="Copiar CPF/CNPJ sem pontuação"]') as HTMLButtonElement).click();
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('10877412001130'));
+  });
+
   it('substitui o carregamento financeiro por erro quando o iframe falha', async () => {
     const api = loadProcessScript();
     await api.installToolkit();

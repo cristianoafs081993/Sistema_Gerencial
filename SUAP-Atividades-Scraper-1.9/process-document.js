@@ -845,15 +845,24 @@
   });
 
   function panel(name) { return document.querySelector(`#${ROOT_ID} [data-panel="${name}"]`); }
-  function appendCopyRow(container, label, value, mono = false) {
+  function appendCopyRow(container, label, value, mono = false, copyDigits = false) {
     if (value == null || cleanText(value) === '' || cleanText(value) === '-') return;
-    const row = createElement('div', 'suape-data-row');
+    const row = createElement('div', `suape-data-row${copyDigits ? ' suape-data-row-with-digits-copy' : ''}`);
     const labelElement = createElement('span', '', label);
     const valueElement = createElement('span', `suape-data-value${mono ? ' suape-mono' : ''}`, String(value));
     const button = createElement('button', 'suape-copy', '⧉');
     button.type = 'button'; button.title = `Copiar ${label}`; button.setAttribute('aria-label', `Copiar ${label}`);
     button.addEventListener('click', () => void copyText(value, button));
-    row.append(labelElement, valueElement, button); container.appendChild(row);
+    row.append(labelElement, valueElement, button);
+    if (copyDigits) {
+      const digitsButton = createElement('button', 'suape-copy', '⧉');
+      digitsButton.type = 'button';
+      digitsButton.title = `Copiar ${label} sem pontuação`;
+      digitsButton.setAttribute('aria-label', `Copiar ${label} sem pontuação`);
+      digitsButton.addEventListener('click', () => void copyText(String(value).replace(/\D/g, ''), digitsButton));
+      row.appendChild(digitsButton);
+    }
+    container.appendChild(row);
   }
   function appendSection(container, title, rows) {
     const sectionId = 'suape-sec-' + cleanText(title).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-');
@@ -924,7 +933,7 @@
       const workflow = full.workflow || {};
       appendSection(container, 'Beneficiário', (section) => {
         appendCopyRow(section, 'Nome', process.beneficiario);
-        appendCopyRow(section, 'CPF/CNPJ', process.cpfCnpj, true);
+        appendCopyRow(section, 'CPF/CNPJ', process.cpfCnpj, true, true);
         appendCopyRow(section, 'Assunto', process.assunto);
       });
       appendSection(container, 'Documento e pagamento', (section) => {

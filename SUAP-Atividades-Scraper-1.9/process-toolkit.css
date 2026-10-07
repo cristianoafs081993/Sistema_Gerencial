@@ -73,6 +73,7 @@
 .suape-section-body > .suape-data-row:first-child { border-top: 0 !important; }
 .suape-section-collapsed .suape-section-body { display: none !important; }
 .suape-data-row { display: grid; grid-template-columns: minmax(82px, .75fr) minmax(0, 1.5fr) 28px; align-items: start; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--suape-border); }
+.suape-data-row-with-digits-copy { grid-template-columns: minmax(82px, .75fr) minmax(0, 1.5fr) 28px 28px; }
 .suape-data-row > span:first-child { color: var(--suape-muted); font-size: 11px; }
 .suape-data-value { overflow-wrap: anywhere; color: var(--suape-text); font-weight: 650; }
 .suape-data-value.suape-mono { font-family: "IBM Plex Mono", Consolas, monospace; font-size: 11px; }
@@ -353,6 +354,7 @@ textarea.suape-input { min-height: 72px; resize: vertical; }
   #siages-suap-toolkit { position: static; min-width: 0; }
   .suape-panel { max-height: none; }
   .suape-data-row { grid-template-columns: 84px minmax(0, 1fr) 28px; }
+  .suape-data-row-with-digits-copy { grid-template-columns: 84px minmax(0, 1fr) 28px 28px; }
 }
 
 .siages-suap-document-ai-slot {
