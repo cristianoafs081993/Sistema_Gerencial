@@ -239,6 +239,8 @@ Ver [cenários e validação remota](ops/PNCP_CONTRACT_SYNC.md).
 
 ## Extensão SUAP - Painel do Processo e Configurações
 
+- Popup SIAGES 1.9.62: `suapPopupAccount.test.ts` cobre login por formulário, sessão ativa sem campos de credenciais, logout, limpeza de senha, erros e atualização reativa da sessão, além da separação de autenticação/sincronização e remoção do segredo de automação. Contrato visual e operacional: [EXTENSION_POPUP](frontend/EXTENSION_POPUP.md).
+
 - Os títulos de seções estáticas do painel de configurações (`Aparência`, `Acesso ao SIAGES`) e mensagens de estado mantêm espaçamento (`padding: 10px 12px 9px !important`), borda divisória inferior e display em bloco, impedindo que encostem nas bordas do card.
 - A tela de autenticação da extensão na aba de configurações alterna de forma reativa:
   - Quando autenticado (`session?.accessToken`), exibe o card de usuário conectado com e-mail, status de sessão ativa e botão de largura total `Sair`, ocultando os campos de login e o botão `Entrar`.

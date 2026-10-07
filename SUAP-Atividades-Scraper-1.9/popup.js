@@ -1,7 +1,5 @@
 const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
-const SAVINGS_EVENT_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/record-automation-savings-event`;
-const SECRET_STORAGE_KEY = 'automation-event-secret';
 const PLAN_PREVIEW_STORAGE_KEY = 'siages-suap-plan-preview';
 const PLAN_BATCH_PREVIEW_STORAGE_KEY = 'siages-suap-plan-batch-preview';
 const SIAFI_LISTS_QUERY = 'select=id,name,updated_at,rows&order=updated_at.desc';
@@ -25,7 +23,10 @@ const btnApplyAllRds = document.getElementById('btn-apply-all-rds');
 const btnPauseAllRds = document.getElementById('btn-pause-all-rds');
 const rdForceFull = document.getElementById('rd-force-full');
 let rdUnit = null;
-const automationSecretInput = document.getElementById('automation-secret');
+const extensionAuthForm = document.getElementById('extension-auth-form');
+const extensionAuthUser = document.getElementById('extension-auth-user');
+const extensionAuthUserEmail = document.getElementById('extension-auth-user-email');
+const extensionAuthBadge = document.getElementById('extension-auth-badge');
 const extensionAuthEmailInput = document.getElementById('extension-auth-email');
 const extensionAuthPasswordInput = document.getElementById('extension-auth-password');
 const extensionAuthStatus = document.getElementById('extension-auth-status');
@@ -44,7 +45,17 @@ let siafiBatchProgress = null;
 
 function setExtensionAuthStatus(message, isError = false) {
   extensionAuthStatus.textContent = message;
-  extensionAuthStatus.style.color = isError ? '#fca5a5' : '#b8c5d1';
+  extensionAuthStatus.dataset.error = String(isError);
+}
+
+function renderExtensionAccount(session) {
+  const connected = Boolean(session?.accessToken);
+  extensionAuthForm.hidden = connected;
+  extensionAuthUser.hidden = !connected;
+  extensionAuthBadge.textContent = connected ? 'Conectado' : 'Desconectado';
+  extensionAuthBadge.dataset.state = connected ? 'connected' : 'disconnected';
+  extensionAuthUserEmail.textContent = connected ? session.user?.email || 'Conta SIAGES conectada' : '';
+  if (connected) extensionAuthPasswordInput.value = '';
 }
 
 function isExtensionContextInvalidated(error) {
@@ -64,12 +75,16 @@ async function getStoredExtensionSession() {
 async function updateExtensionAuthStatus() {
   try {
     const session = await getStoredExtensionSession();
-    if (session) {
-      setExtensionAuthStatus('Sessão ativa. A renovação é automática; a extensão só sai quando você clicar em Sair.');
+    renderExtensionAccount(session);
+    if (session?.accessToken) {
+      setExtensionAuthStatus('Sua sessão é renovada automaticamente.');
     } else {
-      setExtensionAuthStatus('Entre para permitir que a extensao consulte o banco de dados.');
+      setExtensionAuthStatus('Use sua conta SIAGES para acessar os recursos da extensão.');
     }
   } catch (error) {
+    extensionAuthForm.hidden = !extensionAuthUser.hidden;
+    extensionAuthBadge.textContent = 'Verificar acesso';
+    extensionAuthBadge.dataset.state = 'unknown';
     setExtensionAuthStatus(error instanceof Error ? error.message : 'Não foi possível renovar a sessão agora. A sessão continua salva para uma nova tentativa.', true);
   }
 }
@@ -86,7 +101,10 @@ function updateProcessBoxSyncStatus() {
   chrome.runtime.sendMessage(
     { source: 'siages-extension-process-box-sync', type: 'get-status' },
     (response) => {
-      if (chrome.runtime.lastError || !response?.ok) return;
+      if (chrome.runtime.lastError || !response?.ok) {
+        processBoxSyncStatus.textContent = 'Não foi possível consultar a sincronização. Reabra a extensão para tentar novamente.';
+        return;
+      }
       const status = response.status || {};
       const lines = [`Próxima execução: ${formatLocalScheduleDate(status.nextRunAt)} (dias úteis).`];
       if (status.phase === 'inventory' || status.phase === 'processing') {
@@ -115,8 +133,9 @@ async function signInExtension() {
     extensionSignInButton.disabled = true;
     setExtensionAuthStatus('Autenticando a extensão...');
     if (!globalThis.SiagesExtensionAuth?.signIn) throw new Error('O serviço de autenticação da extensão não está disponível.');
-    await globalThis.SiagesExtensionAuth.signIn(email, password);
-    setExtensionAuthStatus('Sessão ativa. A renovação é automática; só será encerrada quando você clicar em Sair. Recarregue a página atual do SUAP para consultar os dados.');
+    const session = await globalThis.SiagesExtensionAuth.signIn(email, password);
+    renderExtensionAccount(session);
+    setExtensionAuthStatus('Você entrou no SIAGES. Sua sessão é renovada automaticamente.');
     extensionAuthPasswordInput.value = '';
   } catch (error) {
     setExtensionAuthStatus(formatExtensionAuthError(error), true);
@@ -125,28 +144,34 @@ async function signInExtension() {
   }
 }
 
-extensionSignInButton.addEventListener('click', () => { void signInExtension(); });
+extensionAuthForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (!extensionSignInButton.disabled) void signInExtension();
+});
 extensionSignOutButton.addEventListener('click', async () => {
   try {
+    extensionSignOutButton.disabled = true;
     if (!globalThis.SiagesExtensionAuth?.signOut) throw new Error('O serviço de autenticação da extensão não está disponível.');
     await globalThis.SiagesExtensionAuth.signOut();
+    renderExtensionAccount(null);
+    extensionAuthPasswordInput.value = '';
     setExtensionAuthStatus('Sessão da extensão encerrada.');
+    extensionAuthEmailInput.focus();
   } catch (error) {
     setExtensionAuthStatus(formatExtensionAuthError(error), true);
+  } finally {
+    extensionSignOutButton.disabled = false;
   }
 });
 void updateExtensionAuthStatus();
 updateProcessBoxSyncStatus();
 chrome?.storage?.onChanged?.addListener((changes, areaName) => {
   if (areaName === 'local' && changes['siages-process-box-sync-state']) updateProcessBoxSyncStatus();
-});
-
-automationSecretInput.value = localStorage.getItem(SECRET_STORAGE_KEY) || '';
-automationSecretInput.addEventListener('change', () => {
-  localStorage.setItem(SECRET_STORAGE_KEY, automationSecretInput.value.trim());
+  if (areaName === 'local' && changes['siages-extension-session']) void updateExtensionAuthStatus();
 });
 
 function log(msg, type = 'info') {
+  document.getElementById('plan-sync-panel').open = true;
   statusEl.style.display = 'block';
   const div = document.createElement('div');
   div.className = `status-line status-${type}`;
@@ -196,6 +221,7 @@ async function updateAllRdStatus() {
   const previews = entries.filter(entry => entry.run?.status === 'preview' && entry.run.complete);
   const applied = entries.filter(entry => entry.run?.status === 'applied');
   const failed = entries.filter(entry => entry.error);
+  if (running || previews.length || failed.length) document.getElementById('rd-sync-panel').open = true;
   const reused = entries.reduce((sum,entry) => sum + (entry.run?.reusedDetails || 0),0);
   const published = entries.reduce((sum,entry) => sum + (entry.run?.appliedSnapshots || 0),0);
   const captured = entries.reduce((sum,entry) => sum + (entry.run?.snapshotCount || 0),0);
@@ -218,6 +244,7 @@ async function updateRdStatus() {
   const running = result.running;
   btnApplyRds.hidden = run?.status !== 'preview' || !run?.complete || running;
   btnPauseRds.hidden = !running;
+  if (running || run?.status === 'preview' || status?.error) document.getElementById('rd-sync-panel').open = true;
   btnCollectRds.disabled = running;
   const totals = run?.summary;
   const reuse = run?.syncMode === 'incremental' ? ` ${run.reusedDetails || 0} RDs reaproveitadas; ${run.refreshedDetails || 0} relidas; ${run.reusedActivities || 0} relações de atividades reaproveitadas.` : '';
@@ -382,6 +409,7 @@ async function updatePlanPreviewButton() {
   const hasPreview = Boolean(preview?.runId || preview?.id || batchPreview?.batchId || batchPreview?.id);
   btnApplyPlan.textContent = batchPreview?.batchId || batchPreview?.id ? 'Aplicar atividades das unidades conferidas' : 'Aplicar atividades desta unidade';
   btnApplyPlan.hidden = !hasPreview;
+  if (hasPreview) document.getElementById('plan-sync-panel').open = true;
   btnApplyPlan.disabled = !hasPreview;
 }
 
@@ -432,7 +460,7 @@ function validateSiafiRecords(records) {
 function setSiafiListStatus(message, isError = false) {
   if (!siafiFillStatus) return;
   siafiFillStatus.textContent = message;
-  siafiFillStatus.style.color = isError ? '#fca5a5' : '#b8c5d1';
+  siafiFillStatus.dataset.error = String(isError);
 }
 
 function siafiListUpdatedAt(list) {

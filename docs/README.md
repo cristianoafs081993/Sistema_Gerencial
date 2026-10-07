@@ -57,6 +57,8 @@ Este indice organiza a documentacao operacional do repositorio por dominio.
 
 ## Frontend e design system
 
+- [Tela inicial da extensão SIAGES](frontend/EXTENSION_POPUP.md)
+
 - [DATA_FLOW.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/frontend/DATA_FLOW.md)
 - [DESIGN_SYSTEM.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/DESIGN_SYSTEM.md)
 - [COMPONENT_CATALOG.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/design-system/COMPONENT_CATALOG.md)
