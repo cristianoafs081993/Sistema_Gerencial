@@ -4,7 +4,7 @@ Este documento registra a politica minima de testes do repositorio.
 
 ## Prioridade
 
-Comprovantes SIAFI 1.9.66: `siafiEvidence.test.ts` valida plano de abas, extração de inputs/spans/tabelas, formatos, exclusão de segredos, pré-docs, origem/frame/aba ativa do worker e PDF. `siafiEvidenceCapture.test.ts` cobre percurso/restauração AJAX, situações múltiplas, pré-docs, janela fixa com body bloqueado, limite inferior de rolagem e PDF sem capa com referências de páginas corretas. `suapSiafiPredocAlert.test.ts` verifica navegação sem liberar Registrar; `suapExtensionPackage.test.ts` protege carregamento/versão e a exclusão do login gov.br. Operação e validação real: [SIAFI_EVIDENCE](integrations/SIAFI_EVIDENCE.md).
+Comprovantes SIAFI 1.9.67: `siafiEvidence.test.ts` valida plano de abas, extração de inputs/spans/tabelas, formatos, exclusão de segredos, pré-docs, origem/frame/aba ativa do worker e PDF sem cabeçalho/rodapé. `siafiEvidenceCapture.test.ts` cobre percurso/restauração AJAX, situações múltiplas, pré-docs, janela fixa com body bloqueado, limite inferior de rolagem e PDF sem capa com referências de páginas corretas. `suapSiafiPredocAlert.test.ts` verifica navegação sem liberar Registrar; `suapExtensionPackage.test.ts` protege carregamento/versão e a exclusão do login gov.br. Operação e validação real: [SIAFI_EVIDENCE](integrations/SIAFI_EVIDENCE.md).
 
 Indisponibilidade do Supabase e concorrência do inventário SUAP:
 

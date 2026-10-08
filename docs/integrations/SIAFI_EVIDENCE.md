@@ -1,10 +1,10 @@
 # Comprovantes de preenchimento no SIAFI
 
-Extensão SIAGES **1.9.66**. A captura funciona localmente no DH em `https://siafi.tesouro.gov.br`, sem login SIAGES, storage remoto, migration, Edge Function ou chamada a LLM. As injeções globais também ficam excluídas do login `acesso.gov.br`.
+Extensão SIAGES **1.9.67**. A captura funciona localmente no DH em `https://siafi.tesouro.gov.br`, sem login SIAGES, storage remoto, migration, Edge Function ou chamada a LLM. As injeções globais também ficam excluídas do login `acesso.gov.br`.
 
 ## Uso
 
-1. Atualize/recarregue a extensão pelo pacote 1.9.66. Abra uma nova tela de DH após a atualização. Não recarregue uma tela com preenchimento ainda não registrado apenas para ativar a extensão.
+1. Atualize/recarregue a extensão pelo pacote 1.9.67. Abra uma nova tela de DH após a atualização. Não recarregue uma tela com preenchimento ainda não registrado apenas para ativar a extensão.
 2. Conclua a edição das listas e dos Dados Básicos no próprio SIAFI. Retorne de eventual pré-doc aberto.
 3. No painel **Comprovante da liquidação**, mantenha **Incluir pré-docs preenchidos** marcado e clique em **Capturar liquidação**.
 4. Mantenha a aba SIAFI selecionada. A extensão percorre as abas e situações, expande os detalhes dos itens e aguarda o AJAX terminar. **Cancelar captura** interrompe a coleta e tenta restaurar a aba original.
@@ -14,7 +14,7 @@ Dados Básicos, Principal Com Orçamento e Dados de Pagamento são obrigatórios
 
 ## Saídas e contrato de dados
 
-- PDF A4 paisagem: imagens reais do navegador, divididas em trechos com pequena sobreposição. Começa diretamente nas telas do SIAFI, sem capa de metadados. Cada página identifica DH, UG, exercício, data e paginação. Capturas parciais recebem `PARCIAL` no cabeçalho; os avisos detalhados ficam no painel e no JSON.
+- PDF A4 paisagem: imagens reais do navegador, divididas em trechos com pequena sobreposição. Cada página contém somente a captura da tela do SIAFI, sem capa, cabeçalho, rodapé ou metadados sobrepostos. Identificação, estado, avisos e paginação permanecem no JSON estruturado.
 - JSON UTF-8, `schemaVersion: "1.0.0"`: `captureId`, `startedAt`, `finishedAt`, `source`, `document`, `status`, `sections`, `predocs`, `warnings`, `analysis` e `purpose`.
 - `sections[]`: chave/título, situação quando houver, estado, horário, campos (`id`, `label`, `value`, `type`, `disabled`), tabelas com cabeçalhos/células e texto de apoio; `firstPage`/`lastPage` relacionam a seção ao PDF.
 - `predocs[]`: controle/linha de origem, `sectionKey`, preenchimento e estado (`captured`, `missing`, `skipped`); quando capturado, recebe campos/tabelas/texto e referências de páginas.
@@ -22,7 +22,7 @@ Dados Básicos, Principal Com Orçamento e Dados de Pagamento são obrigatórios
 - URL contém somente origem/caminho. Campos ocultos, senhas, ViewState e calendários ocultos não são exportados. Cookies, tokens e HTML bruto não integram os arquivos.
 - `analysis.status: "not_requested"`: sem avaliação automatizada nem envio à LLM; arquivo preparado para a integração posterior.
 
-`complete` indica cobertura das abas planejadas e dos pré-docs identificados; não significa que os dados estejam corretos ou que o DH tenha sido registrado. `partial` sinaliza pré-doc ausente, exclusão voluntária dos pré-docs ou aba opcional indisponível. Falhas de captura/restauração não disponibilizam comprovante como concluído. DH sem número é identificado como em preenchimento no nome do arquivo. O PDF declara que não atesta registro, liquidação ou pagamento.
+`complete` indica cobertura das abas planejadas e dos pré-docs identificados; não significa que os dados estejam corretos ou que o DH tenha sido registrado. `partial` sinaliza pré-doc ausente, exclusão voluntária dos pré-docs ou aba opcional indisponível. Falhas de captura/restauração não disponibilizam comprovante como concluído. DH sem número é identificado como em preenchimento no nome do arquivo. O JSON mantém a finalidade de conferência e informa que os dados não atestam registro, liquidação ou pagamento.
 
 ## Implementação e operação
 

@@ -123,9 +123,11 @@ describe('PDF local com capturas', () => {
     ], { document: { ug: '158366', year: '2026', type: 'RP', number: '-' }, startedAt: '2026-10-08', status: 'complete' });
     const text = new TextDecoder('latin1').decode(pdf);
     expect(text).toContain('/Type /Pages /Count 2'); expect(text).toContain('/Filter /DCTDecode /Length 5');
+    expect(text).not.toContain('SIAFI'); expect(text).not.toContain('Captura de tela para conferencia'); expect(text).not.toContain('/Font');
     const xref = Number(text.match(/startxref\n(\d+)/)![1]);
     expect(new TextDecoder().decode(pdf.slice(xref, xref + 4))).toBe('xref');
-    const entries = text.slice(xref).split('\n').slice(3, 12);
+    const objectCount = Number(text.match(/xref\n0 (\d+)/)![1]);
+    const entries = text.slice(xref).split('\n').slice(3, 3 + objectCount - 1);
     entries.forEach((entry, index) => { const offset = Number(entry.slice(0, 10)); expect(new TextDecoder().decode(pdf.slice(offset, offset + `${index + 1} 0 obj`.length))).toBe(`${index + 1} 0 obj`); });
   });
 });

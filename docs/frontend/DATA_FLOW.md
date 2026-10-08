@@ -1,6 +1,6 @@
 # DATA_FLOW
 
-## Comprovantes SIAFI (extensão 1.9.66)
+## Comprovantes SIAFI (extensão 1.9.67)
 
 Painel `siafi-evidence.js` → abas/situações e pré-docs preenchidos no DOM SIAFI → worker de screenshots da aba ativa → PDF sem capa e JSON locais para download explícito. Campos/tabelas e referências de páginas preservam a origem. Janelas fixas dos pré-docs são deslocadas por trecho durante a captura e restauradas ao final. Sem gravação no Supabase ou análise LLM. Contrato: [SIAFI_EVIDENCE](../integrations/SIAFI_EVIDENCE.md).
 
