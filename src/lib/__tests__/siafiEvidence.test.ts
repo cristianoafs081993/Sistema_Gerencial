@@ -124,6 +124,7 @@ describe('PDF local com capturas', () => {
     const text = new TextDecoder('latin1').decode(pdf);
     expect(text).toContain('/Type /Pages /Count 2'); expect(text).toContain('/Filter /DCTDecode /Length 5');
     expect(text).not.toContain('SIAFI'); expect(text).not.toContain('Captura de tela para conferencia'); expect(text).not.toContain('/Font');
+    expect(text).toMatch(/ 0 0 cm \/Im0 Do Q/);
     const xref = Number(text.match(/startxref\n(\d+)/)![1]);
     expect(new TextDecoder().decode(pdf.slice(xref, xref + 4))).toBe('xref');
     const objectCount = Number(text.match(/xref\n0 (\d+)/)![1]);

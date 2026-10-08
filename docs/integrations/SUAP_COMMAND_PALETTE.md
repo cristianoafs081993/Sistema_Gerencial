@@ -27,7 +27,7 @@ A paleta global consulta contratos locais somente pelas colunas existentes (`id`
 - As quatro injeções globais da extensão são excluídas de `acesso.gov.br` e de seus subdomínios. Isso mantém o fluxo de autenticação gov.br livre dos atalhos e listeners da extensão; as páginas do SIAFI, SUAP e Comprasnet continuam usando suas próprias regras de rota.
 - Páginas internas ou superfícies nas quais o navegador bloqueia content scripts não são compatíveis.
 
-Essa exclusão reduz interferência possível no login, mas não prova a origem de um `403 Forbidden`: a resposta pode ser produzida pelo próprio serviço gov.br antes de qualquer content script. Para separar as hipóteses, teste a versão 1.9.67 em uma janela normal, após recarregar a extensão. Cookies primários do site continuam sendo diferentes de cookies de terceiros; a configuração de terceiros não informa se há uma sessão gov.br antiga salva.
+Essa exclusão reduz interferência possível no login, mas não prova a origem de um `403 Forbidden`: a resposta pode ser produzida pelo próprio serviço gov.br antes de qualquer content script. Para separar as hipóteses, teste a versão 1.9.68 em uma janela normal, após recarregar a extensão. Cookies primários do site continuam sendo diferentes de cookies de terceiros; a configuração de terceiros não informa se há uma sessão gov.br antiga salva.
 
 ## Validação manual
 

@@ -90,7 +90,7 @@
     const image = new Image(); image.onload = () => resolve(image); image.onerror = () => reject(new Error('Falha ao ler a captura do navegador.')); image.src = url;
   });
   function jpegPage(canvas, title) {
-    const raw = atob(canvas.toDataURL('image/jpeg', 0.96).split(',')[1]);
+    const raw = atob(canvas.toDataURL('image/jpeg', 0.84).split(',')[1]);
     return { title, width: canvas.width, height: canvas.height, jpeg: Uint8Array.from(raw, character => character.charCodeAt(0)) };
   }
   async function screenshotPages(element, title, pages) {

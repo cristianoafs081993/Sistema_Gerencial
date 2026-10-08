@@ -1,10 +1,10 @@
 # Comprovantes de preenchimento no SIAFI
 
-Extensão SIAGES **1.9.67**. A captura funciona localmente no DH em `https://siafi.tesouro.gov.br`, sem login SIAGES, storage remoto, migration, Edge Function ou chamada a LLM. As injeções globais também ficam excluídas do login `acesso.gov.br`.
+Extensão SIAGES **1.9.68**. A captura funciona localmente no DH em `https://siafi.tesouro.gov.br`, sem login SIAGES, storage remoto, migration, Edge Function ou chamada a LLM. As injeções globais também ficam excluídas do login `acesso.gov.br`.
 
 ## Uso
 
-1. Atualize/recarregue a extensão pelo pacote 1.9.67. Abra uma nova tela de DH após a atualização. Não recarregue uma tela com preenchimento ainda não registrado apenas para ativar a extensão.
+1. Atualize/recarregue a extensão pelo pacote 1.9.68. Abra uma nova tela de DH após a atualização. Não recarregue uma tela com preenchimento ainda não registrado apenas para ativar a extensão.
 2. Conclua a edição das listas e dos Dados Básicos no próprio SIAFI. Retorne de eventual pré-doc aberto.
 3. No painel **Comprovante da liquidação**, mantenha **Incluir pré-docs preenchidos** marcado e clique em **Capturar liquidação**.
 4. Mantenha a aba SIAFI selecionada. A extensão percorre as abas e situações, expande os detalhes dos itens e aguarda o AJAX terminar. **Cancelar captura** interrompe a coleta e tenta restaurar a aba original.
