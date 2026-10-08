@@ -17,8 +17,9 @@
     const kids = [];
     pages.forEach(page => {
       const image = add(stream(`/Type /XObject /Subtype /Image /Width ${page.width} /Height ${page.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode`, page.jpeg));
-      const width = 841.89, height = 595.28, margin = 0;
-      const scale = Math.min((width - margin * 2) / page.width, (height - margin * 2) / page.height);
+      const width = 841.89, margin = 0;
+      const scale = (width - margin * 2) / page.width;
+      const height = page.height * scale + margin * 2;
       const iw = page.width * scale, ih = page.height * scale;
       const content = bytes(`q ${iw.toFixed(2)} 0 0 ${ih.toFixed(2)} ${margin} ${margin} cm /Im0 Do Q\n`);
       const commands = add(stream('', content));
