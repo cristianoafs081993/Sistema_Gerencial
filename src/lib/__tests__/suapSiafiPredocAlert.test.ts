@@ -218,4 +218,32 @@ describe('guardião de pré-doc do SIAFI', () => {
     window.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
   });
+
+  it('libera somente navegação do coletor, mantendo Registrar protegido', () => {
+    loadScript();
+    const tab = document.getElementById('form_manterDocumentoHabil:abaDadosBasicosId')!;
+    tab.classList.add('btn-aba-dh');
+    const register = document.getElementById('form_manterDocumentoHabil:btnRegistrar')!;
+    const tabHandler = vi.fn(); const registerHandler = vi.fn();
+    tab.addEventListener('click', tabHandler); register.addEventListener('click', registerHandler);
+    const testWindow = window as typeof window & { __siagesSiafiEvidenceNavigation?: Element | null };
+    testWindow.__siagesSiafiEvidenceNavigation = tab;
+    tab.click();
+    expect(tabHandler).toHaveBeenCalledOnce();
+    testWindow.__siagesSiafiEvidenceNavigation = register;
+    register.click();
+    expect(registerHandler).not.toHaveBeenCalled();
+    testWindow.__siagesSiafiEvidenceNavigation = null;
+  });
+
+  it('permite baixar arquivos locais no painel mesmo com pré-doc pendente', () => {
+    loadScript();
+    const panel = document.createElement('aside'); panel.id = 'siages-siafi-evidence';
+    panel.innerHTML = '<a href="#captura" download="captura.json">Baixar JSON</a>';
+    document.body.appendChild(panel);
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    panel.querySelector('a')!.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(document.getElementById('suape-siafi-predoc-overlay')).toHaveAttribute('hidden');
+  });
 });

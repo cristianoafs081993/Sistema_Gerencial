@@ -34,6 +34,8 @@ Este indice organiza a documentacao operacional do repositorio por dominio.
 
 ## Integracoes e operacao
 
+- [Comprovantes de preenchimento do SIAFI: PDF e JSON](integrations/SIAFI_EVIDENCE.md)
+
 - [Diagnóstico e recuperação do Supabase](ops/SUPABASE_RECOVERY.md)
 
 - [API_CATALOG.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/API_CATALOG.md)

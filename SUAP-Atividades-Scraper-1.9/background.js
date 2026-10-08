@@ -1,5 +1,6 @@
 if (typeof importScripts === 'function') importScripts('scheduled-process-sync.js');
 if (typeof importScripts === 'function') importScripts('rd-sync.js');
+if (typeof importScripts === 'function') importScripts('siafi-evidence-background.js');
 
 const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';

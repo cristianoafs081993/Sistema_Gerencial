@@ -1,0 +1,12 @@
+#siages-siafi-evidence { position:fixed; right:18px; bottom:18px; z-index:10000; width:360px; max-width:calc(100vw - 48px); padding:16px; border:1px solid #dde6f0; border-radius:12px; background:#fff; color:#1b2b3a; box-shadow:0 8px 30px #0b294526; font:14px/1.5 Arial,sans-serif; text-align:left; }
+#siages-siafi-evidence[hidden], #siages-siafi-evidence [hidden] { display:none !important; }
+#siages-siafi-evidence strong { display:block; margin-bottom:10px; font-size:16px; }
+#siages-siafi-evidence label { display:flex; align-items:center; gap:7px; margin-bottom:12px; color:#1b2b3a; }
+#siages-siafi-evidence input { margin:0; }
+#siages-siafi-evidence .siages-evidence-actions, #siages-siafi-evidence [data-results] { display:flex; gap:8px; flex-wrap:wrap; }
+#siages-siafi-evidence button, #siages-siafi-evidence a { box-sizing:border-box; padding:8px 12px; border:1px solid #1976d2; border-radius:8px; background:#1976d2; color:#fff; font:bold 13px/1.4 Arial,sans-serif; text-decoration:none; cursor:pointer; }
+#siages-siafi-evidence a, #siages-siafi-evidence [data-cancel] { background:#fff; color:#1565c0; }
+#siages-siafi-evidence button:disabled { opacity:.65; cursor:wait; }
+#siages-siafi-evidence :focus-visible { outline:3px solid #1e88e5; outline-offset:3px; }
+#siages-siafi-evidence p { margin:12px 0 0; font-size:12px; color:#5b6b7b; }
+@media print { #siages-siafi-evidence { display:none !important; } }

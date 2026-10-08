@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SIAGES",
-  "version": "1.9.63",
+  "version": "1.9.66",
   "description": "Paleta Ctrl+K, resumo de processos, caminho BPMN, dados financeiros, atalhos e documentos com IA no SIAGES, SUAP e Comprasnet.",
   "permissions": [
     "activeTab",
@@ -60,7 +60,9 @@
       ],
       "exclude_matches": [
         "https://www.siages.com.br/*",
-        "https://suap.ifrn.edu.br/*"
+        "https://suap.ifrn.edu.br/*",
+        "https://acesso.gov.br/*",
+        "https://*.acesso.gov.br/*"
       ],
       "css": [
         "command-palette.css"
@@ -75,6 +77,10 @@
       "matches": [
         "<all_urls>"
       ],
+      "exclude_matches": [
+        "https://acesso.gov.br/*",
+        "https://*.acesso.gov.br/*"
+      ],
       "css": [
         "click-hints.css"
       ],
@@ -88,6 +94,10 @@
       "matches": [
         "<all_urls>"
       ],
+      "exclude_matches": [
+        "https://acesso.gov.br/*",
+        "https://*.acesso.gov.br/*"
+      ],
       "css": [
         "process-paste-picker.css"
       ],
@@ -100,6 +110,10 @@
     {
       "matches": [
         "<all_urls>"
+      ],
+      "exclude_matches": [
+        "https://acesso.gov.br/*",
+        "https://*.acesso.gov.br/*"
       ],
       "js": [
         "text-expander.js"
@@ -122,10 +136,14 @@
         "https://siafi.tesouro.gov.br/*"
       ],
       "css": [
-        "siafi-predoc-alert.css"
+        "siafi-predoc-alert.css",
+        "siafi-evidence.css"
       ],
       "js": [
-        "siafi-predoc-alert.js"
+        "siafi-predoc-alert.js",
+        "siafi-evidence-core.js",
+        "siafi-evidence-pdf.js",
+        "siafi-evidence.js"
       ],
       "run_at": "document_idle"
     },

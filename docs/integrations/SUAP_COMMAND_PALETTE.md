@@ -24,7 +24,10 @@ A paleta global consulta contratos locais somente pelas colunas existentes (`id`
 - A consulta não lê nem armazena dados do SUAP na página de origem.
 - A paleta global pode coexistir com o content script de redação de ETP no Comprasnet.
 - Ações contextuais de processos e comandos de sincronização não são liberados globalmente por esta funcionalidade.
+- As quatro injeções globais da extensão são excluídas de `acesso.gov.br` e de seus subdomínios. Isso mantém o fluxo de autenticação gov.br livre dos atalhos e listeners da extensão; as páginas do SIAFI, SUAP e Comprasnet continuam usando suas próprias regras de rota.
 - Páginas internas ou superfícies nas quais o navegador bloqueia content scripts não são compatíveis.
+
+Essa exclusão reduz interferência possível no login, mas não prova a origem de um `403 Forbidden`: a resposta pode ser produzida pelo próprio serviço gov.br antes de qualquer content script. Para separar as hipóteses, teste a versão 1.9.66 em uma janela normal, após recarregar a extensão. Cookies primários do site continuam sendo diferentes de cookies de terceiros; a configuração de terceiros não informa se há uma sessão gov.br antiga salva.
 
 ## Validação manual
 
@@ -33,3 +36,4 @@ A paleta global consulta contratos locais somente pelas colunas existentes (`id`
 3. Confirme que Enter usa a aba atual e `Ctrl+Enter` abre uma nova aba no SUAP.
 4. No SIAGES, confirme que somente a paleta nativa aparece; no Comprasnet, confirme que o assistente de ETP continua disponível.
 5. Confirme que o comando de sincronização imediata e as ações contextuais de processo permanecem restritos.
+6. No SIAFI, faça um novo login em uma janela normal e confirme se o 403 desapareceu. Se ainda ocorrer somente no perfil normal, remova apenas os dados de `acesso.gov.br` nas configurações de cookies do Chrome e repita o teste.

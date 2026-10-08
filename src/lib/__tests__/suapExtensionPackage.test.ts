@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.63');
+    expect(manifest.version).toBe('1.9.66');
     expect(manifest.name).toBe('SIAGES');
     expect(manifest.icons['128']).toBe('logo-transparent.png');
     expect(manifest.action.default_icon['32']).toBe('logo-transparent.png');
@@ -73,8 +73,8 @@ describe('pacote da extensao Suape 1.9', () => {
     });
     expect(siafiPredocAlert).toMatchObject({
       matches: ['https://siafi.tesouro.gov.br/*'],
-      css: ['siafi-predoc-alert.css'],
-      js: ['siafi-predoc-alert.js'],
+      css: ['siafi-predoc-alert.css', 'siafi-evidence.css'],
+      js: ['siafi-predoc-alert.js', 'siafi-evidence-core.js', 'siafi-evidence-pdf.js', 'siafi-evidence.js'],
       run_at: 'document_idle',
     });
     expect(comprasnetPredocAlert).toMatchObject({
@@ -88,6 +88,8 @@ describe('pacote da extensao Suape 1.9', () => {
       exclude_matches: [
         'https://www.siages.com.br/*',
         'https://suap.ifrn.edu.br/*',
+        'https://acesso.gov.br/*',
+        'https://*.acesso.gov.br/*',
       ],
       css: ['command-palette.css'],
       js: ['extension-auth-client.js', 'command-palette.js'],
@@ -95,6 +97,7 @@ describe('pacote da extensao Suape 1.9', () => {
     });
     expect(clickHints).toMatchObject({
       matches: ['<all_urls>'],
+      exclude_matches: ['https://acesso.gov.br/*', 'https://*.acesso.gov.br/*'],
       css: ['click-hints.css'],
       js: ['click-hints.js'],
       run_at: 'document_idle',
@@ -293,10 +296,24 @@ describe('pacote da extensao Suape 1.9', () => {
     );
     expect(pickerScript).toMatchObject({
       matches: ['<all_urls>'],
+      exclude_matches: ['https://acesso.gov.br/*', 'https://*.acesso.gov.br/*'],
       css: ['process-paste-picker.css'],
       js: ['process-paste-picker.js'],
       run_at: 'document_idle',
       all_frames: true,
     });
+  });
+
+  it('não injeta scripts globais no domínio de autenticação gov.br', () => {
+    const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8')) as {
+      content_scripts: Array<{ matches: string[]; exclude_matches?: string[] }>;
+    };
+    const authExclusions = ['https://acesso.gov.br/*', 'https://*.acesso.gov.br/*'];
+    const globalEntries = manifest.content_scripts.filter((entry) => entry.matches.includes('<all_urls>'));
+
+    expect(globalEntries).toHaveLength(4);
+    for (const entry of globalEntries) {
+      expect(entry.exclude_matches).toEqual(expect.arrayContaining(authExclusions));
+    }
   });
 });

@@ -151,7 +151,7 @@
   }
 
   function isExtensionElement(element) {
-    return Boolean(element?.closest(`#${OVERLAY_ID}`));
+    return Boolean(element?.closest(`#${OVERLAY_ID}, #siages-siafi-evidence`));
   }
 
   function isPredocControl(element) {
@@ -172,6 +172,7 @@
 
   function isSafeControl(element) {
     if (!element) return true;
+    if (element === window.__siagesSiafiEvidenceNavigation && element.classList.contains('btn-aba-dh') && element.id.startsWith(`${FORM_ID}:aba`)) return true;
     if (isExtensionElement(element) || isPredocControl(element) || isPredocWorkflowControl(element)) return true;
     if (element.id === `${FORM_ID}:btnVerificarConsistencia`) return true;
     return false;
