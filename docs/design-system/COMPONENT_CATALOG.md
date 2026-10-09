@@ -180,7 +180,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 
 ## Regra pratica
 
-- `SiagesSiafiEvidence` (extensão 1.9.69): painel isolado `#siages-siafi-evidence` no DH SIAFI, com captura, opção de pré-docs, cancelamento, progresso acessível e downloads PDF/JSON. O PDF começa nas telas, sem capa, cabeçalho ou rodapé; avisos de captura parcial ficam no painel e no JSON. Usa a paleta clara e botões de 8px do Céu, sem sobrescrever o formulário do SIAFI. Contrato: [SIAFI_EVIDENCE](../integrations/SIAFI_EVIDENCE.md).
+- `SiagesSiafiEvidence` (extensão 1.9.70): diálogo isolado `#siages-siafi-evidence`, criado somente pelo comando Ctrl+K → `print` no DH SIAFI. Inclui opção de pré-docs, nova captura, cancelamento, progresso acessível, downloads PDF/JSON e Fechar/Esc, com retorno de foco e ciclo de Tab. Não há card permanente; o diálogo e seu fundo ficam ocultos nos screenshots. O PDF começa nas telas, sem capa, cabeçalho ou rodapé; avisos de captura parcial ficam no diálogo e no JSON. Usa a paleta clara e botões de 8px do Céu, sem sobrescrever o formulário do SIAFI. Contrato: [SIAFI_EVIDENCE](../integrations/SIAFI_EVIDENCE.md).
 
 - Filtros: `FilterPanel`.
 - Tabela: `DataTablePanel` + `TablePagination`.

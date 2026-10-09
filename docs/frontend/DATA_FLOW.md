@@ -1,8 +1,8 @@
 # DATA_FLOW
 
-## Comprovantes SIAFI (extensão 1.9.69)
+## Comprovantes SIAFI (extensão 1.9.70)
 
-Painel `siafi-evidence.js` → abas/situações e pré-docs preenchidos no DOM SIAFI → worker de screenshots da aba ativa → PDF sem capa e JSON locais para download explícito. Campos/tabelas e referências de páginas preservam a origem. Janelas fixas dos pré-docs são deslocadas por trecho durante a captura e restauradas ao final. Sem gravação no Supabase ou análise LLM. Contrato: [SIAFI_EVIDENCE](../integrations/SIAFI_EVIDENCE.md).
+Paleta Ctrl+K → comando `print` → API do coletor no mundo isolado → abas/situações e pré-docs preenchidos no DOM SIAFI → worker de screenshots da aba ativa → PDF sem capa e JSON locais para download explícito em diálogo temporário. O diálogo é criado somente sob comando, oculta-se nos screenshots e permanece fechado após AJAX quando dispensado. Campos/tabelas e referências de páginas preservam a origem. Janelas fixas dos pré-docs são deslocadas por trecho durante a captura e restauradas ao final. Abrir a paleta no SIAFI e digitar `print` não consulta APIs SIAGES. Sem gravação no Supabase ou análise LLM. Contrato: [SIAFI_EVIDENCE](../integrations/SIAFI_EVIDENCE.md).
 
 Este documento resume como os dados chegam ao frontend e circulam pelas paginas.
 

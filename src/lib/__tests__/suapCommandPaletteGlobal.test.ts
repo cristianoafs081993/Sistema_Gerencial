@@ -117,6 +117,30 @@ afterEach(() => {
 });
 
 describe('paleta global da extensao Suape', () => {
+  it('mantém print disponível no SIAFI mesmo enquanto outra busca espera os dados remotos', async () => {
+    Object.defineProperty(window, 'location', { configurable: true, value: {
+      protocol: 'https:', hostname: 'siafi.tesouro.gov.br', pathname: '/siafi/editarDH', href: 'https://siafi.tesouro.gov.br/siafi/editarDH',
+    } });
+    installExtensionAuth();
+    const start = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('SiagesSiafiEvidence', { available: () => true, isRunning: () => false, start });
+    const fetchMock = vi.fn(() => new Promise(() => {})); vi.stubGlobal('fetch', fetchMock);
+    const openMock = vi.spyOn(window, 'open').mockImplementation(() => null);
+    window.eval(contentScript);
+    const input = openPalette();
+    await flushMicrotasks();
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.input(input, { target: { value: 'empenho' } });
+    await flushMicrotasks();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(document.querySelector('.suape-cp-list')).toHaveTextContent('Carregando dados');
+    fireEvent.input(input, { target: { value: 'print' } });
+    expect(document.querySelector('.suape-cp-list')).toHaveTextContent('Capturar liquidação (PDF e JSON)');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(document.getElementById('suape-cp-overlay')).not.toHaveClass('suape-cp-visible');
+    expect(openMock).not.toHaveBeenCalled();
+  });
   it('exibe consultas SUAP fora do SIAGES e resume RP/NP na própria paleta', async () => {
     vi.useFakeTimers();
     installExtensionAuth();

@@ -17,6 +17,12 @@ Exemplos: `proc 23000.000123/2026-01`, `aluno 20201234567890`, `doc minuta`, `co
 
 Enter abre a consulta na aba atual. `Ctrl+Enter` abre em uma nova aba. A consulta é apenas uma navegação para o domínio oficial `suap.ifrn.edu.br`; é necessário estar autenticado no SUAP para acessar o resultado.
 
+## Captura SIAFI com print
+
+Na extensão 1.9.70, estando em um DH de `https://siafi.tesouro.gov.br`, use **Ctrl+K → print → Enter** para executar **Capturar liquidação (PDF e JSON)**. O comando inicia a coleta local das abas e pré-docs preenchidos, sem exigir login SIAGES. A paleta fecha antes da coleta, e os downloads aparecem em uma janela temporária com **Fechar**. Não há card permanente sobre o formulário.
+
+Abrir a paleta no SIAFI e digitar `print` não dispara consultas de empenhos/contratos; essas consultas continuam disponíveis ao solicitar outras buscas. Durante a captura, Ctrl+K mantém a paleta fechada para preservar as imagens. O comando fica oculto fora de um DH SIAFI HTTPS reconhecido. Operação, saídas e restrições: [SIAFI_EVIDENCE](SIAFI_EVIDENCE.md).
+
 ## Escopo e segurança
 
 A paleta global consulta contratos locais somente pelas colunas existentes (`id`, `numero`, `contratada`, `valor`, `data_inicio`, `data_termino`). Objeto, processo e situação derivados continuam vindo de `contratos_api`; a tabela local não fornece esses campos. A paleta nativa do SIAGES carrega a busca de contratos apenas ao abrir, reduzindo consultas no carregamento inicial.
@@ -37,3 +43,4 @@ Essa exclusão reduz interferência possível no login, mas não prova a origem 
 4. No SIAGES, confirme que somente a paleta nativa aparece; no Comprasnet, confirme que o assistente de ETP continua disponível.
 5. Confirme que o comando de sincronização imediata e as ações contextuais de processo permanecem restritos.
 6. No SIAFI, faça um novo login em uma janela normal e confirme se o 403 desapareceu. Se ainda ocorrer somente no perfil normal, remova apenas os dados de `acesso.gov.br` nas configurações de cookies do Chrome e repita o teste.
+7. Em um DH SIAFI, confirme a ausência do card ao entrar e após atualizar uma aba. Use Ctrl+K → print → Enter, aguarde a coleta e baixe PDF/JSON. Confira que as imagens não contêm a paleta nem a janela de progresso e que a aba original foi restaurada. Feche a janela e confirme que ela permanece fechada após AJAX. Fora do DH e em outros sites, o comando de captura não deve aparecer.

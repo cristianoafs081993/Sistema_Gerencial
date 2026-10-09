@@ -7,6 +7,7 @@
   const SIAGES_APP_URL = 'https://www.siages.com.br';
   const SUAP_APP_URL = 'https://suap.ifrn.edu.br';
   const IS_SUAP_PAGE = window.location.hostname === 'suap.ifrn.edu.br';
+  const IS_SIAFI_PAGE = window.location.protocol === 'https:' && window.location.hostname === 'siafi.tesouro.gov.br';
 
   let empenhosCache = null;
   let contratosCache = null;
@@ -26,6 +27,7 @@
   let listEl = null;
   let detailOverlayEl = null;
   let detailDialogEl = null;
+  let paletteReturnFocus = null;
 
   // Lucide SVG Icons Map
   const ICONS = {
@@ -113,6 +115,15 @@
 
   // Quick actions
   const systemActions = [
+    {
+      id: 'action-siafi-print',
+      title: 'Capturar liquidação (PDF e JSON)',
+      subtitle: 'Capturar abas e pré-docs preenchidos no SIAFI',
+      keywords: 'print captura comprovante liquidacao pdf json siafi pre-doc',
+      icon: 'fileText',
+      color: '#1976d2',
+      siafiOnly: true,
+    },
     {
       id: 'action-suap-sync-now',
       title: 'Sincronizar processos agora',
@@ -970,6 +981,7 @@
         chip.classList.add('suape-cp-chip-active');
         activeScope = chip.dataset.scope || 'all';
         inputEl.focus();
+        if (IS_SIAFI_PAGE && ['empenhos', 'contratos'].includes(activeScope)) loadData(false);
         renderResults();
       });
     });
@@ -984,6 +996,7 @@
     // Input events
     inputEl.addEventListener('input', () => {
       selectedIndex = 0;
+      if (IS_SIAFI_PAGE && !'print'.startsWith(inputEl.value.trim().toLowerCase())) loadData(false);
       renderResults();
     });
 
@@ -1410,6 +1423,7 @@
       const qLower = query.toLowerCase();
       matchingActions = systemActions.filter((act) => {
         if (act.suapOnly && !IS_SUAP_PAGE) return false;
+        if (act.siafiOnly && !globalThis.SiagesSiafiEvidence?.available()) return false;
         if (!qLower) return true;
         return act.title.toLowerCase().includes(qLower) || act.keywords.toLowerCase().includes(qLower) || act.subtitle.toLowerCase().includes(qLower);
       });
@@ -1590,7 +1604,7 @@
       return;
     }
 
-    if (isFetching && !empenhosCache && !contratosCache) {
+    if (isFetching && !empenhosCache && !contratosCache && !matchingActions.some(action => action.siafiOnly)) {
       listEl.innerHTML = `
         <div class="suape-cp-empty">
           <div class="suape-cp-spinner"></div>
@@ -2110,6 +2124,13 @@
 
   // Open Results Detail or Navigate
   async function openResultDetail(result, e) {
+    if (result.type === 'action' && result.data.id === 'action-siafi-print') {
+      const collector = globalThis.SiagesSiafiEvidence;
+      if (!collector?.available()) { renderResults(); return; }
+      closePalette();
+      await collector.start();
+      return;
+    }
     if (result.type === 'action' && result.data.id === 'action-suap-sync-now') {
       closePalette();
       const notice = showProcessSyncNotice('Solicitando sincronização das caixas do SUAP...');
@@ -2478,7 +2499,16 @@
   }
 
   function openPalette() {
+    if (globalThis.SiagesSiafiEvidence?.isRunning()) {
+      globalThis.SiagesSiafiEvidence.show();
+      return;
+    }
+    paletteReturnFocus = document.activeElement;
     createPaletteDOM();
+    if (IS_SIAFI_PAGE) {
+      activeScope = 'all';
+      overlayEl.querySelectorAll('.suape-cp-chip').forEach(chip => chip.classList.toggle('suape-cp-chip-active', chip.dataset.scope === 'all'));
+    }
     applyPaletteTheme(currentPaletteTheme);
     updateProcessChip();
     overlayEl.classList.add('suape-cp-visible');
@@ -2492,11 +2522,12 @@
     }
     selectedIndex = 0;
     renderResults();
-    loadData(false);
+    if (!IS_SIAFI_PAGE) loadData(false);
 
     // Garantir foco imediato e em frames subsequentes
     inputEl.focus();
     requestAnimationFrame(() => {
+      if (!overlayEl?.classList.contains('suape-cp-visible')) return;
       inputEl.focus();
       inputEl.select();
     });
@@ -2513,8 +2544,10 @@
   }
 
   function closePalette() {
+    const wasVisible = overlayEl?.classList.contains('suape-cp-visible');
     if (overlayEl) overlayEl.classList.remove('suape-cp-visible');
     closeDetailModal();
+    if (wasVisible && paletteReturnFocus?.isConnected) paletteReturnFocus.focus();
   }
 
   function togglePalette() {

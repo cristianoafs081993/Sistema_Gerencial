@@ -7,6 +7,7 @@
   let toolbar, running = false, cancelled = false, lastRecord = null;
   let pageCount = 0;
   let objectUrls = [];
+  let returnFocus = null;
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   const byId = id => document.getElementById(id);
   const root = () => byId(core.TABS);
@@ -101,8 +102,8 @@
     for (let ancestor = element; ancestor; ancestor = ancestor.parentElement) {
       if (getComputedStyle(ancestor).position === 'fixed') { fixed = true; break; }
     }
-    const barVisibility = toolbar.style.visibility;
-    toolbar.style.visibility = 'hidden';
+    const barVisibility = toolbar?.style.visibility;
+    if (toolbar) toolbar.style.visibility = 'hidden';
     try {
       // RichFaces puts the pre-doc inside a zero-height fixed wrapper and locks
       // body scrolling. Move the real modal between tiles; window.scrollTo
@@ -151,7 +152,7 @@
       }
     } finally {
       if (captureStyle === null) element.removeAttribute('style'); else element.setAttribute('style', captureStyle);
-      restoreLayout(); toolbar.style.visibility = barVisibility;
+      restoreLayout(); if (toolbar) toolbar.style.visibility = barVisibility;
       window.scrollTo({ left: before.x, top: before.y, behavior: 'instant' });
     }
   }
@@ -229,6 +230,7 @@
     }
   }
   async function start() {
+    show();
     if (running) return;
     if (modal()) { status('Retorne do pré-doc antes de iniciar a captura.'); return; }
     if (pendingEdits()) { status('Conclua a edição da aba no SIAFI antes de capturar.'); return; }
@@ -242,8 +244,10 @@
     lastRecord = core.createRecord(core.documentIdentity(document), location.href);
     toolbar.querySelector('[data-results]').replaceChildren();
     toolbar.querySelector('[data-start]').disabled = true;
+    toolbar.querySelector('[data-close]').disabled = true;
     toolbar.querySelector('input').disabled = true;
     toolbar.querySelector('[data-cancel]').hidden = false;
+    toolbar.querySelector('[data-cancel]').focus();
     let failure = null;
     try {
       for (const tab of tabs) { check(); await captureTab(tab, pages); }
@@ -254,7 +258,9 @@
       catch (error) { lastRecord.warnings.push(error.message); lastRecord.status = 'failed'; failure ||= error; }
       window.scrollTo({ left: originalScroll.x, top: originalScroll.y, behavior: 'instant' });
       running = false; toolbar.querySelector('[data-start]').disabled = false;
+      toolbar.querySelector('[data-close]').disabled = false;
       toolbar.querySelector('input').disabled = false; toolbar.querySelector('[data-cancel]').hidden = true;
+      toolbar.querySelector('[data-close]').focus();
       lastRecord.finishedAt = new Date().toISOString();
     }
     if (failure) { status(`Não foi gerado comprovante: ${failure.message}`); return; }
@@ -264,28 +270,55 @@
     } catch (error) { status(`Falha ao gerar os arquivos: ${error.message}`); }
   }
   function blockDuringCapture(event) {
+    if (running && event.type === 'keydown' && event.key === 'Escape') {
+      event.preventDefault(); event.stopImmediatePropagation(); cancelCapture(); return;
+    }
     if (!running || !event.isTrusted || event.target.closest?.(`#${ID}`)) return;
     event.preventDefault(); event.stopImmediatePropagation();
   }
-  function mount() {
-    if (!document.body) return;
+  function cancelCapture() {
+    cancelled = true; status('Cancelando e restaurando a aba…');
+  }
+  function close() {
+    if (running || !toolbar) return;
+    toolbar.hidden = true;
+    if (returnFocus?.isConnected) returnFocus.focus();
+  }
+  function show() {
     if (!toolbar) {
-      toolbar = document.createElement('aside'); toolbar.id = ID; toolbar.setAttribute('aria-label', 'Comprovante SIAFI');
-      toolbar.innerHTML = '<strong>Comprovante da liquidação</strong><label><input type="checkbox" checked> Incluir pré-docs preenchidos</label><div class="siages-evidence-actions"><button type="button" data-start>Capturar liquidação</button><button type="button" data-cancel hidden>Cancelar captura</button><span data-results></span></div><p role="status" aria-live="polite">Gera PDF das telas e dados em JSON neste navegador.</p>';
+      toolbar = document.createElement('div'); toolbar.id = ID; toolbar.hidden = true;
+      toolbar.innerHTML = '<section role="dialog" aria-modal="true" aria-labelledby="siages-evidence-title"><div class="siages-evidence-header"><strong id="siages-evidence-title">Comprovante da liquidação</strong><button type="button" data-close aria-label="Fechar comprovante">Fechar</button></div><label><input type="checkbox" checked> Incluir pré-docs preenchidos</label><div class="siages-evidence-actions"><button type="button" data-start>Nova captura</button><button type="button" data-cancel hidden>Cancelar captura</button><span data-results></span></div><p role="status" aria-live="polite">Gera PDF das telas e dados em JSON neste navegador.</p></section>';
       toolbar.querySelector('[data-start]').addEventListener('click', () => { void start(); });
-      toolbar.querySelector('[data-cancel]').addEventListener('click', () => { cancelled = true; status('Cancelando e restaurando a aba…'); });
+      toolbar.querySelector('[data-cancel]').addEventListener('click', cancelCapture);
+      toolbar.querySelector('[data-close]').addEventListener('click', close);
+      toolbar.addEventListener('click', event => { if (event.target === toolbar) close(); });
+      toolbar.addEventListener('keydown', event => {
+        if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
+        if (event.key === 'Tab') {
+          const controls = Array.from(toolbar.querySelectorAll('button:not(:disabled):not([hidden]),input:not(:disabled),a[href]'));
+          const first = controls[0], last = controls[controls.length - 1];
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+        }
+      });
       document.body.appendChild(toolbar);
     }
-    const hide = !root(); if (toolbar.hidden !== hide) toolbar.hidden = hide;
+    if (toolbar.hidden) {
+      // The palette has already closed. Restore focus to SIAFI, not its hidden input.
+      returnFocus = document.activeElement;
+      toolbar.hidden = false;
+    }
+    if (toolbar.style.visibility !== 'hidden') toolbar.querySelector(running ? '[data-cancel]' : '[data-close]').focus();
   }
   document.addEventListener('click', blockDuringCapture, true);
   document.addEventListener('keydown', blockDuringCapture, true);
-  const observer = new MutationObserver(mount);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-  mount();
+  const available = () => location.protocol === 'https:' && location.hostname === 'siafi.tesouro.gov.br' && Boolean(root());
+  // Shared only with other content scripts in the extension's isolated world.
+  globalThis.SiagesSiafiEvidence = { available, isRunning: () => running, show, start: () => available() ? start() : Promise.resolve() };
   if (window.__SIAGES_SIAFI_EVIDENCE_TEST__) window.__siagesSiafiEvidence = { start, selectTab, pendingEdits, captureTab, screenshotPages, unscroll, getRecord: () => lastRecord, destroy() {
-    observer.disconnect(); toolbar?.remove(); objectUrls.forEach(url => URL.revokeObjectURL(url));
+    toolbar?.remove(); objectUrls.forEach(url => URL.revokeObjectURL(url));
     document.removeEventListener('click', blockDuringCapture, true); document.removeEventListener('keydown', blockDuringCapture, true);
+    delete globalThis.SiagesSiafiEvidence;
     window.__siagesSiafiEvidenceLoaded = false;
   } };
 })();

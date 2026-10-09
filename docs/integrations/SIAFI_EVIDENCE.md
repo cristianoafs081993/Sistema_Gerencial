@@ -1,14 +1,16 @@
 # Comprovantes de preenchimento no SIAFI
 
-Extensão SIAGES **1.9.69**. A captura funciona localmente no DH em `https://siafi.tesouro.gov.br`, sem login SIAGES, storage remoto, migration, Edge Function ou chamada a LLM. As injeções globais também ficam excluídas do login `acesso.gov.br`.
+Extensão SIAGES **1.9.70**. A captura funciona localmente no DH em `https://siafi.tesouro.gov.br`, sem login SIAGES, storage remoto, migration, Edge Function ou chamada a LLM. As injeções globais também ficam excluídas do login `acesso.gov.br`.
 
 ## Uso
 
-1. Atualize/recarregue a extensão pelo pacote 1.9.69. Abra uma nova tela de DH após a atualização. Não recarregue uma tela com preenchimento ainda não registrado apenas para ativar a extensão.
+1. Atualize/recarregue a extensão pelo pacote 1.9.70. Abra uma nova tela de DH após a atualização. Não recarregue uma tela com preenchimento ainda não registrado apenas para ativar a extensão.
 2. Conclua a edição das listas e dos Dados Básicos no próprio SIAFI. Retorne de eventual pré-doc aberto.
-3. No painel **Comprovante da liquidação**, mantenha **Incluir pré-docs preenchidos** marcado e clique em **Capturar liquidação**.
+3. Abra a paleta com **Ctrl+K**, digite **print** e selecione **Capturar liquidação (PDF e JSON)** com **Enter**. A captura inicia imediatamente, incluindo os pré-docs preenchidos por padrão. O comando aparece somente em um DH SIAFI HTTPS reconhecido.
 4. Mantenha a aba SIAFI selecionada. A extensão percorre as abas e situações, expande os detalhes dos itens e aguarda o AJAX terminar. **Cancelar captura** interrompe a coleta e tenta restaurar a aba original.
-5. Ao concluir, clique em **Baixar PDF** e **Baixar dados (JSON)**. Os dois downloads são explícitos para evitar bloqueio de múltiplos downloads automáticos.
+5. Ao concluir, clique em **Baixar PDF** e **Baixar dados (JSON)** na janela temporária. Os dois downloads são explícitos para evitar bloqueio de múltiplos downloads automáticos. Clique em **Fechar** ou pressione **Esc** para voltar ao formulário. Para repetir, use **Nova captura**; a opção **Incluir pré-docs preenchidos** pode ser alterada antes da nova coleta.
+
+Não há card permanente nem abertura automática da janela em atualizações AJAX. A paleta fecha antes de iniciar a captura; a janela de progresso e seu fundo ficam ocultos em cada screenshot. Durante a coleta, **Ctrl+K** mantém a paleta fechada e **Esc** cancela a captura com restauração do DH. Fora da coleta, a janela também fecha ao clicar em seu fundo e devolve o foco ao controle de origem.
 
 Dados Básicos, Principal Com Orçamento e Dados de Pagamento são obrigatórios. Dedução é consultada e registrada como `empty` quando não há itens/situações. Outras abas preenchidas, identificadas pelas classes de estado do SIAFI, também entram; Resumo fica fora desta versão. Cada situação de orçamento/dedução é percorrida separadamente, sem selecionar ou alterar linhas. Pré-docs de favorecidos e deduções são abertos somente quando já preenchidos e fechados com **Retornar**. A captura nunca aciona Confirmar, Registrar, Registrar Alterações, Salvar Rascunho, Excluir ou Verificar Consistência.
 
@@ -26,7 +28,7 @@ Dados Básicos, Principal Com Orçamento e Dados de Pagamento são obrigatórios
 
 ## Implementação e operação
 
-`siafi-evidence-core.js` extrai campos e planeja abas; `siafi-evidence.js` coordena navegação/montagem local; `siafi-evidence-pdf.js` escreve o PDF com JPEGs; `siafi-evidence-background.js` usa `chrome.tabs.captureVisibleTab` em PNG. O worker valida host HTTPS, frame principal e aba ativa antes/depois da espera, serializa capturas e respeita duas chamadas por segundo. Não há novas permissões no manifesto.
+`command-palette.js` encaminha a ação `action-siafi-print` à API `SiagesSiafiEvidence`, compartilhada somente no mundo isolado dos content scripts. No SIAFI, abrir a paleta e digitar `print` não inicia consultas SIAGES; outras buscas continuam carregando os dados quando solicitadas. `siafi-evidence-core.js` extrai campos e planeja abas; `siafi-evidence.js` coordena navegação e cria o diálogo somente sob comando; `siafi-evidence-pdf.js` escreve o PDF com JPEGs; `siafi-evidence-background.js` usa `chrome.tabs.captureVisibleTab` em PNG. O worker valida host HTTPS, frame principal e aba ativa antes/depois da espera, serializa capturas e respeita duas chamadas por segundo. Não há novas permissões no manifesto.
 
 O alertador de pré-doc continua protegendo registro/saída. Somente a troca de abas solicitada pelo coletor recebe exceção temporária no mundo isolado da extensão. Downloads internos ao painel são liberados. Documento alterado, sessão expirada, troca de aba, timeout e falhas de permissão interrompem a operação. Cliques/teclas fora do painel são bloqueados durante a coleta; não execute outra automação na mesma aba.
 
@@ -34,7 +36,7 @@ Detalhes recolhidos e áreas com rolagem interna são temporariamente expandidos
 
 ## Validação
 
-`siafiEvidence.test.ts`: contrato, campos repetidos/desabilitados, formatos, exclusão de segredos, abas obrigatórias/opcionais, pré-docs, remetente/aba do worker e offsets do PDF. `siafiEvidenceCapture.test.ts`: percurso AJAX, situações múltiplas, pré-doc preenchido/ausente, cancelamento, falha sem exportação e restauração de áreas com rolagem. `suapSiafiPredocAlert.test.ts`: proteção de registro e exceção restrita de navegação. `suapExtensionPackage.test.ts`: carregamento/versão/permissões.
+`siafiEvidence.test.ts`: contrato, campos repetidos/desabilitados, formatos, exclusão de segredos, abas obrigatórias/opcionais, pré-docs, remetente/aba do worker e offsets do PDF. `siafiEvidenceCapture.test.ts`: comando `print` integrado à paleta sem login/consulta SIAGES, ausência de card automático, diálogo oculto nas imagens, fechamento/foco, prevenção de coleta duplicada, restrição de host/DH, percurso AJAX, situações múltiplas, pré-doc preenchido/ausente, cancelamento inclusive por Esc, falha sem exportação e restauração de áreas com rolagem. `suapCommandPaletteGlobal.test.ts`: consultas e navegação da paleta. `suapSiafiPredocAlert.test.ts`: proteção de registro e exceção restrita de navegação. `suapExtensionPackage.test.ts`: carregamento/versão/permissões.
 
 Validação em 08/10/2026: 43 testes dos quatro arquivos acima passaram; a verificação de encoding também passou. O build Vite e a geração dos 54 fallbacks SPA concluíram, usando diretamente o Node empacotado porque o wrapper local de `vite` estava inválido. O PDF do escritor da extensão foi renderizado com Poppler e revisado visualmente. O ZIP 1.9.64 foi conferido arquivo a arquivo contra a pasta da extensão.
 
@@ -45,3 +47,5 @@ Inspeção da sessão real em 08/10/2026: RP em preenchimento, UG 158366, proces
 Correção 1.9.65 em 08/10/2026: o erro de enquadramento foi reproduzido na consulta do RP 170 e localizado na janela fixa do pré-doc. Foram acrescentados testes de modal fixo com body bloqueado, restauração após falha e limite inferior de rolagem; o fluxo integrado também garante ausência de capa e referências de páginas iniciadas em 1. A reprodução de layout no Chrome, com estrutura RichFaces fictícia, completou dois trechos e restaurou os estilos. Nesse teste de layout o retorno do worker é simulado; não substitui a validação nativa depois de carregar a extensão corrigida. A capa também foi retirada do PDF assistido já entregue, ajustando a paginação no PDF e no JSON.
 
 Validação final 1.9.65: 47 testes focados (incluindo encoding) aprovados; suíte geral com 1.417 aprovados e três falhas em `DataContext.test.tsx`, `suapProcessDocumentExtension.test.ts` e `ManutencaoAdmin.test.tsx`, fora do fluxo alterado. O lint geral permanece bloqueado por `src/utils/nfeChave.ts:57`. Build Vite e 54 fallbacks SPA concluídos. PDF assistido sem capa: oito páginas renderizadas e revisadas, paginação/referências JSON conferidas. Os 36 arquivos do ZIP 1.9.65 coincidem por SHA-256 com a pasta da extensão. Não houve migration, deploy ou envio a LLM.
+
+Validação 1.9.70 em 09/10/2026: 65 testes focados (coletor, paleta global, alertador, pacote e encoding) aprovados. O teste integrado executa Ctrl+K → print → Enter em um DH fictício com AJAX, coleta quatro imagens incluindo pré-doc, verifica a ocultação da paleta/diálogo, os dois downloads, a restauração do DH e a ausência de registro, confirmação e consultas SIAGES. Build Vite, 54 fallbacks SPA e `tsc --noEmit` concluídos. Os 36 arquivos do ZIP 1.9.70 coincidem por SHA-256 com a pasta da extensão. Suíte completa: 1.426 aprovados e três falhas em `DataContext.test.tsx`, `suapProcessDocumentExtension.test.ts` e `ManutencaoAdmin.test.tsx`; `npm run check` interrompido pelo erro de lint em `src/utils/nfeChave.ts:57`, sem alteração nesses arquivos. A captura nativa no SIAFI real ainda requer recarregar a extensão e abrir um DH com a versão nova. Não houve migration, deploy ou envio a LLM.

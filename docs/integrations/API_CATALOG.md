@@ -699,7 +699,7 @@ Function chamada pela extensão na rota oficial de edição de ETP.
 
 ## Ponte da extensao Suape 1.9
 
-- Captura SIAFI (1.9.69): painel local no DH gera PDF sem capa, cabeçalho ou rodapé, com screenshots reais das abas/situações e pré-docs preenchidos, mais JSON versionado. Pré-docs fixos são enquadrados por trecho, com restauração da apresentação original. Sem APIs SIAGES/LLM, persistência no servidor ou registro do DH. Contrato e operação: [SIAFI_EVIDENCE](SIAFI_EVIDENCE.md).
+- Captura SIAFI (1.9.70): comando Ctrl+K → `print` no DH inicia o coletor local e oferece PDF/JSON em diálogo temporário, sem card permanente. O PDF não possui capa, cabeçalho ou rodapé e contém screenshots reais das abas/situações e pré-docs preenchidos; o JSON é versionado. Paleta, diálogo e seu fundo ficam fora das imagens. Pré-docs fixos são enquadrados por trecho, com restauração da apresentação original. Sem APIs SIAGES/LLM, persistência no servidor ou registro do DH. Contrato e operação: [SIAFI_EVIDENCE](SIAFI_EVIDENCE.md).
 
 - Origem SIAGES fixa: `https://www.siages.com.br`.
 - Entrada: contexto autenticado do processo SUAP enviado ao iframe `/suap-extension/process-info`.

@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.69');
+    expect(manifest.version).toBe('1.9.70');
     expect(manifest.name).toBe('SIAGES');
     expect(manifest.icons['128']).toBe('logo-transparent.png');
     expect(manifest.action.default_icon['32']).toBe('logo-transparent.png');

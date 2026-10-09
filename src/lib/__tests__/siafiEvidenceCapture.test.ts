@@ -1,11 +1,14 @@
 import { readFileSync } from 'node:fs';
+import { fireEvent } from '@testing-library/dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { extensionFixturePath } from '@/test/extensionFixtures';
 
 type RecordData = { status: string; sections: Array<{ key: string; status: string; fields: Array<{ value: string }>; firstPage?: number; lastPage?: number }>; predocs: Array<{ status: string; fields: Array<{ value: string }>; firstPage?: number; lastPage?: number }> };
 type CapturePage = { title: string; width: number; height: number; jpeg: Uint8Array };
 type Api = { start: () => Promise<void>; getRecord: () => RecordData; unscroll: (root: Element) => () => void; screenshotPages: (root: Element, title: string, pages: CapturePage[]) => Promise<void>; destroy: () => void };
-type TestWindow = typeof window & { __SIAGES_SIAFI_EVIDENCE_TEST__?: boolean; __siagesSiafiEvidence?: Api; chrome?: unknown };
+type TestWindow = typeof window & { __SIAGES_SIAFI_EVIDENCE_TEST__?: boolean; __siagesSiafiEvidence?: Api; __suapeCommandPaletteLoaded?: boolean; SiagesSiafiEvidence: { available: () => boolean; start: () => Promise<void>; isRunning: () => boolean }; chrome?: unknown };
+const originalLocationDescriptor = Object.getOwnPropertyDescriptor(window, 'location');
+let paletteListeners: Array<Parameters<Document['addEventListener']>> = [];
 const prefix = 'form_manterDocumentoHabil';
 const items = [ ['abaDadosBasicosId', 'Dados Básicos'], ['abaPrincipalComOrcamentoId', 'Principal Com Orçamento'], ['abaDeducaoId', 'Dedução'], ['abaDadosPagRecId', 'Dados de Pagamento'] ];
 let screenshots: ReturnType<typeof vi.fn>, confirm: ReturnType<typeof vi.fn>, drawImage: ReturnType<typeof vi.fn>;
@@ -58,8 +61,83 @@ beforeEach(() => {
   const testWindow=window as TestWindow; testWindow.__SIAGES_SIAFI_EVIDENCE_TEST__=true; testWindow.chrome={runtime:{sendMessage:screenshots}};
   for (const file of ['siafi-evidence-core.js','siafi-evidence-pdf.js','siafi-evidence.js']) window.eval(readFileSync(extensionFixturePath(file),'utf8'));
 });
-afterEach(() => { (window as TestWindow).__siagesSiafiEvidence?.destroy();vi.useRealTimers();vi.restoreAllMocks();vi.unstubAllGlobals(); });
+afterEach(() => {
+  (window as TestWindow).__siagesSiafiEvidence?.destroy();
+  for (const [type, listener, options] of paletteListeners) document.removeEventListener(type, listener, options);
+  paletteListeners = [];
+  delete (window as TestWindow).__suapeCommandPaletteLoaded;
+  document.body.innerHTML = '';
+  if (originalLocationDescriptor) Object.defineProperty(window, 'location', originalLocationDescriptor);
+  vi.useRealTimers();vi.restoreAllMocks();vi.unstubAllGlobals();
+});
 describe('coletor completo de comprovantes SIAFI',()=>{
+  it('não coloca card no DH ao carregar nem ao atualizar o formulário', async () => {
+    expect(document.getElementById('siages-siafi-evidence')).toBeNull();
+    document.getElementById('panel')!.appendChild(document.createElement('span'));
+    await vi.runAllTimersAsync();
+    expect(document.getElementById('siages-siafi-evidence')).toBeNull();
+    expect(screenshots).not.toHaveBeenCalled();
+  });
+  it('executa print pela paleta sem login SIAGES e sem sobrepor os screenshots', async () => {
+    Object.defineProperty(window, 'location', { configurable: true, value: {
+      protocol: 'https:', hostname: 'siafi.tesouro.gov.br', pathname: '/siafi/editarDH', href: 'https://siafi.tesouro.gov.br/siafi/editarDH', origin: 'https://siafi.tesouro.gov.br',
+    } });
+    const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('SiagesExtensionAuth', { getSession: async () => null });
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const listeners = vi.spyOn(document, 'addEventListener');
+    window.eval(readFileSync(extensionFixturePath('command-palette.js'), 'utf8'));
+    paletteListeners = listeners.mock.calls;
+    const originalInput = document.createElement('input'); document.body.appendChild(originalInput); originalInput.focus();
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true });
+    const input = document.querySelector<HTMLInputElement>('.suape-cp-input')!;
+    fireEvent.input(input, { target: { value: 'print' } });
+    expect(document.querySelector('.suape-cp-list')).toHaveTextContent('Capturar liquidação (PDF e JSON)');
+    screenshots.mockImplementation(async () => {
+      expect(document.getElementById('suape-cp-overlay')).not.toHaveClass('suape-cp-visible');
+      expect(document.getElementById('siages-siafi-evidence')!.style.visibility).toBe('hidden');
+      return { ok: true, dataUrl: 'data:image/png;base64,AAA=' };
+    });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect((window as TestWindow).SiagesSiafiEvidence.isRunning()).toBe(true);
+    expect(document.querySelector<HTMLInputElement>('#siages-siafi-evidence input')!.checked).toBe(true);
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true });
+    expect(document.getElementById('suape-cp-overlay')).not.toHaveClass('suape-cp-visible');
+    await (window as TestWindow).SiagesSiafiEvidence.start(); // A second command cannot start another capture.
+    await vi.runAllTimersAsync();
+    expect((window as TestWindow).__siagesSiafiEvidence!.getRecord().status).toBe('complete');
+    expect(screenshots).toHaveBeenCalledTimes(4);
+    expect(confirm).not.toHaveBeenCalled(); expect(fetchMock).not.toHaveBeenCalled(); expect(open).not.toHaveBeenCalled();
+    expect(document.querySelectorAll('#siages-siafi-evidence a[download]')).toHaveLength(2);
+    expect(document.getElementById(`${prefix}:abaDadosPagRecId`)).toHaveClass('btn-aba-dh-selecionada');
+    fireEvent.click(document.querySelector('[data-close]')!);
+    expect(document.getElementById('siages-siafi-evidence')).toHaveAttribute('hidden');
+    expect(document.activeElement).toBe(originalInput);
+    document.getElementById('panel')!.appendChild(document.createElement('span'));
+    await vi.runAllTimersAsync();
+    expect(document.getElementById('siages-siafi-evidence')).toHaveAttribute('hidden');
+  });
+  it.each([
+    ['https:', 'siafi.tesouro.gov.br', false],
+    ['https:', 'example.org', true],
+    ['http:', 'siafi.tesouro.gov.br', true],
+  ])('não oferece print fora de um DH SIAFI HTTPS (%s %s DH=%s)', async (protocol, hostname, hasDh) => {
+    Object.defineProperty(window, 'location', { configurable: true, value: { protocol, hostname, pathname: '/', href: `${protocol}//${hostname}/` } });
+    if (!hasDh) document.getElementById(`${prefix}:abasDocHabil`)!.remove();
+    const api = (window as TestWindow).SiagesSiafiEvidence;
+    expect(api.available()).toBe(false);
+    await api.start();
+    expect(document.getElementById('siages-siafi-evidence')).toBeNull();
+    expect(screenshots).not.toHaveBeenCalled();
+    vi.stubGlobal('SiagesExtensionAuth', { getSession: async () => null });
+    const listeners = vi.spyOn(document, 'addEventListener');
+    window.eval(readFileSync(extensionFixturePath('command-palette.js'), 'utf8'));
+    paletteListeners = listeners.mock.calls;
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true });
+    fireEvent.input(document.querySelector('.suape-cp-input')!, { target: { value: 'print' } });
+    expect(document.querySelector('.suape-cp-list')).not.toHaveTextContent('Capturar liquidação');
+    await vi.runAllTimersAsync();
+  });
   it('captura todas as partes do pré-doc fixo com body bloqueado, sem depender de rolagem da janela',async()=>{
     vi.stubGlobal('innerWidth',1600);vi.stubGlobal('innerHeight',683);vi.stubGlobal('scrollX',0);vi.stubGlobal('scrollY',101);
     vi.spyOn(document.documentElement,'clientWidth','get').mockReturnValue(1585);
@@ -93,7 +171,7 @@ describe('coletor completo de comprovantes SIAFI',()=>{
     const task=(window as TestWindow).__siagesSiafiEvidence!.screenshotPages(target,'Pré-doc',[]);
     const result=expect(task).rejects.toThrow('Falha na captura');await vi.runAllTimersAsync();await result;
     expect(target.getAttribute('style')).toBe(originalStyle);
-    expect(document.getElementById('siages-siafi-evidence')!.style.visibility).toBe('');
+    expect(document.getElementById('siages-siafi-evidence')).toBeNull();
   });
   it('captura a última parte de uma página longa quando a rolagem chega ao limite inferior',async()=>{
     vi.stubGlobal('innerWidth',1600);vi.stubGlobal('innerHeight',683);vi.stubGlobal('scrollX',0);vi.stubGlobal('scrollY',142);
@@ -173,5 +251,28 @@ describe('coletor completo de comprovantes SIAFI',()=>{
     await vi.runAllTimersAsync();await task;
     expect(api.getRecord().status).toBe('failed');expect(screenshots).not.toHaveBeenCalled();
     expect(document.getElementById(`${prefix}:abaDadosPagRecId`)).toHaveClass('btn-aba-dh-selecionada');
+  });
+  it('Escape cancela a coleta, restaura o DH e depois fecha o diálogo', async () => {
+    const task = (window as TestWindow).__siagesSiafiEvidence!.start();
+    expect(document.querySelector('[data-close]')).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await vi.runAllTimersAsync(); await task;
+    expect(screenshots).not.toHaveBeenCalled();
+    expect(document.getElementById(`${prefix}:abaDadosPagRecId`)).toHaveClass('btn-aba-dh-selecionada');
+    expect(document.querySelector('[data-close]')).not.toBeDisabled();
+    fireEvent.keyDown(document.querySelector('[data-close]')!, { key: 'Escape' });
+    expect(document.getElementById('siages-siafi-evidence')).toHaveAttribute('hidden');
+  });
+  it('mantém o foco no diálogo e libera o formulário ao clicar no fundo', async () => {
+    const task = (window as TestWindow).__siagesSiafiEvidence!.start();
+    await vi.runAllTimersAsync(); await task;
+    const close = document.querySelector<HTMLButtonElement>('[data-close]')!;
+    const last = document.querySelector<HTMLAnchorElement>('#siages-siafi-evidence a:last-child')!;
+    last.focus(); fireEvent.keyDown(last, { key: 'Tab' });
+    expect(document.activeElement).toBe(close);
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(last);
+    fireEvent.click(document.getElementById('siages-siafi-evidence')!);
+    expect(document.getElementById('siages-siafi-evidence')).toHaveAttribute('hidden');
   });
 });
