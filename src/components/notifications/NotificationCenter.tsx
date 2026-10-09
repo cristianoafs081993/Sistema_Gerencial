@@ -79,7 +79,10 @@ export type NotificationItem =
 function parseDate(value: Date | string | number | undefined | null): Date {
   if (!value) return new Date(0);
   if (value instanceof Date) return isNaN(value.getTime()) ? new Date(0) : value;
-  if (typeof value === 'number') return new Date(value);
+  if (typeof value === 'number') {
+    const parsed = new Date(value);
+    return isNaN(parsed.getTime()) ? new Date(0) : parsed;
+  }
 
   if (typeof value === 'string') {
     const trimmed = value.trim();
@@ -109,40 +112,15 @@ function parseDate(value: Date | string | number | undefined | null): Date {
   return isNaN(d.getTime()) ? new Date(0) : d;
 }
 
-function extractDocNumber(numero?: string | null): number {
-  if (!numero) return 0;
-  const match = numero.match(/(\d{4})[A-Za-z]+(\d+)/);
-  if (match) {
-    const year = parseInt(match[1], 10);
-    const seq = parseInt(match[2], 10);
-    return year * 10_000_000 + seq;
-  }
-  const digits = numero.replace(/\D/g, '');
-  return digits ? parseInt(digits, 10) : 0;
-}
-
-function interleaveEvents(
+function sortNotificationEvents(
   empenhos: NotificationItem[],
   descentralizacoes: NotificationItem[],
   requisicoes: NotificationItem[] = [],
   maxTotal = 20,
 ): NotificationItem[] {
-  const result: NotificationItem[] = [];
-  const maxLen = Math.max(empenhos.length, descentralizacoes.length, requisicoes.length);
-
-  for (let i = 0; i < maxLen && result.length < maxTotal; i++) {
-    if (requisicoes[i] && result.length < maxTotal) {
-      result.push(requisicoes[i]);
-    }
-    if (descentralizacoes[i] && result.length < maxTotal) {
-      result.push(descentralizacoes[i]);
-    }
-    if (empenhos[i] && result.length < maxTotal) {
-      result.push(empenhos[i]);
-    }
-  }
-
-  return result;
+  return [...empenhos, ...descentralizacoes, ...requisicoes]
+    .sort((a, b) => b.date.getTime() - a.date.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .slice(0, maxTotal);
 }
 
 function formatNotificationDate(date: Date): string {
@@ -204,19 +182,19 @@ export function NotificationCenter({
 
   // Consolidar empenhos, descentralizações e requisições enviadas ao fornecedor (máx 20 eventos)
   const allNotifications = useMemo<NotificationItem[]>(() => {
-    // 1. Mapear e ordenar descentralizações decrescentemente pela data oficial de emissão (as mais recentes primeiro)
-    const sortedDescentralizacoes: NotificationItem[] = descentralizacoes
+    // A data de emissão prevalece sobre a data de importação no sistema.
+    const descentralizacaoEvents: NotificationItem[] = descentralizacoes
       .map((d) => {
-        const docDate = parseDate(d.dataEmissao || d.createdAt);
-        const createdDate = parseDate(d.createdAt || d.dataEmissao);
+        const docDate = parseDate(d.dataEmissao);
+        const createdDate = parseDate(d.createdAt);
         const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
 
         return {
-          id: `desc-${d.id || d.notaCredito || Math.random().toString()}`,
+          id: `desc-${d.id || d.notaCredito || [d.dataEmissao, d.origemRecurso, d.planoInterno, d.valor, d.descricao].join('|')}`,
           type: 'descentralizacao' as const,
           date: effectiveDate,
           createdAt: createdDate,
-          documentDate: docDate,
+          documentDate: effectiveDate,
           title: d.notaCredito ? `Descentralização ${d.notaCredito}` : 'Descentralização de Crédito',
           subtitle: d.origemRecurso ? `Origem: ${d.origemRecurso}` : 'Origem não informada',
           description: d.descricao || (d.planoInterno ? `PI: ${d.planoInterno}` : ''),
@@ -225,23 +203,12 @@ export function NotificationCenter({
           origem: d.origemRecurso,
           raw: d,
         };
-      })
-      .sort((a, b) => {
-        const dateDiff = b.date.getTime() - a.date.getTime();
-        if (dateDiff !== 0) return dateDiff;
-        const numA = extractDocNumber(a.raw.notaCredito);
-        const numB = extractDocNumber(b.raw.notaCredito);
-        if (numA !== 0 && numB !== 0 && numA !== numB) {
-          return numB - numA;
-        }
-        return b.createdAt.getTime() - a.createdAt.getTime();
       });
 
-    // 2. Mapear e ordenar empenhos pelos últimos emitidos (maior número sequencial de NE primeiro)
-    const sortedEmpenhos: NotificationItem[] = empenhos
+    const empenhoEvents: NotificationItem[] = empenhos
       .map((e) => {
-        const docDate = parseDate(e.dataEmpenho || e.createdAt);
-        const createdDate = parseDate(e.createdAt || e.dataEmpenho);
+        const docDate = parseDate(e.dataEmpenho);
+        const createdDate = parseDate(e.createdAt);
         const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
 
         return {
@@ -249,7 +216,7 @@ export function NotificationCenter({
           type: 'empenho' as const,
           date: effectiveDate,
           createdAt: createdDate,
-          documentDate: docDate,
+          documentDate: effectiveDate,
           title: `Empenho ${e.numero}`,
           subtitle: e.favorecidoNome || 'Favorecido não informado',
           description: e.descricao || '',
@@ -258,24 +225,13 @@ export function NotificationCenter({
           status: e.status || 'pendente',
           raw: e,
         };
-      })
-      .sort((a, b) => {
-        const numA = extractDocNumber(a.raw.numero);
-        const numB = extractDocNumber(b.raw.numero);
-        if (numA !== 0 && numB !== 0 && numA !== numB) {
-          return numB - numA;
-        }
-        const dateDiff = b.date.getTime() - a.date.getTime();
-        if (dateDiff !== 0) return dateDiff;
-        return b.createdAt.getTime() - a.createdAt.getTime();
       });
 
-    // 3. Mapear e ordenar requisições de compra com status 'enviada_fornecedor' (ou review/approved)
-    const sortedRequisicoes: NotificationItem[] = requisicoes
+    const requisicaoEvents: NotificationItem[] = requisicoes
       .filter((r) => r.status === 'enviada_fornecedor' || r.status === 'review' || r.status === 'approved')
       .map((r) => {
-        const docDate = parseDate(r.updatedAt || r.createdAt);
-        const createdDate = parseDate(r.createdAt || r.updatedAt);
+        const docDate = parseDate(r.updatedAt);
+        const createdDate = parseDate(r.createdAt);
         const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
 
         const empenhoLabels = r.empenhos?.length
@@ -287,7 +243,7 @@ export function NotificationCenter({
           type: 'requisicao' as const,
           date: effectiveDate,
           createdAt: createdDate,
-          documentDate: docDate,
+          documentDate: effectiveDate,
           title: r.number ? `Requisição ${r.number}` : 'Requisição de Compra',
           subtitle: r.createdByEmail ? `Criador: ${r.createdByEmail}` : 'Enviada ao Fornecedor',
           description: r.title || (empenhoLabels ? `Empenho(s): ${empenhoLabels}` : (r.contratoNumero ? `Contrato: ${r.contratoNumero}` : '')),
@@ -295,15 +251,10 @@ export function NotificationCenter({
           status: r.status,
           raw: r,
         };
-      })
-      .sort((a, b) => {
-        const dateDiff = b.date.getTime() - a.date.getTime();
-        if (dateDiff !== 0) return dateDiff;
-        return b.createdAt.getTime() - a.createdAt.getTime();
       });
 
-    // 4. Intercalar os últimos eventos (requisições, descentralizações e empenhos)
-    return interleaveEvents(sortedEmpenhos, sortedDescentralizacoes, sortedRequisicoes, MAX_EVENTS);
+    // Selecionar os mais recentes somente depois de ordenar todas as categorias.
+    return sortNotificationEvents(empenhoEvents, descentralizacaoEvents, requisicaoEvents, MAX_EVENTS);
   }, [empenhos, descentralizacoes, requisicoes]);
 
   // Contagem de itens não lidos dentre os últimos eventos
@@ -406,7 +357,7 @@ export function NotificationCenter({
             )}
           </div>
 
-          {/* Lista Unificada e Intercalada de Notificações */}
+          {/* Lista cronológica de notificações */}
           <ScrollArea className="max-h-[390px] overflow-y-auto pl-2 pr-3.5 py-2">
             {allNotifications.length === 0 ? (
               <div className="py-8 text-center px-4 space-y-2">

@@ -223,7 +223,10 @@ export async function fetchEmpenhos(
 function parseNotificationDate(value: Date | string | number | undefined | null): Date {
   if (!value) return new Date(0);
   if (value instanceof Date) return isNaN(value.getTime()) ? new Date(0) : value;
-  if (typeof value === 'number') return new Date(value);
+  if (typeof value === 'number') {
+    const parsed = new Date(value);
+    return isNaN(parsed.getTime()) ? new Date(0) : parsed;
+  }
 
   if (typeof value === 'string') {
     const trimmed = value.trim();
@@ -251,40 +254,15 @@ function parseNotificationDate(value: Date | string | number | undefined | null)
   return isNaN(d.getTime()) ? new Date(0) : d;
 }
 
-function extractDocNumber(numero?: string | null): number {
-  if (!numero) return 0;
-  const match = numero.match(/(\d{4})[A-Za-z]+(\d+)/);
-  if (match) {
-    const year = parseInt(match[1], 10);
-    const seq = parseInt(match[2], 10);
-    return year * 10_000_000 + seq;
-  }
-  const digits = numero.replace(/\D/g, '');
-  return digits ? parseInt(digits, 10) : 0;
-}
-
-export function interleaveEvents(
+export function sortNotificationEvents(
   empenhos: NotificationItem[],
   descentralizacoes: NotificationItem[],
   requisicoes: NotificationItem[] = [],
   maxTotal = 60
 ): NotificationItem[] {
-  const result: NotificationItem[] = [];
-  const maxLen = Math.max(empenhos.length, descentralizacoes.length, requisicoes.length);
-
-  for (let i = 0; i < maxLen && result.length < maxTotal; i++) {
-    if (requisicoes[i] && result.length < maxTotal) {
-      result.push(requisicoes[i]);
-    }
-    if (descentralizacoes[i] && result.length < maxTotal) {
-      result.push(descentralizacoes[i]);
-    }
-    if (empenhos[i] && result.length < maxTotal) {
-      result.push(empenhos[i]);
-    }
-  }
-
-  return result;
+  return [...empenhos, ...descentralizacoes, ...requisicoes]
+    .sort((a, b) => b.date.getTime() - a.date.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .slice(0, maxTotal);
 }
 
 export async function fetchNotifications(
@@ -320,17 +298,17 @@ export async function fetchNotifications(
     ]);
 
     // Mapear descentralizações
-    const sortedDescentralizacoes: NotificationItem[] = (descRes.data || [])
+    const descentralizacaoEvents: NotificationItem[] = (descRes.data || [])
       .map((d: any) => {
-        const docDate = parseNotificationDate(d.data_emissao || d.created_at);
-        const createdDate = parseNotificationDate(d.created_at || d.data_emissao);
+        const docDate = parseNotificationDate(d.data_emissao);
+        const createdDate = parseNotificationDate(d.created_at);
         const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
 
         return {
           id: `desc-${d.id || d.nota_credito}`,
           type: 'descentralizacao' as const,
           date: effectiveDate,
-          documentDate: docDate,
+          documentDate: effectiveDate,
           title: d.nota_credito ? `Descentralização ${d.nota_credito}` : 'Descentralização de Crédito',
           subtitle: d.origem_recurso ? `Origem: ${d.origem_recurso}` : 'Origem não informada',
           description: d.descricao || (d.plano_interno ? `PI: ${d.plano_interno}` : ''),
@@ -339,27 +317,20 @@ export async function fetchNotifications(
           status: 'NC',
           numeroDocumento: d.nota_credito,
         };
-      })
-      .sort((a, b) => {
-        const dateDiff = b.date.getTime() - a.date.getTime();
-        if (dateDiff !== 0) return dateDiff;
-        const numA = extractDocNumber(a.numeroDocumento);
-        const numB = extractDocNumber(b.numeroDocumento);
-        return numB - numA;
       });
 
     // Mapear empenhos
-    const sortedEmpenhos: NotificationItem[] = (empenhosRes.data || [])
+    const empenhoEvents: NotificationItem[] = (empenhosRes.data || [])
       .map((e: any) => {
-        const docDate = parseNotificationDate(e.data_empenho || e.created_at);
-        const createdDate = parseNotificationDate(e.created_at || e.data_empenho);
+        const docDate = parseNotificationDate(e.data_empenho);
+        const createdDate = parseNotificationDate(e.created_at);
         const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
 
         return {
           id: `emp-${e.id || e.numero}`,
           type: 'empenho' as const,
           date: effectiveDate,
-          documentDate: docDate,
+          documentDate: effectiveDate,
           title: `Empenho ${e.numero}`,
           subtitle: e.favorecido_nome || 'Favorecido não informado',
           description: e.descricao || '',
@@ -368,21 +339,13 @@ export async function fetchNotifications(
           status: e.status || 'pendente',
           numeroDocumento: e.numero,
         };
-      })
-      .sort((a, b) => {
-        const numA = extractDocNumber(a.numeroDocumento);
-        const numB = extractDocNumber(b.numeroDocumento);
-        if (numA !== 0 && numB !== 0 && numA !== numB) {
-          return numB - numA;
-        }
-        return b.date.getTime() - a.date.getTime();
       });
 
     // Mapear requisições
-    const sortedRequisicoes: NotificationItem[] = (reqRes.data || [])
+    const requisicaoEvents: NotificationItem[] = (reqRes.data || [])
       .map((r: any) => {
-        const docDate = parseNotificationDate(r.updated_at || r.created_at);
-        const createdDate = parseNotificationDate(r.created_at || r.updated_at);
+        const docDate = parseNotificationDate(r.updated_at);
+        const createdDate = parseNotificationDate(r.created_at);
         const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
 
         const totalValor = (r.requisicao_compra_itens || []).reduce(
@@ -394,7 +357,7 @@ export async function fetchNotifications(
           id: `req-${r.id || r.number}`,
           type: 'requisicao' as const,
           date: effectiveDate,
-          documentDate: docDate,
+          documentDate: effectiveDate,
           title: r.number ? `Requisição ${r.number}` : 'Requisição de Compra',
           subtitle: r.created_by_email ? `Criador: ${r.created_by_email}` : 'Enviada ao Fornecedor',
           description: r.title || '',
@@ -402,10 +365,9 @@ export async function fetchNotifications(
           status: 'enviada_fornecedor',
           numeroDocumento: r.number,
         };
-      })
-      .sort((a, b) => b.date.getTime() - a.date.getTime());
+      });
 
-    return interleaveEvents(sortedEmpenhos, sortedDescentralizacoes, sortedRequisicoes, 60);
+    return sortNotificationEvents(empenhoEvents, descentralizacaoEvents, requisicaoEvents, 60);
   } catch (err) {
     // Notificações são complementares: em falha o sino fica vazio (nunca exibimos avisos fictícios).
     console.warn('Erro ao buscar notificações do backend:', err);

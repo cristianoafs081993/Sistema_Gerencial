@@ -143,6 +143,10 @@ Usado em modulos com IA ou integracoes externas:
 
 ## Camada 3: services
 
+### Central de notificações
+
+O `NotificationCenter` recebe empenhos e descentralizações do `DataContext` e consulta requisições de compra pelo service próprio. A lista une os três tipos, ordena pela data decrescente e só então seleciona os 20 eventos mais recentes, sem alternância ou prioridade por categoria/número do documento. Empenhos usam `dataEmpenho`, descentralizações usam `dataEmissao` e requisições enviadas ao fornecedor (`enviada_fornecedor`, `review`, `approved`) usam `updatedAt`. Se a data principal estiver ausente ou inválida, usa `createdAt`; sem data válida, o evento fica no final e mostra `-`. A data exibida acompanha a usada na ordenação. Datas iguais são desempatadas pelo identificador em ordem crescente, para manter estabilidade após recargas. Importar um documento antigo não o promove se a emissão for válida. Não há expiração por idade; o indicador de leitura e a persistência do último instante lido continuam usando a data efetiva.
+
 Os services em [src/services](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services) fazem:
 
 - query em tabela ou view do Supabase

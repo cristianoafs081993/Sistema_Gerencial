@@ -46,6 +46,10 @@ Arquivos: `src/contexts/AuthContext.tsx` (estado da sessão), `src/screens/Login
 
 ## Telas Implementadas
 
+### Notificações
+
+O sino reúne até 20 registros consultados por categoria (empenhos, descentralizações e requisições enviadas ao fornecedor), com limite total de 60. `fetchNotifications` em `mobile/src/services/api.ts` ordena a lista unificada pela data decrescente, sem rodízio por categoria nem prioridade pelo número. A regra acompanha a web: data de emissão para empenhos e descentralizações, última atualização para requisições; data de criação como fallback se a principal estiver ausente ou inválida. Sem data válida, o evento fica no final e mostra `-`. Datas iguais são desempatadas pelo identificador crescente, e a data exibida acompanha a ordenação. Não há expiração por idade. Os filtros existentes de campus, exercício, cancelamento e status de requisição permanecem nas consultas. Regressões com Supabase simulado: `src/test/mobile-notifications.test.ts`.
+
 1. **Dashboard (Visão Geral - 01)**:
    - Saudação com o nome do usuário logado e filtro por **PTRES / origem de recurso** (recalcula todo o painel). A lista de PTRES vem dos dados reais (atividades, empenhos, descentralizações e crédito), com os principais primeiro.
    - Card **Planejado** (gradiente azul-céu): valor, atividades, % executado, barra de descentralização e os totais Descentralizado / A descentralizar.

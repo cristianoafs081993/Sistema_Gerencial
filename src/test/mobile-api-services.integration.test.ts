@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { fetchEmpenhos, fetchNotifications, interleaveEvents } from '../../mobile/src/services/api';
+import { fetchEmpenhos, fetchNotifications, sortNotificationEvents } from '../../mobile/src/services/api';
 import { fetchContratos } from '../../mobile/src/services/contratos';
 import { fetchDashboard } from '../../mobile/src/services/dashboard';
 import type { NotificationItem } from '../../mobile/src/types';
@@ -60,16 +60,20 @@ describe('SIAGES Mobile — integração com o backend (dados reais)', () => {
     }
   }, TIMEOUT);
 
-  it('notificações: lista ordenável e sem itens fictícios quando não há eventos', async () => {
+  it('notificações: lista cronológica e sem itens fictícios quando não há eventos', async () => {
     const notificacoes = await fetchNotifications(CAMPUS);
 
     expect(Array.isArray(notificacoes)).toBe(true);
     for (const item of notificacoes) {
       expect(item.date).toBeInstanceOf(Date);
     }
+    expect(notificacoes.length).toBeLessThanOrEqual(60);
+    for (let i = 1; i < notificacoes.length; i++) {
+      expect(notificacoes[i - 1].date.getTime()).toBeGreaterThanOrEqual(notificacoes[i].date.getTime());
+    }
   }, TIMEOUT);
 
-  it('intercala eventos em rodízio respeitando o limite máximo', () => {
+  it('ordena eventos por data respeitando o limite máximo', () => {
     const criar = (prefixo: string, total: number): NotificationItem[] =>
       Array.from({ length: total }, (_, i) => ({
         id: `${prefixo}-${i}`,
@@ -80,8 +84,9 @@ describe('SIAGES Mobile — integração com o backend (dados reais)', () => {
         description: '',
       })) as NotificationItem[];
 
-    const resultado = interleaveEvents(criar('e', 30), criar('d', 30), criar('r', 30), 10);
+    const resultado = sortNotificationEvents(criar('e', 30), criar('d', 30), criar('r', 30), 10);
 
     expect(resultado).toHaveLength(10);
+    expect(resultado[0].date).toEqual(new Date(2026, 0, 30));
   });
 });

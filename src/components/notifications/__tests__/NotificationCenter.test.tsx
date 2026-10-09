@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationCenter, type NotificationCenterProps } from '../NotificationCenter';
 import type { Empenho, Descentralizacao, Atividade, RequisicaoCompraRecord } from '@/types';
 
@@ -88,6 +88,7 @@ const mockRequisicoes: RequisicaoCompraRecord[] = [
     contratoNumero: '00329/2025',
     processNumber: '23035.000001/2026-01',
     notes: 'Pedido enviado',
+    items: [],
     totalValue: 3500.0,
     createdAt: new Date('2026-08-20T10:00:00.000Z'),
     updatedAt: new Date('2026-08-20T10:00:00.000Z'),
@@ -103,6 +104,7 @@ const mockRequisicoes: RequisicaoCompraRecord[] = [
     empenhoNumero: '2026NE000102',
     empenhos: [{ empenhoId: 'emp-2', empenhoNumero: '2026NE000102', sortOrder: 0 }],
     notes: 'Rascunho',
+    items: [],
     totalValue: 1200.0,
     createdAt: new Date('2026-08-21T10:00:00.000Z'),
     updatedAt: new Date('2026-08-21T10:00:00.000Z'),
@@ -120,7 +122,7 @@ function renderComponent(props: NotificationCenterProps = {}) {
     },
   });
 
-  return render(
+  const tree = (notificationProps: NotificationCenterProps) => (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
         <NotificationCenter
@@ -128,14 +130,21 @@ function renderComponent(props: NotificationCenterProps = {}) {
           descentralizacoes={mockDescentralizacoes}
           atividades={mockAtividades}
           requisicoesCompra={mockRequisicoes}
-          {...props}
+          {...notificationProps}
         />
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const result = render(tree(props));
+  return { ...result, rerenderNotifications: (next: NotificationCenterProps) => result.rerender(tree(next)) };
+}
+
+function notificationTitles() {
+  return screen.getAllByText(/^(Empenho \S+|Descentralização \S+|Requisição \S+)$/).map((item) => item.textContent);
 }
 
 describe('NotificationCenter', () => {
+  afterEach(() => vi.restoreAllMocks());
   beforeEach(() => {
     localStorage.clear();
     mockNavigate.mockReset();
@@ -259,5 +268,91 @@ describe('NotificationCenter', () => {
     fireEvent.click(screen.getByTitle('Marcar todas como lidas'));
 
     expect(screen.queryByTestId('notification-unread-badge')).not.toBeInTheDocument();
+  });
+
+  it('ordena os três tipos por data, sem promover documentos antigos importados recentemente', () => {
+    const oldRequisicao = { ...mockRequisicoes[0], updatedAt: new Date('2026-07-01'), createdAt: new Date('2026-07-01') };
+    renderComponent({ requisicoesCompra: [oldRequisicao] });
+    fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
+
+    expect(notificationTitles()).toEqual([
+      'Empenho 2026NE000102',
+      'Descentralização 2026NC000045',
+      'Empenho 2026NE000101',
+      'Requisição REQ-2026-0001',
+    ]);
+  });
+
+  it('a data prevalece sobre o número sequencial do empenho', () => {
+    renderComponent({
+      empenhos: [{ ...mockEmpenhos[0], numero: '2026NE999999' }, mockEmpenhos[1]],
+      descentralizacoes: [], requisicoesCompra: [],
+    });
+    fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
+    expect(notificationTitles()).toEqual(['Empenho 2026NE000102', 'Empenho 2026NE999999']);
+  });
+
+  it('aplica o limite depois de ordenar todas as categorias', () => {
+    const recentes = Array.from({ length: 20 }, (_, i) => ({
+      ...mockEmpenhos[0], id: `recent-${i}`, numero: `2026NE${String(i).padStart(6, '0')}`,
+      dataEmpenho: new Date(2026, 8, i + 1),
+    }));
+    renderComponent({ empenhos: recentes });
+    fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
+    expect(notificationTitles()).toHaveLength(20);
+    expect(screen.getByText('Empenho 2026NE000000')).toBeInTheDocument();
+    expect(screen.getByText('Empenho 2026NE000019')).toBeInTheDocument();
+    expect(screen.queryByText('Requisição REQ-2026-0001')).not.toBeInTheDocument();
+    expect(screen.queryByText('Descentralização 2026NC000045')).not.toBeInTheDocument();
+  });
+
+  it('desempata pelo identificador mesmo se a ordem de entrada mudar', () => {
+    const sameDate = new Date('2026-08-10T14:30:00Z');
+    const a = { ...mockEmpenhos[0], id: 'a', dataEmpenho: sameDate };
+    const b = { ...mockEmpenhos[1], id: 'b', dataEmpenho: sameDate };
+    const props = { empenhos: [b, a], descentralizacoes: [], requisicoesCompra: [] };
+    const view = renderComponent(props);
+    fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
+    expect(notificationTitles()).toEqual(['Empenho 2026NE000101', 'Empenho 2026NE000102']);
+    view.rerenderNotifications({ ...props, empenhos: [a, b] });
+    expect(notificationTitles()).toEqual(['Empenho 2026NE000101', 'Empenho 2026NE000102']);
+  });
+
+  it.each([undefined, new Date('inválida')])('usa criação quando a data principal é ausente ou inválida (%s)', (invalidDate) => {
+    renderComponent({
+      empenhos: [{ ...mockEmpenhos[0], dataEmpenho: invalidDate, createdAt: new Date('2026-08-18T12:00:00Z') }],
+      descentralizacoes: [{ ...mockDescentralizacoes[0], dataEmissao: invalidDate, createdAt: new Date('2026-08-19T12:00:00Z') }],
+      requisicoesCompra: [{ ...mockRequisicoes[0], updatedAt: invalidDate, createdAt: new Date('2026-08-20T12:00:00Z') }],
+    });
+    fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
+    expect(notificationTitles()).toEqual([
+      'Requisição REQ-2026-0001', 'Descentralização 2026NC000045', 'Empenho 2026NE000101',
+    ]);
+    expect(screen.getByText('18/08/2026')).toBeInTheDocument();
+    expect(screen.getByText('19/08/2026')).toBeInTheDocument();
+    expect(screen.getByText('20/08/2026')).toBeInTheDocument();
+  });
+
+  it('coloca eventos sem nenhuma data válida no final', () => {
+    renderComponent({
+      empenhos: [mockEmpenhos[1], { ...mockEmpenhos[0], dataEmpenho: new Date('inválida'), createdAt: new Date('inválida') }],
+      descentralizacoes: [], requisicoesCompra: [],
+    });
+    fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
+    expect(notificationTitles()).toEqual(['Empenho 2026NE000102', 'Empenho 2026NE000101']);
+    expect(screen.getByText('-')).toBeInTheDocument();
+  });
+
+  it('um novo evento sobe ao topo após a leitura sem tornar antigos não lidos', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-08-21T12:00:00Z').getTime());
+    const view = renderComponent();
+    fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
+    fireEvent.click(screen.getByTitle('Marcar todas como lidas'));
+    expect(screen.queryByTestId('notification-unread-badge')).not.toBeInTheDocument();
+    const novo = { ...mockEmpenhos[0], id: 'novo', numero: '2026NE000103', dataEmpenho: new Date('2026-08-22T12:00:00Z') };
+    view.rerenderNotifications({ empenhos: [...mockEmpenhos, novo] });
+    expect(notificationTitles()[0]).toBe('Empenho 2026NE000103');
+    expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('1');
+    expect(localStorage.getItem('siages-notifications-last-read')).toBe(String(Date.now()));
   });
 });
