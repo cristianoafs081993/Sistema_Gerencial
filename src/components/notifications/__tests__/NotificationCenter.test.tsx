@@ -292,6 +292,39 @@ describe('NotificationCenter', () => {
     expect(notificationTitles()).toEqual(['Empenho 2026NE000102', 'Empenho 2026NE999999']);
   });
 
+  it('usa a entrada do empenho SIAFI com emissão provisória, sem promover sincronizações seguintes', () => {
+    localStorage.setItem('siages-notifications-last-read', String(new Date('2026-10-09T12:00:00Z').getTime()));
+    renderComponent({
+      empenhos: [{
+        ...mockEmpenhos[0],
+        dataEmpenho: new Date('2026-01-01T00:00:00Z'),
+        createdAt: new Date('2026-10-09T10:55:04Z'),
+        updatedAt: new Date('2026-10-13T12:00:00Z'),
+        ultimaAtualizacaoSiafi: new Date('2026-10-13T03:00:00Z'),
+      }],
+      descentralizacoes: [{ ...mockDescentralizacoes[0], dataEmissao: new Date('2026-10-08T12:00:00Z') }],
+      requisicoesCompra: [{ ...mockRequisicoes[0], updatedAt: new Date('2026-10-01T17:20:10Z') }],
+    });
+    fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
+    expect(notificationTitles()).toEqual([
+      'Empenho 2026NE000101', 'Descentralização 2026NC000045', 'Requisição REQ-2026-0001',
+    ]);
+    expect(screen.getByText('09/10/2026')).toBeInTheDocument();
+    expect(screen.queryByTestId('notification-unread-badge')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { dataEmpenho: new Date('2026-01-01T00:00:00Z'), ultimaAtualizacaoSiafi: undefined },
+    { dataEmpenho: new Date('2026-01-02T00:00:00Z'), ultimaAtualizacaoSiafi: new Date('2026-10-13') },
+  ])('preserva a emissão real ou manual em janeiro (%s)', (janeiro) => {
+    renderComponent({
+      empenhos: [{ ...mockEmpenhos[0], ...janeiro, createdAt: new Date('2026-10-09') }, mockEmpenhos[1]],
+      descentralizacoes: [], requisicoesCompra: [],
+    });
+    fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
+    expect(notificationTitles()).toEqual(['Empenho 2026NE000102', 'Empenho 2026NE000101']);
+  });
+
   it('aplica o limite depois de ordenar todas as categorias', () => {
     const recentes = Array.from({ length: 20 }, (_, i) => ({
       ...mockEmpenhos[0], id: `recent-${i}`, numero: `2026NE${String(i).padStart(6, '0')}`,

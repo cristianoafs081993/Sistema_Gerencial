@@ -269,15 +269,28 @@ export async function fetchNotifications(
   campusUasg = DEFAULT_CAMPUS_UASG
 ): Promise<NotificationItem[]> {
   try {
-    const [empenhosRes, descRes, reqRes] = await Promise.all([
+    const empenhoColumns = 'id, numero, valor, data_empenho, favorecido_nome, status, dimensao, descricao, created_at, ultima_atualizacao_siafi';
+    const [empenhosRes, newEmpenhosRes, descRes, reqRes] = await Promise.all([
       // 1. Empenhos do exercício mais recentes
       supabase
         .from('empenhos')
-        .select('id, numero, valor, data_empenho, favorecido_nome, status, dimensao, descricao, created_at')
+        .select(empenhoColumns)
         .eq('campus_uasg', campusUasg)
         .eq('tipo', 'exercicio')
         .neq('status', 'cancelado')
-        .order('data_empenho', { ascending: false })
+        .order('data_empenho', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: true })
+        .limit(20),
+
+      // Incluir entradas recentes cuja emissão esteja ausente ou seja provisória.
+      supabase
+        .from('empenhos')
+        .select(empenhoColumns)
+        .eq('campus_uasg', campusUasg)
+        .eq('tipo', 'exercicio')
+        .neq('status', 'cancelado')
+        .order('created_at', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: true })
         .limit(20),
 
       // 2. Descentralizações mais recentes
@@ -320,11 +333,18 @@ export async function fetchNotifications(
       });
 
     // Mapear empenhos
-    const empenhoEvents: NotificationItem[] = (empenhosRes.data || [])
+    const empenhoRows = [...new Map(
+      [...(empenhosRes.data || []), ...(newEmpenhosRes.data || [])]
+        .map((e) => [e.id || e.numero, e] as const),
+    ).values()];
+    const empenhoEvents: NotificationItem[] = empenhoRows
       .map((e: any) => {
         const docDate = parseNotificationDate(e.data_empenho);
         const createdDate = parseNotificationDate(e.created_at);
-        const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
+        const isSiafiPlaceholder = Boolean(e.ultima_atualizacao_siafi)
+          && /^\d{4}NE\d+$/i.test(e.numero || '')
+          && docDate.toISOString().slice(0, 10) === `${e.numero.slice(0, 4)}-01-01`;
+        const effectiveDate = docDate.getTime() > 0 && !isSiafiPlaceholder ? docDate : createdDate;
 
         return {
           id: `emp-${e.id || e.numero}`,
@@ -367,7 +387,8 @@ export async function fetchNotifications(
         };
       });
 
-    return sortNotificationEvents(empenhoEvents, descentralizacaoEvents, requisicaoEvents, 60);
+    const recentEmpenhos = sortNotificationEvents(empenhoEvents, [], [], 20);
+    return sortNotificationEvents(recentEmpenhos, descentralizacaoEvents, requisicaoEvents, 60);
   } catch (err) {
     // Notificações são complementares: em falha o sino fica vazio (nunca exibimos avisos fictícios).
     console.warn('Erro ao buscar notificações do backend:', err);

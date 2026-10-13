@@ -11,15 +11,27 @@ vi.mock('../../mobile/src/lib/supabase', () => ({
   supabase: {
     from: (table: string) => {
       const builder: Record<string, unknown> = {};
+      const orders: { column: string; ascending: boolean }[] = [];
       for (const method of ['select', 'eq', 'neq', 'in', 'order']) {
         builder[method] = (...args: unknown[]) => {
           calls.push({ table, method, args });
+          if (method === 'order') orders.push({ column: args[0] as string, ...(args[1] as { ascending: boolean }) });
           return builder;
         };
       }
       builder.limit = (limit: number) => {
         calls.push({ table, method: 'limit', args: [limit] });
-        return Promise.resolve({ data: (tables.get(table) ?? []).slice(0, limit), error: null });
+        const rows = [...(tables.get(table) ?? [])].sort((a, b) => {
+          for (const { column, ascending } of orders) {
+            if (a[column] === b[column]) continue;
+            if (a[column] == null) return 1;
+            if (b[column] == null) return -1;
+            const diff = String(a[column]) < String(b[column]) ? -1 : 1;
+            return ascending ? diff : -diff;
+          }
+          return 0;
+        });
+        return Promise.resolve({ data: rows.slice(0, limit), error: null });
       };
       return builder;
     },
@@ -104,7 +116,7 @@ describe('mobile — notificações cronológicas', () => {
     for (const type of ['empenho', 'descentralizacao', 'requisicao']) {
       expect(result.filter((n) => n.type === type)).toHaveLength(20);
     }
-    expect(calls.filter((c) => c.method === 'limit').map((c) => c.args)).toEqual([[20], [20], [20]]);
+    expect(calls.filter((c) => c.method === 'limit').map((c) => c.args)).toEqual([[20], [20], [20], [20]]);
     expect(calls).toEqual(expect.arrayContaining([
       { table: 'empenhos', method: 'eq', args: ['campus_uasg', '158367'] },
       { table: 'descentralizacoes', method: 'eq', args: ['campus_uasg', '158367'] },
@@ -115,6 +127,37 @@ describe('mobile — notificações cronológicas', () => {
     expect(result.slice(0, 20).every((n) => n.type === 'empenho')).toBe(true);
     expect(result.slice(20, 40).every((n) => n.type === 'descentralizacao')).toBe(true);
     expect(result.slice(40).every((n) => n.type === 'requisicao')).toBe(true);
+  });
+
+  it('inclui entrada SIAFI recente além dos 20 candidatos por emissão, sem duplicar ou superar o limite', async () => {
+    const antigos = Array.from({ length: 25 }, (_, i) => ({
+      id: `old-${i}`, numero: `2026NE${String(i).padStart(6, '0')}`,
+      data_empenho: '2026-02-24', created_at: '2026-02-27T11:17:00Z',
+    }));
+    const novo = {
+      id: 'new', numero: '2026NE000101', data_empenho: '2026-01-01',
+      created_at: '2026-10-09T10:55:04Z', ultima_atualizacao_siafi: '2026-10-13T03:00:00Z',
+    };
+    tables.set('empenhos', [...antigos, novo]);
+    tables.set('descentralizacoes', [{ id: 'nc', data_emissao: '2026-10-08' }]);
+    tables.set('requisicoes_compra', [{ id: 'req', updated_at: '2026-10-01' }]);
+    const result = await fetchNotifications();
+    expect(result.slice(0, 3).map((n) => n.id)).toEqual(['emp-new', 'desc-nc', 'req-req']);
+    expect(result[0].date).toEqual(new Date(novo.created_at));
+    expect(result[0].documentDate).toEqual(new Date(novo.created_at));
+    expect(result.filter((n) => n.type === 'empenho')).toHaveLength(20);
+    expect(new Set(result.map((n) => n.id)).size).toBe(result.length);
+    const selects = calls.filter((c) => c.table === 'empenhos' && c.method === 'select');
+    expect(selects.every((c) => String(c.args[0]).includes('ultima_atualizacao_siafi'))).toBe(true);
+  });
+
+  it('emissão real de janeiro e datas manuais não são promovidas pela entrada recente', async () => {
+    tables.set('empenhos', [
+      { id: 'manual', numero: '2026NE000001', data_empenho: '2026-01-01', created_at: '2026-10-09' },
+      { id: 'real', numero: '2026NE000002', data_empenho: '2026-01-02', created_at: '2026-10-09', ultima_atualizacao_siafi: '2026-10-13' },
+    ]);
+    tables.set('descentralizacoes', [{ id: 'nc', data_emissao: '2026-10-08' }]);
+    expect((await fetchNotifications()).map((n) => n.id)).toEqual(['desc-nc', 'emp-real', 'emp-manual']);
   });
 
   it('o limite padrão do helper mantém apenas os 60 mais recentes', () => {

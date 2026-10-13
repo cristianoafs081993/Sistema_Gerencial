@@ -25,6 +25,8 @@ Testes de regressao sao prioridade para qualquer mudanca que altere comportament
 
 Central de notificações (web e mobile): `NotificationCenter.test.tsx` e `mobile-notifications.test.ts` protegem ordenação cronológica entre categorias, prioridade de emissão sobre importação/número, limite aplicado após a ordenação, desempates estáveis e fallback de datas. A suíte web também verifica novos eventos após marcar todos como lidos e mantém as regressões de navegação; a suíte mobile usa Supabase simulado para preservar filtros, 20 registros por categoria e limite total de 60. A integração opcional `mobile-api-services.integration.test.ts` verifica ordem decrescente e limite com dados reais.
 
+A regressão de 13/10 cobre emissão provisória SIAFI (`YYYY-01-01` + ano da NE + marca de sincronização): ordenar/exibir pela criação sem renovar a leitura em sincronizações de saldo. Datas manuais de 1º de janeiro e outras emissões reais permanecem prioritárias. O mock mobile respeita ordenação e limite do servidor, garantindo que uma entrada recente fora dos 20 candidatos por emissão seja recuperada pela consulta por criação, deduplicada e incluída entre os 20 empenhos finais.
+
 Use testes unitarios para regras puras, normalizadores, parsers, formatadores, filtros, calculos e funcoes utilitarias.
 
 Use testes de integracao para validar contratos entre componentes e camadas, especialmente quando a mudanca atravessar pagina, dialog, service, contexto de dados, cliente Supabase, Edge Function, parser ou tabela/view de destino.

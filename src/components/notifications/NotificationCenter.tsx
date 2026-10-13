@@ -209,7 +209,11 @@ export function NotificationCenter({
       .map((e) => {
         const docDate = parseDate(e.dataEmpenho);
         const createdDate = parseDate(e.createdAt);
-        const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
+        // O CSV SIAFI sem emissão cadastra YYYY-01-01 como data provisória.
+        const isSiafiPlaceholder = Boolean(e.ultimaAtualizacaoSiafi)
+          && /^\d{4}NE\d+$/i.test(e.numero)
+          && docDate.toISOString().slice(0, 10) === `${e.numero.slice(0, 4)}-01-01`;
+        const effectiveDate = docDate.getTime() > 0 && !isSiafiPlaceholder ? docDate : createdDate;
 
         return {
           id: `emp-${e.id || e.numero}`,
