@@ -1,10 +1,10 @@
 # Comprovantes de preenchimento no SIAFI
 
-Extensão SIAGES **1.9.70**. A captura funciona localmente no DH em `https://siafi.tesouro.gov.br`, sem login SIAGES, storage remoto, migration, Edge Function ou chamada a LLM. As injeções globais também ficam excluídas do login `acesso.gov.br`.
+Extensão SIAGES **1.9.71**. A captura funciona localmente no DH em `https://siafi.tesouro.gov.br`, sem login SIAGES ou chamada a LLM. Após capturar, a ação opcional **Conferir com IA** usa autenticação SIAGES, documentos autorizados e checklist persistido: [operação e contrato](SIAFI_CHECKLIST.md). As injeções globais também ficam excluídas do login `acesso.gov.br`.
 
 ## Uso
 
-1. Atualize/recarregue a extensão pelo pacote 1.9.70. Abra uma nova tela de DH após a atualização. Não recarregue uma tela com preenchimento ainda não registrado apenas para ativar a extensão.
+1. Atualize/recarregue a extensão pelo pacote 1.9.71. Abra uma nova tela de DH após a atualização. Não recarregue uma tela com preenchimento ainda não registrado apenas para ativar a extensão.
 2. Conclua a edição das listas e dos Dados Básicos no próprio SIAFI. Retorne de eventual pré-doc aberto.
 3. Abra a paleta com **Ctrl+K**, digite **print** e selecione **Capturar liquidação (PDF e JSON)** com **Enter**. A captura inicia imediatamente, incluindo os pré-docs preenchidos por padrão. O comando aparece somente em um DH SIAFI HTTPS reconhecido.
 4. Mantenha a aba SIAFI selecionada. A extensão percorre as abas e situações, expande os detalhes dos itens e aguarda o AJAX terminar. **Cancelar captura** interrompe a coleta e tenta restaurar a aba original.
@@ -22,9 +22,9 @@ Dados Básicos, Principal Com Orçamento e Dados de Pagamento são obrigatórios
 - `predocs[]`: controle/linha de origem, `sectionKey`, preenchimento e estado (`captured`, `missing`, `skipped`); quando capturado, recebe campos/tabelas/texto e referências de páginas.
 - Valores monetários, datas, documentos e classificações preservam o formato de origem, incluindo zeros à esquerda. Rótulos repetidos não sobrescrevem outros campos.
 - URL contém somente origem/caminho. Campos ocultos, senhas, ViewState e calendários ocultos não são exportados. Cookies, tokens e HTML bruto não integram os arquivos.
-- `analysis.status: "not_requested"`: sem avaliação automatizada nem envio à LLM; arquivo preparado para a integração posterior.
+- `analysis.status: "not_requested"`: estado do arquivo original da captura. A conferência opcional gera análise separada e mantém PDF/JSON originais inalterados.
 
-`complete` indica cobertura das abas planejadas e dos pré-docs identificados; não significa que os dados estejam corretos ou que o DH tenha sido registrado. `partial` sinaliza pré-doc ausente, exclusão voluntária dos pré-docs ou aba opcional indisponível. Falhas de captura/restauração não disponibilizam comprovante como concluído. DH sem número é identificado como em preenchimento no nome do arquivo. O JSON mantém a finalidade de conferência e informa que os dados não atestam registro, liquidação ou pagamento.
+`complete` indica cobertura das abas planejadas e dos pré-docs identificados; não significa que os dados estejam corretos ou que o DH tenha sido registrado. `partial` sinaliza pré-doc ausente, exclusão voluntária dos pré-docs ou aba opcional indisponível. Falhas de captura/restauração não disponibilizam comprovante como concluído. PDF e JSON são nomeados com o número do DH (`ano + tipo + número`, ex.: `2026NP000123`) e o nome do credor lido em `nomeCredorDevedor` da aba Dados Básicos, ex.: `2026NP000123 - EMPRESA LTDA.pdf`. Quando o credor é o Banco do Brasil (CNPJ `00000000000191`, bolsas pagas por lista PIX), o nome do banco é substituído pelo campo Processo de Dados Básicos (ou, na falta dele, pelo número de processo citado na Observação), ex.: `2026RP000050 - processo 23035.002988.2026-97.pdf`. Caracteres inválidos no Windows são removidos; sem credor, fica só o número. DH sem número é identificado como `NP em preenchimento` no nome do arquivo. O JSON mantém a finalidade de conferência e informa que os dados não atestam registro, liquidação ou pagamento.
 
 ## Implementação e operação
 

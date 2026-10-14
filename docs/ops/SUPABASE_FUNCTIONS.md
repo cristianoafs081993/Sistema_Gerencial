@@ -40,13 +40,16 @@ Chamador:
 
 Entrada esperada:
 
-- dados do processo
-- `nsNumero`
-- screenshots em `dataUrl`
+- modo estruturado: `action` prepare/start/status/retry/review, captura JSON e escopo/processo ou runId;
+- modo legado: processo identificado e screenshots em `dataUrl`; NS permanece apenas no fluxo antigo de conclusão;
+- JWT de usuário validado no handler; processo e fontes esperadas são obtidos no servidor.
 
 Saida:
 
-- objeto de analise com `statusGeral`, `resumo`, `recomendacao` e `itens`
+- modo estruturado: seleção ou runId, progresso e checklist 2.0.0, histórico e revisão humana;
+- legado: objeto com `statusGeral`, `resumo`, `recomendacao` e `itens`.
+
+Worker interno `analisar-liquidacao-siafi-worker` exige service role, claim exclusivo e execução em segundo plano. Migration `20261013140000`, deploy do worker antes do endpoint; ambos validam autenticação no handler (`verify_jwt=false`). [Contrato e limites](../integrations/SIAFI_CHECKLIST.md).
 
 Dependencias:
 

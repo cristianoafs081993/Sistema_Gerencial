@@ -13,6 +13,7 @@ const prefix = 'form_manterDocumentoHabil';
 const items = [ ['abaDadosBasicosId', 'Dados Básicos'], ['abaPrincipalComOrcamentoId', 'Principal Com Orçamento'], ['abaDeducaoId', 'Dedução'], ['abaDadosPagRecId', 'Dados de Pagamento'] ];
 let screenshots: ReturnType<typeof vi.fn>, confirm: ReturnType<typeof vi.fn>, drawImage: ReturnType<typeof vi.fn>;
 let multiSituation = false;
+let creditor = { code: '00000000000191', name: 'BANCO DO BRASIL SA' };
 function setup() {
   document.body.innerHTML = `<div id="divDH"><span id="${prefix}:ugEmitente_output">158366</span><span id="${prefix}:anoExercicioSiafi">2026</span><span id="${prefix}:codigoTipoDocHabil_outputText">RP</span><span id="${prefix}:numeroDocumentoHabil_outputText">-</span><div id="${prefix}:abasDocHabil">${items.map(([id,title])=>`<input type="button" id="${prefix}:${id}" value="${title}" class="btn-aba-dh${id==='abaDadosPagRecId'?' btn-aba-dh-selecionada':''}" ${id==='abaDadosPagRecId'?'disabled':''}>`).join('')}<div id="panel"></div></div><input type="button" id="${prefix}:btnRegistrar" value="Registrar"></div><div id="mpStatusContainer" style="display:none"></div><div id="${prefix}:modalPredocContainer" style="display:none"></div>`;
   function content(id: string) {
@@ -33,6 +34,8 @@ function setup() {
         for(const code of ['DSP061','DSP062'])document.getElementById(`${prefix}:${code}`)!.onclick=()=>{setTimeout(()=>renderSituation(code),300);};
       };
       renderSituation('DSP061');
+    } else if (id === 'abaDadosBasicosId') {
+      panel.innerHTML = `<label for="${id}:valor">Valor</label><input id="${id}:valor" value="4.000,00" disabled><label for="${prefix}:processo">Processo:</label><span id="${prefix}:processo">23035.002988.2026-97</span><label for="${prefix}:credorDevedor">Código do Credor</label><span id="${prefix}:credorDevedor">${creditor.code}</span><label for="${prefix}:nomeCredorDevedor">Nome do Credor:</label><span id="${prefix}:nomeCredorDevedor">${creditor.name}</span>`;
     } else panel.innerHTML = `<label for="${id}:valor">Valor</label><input id="${id}:valor" value="4.000,00" disabled>`;
   }
   for (const [id] of items) document.getElementById(`${prefix}:${id}`)!.onclick = () => {
@@ -46,7 +49,7 @@ function setup() {
   content('abaDadosPagRecId'); document.getElementById(`${prefix}:btnRegistrar`)!.onclick = confirm;
 }
 beforeEach(() => {
-  vi.useFakeTimers(); multiSituation=false; confirm = vi.fn(); screenshots = vi.fn().mockResolvedValue({ok:true,dataUrl:'data:image/png;base64,AAA='});
+  vi.useFakeTimers(); multiSituation=false; creditor={ code: '00000000000191', name: 'BANCO DO BRASIL SA' }; confirm = vi.fn(); screenshots = vi.fn().mockResolvedValue({ok:true,dataUrl:'data:image/png;base64,AAA='});
   vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   vi.spyOn(window.crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000000');
@@ -108,7 +111,8 @@ describe('coletor completo de comprovantes SIAFI',()=>{
     expect((window as TestWindow).__siagesSiafiEvidence!.getRecord().status).toBe('complete');
     expect(screenshots).toHaveBeenCalledTimes(4);
     expect(confirm).not.toHaveBeenCalled(); expect(fetchMock).not.toHaveBeenCalled(); expect(open).not.toHaveBeenCalled();
-    expect(document.querySelectorAll('#siages-siafi-evidence a[download]')).toHaveLength(2);
+    expect(Array.from(document.querySelectorAll('#siages-siafi-evidence a[download]'), anchor => anchor.getAttribute('download')))
+      .toEqual(['RP em preenchimento - processo 23035.002988.2026-97.pdf', 'RP em preenchimento - processo 23035.002988.2026-97.json']);
     expect(document.getElementById(`${prefix}:abaDadosPagRecId`)).toHaveClass('btn-aba-dh-selecionada');
     fireEvent.click(document.querySelector('[data-close]')!);
     expect(document.getElementById('siages-siafi-evidence')).toHaveAttribute('hidden');
@@ -116,6 +120,14 @@ describe('coletor completo de comprovantes SIAFI',()=>{
     document.getElementById('panel')!.appendChild(document.createElement('span'));
     await vi.runAllTimersAsync();
     expect(document.getElementById('siages-siafi-evidence')).toHaveAttribute('hidden');
+  });
+  it('nomeia o PDF com o número do DH e o nome do credor', async () => {
+    creditor = { code: '12345678000190', name: 'EMPRESA: SERVIÇOS / LTDA' };
+    document.getElementById(`${prefix}:codigoTipoDocHabil_outputText`)!.textContent = 'NP';
+    document.getElementById(`${prefix}:numeroDocumentoHabil_outputText`)!.textContent = '000123';
+    const task = (window as TestWindow).__siagesSiafiEvidence!.start();
+    await vi.runAllTimersAsync(); await task;
+    expect(document.querySelector('#siages-siafi-evidence a[download]')).toHaveAttribute('download', '2026NP000123 - EMPRESA SERVIÇOS LTDA.pdf');
   });
   it.each([
     ['https:', 'siafi.tesouro.gov.br', false],

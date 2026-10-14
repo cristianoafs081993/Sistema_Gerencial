@@ -1,5 +1,7 @@
 # DATA_FLOW
 
+Conferência SIAFI 1.9.71: detalhes SUAP exibem `SiafiLiquidacaoPanel`, consumindo jobs e revisões por processo via `siafiLiquidacaoService`. Captura JSON é selecionada/contextual; backend resolve processo/PDFs/listas com JWT/RLS. Checklist prioriza divergências, registra revisão sem mudar parecer e conserva histórico. Fluxo, limites e contrato: [SIAFI_CHECKLIST](../integrations/SIAFI_CHECKLIST.md).
+
 ## Comprovantes SIAFI (extensão 1.9.70)
 
 Paleta Ctrl+K → comando `print` → API do coletor no mundo isolado → abas/situações e pré-docs preenchidos no DOM SIAFI → worker de screenshots da aba ativa → PDF sem capa e JSON locais para download explícito em diálogo temporário. O diálogo é criado somente sob comando, oculta-se nos screenshots e permanece fechado após AJAX quando dispensado. Campos/tabelas e referências de páginas preservam a origem. Janelas fixas dos pré-docs são deslocadas por trecho durante a captura e restauradas ao final. Abrir a paleta no SIAFI e digitar `print` não consulta APIs SIAGES. Sem gravação no Supabase ou análise LLM. Contrato: [SIAFI_EVIDENCE](../integrations/SIAFI_EVIDENCE.md).

@@ -1,6 +1,7 @@
 if (typeof importScripts === 'function') importScripts('scheduled-process-sync.js');
 if (typeof importScripts === 'function') importScripts('rd-sync.js');
 if (typeof importScripts === 'function') importScripts('siafi-evidence-background.js');
+if (typeof importScripts === 'function') importScripts('siafi-analysis-background.js');
 
 const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
@@ -328,6 +329,12 @@ async function handleProcessRegistryMessage(message, sender) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.source === 'siages-siafi-analysis') {
+    void globalThis.SiagesSiafiAnalysisBackground.handle(message,sender,postSiafiAnalysis,options=>chrome.tabs.create(options))
+      .then(result=>sendResponse({ok:true,...result}))
+      .catch(error=>sendResponse({ok:false,error:error instanceof Error?error.message:'Falha na conferência.'}));
+    return true;
+  }
   if (message?.source === 'siages-extension-rd-sync') {
     if (sender?.url !== chrome.runtime.getURL('popup.html')) {
       sendResponse({ ok: false, error: 'Acione a coleta pelo popup da extensão.' });
@@ -380,6 +387,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 const rdJobs = new Map();
+async function postSiafiAnalysis(body) {
+  const session = await refreshSessionIfNeeded();
+  if (!session?.accessToken) throw new Error('Entre no SIAGES pelo popup da extensão para conferir com IA.');
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/analisar-liquidacao-siafi`, {
+    method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${session.accessToken}`,'Content-Type':'application/json'},
+    body:JSON.stringify(body),signal:AbortSignal.timeout(60000),
+  });
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(payload.error || `Falha na conferência (HTTP ${response.status}).`);
+  return payload;
+}
 const RD_STATUS_KEY = 'siages-suap-rd-status';
 async function postRdAction(body) {
   const session = await refreshSessionIfNeeded();

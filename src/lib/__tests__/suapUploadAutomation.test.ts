@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { extensionFixturePath } from '@/test/extensionFixtures';
 
 interface UploadAutomationTestWindow extends Window {
@@ -53,6 +53,11 @@ const mockUploadHtml = `
     <div class="form-row">
       <label for="id_assunto">Assunto:</label>
       <input type="text" id="id_assunto" name="assunto" value="" />
+    </div>
+
+    <div class="form-row">
+      <label for="id_arquivo">Arquivo:</label>
+      <input type="file" id="id_arquivo" name="arquivo" />
     </div>
 
     <div class="form-row">
@@ -208,6 +213,16 @@ describe('upload-document.js (Automação de Upload de Documentos no SUAP)', () 
     expect(notice?.textContent).toContain('Cópia Simples');
   });
 
+  it('nunca cria opção com o texto como valor quando o tipo não existe no select', () => {
+    const automation = loadScript();
+    const tipo = document.getElementById('id_tipo') as HTMLSelectElement;
+    const optionCount = tipo.options.length;
+
+    expect(automation.selectOptionByText(tipo, 'Tipo Inexistente')).toBeNull();
+    expect(tipo.options).toHaveLength(optionCount);
+    expect(tipo.value).toBe('');
+  });
+
   it('recupera e limpa payload do storage quando não vem pelo hash', () => {
     const automation = loadScript();
     const payload = {
@@ -230,5 +245,152 @@ describe('upload-document.js (Automação de Upload de Documentos no SUAP)', () 
 
     automation.clearPendingUploadAutomation();
     expect(automation.loadPendingUploadAutomation()).toBeNull();
+  });
+});
+
+// SUAP renders "Tipo" as an AJAX Select2: the <select> only holds the chosen option.
+const mockAjaxUploadHtml = `
+  <form id="documento-externo-form" method="post">
+    <div class="form-row">
+      <label for="id_tipo_conferencia">Tipo de Conferência:</label>
+      <select id="id_tipo_conferencia" name="tipo_conferencia">
+        <option value="">---------</option>
+        <option value="3">Cópia Simples</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label for="id_tipo">Tipo:</label>
+      <select class="js-example-data-ajax form-control select2-hidden-accessible" id="tipo_Xk29aQ" name="tipo"></select>
+      <span class="select2 select2-container"><span class="select2-selection__rendered" id="select2-tipo_Xk29aQ-container"></span></span>
+    </div>
+    <div class="form-row">
+      <label for="id_assunto">Assunto:</label>
+      <input type="text" id="id_assunto" name="assunto" value="" />
+    </div>
+  </form>
+`;
+
+describe('select2-bridge-main.js (Tipo com Select2 AJAX no upload)', () => {
+  let queries: string[];
+  let select2Events: unknown[];
+  let results: Array<{ id: string; text?: string; html?: string }>;
+
+  beforeEach(() => {
+    document.body.innerHTML = mockAjaxUploadHtml;
+    queries = [];
+    select2Events = [];
+    results = [
+      { id: '46', text: 'Liquidação de Despesa' },
+      { id: '45', html: '<span class="text">Liquidação</span>' },
+    ];
+    const fakeJquery = Object.assign(
+      () => ({
+        data: (key: string) => (key === 'select2'
+          ? { dataAdapter: { query: (params: { term: string }, callback: (data: unknown) => void) => { queries.push(params.term); callback({ results }); } } }
+          : undefined),
+        trigger: (event: unknown) => { select2Events.push(event); },
+      }),
+      { fn: { select2: () => undefined } },
+    );
+    vi.stubGlobal('jQuery', fakeJquery);
+    const bridgeWindow = window as unknown as { __siagesSelect2BridgeLoaded?: boolean };
+    if (!bridgeWindow.__siagesSelect2BridgeLoaded) {
+      window.eval(readFileSync(extensionFixturePath('select2-bridge-main.js'), 'utf8'));
+    }
+    document.documentElement.dataset.siagesSelect2Bridge = 'ready';
+  });
+
+  afterEach(() => {
+    document.documentElement.removeAttribute('data-siages-select2-bridge');
+    vi.unstubAllGlobals();
+  });
+
+  it('busca o tipo na fonte AJAX do Select2 e seleciona o ID real', async () => {
+    const automation = loadScript();
+    const changes = vi.fn();
+    const tipo = document.querySelector<HTMLSelectElement>('select[name="tipo"]')!;
+    tipo.addEventListener('change', changes);
+
+    const result = await automation.runUploadAutomation({
+      source: 'siages', version: 1, action: 'suap_upload_document', suapId: '498930',
+      tipoConferencia: 'Cópia Simples', tipoDocumento: 'Liquidação', assunto: 'Liquidação',
+    });
+
+    expect(result).toBe(true);
+    expect(queries).toEqual(['Liquidação']);
+    expect(tipo.value).toBe('45');
+    expect(tipo.selectedOptions[0].textContent).toBe('Liquidação');
+    expect(changes).toHaveBeenCalled();
+    expect(select2Events).toEqual([expect.objectContaining({ type: 'select2:select' })]);
+    expect(document.getElementById('siages-suap-upload-notice')?.textContent).toContain('Campos preenchidos');
+  });
+
+  it('avisa e não inventa opção quando o tipo não é encontrado', async () => {
+    results = [{ id: '10', text: 'Acordo' }];
+    const automation = loadScript();
+    const tipo = document.querySelector<HTMLSelectElement>('select[name="tipo"]')!;
+
+    await automation.runUploadAutomation({
+      source: 'siages', version: 1, action: 'suap_upload_document', suapId: '498930',
+      tipoConferencia: 'Cópia Simples', tipoDocumento: 'Liquidação', assunto: 'Liquidação',
+    });
+
+    expect(tipo.options).toHaveLength(0);
+    expect(tipo.value).toBe('');
+    expect(document.getElementById('siages-suap-upload-notice')?.textContent).toContain('não foi possível selecionar Tipo "Liquidação"');
+  });
+});
+
+describe('upload-document.js (seletor de arquivo após o preenchimento)', () => {
+  const payload = {
+    source: 'siages', version: 1, action: 'suap_upload_document', suapId: '498930',
+    tipoConferencia: 'Cópia Simples', tipoDocumento: 'Liquidação', assunto: 'Liquidação',
+  };
+
+  beforeEach(() => {
+    document.body.innerHTML = mockUploadHtml;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Reflect.deleteProperty(navigator, 'userActivation');
+  });
+
+  it('sem gesto do usuário na página, foca o arquivo e abre o seletor com Enter ou com o botão', async () => {
+    const automation = loadScript();
+    const fileInput = document.getElementById('id_arquivo') as HTMLInputElement;
+    const click = vi.spyOn(fileInput, 'click').mockImplementation(() => undefined);
+
+    await automation.runUploadAutomation(payload);
+
+    expect(click).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(fileInput);
+    const button = document.getElementById('siages-suap-upload-file-prompt') as HTMLButtonElement;
+    expect(button).toHaveTextContent('Escolher documento (Enter)');
+
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    fileInput.dispatchEvent(enter);
+    expect(enter.defaultPrevented).toBe(true);
+    expect(click).toHaveBeenCalledTimes(1);
+
+    button.click();
+    expect(click).toHaveBeenCalledTimes(2);
+
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(document.getElementById('siages-suap-upload-file-prompt')).toBeNull();
+    fileInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    expect(click).toHaveBeenCalledTimes(2);
+  });
+
+  it('abre o seletor direto quando o navegador permite', async () => {
+    Object.defineProperty(navigator, 'userActivation', { configurable: true, value: { isActive: true } });
+    const automation = loadScript();
+    const fileInput = document.getElementById('id_arquivo') as HTMLInputElement;
+    const click = vi.spyOn(fileInput, 'click').mockImplementation(() => undefined);
+
+    await automation.runUploadAutomation(payload);
+
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(document.getElementById('siages-suap-upload-file-prompt')).toBeNull();
   });
 });

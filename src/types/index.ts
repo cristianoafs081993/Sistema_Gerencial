@@ -354,6 +354,7 @@ export interface SuapWorkflowConclusao {
 }
 
 export interface SuapDadosCompletos {
+  valor_liquido?: string;
   extraction_job?: {
     provider?: string;
     input_strategy?: 'full' | 'eligible_documents';

@@ -145,29 +145,76 @@
     }) || null;
   }
 
+  function findArquivoField(root) {
+    return (root || document).querySelector('input[type="file"]');
+  }
+
+  const FILE_PROMPT_ID = 'siages-suap-upload-file-prompt';
+
+  function openFileChooser(fileInput) {
+    try {
+      if (typeof fileInput.showPicker === 'function') fileInput.showPicker();
+      else fileInput.click();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Chrome only opens a file chooser after a click or key press on this page; the
+  // palette's Enter happened on the previous page. Open it directly when allowed,
+  // otherwise focus the field and let Enter or the floating button open it.
+  function promptFileChooser(fileInput) {
+    if (!fileInput || fileInput.files?.length) return false;
+    fileInput.scrollIntoView?.({ block: 'center' });
+    if (navigator.userActivation?.isActive && openFileChooser(fileInput)) return true;
+
+    document.getElementById(FILE_PROMPT_ID)?.remove();
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.id = FILE_PROMPT_ID;
+    button.textContent = 'Escolher documento (Enter)';
+    Object.assign(button.style, {
+      position: 'fixed', zIndex: '2147483647', top: '76px', right: '16px', padding: '10px 16px',
+      borderRadius: '10px', border: '1px solid #1d4ed8', background: '#2563eb', color: '#ffffff',
+      fontFamily: 'system-ui, -apple-system, sans-serif', fontSize: '13px', fontWeight: '700',
+      boxShadow: '0 12px 30px rgba(15, 23, 42, 0.25)', cursor: 'pointer',
+    });
+
+    const onKeyDown = (event) => {
+      if (event.key !== 'Enter' || ![fileInput, button].includes(document.activeElement)) return;
+      event.preventDefault();
+      openFileChooser(fileInput);
+    };
+    const cleanup = () => {
+      button.remove();
+      document.removeEventListener('keydown', onKeyDown, true);
+      fileInput.removeEventListener('change', cleanup);
+    };
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      openFileChooser(fileInput);
+    });
+    document.addEventListener('keydown', onKeyDown, true);
+    fileInput.addEventListener('change', cleanup);
+    document.body.appendChild(button);
+    fileInput.focus();
+    return false;
+  }
+
   function selectOptionByText(selectEl, targetText) {
     if (!selectEl || !targetText) return null;
     const normalizedTarget = normalizeText(targetText);
-    const options = Array.from(selectEl.options || []);
+    // Placeholders ("---------") have an empty value and must never match.
+    const options = Array.from(selectEl.options || []).filter((opt) => opt.value);
 
     let match = options.find((opt) => normalizeText(opt.textContent) === normalizedTarget);
 
     if (!match) {
-      match = options.find((opt) => {
-        const text = normalizeText(opt.textContent);
-        return text.includes(normalizedTarget) || normalizedTarget.includes(text);
-      });
+      match = options.find((opt) => normalizeText(opt.textContent).includes(normalizedTarget));
     }
 
-    if (!match && selectEl.options) {
-      const opt = document.createElement('option');
-      opt.value = targetText;
-      opt.textContent = targetText;
-      opt.selected = true;
-      selectEl.appendChild(opt);
-      match = opt;
-    }
-
+    // Never invent an option: the server only accepts the real option id.
     if (!match) return null;
 
     selectEl.value = match.value;
@@ -219,13 +266,11 @@
 
     const selectId = selectEl.id;
     const optionText = option.textContent.trim();
+    // Only this field's widget: a page-wide fallback could relabel another Select2.
     const containers = [
-      document.querySelector(`#select2-${selectId}-container`),
-      document.querySelector(`#s2id_${selectId} .select2-chosen`),
-      document.querySelector(`.select2-container--default [aria-labelledby*="${selectId}"]`),
-      selectEl.closest('.form-row, div')?.querySelector('.select2-selection__rendered, .select2-chosen'),
-      document.querySelector('.select2-selection__rendered'),
-      document.querySelector('.select2-chosen'),
+      selectId ? document.querySelector(`#select2-${selectId}-container`) : null,
+      selectId ? document.querySelector(`#s2id_${selectId} .select2-chosen`) : null,
+      selectEl.closest('.form-row')?.querySelector('.select2-selection__rendered, .select2-chosen'),
     ];
 
     for (const c of containers) {
@@ -239,6 +284,55 @@
     if (selectId) {
       injectMainWorldSelect2Update(selectId, option.value, optionText);
     }
+  }
+
+  function isSelect2Field(selectEl) {
+    return Boolean(selectEl?.classList?.contains('select2-hidden-accessible') || selectEl?.classList?.contains('js-example-data-ajax'));
+  }
+
+  // Asks select2-bridge-main.js (page world) to pick the option, searching the
+  // widget's AJAX source when the <select> does not list it yet.
+  async function pickSelect2ViaPage(selectEl, text, timeoutMs = 10000) {
+    if (!selectEl?.name || !text) return null;
+    const root = document.documentElement;
+    if (root.dataset.siagesSelect2Bridge !== 'ready') {
+      if (!isSelect2Field(selectEl)) return null;
+      await waitFor(() => root.dataset.siagesSelect2Bridge === 'ready', 3000);
+      if (root.dataset.siagesSelect2Bridge !== 'ready') return null;
+    }
+
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return new Promise((resolve) => {
+      let timer = null;
+      const onPicked = (event) => {
+        let result = null;
+        try {
+          result = JSON.parse(event.detail);
+        } catch (_) {
+          return;
+        }
+        if (result?.requestId !== requestId) return;
+        done(result.ok ? result : null);
+      };
+      const done = (result) => {
+        document.removeEventListener('siages:select2-picked', onPicked);
+        window.clearTimeout(timer);
+        resolve(result);
+      };
+      timer = window.setTimeout(() => done(null), timeoutMs);
+      document.addEventListener('siages:select2-picked', onPicked);
+      document.dispatchEvent(new CustomEvent('siages:select2-pick', {
+        detail: JSON.stringify({ requestId, name: selectEl.name, text }),
+      }));
+    });
+  }
+
+  async function selectTipoDocumento(selectEl, text) {
+    const picked = await pickSelect2ViaPage(selectEl, text);
+    if (picked) return picked;
+    const option = selectOptionByText(selectEl, text);
+    if (option) updateSelect2Display(selectEl, option);
+    return option;
   }
 
   function fillTextInput(inputEl, value) {
@@ -334,18 +428,18 @@
     const assuntoField = fieldsReady?.ass || findAssuntoField(document);
 
     let filledCount = 0;
+    const missing = [];
 
     if (confField && payload.tipoConferencia) {
       const selected = selectOptionByText(confField, payload.tipoConferencia);
       if (selected) filledCount++;
+      else missing.push(`Tipo de Conferência "${payload.tipoConferencia}"`);
     }
 
     if (tipoField && payload.tipoDocumento) {
-      const selected = selectOptionByText(tipoField, payload.tipoDocumento);
-      if (selected) {
-        updateSelect2Display(tipoField, selected);
-        filledCount++;
-      }
+      const selected = await selectTipoDocumento(tipoField, payload.tipoDocumento);
+      if (selected) filledCount++;
+      else missing.push(`Tipo "${payload.tipoDocumento}"`);
     }
 
     if (assuntoField && payload.assunto) {
@@ -355,20 +449,26 @@
 
     if (filledCount > 0) {
       clearPendingUploadAutomation();
-      showNotice(
-        `SIAGES: Campos preenchidos automaticamente (${payload.tipoDocumento || 'Liquidação'} / ${payload.tipoConferencia || 'Cópia Simples'}).`,
-        'success'
-      );
+      if (missing.length) {
+        showNotice(`SIAGES: não foi possível selecionar ${missing.join(' e ')}. Escolha manualmente antes de salvar.`, 'error');
+      } else {
+        showNotice(
+          `SIAGES: Campos preenchidos automaticamente (${payload.tipoDocumento || 'Liquidação'} / ${payload.tipoConferencia || 'Cópia Simples'}).`,
+          'success'
+        );
+      }
 
+      promptFileChooser(findArquivoField(document));
+
+      // The page may reset fields while it finishes loading; reapply only what was lost.
       window.setTimeout(() => {
-        if (tipoField && payload.tipoDocumento) {
-          const opt = selectOptionByText(tipoField, payload.tipoDocumento);
-          if (opt) updateSelect2Display(tipoField, opt);
+        if (tipoField && payload.tipoDocumento && !tipoField.value) {
+          void selectTipoDocumento(tipoField, payload.tipoDocumento);
         }
-        if (confField && payload.tipoConferencia) {
+        if (confField && payload.tipoConferencia && !confField.value) {
           selectOptionByText(confField, payload.tipoConferencia);
         }
-        if (assuntoField && payload.assunto) {
+        if (assuntoField && payload.assunto && !assuntoField.value) {
           fillTextInput(assuntoField, payload.assunto);
         }
       }, 350);
@@ -427,8 +527,12 @@
     findTipoConferenciaField,
     findTipoDocumentoField,
     findAssuntoField,
+    findArquivoField,
+    promptFileChooser,
     selectOptionByText,
     updateSelect2Display,
+    pickSelect2ViaPage,
+    selectTipoDocumento,
     fillTextInput,
     runUploadAutomation,
     initUploadAutomation,

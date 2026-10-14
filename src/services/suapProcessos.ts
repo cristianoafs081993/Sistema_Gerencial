@@ -110,6 +110,11 @@ const upsertWorkflow = async (processoId: string, dadosCompletos: SuapDadosCompl
 };
 
 export const suapProcessosService = {
+  async getById(id: string): Promise<SuapProcesso | null> {
+    const {data,error} = await supabase.from('processos').select(PROCESSOS_SELECT).eq('id',id).maybeSingle();
+    if (error) throw error;
+    return data ? mapProcessoRow(data as SuapProcessoRow) : null;
+  },
   async getAll(client: SupabaseClient = supabase): Promise<SuapProcesso[]> {
     const fetchFallback = async () => {
       const [processos, memberships] = await Promise.all([
@@ -230,7 +235,8 @@ export const suapProcessosService = {
           contrato: params.processo.contrato || params.processo.dadosCompletos?.contrato_numero,
           notaFiscal: params.processo.dadosCompletos?.notas_fiscais?.[0],
           notasFiscais: params.processo.dadosCompletos?.notas_fiscais || [],
-          valorLiquido: params.processo.dadosCompletos?.val_nf,
+          valorBruto: params.processo.dadosCompletos?.val_nf,
+          valorLiquido: params.processo.dadosCompletos?.valor_liquido,
           nsNumero: params.nsNumero,
           dadosBancarios: params.processo.dadosCompletos?.dados_bancarios,
           retencoesTributarias: params.processo.dadosCompletos?.retencoes_tributarias,

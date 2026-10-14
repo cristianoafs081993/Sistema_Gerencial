@@ -1,5 +1,7 @@
 # SCHEMA_OVERVIEW
 
+Conferência SIAFI: `siafi_liquidacao_analises` (jobs e snapshots) e `siafi_liquidacao_revisoes` (revisão humana separada do parecer), com FK ao processo e RLS por usuário. PDFs de entrada são preservados no bucket privado existente. Ver [contrato e implantação](../integrations/SIAFI_CHECKLIST.md).
+
 ## Aviso importante
 
 Este documento e um mapa operacional do schema, nao um dicionario exaustivo de colunas.

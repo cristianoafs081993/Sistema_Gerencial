@@ -1,6 +1,13 @@
 [functions.invite-user]
 verify_jwt = false
 
+# Handlers validate user JWT with getUser; worker accepts only the service key.
+[functions.analisar-liquidacao-siafi]
+verify_jwt = false
+
+[functions.analisar-liquidacao-siafi-worker]
+verify_jwt = false
+
 [functions.admin-users]
 verify_jwt = false
 

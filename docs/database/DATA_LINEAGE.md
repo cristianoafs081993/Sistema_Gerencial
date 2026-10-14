@@ -1,5 +1,7 @@
 # DATA_LINEAGE
 
+Checklist SIAFI: captura JSON original + processo autorizado + snapshot da extração + documentos originais preservados/hash + listas autorizadas → IA Gemini → validação de citações/cálculos/cobertura → resultado imutável. Revisões humanas são eventos separados; não alteram parecer nem treinam automaticamente. Citações vinculam documento/página ou campo/registro; fontes sem comprovação geram pendência. [SIAFI_CHECKLIST](../integrations/SIAFI_CHECKLIST.md).
+
 ## Objetivo
 
 Mostrar a linhagem operacional dos dados de forma curta:

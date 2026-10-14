@@ -399,6 +399,24 @@ describe('paleta global da extensao Suape', () => {
     fireEvent.keyDown(encsInput, { key: 'Enter' });
     expect(assignedUrl).toBe('https://suap.ifrn.edu.br/processo_eletronico/processo/encaminhar_sem_despacho/498930/');
 
+    // 3b. Atalho 'encdg 498930' leva o preenchimento da DG/CN no hash
+    fireEvent.keyDown(document, { key: 'k', code: 'KeyK', ctrlKey: true });
+    const encdgInput = document.querySelector<HTMLInputElement>('.suape-cp-input')!;
+    fireEvent.input(encdgInput, { target: { value: 'encdg 498930' } });
+    expect(document.body.textContent).toContain('Encaminhar à DG para Autorização de Pagamento');
+    fireEvent.keyDown(encdgInput, { key: 'Enter' });
+    expect(assignedUrl).toContain('https://suap.ifrn.edu.br/processo_eletronico/processo/encaminhar/498930/#siagesEncaminhar=');
+    expect(JSON.parse(decodeURIComponent(assignedUrl.split('#siagesEncaminhar=')[1]))).toEqual({
+      source: 'siages',
+      version: 1,
+      action: 'suap_forward_process',
+      suapId: '498930',
+      despacho: 'Ao Diretor geral para autorização de pagamento',
+      campus: { id: '3', text: 'CN' },
+      setor: { id: '841', text: 'DG/CN' },
+      papel: 'ASSISTENTE EM ADMINISTRACAO',
+    });
+
     // 4. Apenas o ID '498930' lista todas as ações do processo
     fireEvent.keyDown(document, { key: 'k', code: 'KeyK', ctrlKey: true });
     const idInput = document.querySelector<HTMLInputElement>('.suape-cp-input')!;

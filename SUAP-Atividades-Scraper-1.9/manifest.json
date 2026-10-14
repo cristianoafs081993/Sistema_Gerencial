@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SIAGES",
-  "version": "1.9.70",
+  "version": "1.9.71",
   "description": "Paleta Ctrl+K, resumo de processos, caminho BPMN, dados financeiros, atalhos e documentos com IA no SIAGES, SUAP e Comprasnet.",
   "permissions": [
     "activeTab",
@@ -143,6 +143,7 @@
         "siafi-predoc-alert.js",
         "siafi-evidence-core.js",
         "siafi-evidence-pdf.js",
+        "siafi-analysis.js",
         "siafi-evidence.js"
       ],
       "run_at": "document_idle"
@@ -174,6 +175,26 @@
         "upload-document.js"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://suap.ifrn.edu.br/processo_eletronico/documento_upload/*"
+      ],
+      "js": [
+        "select2-bridge-main.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://suap.ifrn.edu.br/processo_eletronico/processo/encaminhar/*"
+      ],
+      "js": [
+        "forward-process-main.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
     },
     {
       "matches": [

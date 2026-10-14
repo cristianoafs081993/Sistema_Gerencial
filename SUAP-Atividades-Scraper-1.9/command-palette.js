@@ -211,6 +211,26 @@
     };
   }
 
+  // Valores do encaminhamento para autorização de pagamento pela DG/CN.
+  // Os IDs são os do SUAP (Campus CN = 3, setor DG/CN = 841); a senha nunca é preenchida.
+  function buildForwardDgAutomationData(processId) {
+    const payload = {
+      source: 'siages',
+      version: 1,
+      action: 'suap_forward_process',
+      suapId: String(processId),
+      despacho: 'Ao Diretor geral para autorização de pagamento',
+      campus: { id: '3', text: 'CN' },
+      setor: { id: '841', text: 'DG/CN' },
+      papel: 'ASSISTENTE EM ADMINISTRACAO',
+    };
+    const hashPayload = encodeURIComponent(JSON.stringify(payload));
+    return {
+      payload,
+      url: `/processo_eletronico/processo/encaminhar/${processId}/#siagesEncaminhar=${hashPayload}`,
+    };
+  }
+
   function persistUploadAutomation(payload) {
     try {
       const record = JSON.stringify({
@@ -249,6 +269,16 @@
         icon: 'send',
         color: '#2563eb',
         badge: 'enc',
+      },
+      {
+        id: 'proc-encaminhar-dg',
+        title: 'Encaminhar à DG para Autorização de Pagamento',
+        subtitle: `Tramitar processo #${processId} à DG/CN com despacho preenchido`,
+        shortcuts: ['encdg'],
+        url: buildForwardDgAutomationData(processId).url,
+        icon: 'send',
+        color: '#1d4ed8',
+        badge: 'encdg',
       },
       {
         id: 'proc-encaminhar-sem-despacho',
@@ -1140,6 +1170,7 @@
     const PROCESS_SHORTCUTS = new Set([
       'up', 'upload', 'doc', 'upld', 'anexar',
       'enc', 'encaminhar', 'despacho', 'tramitar',
+      'encdg',
       'encs', 'semdespacho', 'encsem', 'tramitarsem', 'sem',
       'capa', 'proc', 'processo', 'p', 'home',
       'vis', 'docs', 'arvore', 'timeline',
@@ -1279,6 +1310,7 @@
       const shortcutGuides = [
         { shortcut: 'up', title: 'Fazer Upload de Documento', example: 'up 498930', desc: 'Digite "up <id_processo>" para abrir o upload direto' },
         { shortcut: 'enc', title: 'Encaminhar Processo', example: 'enc 498930', desc: 'Digite "enc <id_processo>" para tramitar com despacho' },
+        { shortcut: 'encdg', title: 'Encaminhar à DG para Autorização de Pagamento', example: 'encdg 498930', desc: 'Digite "encdg <id_processo>" para tramitar à DG/CN com o formulário preenchido' },
         { shortcut: 'encs', title: 'Encaminhar Sem Despacho', example: 'encs 498930', desc: 'Digite "encs <id_processo>" para tramitar direto' },
         { shortcut: 'capa', title: 'Ver Capa do Processo', example: 'capa 498930', desc: 'Digite "capa <id_processo>" para abrir a página principal' },
         { shortcut: 'vis', title: 'Visualizar Árvore de Documentos', example: 'vis 498930', desc: 'Digite "vis <id_processo>" para ver a timeline e documentos' },

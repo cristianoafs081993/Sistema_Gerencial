@@ -69,6 +69,7 @@ import { SuapProcesso } from '@/types';
 import { suapProcessosService } from '@/services/suapProcessos';
 import { suapScraperService } from '@/services/suapScraperService';
 import { SuapDocumentGeneratorDialog } from '@/components/suap/SuapDocumentGeneratorDialog';
+import { SiafiLiquidacaoPanel } from '@/components/suap/SiafiLiquidacaoPanel';
 import {
   clearDispatchQueue,
   createDispatchQueue,
@@ -695,6 +696,15 @@ export default function Suap() {
   const [reopeningProcessId, setReopeningProcessId] = useState<string | null>(null);
   const [selectedProcesso, setSelectedProcesso] = useState<SuapProcesso | null>(null);
   const [detailsProcesso, setDetailsProcesso] = useState<SuapProcesso | null>(null);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('processo');
+    if (!session || !id || !/^[0-9a-f-]{36}$/i.test(id)) return;
+    let active = true;
+    void suapProcessosService.getById(id).then(process => {
+      if (active && process) setDetailsProcesso(process);
+    }).catch(() => { if (active) toast.error('Não foi possível abrir o processo da conferência.'); });
+    return () => { active = false; };
+  }, [session]);
   const [isConclusaoDialogOpen, setIsConclusaoDialogOpen] = useState(false);
   const [dispatchQueue, setDispatchQueue] = useState<DispatchQueueState | null>(() => loadDispatchQueue());
   const [isDispatchDialogOpen, setIsDispatchDialogOpen] = useState(() => Boolean(loadDispatchQueue()));
@@ -723,7 +733,7 @@ export default function Suap() {
     refetch,
   } = useQuery({
     queryKey: ['suap-processos'],
-    queryFn: suapProcessosService.getAll,
+    queryFn: () => suapProcessosService.getAll(),
     enabled: !!session,
     refetchInterval: (query) => {
       const items = (query.state.data || []) as SuapProcesso[];
@@ -1125,7 +1135,7 @@ export default function Suap() {
               Detalhes do processo SUAP
             </DialogTitle>
           </DialogHeader>
-          {detailsProcesso ? <ProcessDetailsContent processo={detailsProcesso} /> : null}
+          {detailsProcesso ? <><ProcessDetailsContent processo={detailsProcesso} /><SiafiLiquidacaoPanel key={detailsProcesso.id} processoId={detailsProcesso.id} /></> : null}
         </DialogContent>
       </Dialog>
 

@@ -1,5 +1,9 @@
 # TABLE_CATALOG
 
+## Conferência da liquidação SIAFI
+
+`siafi_liquidacao_analises` guarda jobs, entrada/hash imutáveis e resultado imutável após conclusão, com FK para `processos` e isolamento `tenant_id=auth.uid()`. Escrita/claim exclusivos de service role. `siafi_liquidacao_revisoes` guarda eventos append-only por item existente; usuário só lê/insere revisões de sua análise concluída. Migration `20261013140000`. Contrato: [SIAFI_CHECKLIST](../integrations/SIAFI_CHECKLIST.md).
+
 Este catalogo resume as tabelas e views mais relevantes para manutencao. Nao substitui as migrations.
 
 ## Escopo por campus IFRN

@@ -1,3 +1,5 @@
+import { authenticateAnalysis, handleStructuredAnalysis } from '../_shared/siafi_analysis_backend.ts';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -211,6 +213,9 @@ Deno.serve(async (request) => {
   }
 
   try {
+    const auth = await authenticateAnalysis(request);
+    const body = await request.json();
+    if (body?.action || body?.captura) return jsonResponse(await handleStructuredAnalysis(auth, body));
     const geminiApiKey = getGeminiApiKey();
     if (!geminiApiKey) {
       return jsonResponse(
@@ -219,7 +224,7 @@ Deno.serve(async (request) => {
       );
     }
 
-    const { processo, screenshots }: LiquidacaoRequest = await request.json();
+    const { processo, screenshots }: LiquidacaoRequest = body;
 
     if (!processo || !Array.isArray(screenshots) || screenshots.length === 0) {
       return jsonResponse(
@@ -227,9 +232,15 @@ Deno.serve(async (request) => {
         400,
       );
     }
+    if (screenshots.length > 6 || screenshots.some(s => !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(s.dataUrl) || s.dataUrl.length > 12*1024*1024)) return jsonResponse({error:'Envie até seis imagens válidas com até 8 MB cada.'},400);
+
+    const { data: original, error: originalError } = await auth.client.from('processos').select('*').eq('id',String(processo.id || '')).eq('tenant_id',auth.user.id).single();
+    if (originalError || !original) return jsonResponse({error:'Processo não encontrado na sua conta.'},404);
+    const dados = original.dados_completos || {};
+    const trustedProcess = {id:original.id,numProcesso:original.num_processo,beneficiario:original.beneficiario,cpfCnpj:original.cpf_cnpj,assunto:original.assunto,contrato:original.contrato,notasFiscais:dados.notas_fiscais || [],valorBruto:dados.val_nf || original.valor_nf,valorLiquido:dados.valor_liquido || null,dadosBancarios:dados.dados_bancarios,retencoesTributarias:dados.retencoes_tributarias,empenhos:dados.empenhos || [],nsNumero:String(processo.nsNumero || '')};
 
     const { content, model } = await callGeminiWithFallback(
-      buildPrompt(processo),
+      buildPrompt(trustedProcess),
       screenshots,
       geminiApiKey,
       getModelCandidates(),
@@ -242,7 +253,7 @@ Deno.serve(async (request) => {
       {
         error: error instanceof Error ? error.message : 'Falha inesperada ao analisar os prints do SIAFI.',
       },
-      500,
+      /^(400|401|403|404|409):/.test(error instanceof Error ? error.message : '') ? Number((error as Error).message.slice(0,3)) : 500,
     );
   }
 });

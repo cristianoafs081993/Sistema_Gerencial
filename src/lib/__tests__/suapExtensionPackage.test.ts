@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.70');
+    expect(manifest.version).toBe('1.9.71');
     expect(manifest.name).toBe('SIAGES');
     expect(manifest.icons['128']).toBe('logo-transparent.png');
     expect(manifest.action.default_icon['32']).toBe('logo-transparent.png');
@@ -34,6 +34,20 @@ describe('pacote da extensao Suape 1.9', () => {
       matches: ['https://suap.ifrn.edu.br/processo_eletronico/documento_upload/*'],
       js: ['upload-document.js'],
       run_at: 'document_idle',
+    });
+    const select2Bridge = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('select2-bridge-main.js'));
+    expect(select2Bridge).toMatchObject({
+      matches: ['https://suap.ifrn.edu.br/processo_eletronico/documento_upload/*'],
+      js: ['select2-bridge-main.js'],
+      run_at: 'document_idle',
+      world: 'MAIN',
+    });
+    const forwardProcess = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('forward-process-main.js'));
+    expect(forwardProcess).toMatchObject({
+      matches: ['https://suap.ifrn.edu.br/processo_eletronico/processo/encaminhar/*'],
+      js: ['forward-process-main.js'],
+      run_at: 'document_idle',
+      world: 'MAIN',
     });
     const portalSync = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('siages-portal-sync.js'));
     expect(portalSync).toMatchObject({
@@ -74,7 +88,7 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(siafiPredocAlert).toMatchObject({
       matches: ['https://siafi.tesouro.gov.br/*'],
       css: ['siafi-predoc-alert.css', 'siafi-evidence.css'],
-      js: ['siafi-predoc-alert.js', 'siafi-evidence-core.js', 'siafi-evidence-pdf.js', 'siafi-evidence.js'],
+      js: ['siafi-predoc-alert.js', 'siafi-evidence-core.js', 'siafi-evidence-pdf.js', 'siafi-analysis.js', 'siafi-evidence.js'],
       run_at: 'document_idle',
     });
     expect(comprasnetPredocAlert).toMatchObject({

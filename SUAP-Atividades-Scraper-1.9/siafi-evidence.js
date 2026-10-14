@@ -217,10 +217,27 @@
       }
     }
   }
+  function fileName(record) {
+    const identity = record.document;
+    const number = core.clean(identity.number);
+    const documentNumber = !number || number === '-' ? `${identity.type} em preenchimento` : `${identity.year}${identity.type}${number}`;
+    const fields = record.sections.filter(section => section.key === 'dados-basicos').flatMap(section => section.fields || []);
+    const read = (id, label) => core.clean((fields.find(field => id.test(field.id)) || fields.find(field => label.test(core.normalize(field.label))))?.value);
+    let beneficiary = read(/:nomeCredorDevedor/, /^nome do credor/);
+    const creditor = read(/:credorDevedor$/, /^codigo do credor/).replace(/\D/g, '');
+    // Bolsas pagas por lista PIX têm o BB como credor; o processo identifica o aluno ou o projeto.
+    if (creditor === '00000000000191' || /^banco do brasil/.test(core.normalize(beneficiary))) {
+      const process = read(/:processo$/, /^processo/) || read(/:observacao$/, /^observacao/).match(/\d{5}\.\d{6}\.\d{4}-\d{2}/)?.[0];
+      if (process) beneficiary = `processo ${process}`;
+    }
+    // Windows rejects these characters; trailing dots and spaces are dropped by the OS.
+    const name = [documentNumber, beneficiary].map(core.clean).filter(Boolean).join(' - ')
+      .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').slice(0, 150).replace(/[\s.]+$/, '');
+    return name || 'SIAFI-comprovante';
+  }
   function downloads(record, pages) {
     objectUrls.forEach(url => URL.revokeObjectURL(url)); objectUrls = [];
-    const identity = record.document;
-    const name = `SIAFI-${identity.ug}-${identity.year}-${identity.type}-${identity.number === '-' ? 'em-preenchimento' : identity.number}-${record.startedAt.replace(/[:.]/g, '-')}`.replace(/[^a-zA-Z0-9_-]/g, '-');
+    const name = fileName(record);
     const json = new Blob([JSON.stringify(record, null, 2)], { type: 'application/json;charset=utf-8' });
     const pdf = new Blob([globalThis.SiagesSiafiEvidencePdf.buildPdf(pages, record)], { type: 'application/pdf' });
     const results = toolbar.querySelector('[data-results]'); results.replaceChildren();
@@ -228,6 +245,7 @@
       const anchor = document.createElement('a'); anchor.textContent = label; anchor.download = `${name}.${extension}`;
       anchor.href = URL.createObjectURL(blob); objectUrls.push(anchor.href); results.appendChild(anchor);
     }
+    globalThis.SiagesSiafiAnalysis?.attach(toolbar, record);
   }
   async function start() {
     show();
@@ -242,6 +260,7 @@
     const pages = [];
     cancelled = false; running = true; pageCount = 0;
     lastRecord = core.createRecord(core.documentIdentity(document), location.href);
+    globalThis.SiagesSiafiAnalysis?.reset();
     toolbar.querySelector('[data-results]').replaceChildren();
     toolbar.querySelector('[data-start]').disabled = true;
     toolbar.querySelector('[data-close]').disabled = true;
@@ -295,7 +314,8 @@
       toolbar.addEventListener('keydown', event => {
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
         if (event.key === 'Tab') {
-          const controls = Array.from(toolbar.querySelectorAll('button:not(:disabled):not([hidden]),input:not(:disabled),a[href]'));
+          const controls = Array.from(toolbar.querySelectorAll('button:not(:disabled):not([hidden]),input:not(:disabled),select:not(:disabled),a[href]'))
+            .filter(control => !control.closest('[hidden]') && !control.closest('details:not([open])'));
           const first = controls[0], last = controls[controls.length - 1];
           if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
           else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
@@ -309,6 +329,7 @@
       toolbar.hidden = false;
     }
     if (toolbar.style.visibility !== 'hidden') toolbar.querySelector(running ? '[data-cancel]' : '[data-close]').focus();
+    globalThis.SiagesSiafiAnalysis?.resume();
   }
   document.addEventListener('click', blockDuringCapture, true);
   document.addEventListener('keydown', blockDuringCapture, true);
