@@ -1248,20 +1248,19 @@ export default function Dashboard() {
     });
   }, [filterPlanoInterno, filteredData.descentralizacoes, resumoDescentralizacoes, filterOrigem]);
 
-  const empenhosCorrenteParaSoma = useMemo(() => {
-    if (filterOrigem !== 'all') {
-      return filteredData.empenhosCorrente;
-    }
-    return filteredData.empenhosCorrente.filter(
+  // A origem externa permanece no detalhamento, sem compor os indicadores de execução.
+  const empenhosCorrenteParaSoma = useMemo(
+    () => filteredData.empenhosCorrente.filter(
       (empenho) => !isOrigemRecursoIgnoradaNoEmpenhado(empenho.origemRecurso),
-    );
-  }, [filteredData.empenhosCorrente, filterOrigem]);
+    ),
+    [filteredData.empenhosCorrente],
+  );
 
   const totalPlanejado = filteredData.atividades.reduce((total, atividade) => total + atividade.valorTotal, 0);
   const totalEmpenhado = empenhosCorrenteParaSoma.reduce((total, empenho) => total + empenho.valor, 0);
   const aDescentralizar = totalPlanejado - totalDescentralizado;
   const percentualExecutado = totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0;
-  const totalPago = filteredData.empenhosCorrente.reduce(
+  const totalPago = empenhosCorrenteParaSoma.reduce(
     (total, empenho) => total + (empenho.valorPagoOficial ?? empenho.valorPago ?? 0),
     0,
   );
@@ -1367,8 +1366,8 @@ export default function Dashboard() {
   });
 
   const totalLiquidado = useMemo(
-    () => calculateDashboardLiquidadoTotal(filteredData.empenhosCorrente, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho),
-    [filteredData.empenhosCorrente, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho],
+    () => calculateDashboardLiquidadoTotal(empenhosCorrenteParaSoma, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho),
+    [empenhosCorrenteParaSoma, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho],
   );
 
   const { data: contratosApiAtivos = EMPTY_ARRAY, isLoading: isContratosApiAtivosLoading = false } = useQuery({

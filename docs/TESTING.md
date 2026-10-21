@@ -1,5 +1,7 @@
 # Testes
 
+Dashboard — PTRES `230446`: `Dashboard.test.tsx` verifica que Empenhado, Liquidado e Pago excluem essa origem na visão geral e ao filtrá-la explicitamente, preservando seus empenhos no detalhamento por origem e restaurando os totais ao limpar filtros. O liquidado cobre documentos hábeis, saldo oficial, API de contratos e campo legado. Os mesmos totais alimentam os percentuais, o funil e os velocímetros de execução.
+
 Checklist SIAFI 1.9.71: `siafiChecklist.test.ts` cobre 32 regras, centavos, percentual/arredondamento, parcelas repetidas, omissão por estudante, seleção de notas, citações/host inválidos, fontes históricas, captura parcial e comparação por identidade. `SiafiChecklist.test.tsx` cobre filtro, conferido sem mudar parecer e feedback. `siafiAnalysisExtension.test.ts` cobre autenticação sob clique e rejeição de frame/origem. Deno valida JWT, processo/lista autorizados, seleção e texto/paginação PDF. `node scripts/test-siafi-checklist-db.mjs` valida migration em PGlite, RLS, claim exclusivo e snapshots/revisões imutáveis. [Operação e homologação](integrations/SIAFI_CHECKLIST.md).
 
 Este documento registra a politica minima de testes do repositorio.
