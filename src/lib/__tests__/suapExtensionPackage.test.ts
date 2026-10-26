@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.71');
+    expect(manifest.version).toBe('1.9.82');
     expect(manifest.name).toBe('SIAGES');
     expect(manifest.icons['128']).toBe('logo-transparent.png');
     expect(manifest.action.default_icon['32']).toBe('logo-transparent.png');
@@ -29,6 +29,8 @@ describe('pacote da extensao Suape 1.9', () => {
     const clickHints = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('click-hints.js'));
     const suapCommandPalette = commandPalettes.find((entry: { matches: string[] }) => entry.matches.includes('https://suap.ifrn.edu.br/*'));
     const globalCommandPalette = commandPalettes.find((entry: { matches: string[] }) => entry.matches.includes('<all_urls>'));
+    const siagesCommandBridge=commandPalettes.find((entry:{matches:string[]})=>entry.matches.includes('https://www.siages.com.br/*'));
+    expect(siagesCommandBridge).toMatchObject({js:['extension-auth-client.js','command-palette.js'],css:['command-palette.css']});
 
     expect(uploadDoc).toMatchObject({
       matches: ['https://suap.ifrn.edu.br/processo_eletronico/documento_upload/*'],
@@ -241,6 +243,13 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(backgroundScript).toContain("const CLICK_HINTS_SOURCE = 'suape-click-hints'");
     expect(backgroundScript).toContain('chrome.tabs.create({ url: url.href, active: true })');
     expect(backgroundScript).toContain("importScripts('scheduled-process-sync.js')");
+    expect(backgroundScript).toContain("importScripts('process-registry-sync.js')");
+    expect(fs.existsSync(extensionFixturePath('process-registry-sync.js'))).toBe(true);
+    expect(backgroundScript).toContain("importScripts('snippets-sync.js')");
+    expect(backgroundScript).toContain("const SNIPPETS_SYNC_SOURCE = 'siages-snippets-sync'");
+    expect(fs.existsSync(extensionFixturePath('snippets-sync.js'))).toBe(true);
+    expect(backgroundScript).toContain("importScripts('siafi-upload-bridge.js')");
+    expect(fs.existsSync(extensionFixturePath('siafi-upload-bridge.js'))).toBe(true);
     expect(scheduledSyncScript).toContain('atribuido_para=304806');
     expect(scheduledSyncScript).toContain('setor=857');
     expect(scheduledSyncScript).toContain('getNextRunAt');

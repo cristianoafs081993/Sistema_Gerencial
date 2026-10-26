@@ -394,3 +394,102 @@ describe('upload-document.js (seletor de arquivo após o preenchimento)', () => 
     expect(document.getElementById('siages-suap-upload-file-prompt')).toBeNull();
   });
 });
+
+describe('upload-document.js (captura SIAFI do printup)', () => {
+  const uploadId = '11111111-1111-4111-8111-111111111111';
+  const pdf = '%PDF-1.4\n%SIAGES\n';
+  const capture = { id: uploadId, processKey: '23035002988202697', processNumber: '23035.002988.2026-97', documentLabel: '2026NP000123', fileName: '23035.002988.2026-97 - 2026NP000123.pdf' };
+  const payload = {
+    source: 'siages', version: 1, action: 'suap_upload_document', suapId: '498930', processNumber: '23035.002988.2026-97', siafiUploadId: uploadId,
+    tipoConferencia: 'Cópia Simples', tipoDocumento: 'Liquidação', assunto: 'Liquidação',
+  };
+  let messages: Array<Record<string, unknown>>;
+  let responses: Record<string, unknown>;
+  let selected: File[];
+
+  beforeEach(() => {
+    document.body.innerHTML = mockUploadHtml;
+    messages = [];
+    selected = [];
+    responses = {
+      'find-siafi-capture': { ok: true, capture, others: 0 },
+      'download-siafi-capture': { ok: true, file: { ...capture, pdfBase64: btoa(pdf) } },
+      'consume-siafi-capture': { ok: true, consumed: true },
+    };
+    vi.stubGlobal('chrome', { runtime: { lastError: undefined, sendMessage: (message: Record<string, unknown>, reply: (value: unknown) => void) => {
+      messages.push(message);
+      queueMicrotask(() => reply(responses[String(message.type)]));
+    } } });
+    vi.stubGlobal('DataTransfer', class { files: File[] = []; items = { add: (file: File) => { this.files.push(file); } }; });
+    // jsdom só aceita FileList real em input.files; o teste guarda o que a extensão atribui.
+    Object.defineProperty(document.getElementById('id_arquivo')!, 'files', { configurable: true, get: () => selected, set: (value: File[]) => { selected = [...value]; } });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('anexa o PDF do printup, dispensa o seletor e apaga a captura ao salvar', async () => {
+    const automation = loadScript();
+    const fileInput = document.getElementById('id_arquivo') as HTMLInputElement;
+    const change = vi.fn();
+    fileInput.addEventListener('change', change);
+
+    await expect(automation.runUploadAutomation(automation.parseUploadPayloadFromHash(`#siagesUpload=${encodeURIComponent(JSON.stringify(payload))}`))).resolves.toBe(true);
+
+    expect(messages[0]).toMatchObject({ source: 'siages-upload', type: 'find-siafi-capture', uploadId, processNumber: '23035.002988.2026-97' });
+    expect(messages[1]).toMatchObject({ type: 'download-siafi-capture', id: uploadId });
+    expect(selected).toHaveLength(1);
+    expect(selected[0].name).toBe('23035.002988.2026-97 - 2026NP000123.pdf');
+    expect(selected[0].type).toBe('application/pdf');
+    expect(selected[0].size).toBe(pdf.length);
+    expect(change).toHaveBeenCalled();
+    expect(document.getElementById('siages-suap-upload-file-prompt')).toBeNull();
+    expect(document.getElementById('siages-suap-upload-notice')?.textContent).toContain('captura SIAFI 2026NP000123 anexada (processo 23035.002988.2026-97). Confira e clique em Salvar.');
+
+    document.getElementById('documento-externo-form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await Promise.resolve();
+    expect(messages.at(-1)).toMatchObject({ type: 'consume-siafi-capture', id: uploadId });
+  });
+
+  it('recusa a captura de outro processo exibido no cabeçalho e volta ao seletor', async () => {
+    document.body.insertAdjacentHTML('afterbegin', '<h2>Processo 23035.000001.2026-01</h2>');
+    const automation = loadScript();
+
+    await automation.runUploadAutomation(payload);
+
+    expect(messages.map((message) => message.type)).toEqual(['find-siafi-capture']);
+    expect(messages[0].pageNumbers).toEqual(['23035.000001.2026-01']);
+    expect(selected).toHaveLength(0);
+    expect(document.getElementById('siages-suap-upload-notice')?.textContent).toContain('a captura SIAFI é do processo 23035.002988.2026-97, diferente do processo desta página');
+    expect(document.getElementById('siages-suap-upload-file-prompt')).not.toBeNull();
+  });
+
+  it('up comum sem captura mantém o aviso dos campos e abre o seletor', async () => {
+    responses['find-siafi-capture'] = { ok: true, capture: null, reason: 'sem-captura' };
+    const automation = loadScript();
+
+    await automation.runUploadAutomation({ ...payload, processNumber: undefined, siafiUploadId: undefined });
+
+    expect(messages).toHaveLength(1);
+    expect(document.getElementById('siages-suap-upload-notice')?.textContent).toContain('Campos preenchidos automaticamente');
+    expect(document.getElementById('siages-suap-upload-file-prompt')).not.toBeNull();
+  });
+
+  it('não substitui um arquivo escolhido pelo usuário durante o download', async () => {
+    const automation = loadScript();
+    const own = new File(['meu'], 'meu.pdf', { type: 'application/pdf' });
+    responses['download-siafi-capture'] = { ok: true, file: { ...capture, pdfBase64: btoa(pdf) } };
+    const original = (globalThis as unknown as { chrome: { runtime: { sendMessage: (m: Record<string, unknown>, r: (v: unknown) => void) => void } } }).chrome.runtime.sendMessage;
+    (globalThis as unknown as { chrome: { runtime: { sendMessage: unknown } } }).chrome.runtime.sendMessage = (message: Record<string, unknown>, reply: (value: unknown) => void) => {
+      if (message.type === 'download-siafi-capture') selected = [own];
+      original(message, reply);
+    };
+
+    await automation.runUploadAutomation(payload);
+
+    expect(selected).toEqual([own]);
+    expect(messages.map((message) => message.type)).toEqual(['find-siafi-capture', 'download-siafi-capture']);
+  });
+});

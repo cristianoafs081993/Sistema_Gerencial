@@ -6,6 +6,7 @@
   const ID = 'siages-siafi-evidence';
   let toolbar, running = false, cancelled = false, lastRecord = null;
   let pageCount = 0;
+  let uploadMode = false, uploadGeneration = 0;
   let objectUrls = [];
   let returnFocus = null;
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -217,39 +218,93 @@
       }
     }
   }
-  function fileName(record) {
+  function basicField(record, id, label) {
+    const fields = record.sections.filter(section => section.key === 'dados-basicos').flatMap(section => section.fields || []);
+    return core.clean((fields.find(field => id.test(field.id)) || fields.find(field => label.test(core.normalize(field.label))))?.value);
+  }
+  // O campo Processo é digitado no SIAFI; o NUP de 17 dígitos volta ao formato do SUAP.
+  function processNumber(record) {
+    const typed = basicField(record, /:processo$/, /^processo/);
+    const noted = basicField(record, /:observacao$/, /^observacao/).match(/\d{5}\.\d{6}[./]\d{4}-\d{2}/)?.[0] || '';
+    const digits = [typed, noted].map(value => value.replace(/\D/g, '')).find(value => value.length === 17);
+    return digits ? `${digits.slice(0, 5)}.${digits.slice(5, 11)}.${digits.slice(11, 15)}-${digits.slice(15)}` : typed;
+  }
+  function documentNumber(record) {
     const identity = record.document;
     const number = core.clean(identity.number);
-    const documentNumber = !number || number === '-' ? `${identity.type} em preenchimento` : `${identity.year}${identity.type}${number}`;
-    const fields = record.sections.filter(section => section.key === 'dados-basicos').flatMap(section => section.fields || []);
-    const read = (id, label) => core.clean((fields.find(field => id.test(field.id)) || fields.find(field => label.test(core.normalize(field.label))))?.value);
-    let beneficiary = read(/:nomeCredorDevedor/, /^nome do credor/);
-    const creditor = read(/:credorDevedor$/, /^codigo do credor/).replace(/\D/g, '');
-    // Bolsas pagas por lista PIX têm o BB como credor; o processo identifica o aluno ou o projeto.
-    if (creditor === '00000000000191' || /^banco do brasil/.test(core.normalize(beneficiary))) {
-      const process = read(/:processo$/, /^processo/) || read(/:observacao$/, /^observacao/).match(/\d{5}\.\d{6}\.\d{4}-\d{2}/)?.[0];
-      if (process) beneficiary = `processo ${process}`;
-    }
+    return !number || number === '-' ? `${identity.type} em preenchimento` : `${identity.year}${identity.type}${number}`;
+  }
+  function fileName(record) {
+    const process = processNumber(record);
+    let beneficiary = basicField(record, /:nomeCredorDevedor/, /^nome do credor/);
+    const creditor = basicField(record, /:credorDevedor$/, /^codigo do credor/).replace(/\D/g, '');
+    // Bolsas pagas por lista PIX têm o BB como credor; o processo já identifica o aluno ou o projeto.
+    if (process && (creditor === '00000000000191' || /^banco do brasil/.test(core.normalize(beneficiary)))) beneficiary = '';
     // Windows rejects these characters; trailing dots and spaces are dropped by the OS.
-    const name = [documentNumber, beneficiary].map(core.clean).filter(Boolean).join(' - ')
+    const name = [process, documentNumber(record), beneficiary].map(core.clean).filter(Boolean).join(' - ')
       .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').slice(0, 150).replace(/[\s.]+$/, '');
     return name || 'SIAFI-comprovante';
+  }
+  function toBase64(bytes) {
+    let binary = '';
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(offset, offset + 0x8000));
+    return btoa(binary);
+  }
+  // printup: entrega o PDF ao worker, que o guarda no SIAGES e abre o upload do processo no SUAP.
+  async function sendToSuap(record, name, pdfBytes) {
+    const generation = ++uploadGeneration;
+    const line = toolbar.querySelector('[data-suap-upload]'), actions = toolbar.querySelector('[data-suap-actions]');
+    const report = text => { if (generation !== uploadGeneration) return; line.hidden = false; line.textContent = text; };
+    // Cópia local primeiro: se a rede ou a sessão SIAGES falharem, o arquivo já está em Downloads para o seletor do SUAP.
+    toolbar.querySelector('[data-results] a[download$=".pdf"]')?.click();
+    const local = `Cópia salva no computador (${name}.pdf).`;
+    const process = processNumber(record);
+    if (process.replace(/\D/g, '').length !== 17) { report(`${local} O DH não informa o processo em Dados Básicos; anexe o PDF manualmente no SUAP.`); return; }
+    const identity = record.document, number = core.clean(identity.number);
+    report(`${local} Enviando o PDF para o upload do processo ${process}…`);
+    let response;
+    try {
+      response = await chrome.runtime.sendMessage({ source: 'siages-siafi-evidence', type: 'stage-upload', payload: {
+        processNumber: process, documentLabel: documentNumber(record), fileName: `${name}.pdf`, captureId: record.captureId, openUp: true,
+        documentKey: !number || number === '-' ? `${identity.year}${identity.type}-preenchimento` : `${identity.year}${identity.type}${number}`,
+        pdfBase64: toBase64(pdfBytes) } });
+    } catch (error) { response = { ok: false, error: error.message }; }
+    if (!response?.ok || !response.capture) { report(`${local} Não foi possível enviar ao SUAP: ${String(response?.error || 'a extensão não respondeu').replace(/\.$/, '')}. Use up no processo ${process} e escolha a cópia local.`); return; }
+    if (response.opened) { report(`${local} Upload do processo ${process} aberto no SUAP com o PDF anexado. Confira e clique em Salvar.`); return; }
+    report(`${local} Volte à janela do SUAP: o upload do processo ${process} abre com o documento anexado (ou use up no processo).`);
+    if (generation !== uploadGeneration) return;
+    const here = document.createElement('button'); here.type = 'button'; here.textContent = 'Abrir upload nesta janela';
+    here.addEventListener('click', async () => {
+      here.disabled = true;
+      const opened = await chrome.runtime.sendMessage({ source: 'siages-siafi-evidence', type: 'open-upload-here', capture: response.capture }).catch(error => ({ ok: false, error: error.message }));
+      if (opened?.ok) { actions.replaceChildren(); report(`${local} Upload do processo ${process} aberto com o PDF anexado. Confira e clique em Salvar.`); }
+      else { here.disabled = false; report(opened?.error || 'Não foi possível abrir o upload.'); }
+    });
+    actions.replaceChildren(here);
   }
   function downloads(record, pages) {
     objectUrls.forEach(url => URL.revokeObjectURL(url)); objectUrls = [];
     const name = fileName(record);
     const json = new Blob([JSON.stringify(record, null, 2)], { type: 'application/json;charset=utf-8' });
-    const pdf = new Blob([globalThis.SiagesSiafiEvidencePdf.buildPdf(pages, record)], { type: 'application/pdf' });
+    const pdfBytes = globalThis.SiagesSiafiEvidencePdf.buildPdf(pages, record);
+    const pdf = new Blob([pdfBytes], { type: 'application/pdf' });
     const results = toolbar.querySelector('[data-results]'); results.replaceChildren();
     for (const [label, extension, blob] of [['Baixar PDF', 'pdf', pdf], ['Baixar dados (JSON)', 'json', json]]) {
       const anchor = document.createElement('a'); anchor.textContent = label; anchor.download = `${name}.${extension}`;
       anchor.href = URL.createObjectURL(blob); objectUrls.push(anchor.href); results.appendChild(anchor);
     }
     globalThis.SiagesSiafiAnalysis?.attach(toolbar, record);
+    try { window.dispatchEvent(new CustomEvent('siages-siafi-capture-complete', { detail: { record } })); } catch (_) {}
+    return { name, pdfBytes };
   }
-  async function start() {
+  // A palette chooses print or printup; "Nova captura" repeats the last mode.
+  async function start(options) {
     show();
     if (running) return;
+    if (options && typeof options.upload === 'boolean') uploadMode = options.upload;
+    uploadGeneration++;
+    toolbar.querySelector('[data-suap-upload]').hidden = true;
+    toolbar.querySelector('[data-suap-actions]').replaceChildren();
     if (modal()) { status('Retorne do pré-doc antes de iniciar a captura.'); return; }
     if (pendingEdits()) { status('Conclua a edição da aba no SIAFI antes de capturar.'); return; }
     const originalTab = core.getTabs(document).find(tab => tab.active)?.id;
@@ -283,10 +338,12 @@
       lastRecord.finishedAt = new Date().toISOString();
     }
     if (failure) { status(`Não foi gerado comprovante: ${failure.message}`); return; }
+    let files;
     try {
-      downloads(lastRecord, pages);
+      files = downloads(lastRecord, pages);
       status(lastRecord.status === 'complete' ? 'Captura pronta. Baixe o PDF e o JSON.' : `Captura parcial: ${lastRecord.warnings.join(' ')} Confira os avisos no JSON.`);
-    } catch (error) { status(`Falha ao gerar os arquivos: ${error.message}`); }
+    } catch (error) { status(`Falha ao gerar os arquivos: ${error.message}`); return; }
+    if (uploadMode) await sendToSuap(lastRecord, files.name, files.pdfBytes);
   }
   function blockDuringCapture(event) {
     if (running && event.type === 'keydown' && event.key === 'Escape') {
@@ -306,7 +363,7 @@
   function show() {
     if (!toolbar) {
       toolbar = document.createElement('div'); toolbar.id = ID; toolbar.hidden = true;
-      toolbar.innerHTML = '<section role="dialog" aria-modal="true" aria-labelledby="siages-evidence-title"><div class="siages-evidence-header"><strong id="siages-evidence-title">Comprovante da liquidação</strong><button type="button" data-close aria-label="Fechar comprovante">Fechar</button></div><label><input type="checkbox" checked> Incluir pré-docs preenchidos</label><div class="siages-evidence-actions"><button type="button" data-start>Nova captura</button><button type="button" data-cancel hidden>Cancelar captura</button><span data-results></span></div><p role="status" aria-live="polite">Gera PDF das telas e dados em JSON neste navegador.</p></section>';
+      toolbar.innerHTML = '<section role="dialog" aria-modal="true" aria-labelledby="siages-evidence-title"><div class="siages-evidence-header"><strong id="siages-evidence-title">Comprovante da liquidação</strong><button type="button" data-close aria-label="Fechar comprovante">Fechar</button></div><label><input type="checkbox" checked> Incluir pré-docs preenchidos</label><div class="siages-evidence-actions"><button type="button" data-start>Nova captura</button><button type="button" data-cancel hidden>Cancelar captura</button><span data-results></span></div><p role="status" aria-live="polite">Gera PDF das telas e dados em JSON neste navegador.</p><p data-suap-upload aria-live="polite" hidden></p><div class="siages-evidence-actions" data-suap-actions></div></section>';
       toolbar.querySelector('[data-start]').addEventListener('click', () => { void start(); });
       toolbar.querySelector('[data-cancel]').addEventListener('click', cancelCapture);
       toolbar.querySelector('[data-close]').addEventListener('click', close);
@@ -335,7 +392,7 @@
   document.addEventListener('keydown', blockDuringCapture, true);
   const available = () => location.protocol === 'https:' && location.hostname === 'siafi.tesouro.gov.br' && Boolean(root());
   // Shared only with other content scripts in the extension's isolated world.
-  globalThis.SiagesSiafiEvidence = { available, isRunning: () => running, show, start: () => available() ? start() : Promise.resolve() };
+  globalThis.SiagesSiafiEvidence = { available, isRunning: () => running, show, start: options => available() ? start(options) : Promise.resolve() };
   if (window.__SIAGES_SIAFI_EVIDENCE_TEST__) window.__siagesSiafiEvidence = { start, selectTab, pendingEdits, captureTab, screenshotPages, unscroll, getRecord: () => lastRecord, destroy() {
     toolbar?.remove(); objectUrls.forEach(url => URL.revokeObjectURL(url));
     document.removeEventListener('click', blockDuringCapture, true); document.removeEventListener('keydown', blockDuringCapture, true);

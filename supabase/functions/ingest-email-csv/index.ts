@@ -437,7 +437,7 @@ async function applyContaDescentralizacoesImport(
     updated_at: timestamp,
   }));
 
-  await upsertInChunks(supabase, 'descentralizacoes_conta_saldos', payload, 'ptres');
+  await upsertInChunks(supabase, 'descentralizacoes_conta_saldos', payload, 'campus_uasg,ptres');
 
   return {
     pipeline: 'descentralizacoes_conta_saldos' as const,
@@ -820,7 +820,7 @@ async function applyCreditosDisponiveisImport(
     updated_at: timestamp,
   }));
 
-  await upsertInChunks(supabase, 'creditos_disponiveis', payload, 'ptres');
+  await upsertInChunks(supabase, 'creditos_disponiveis', payload, 'campus_uasg,ptres');
 
   return {
     pipeline: 'creditos_disponiveis' as const,

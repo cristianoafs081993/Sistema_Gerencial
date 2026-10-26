@@ -313,6 +313,35 @@ describe('Suape - Menu de Colagem Inteligente Alt+V (suapProcessPastePicker)', (
     api.closePicker();
   });
 
+  it('identifica os processos vindos de outro perfil do Chrome', async () => {
+    window.eval(pasteScript);
+    const api = (window as unknown as { __suapeProcessPastePicker: { openPicker: () => Promise<void>; closePicker: () => void } }).__suapeProcessPastePicker;
+
+    (window as unknown as { chrome: unknown }).chrome = {
+      runtime: {
+        sendMessage: vi.fn((_msg: unknown, cb: (res: unknown) => void) => {
+          cb({
+            ok: true,
+            processes: [
+              { suapId: '1', processNumber: '23035.000001.2026-01', process: { cpfCnpj: '111.111.111-11' } },
+              { suapId: '2', processNumber: '23035.000002.2026-02', process: { cpfCnpj: '222.222.222-22' }, remote: true },
+            ],
+          });
+        }),
+      },
+    };
+
+    await api.openPicker();
+
+    const headers = Array.from(document.querySelectorAll('.suape-paste-group-header'));
+    expect(headers).toHaveLength(2);
+    expect(headers[0].querySelector('.suape-paste-group-remote')).toBeNull();
+    expect(headers[1].querySelector('.suape-paste-group-remote')?.textContent).toBe('outro perfil');
+    expect(pasteCss).toContain('.suape-paste-group-remote');
+
+    api.closePicker();
+  });
+
   it('fecha o menu com a tecla Escape sem alterar o campo de texto', async () => {
     window.eval(pasteScript);
     const api = (window as unknown as { __suapeProcessPastePicker: { openPicker: () => Promise<void>; closePicker: () => void } }).__suapeProcessPastePicker;

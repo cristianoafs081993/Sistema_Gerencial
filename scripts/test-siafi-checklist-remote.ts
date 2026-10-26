@@ -3,6 +3,7 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.94.1';
 import {PDFDocument,StandardFonts} from 'npm:pdf-lib@1.17.1';
 if(Deno.env.get('SIAFI_REMOTE_TEST')!=='1')throw new Error('Execute explicitamente com SIAFI_REMOTE_TEST=1.');
+const rosterOnly=Deno.env.get('SIAFI_ROSTER_TEST')==='1';
 const ref=(await Deno.readTextFile('supabase/.temp/project-ref')).trim();
 const command=await new Deno.Command('supabase',{args:['projects','api-keys','--project-ref',ref,'-o','json'],stdout:'piped',stderr:'piped'}).output();
 if(!command.success)throw new Error('Não foi possível obter as credenciais do projeto vinculado.');
@@ -61,7 +62,7 @@ try {
   const {data:process,error:processError}=await admin.from('processos').insert({tenant_id:userId,suap_id:`fixture-${Date.now()}`,url:'https://suap.ifrn.edu.br/processo_eletronico/processo/999999/',num_processo:'99999.000001.2026-01',status:'success',beneficiario:'EMPRESA FICTICIA',cpf_cnpj:'11111111000191',assunto:'Fornecimento de material de consumo - fixture',pdf_url:path,dados_completos:{val_nf:'100,00',notas_fiscais:[{numero:'123',data_emissao:'2026-10-13',valor:'100,00'}],dados_bancarios:{banco:'001',agencia:'0012',conta:'00123-X'}}}).select('id').single();
   if(processError||!process)throw new Error('Não foi possível inserir o processo fictício.');processId=process.id;
   const capture=(amount:string)=>({schemaVersion:'1.0.0',captureId:crypto.randomUUID(),source:'https://siafi.tesouro.gov.br/siafiweb/dh',startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),status:'complete',document:{ug:'158366',year:'2026',type:'NP',number:'999999'},warnings:[],sections:[{key:'dados_basicos',status:'captured',fields:[{label:'Processo',id:'processo',value:'99999.000001.2026-01'},{label:'Valor do Documento',id:'valor',value:amount},{label:'Código do Credor',id:'credor',value:'11111111000191'},{label:'Data Emissão Contábil',id:'emissao',value:'13/10/2026'}],tables:[{headers:['Número Doc. Origem','Valor'],rows:[[{text:'123'},{text:amount}]]}],text:'Nota fiscal 123'},{key:'deducao',status:'empty',fields:[],tables:[],text:'Sem deduções'}],predocs:[],analysis:{status:'not_requested'}});
-  for(const amount of ['105,50','100,00']) {
+  for(const amount of rosterOnly?[]:['105,50','100,00']) {
     const started=await action({action:'start',captura:capture(amount),processoId:processId});
     assert(started.runId,'O fluxo deveria selecionar a nota e iniciar automaticamente.');runs.push(started.runId);
     const {run}=await result(started.runId),data=run.result_snapshot;
@@ -83,19 +84,40 @@ try {
     }
     console.log(`Fixture PJ ${amount}: C04 ${check.status}; delta ${check.calculo.diferencaCentavos} centavos; ${data.checklist.length} itens.`);
   }
-  for(const missingValue of [false,true]) {
+  const studentCases=rosterOnly?[{missingValue:false,missingStudent:true,extraStudent:false,managerError:false},{missingValue:false,missingStudent:false,extraStudent:true,managerError:false},{missingValue:false,missingStudent:false,extraStudent:false,managerError:true}]:[{missingValue:false,missingStudent:false,extraStudent:false,managerError:false},{missingValue:true,missingStudent:false,extraStudent:false,managerError:false}];
+  for(const {missingValue,missingStudent,extraStudent,managerError} of studentCases) {
     const studentPdf=await PDFDocument.create(),studentFont=await studentPdf.embedFont(StandardFonts.Helvetica),studentPage=studentPdf.addPage();
-    const studentLines=['DOCUMENTO FICTICIO PARA TESTE - NAO PAGAR','Processo: 99999.000001.2026-01','Autorizacao de bolsas de assistencia estudantil','Programa: PAFE. Competencia: 2026-10. Parcela: 1.','Estudante A. CPF: 000.000.001-91. Valor autorizado: 72,10.',`Estudante B. CPF: 000.000.002-72. Valor autorizado: ${missingValue?'NAO INFORMADO':'127,90'}.`,'Total autorizado: 200,00. Sem comprovacao de pagamento anterior.'];
-    studentLines.forEach((line,index)=>studentPage.drawText(line,{x:40,y:780-index*30,font:studentFont,size:12}));
+    const studentLines=['DOCUMENTO FICTICIO PARA TESTE - NAO PAGAR','Processo: 99999.000001.2026-01',
+      'Solicitacao original: PAFE competencia 2026-10 parcela 1.',
+      'Estudante A solicitado. CPF: 000.000.001-91.',...(extraStudent?[]:['Estudante B solicitado. CPF: 000.000.002-72.']),
+      `Quantidade solicitada: ${extraStudent?1:2}. Nenhuma exclusao ou alteracao do pedido foi justificada.`,
+      'Autorizacao integral do gestor: PAFE competencia 2026-10 parcela 1.',
+      'Estudante A autorizado. CPF: 000.000.001-91. Valor autorizado: 72,10.',
+      ...(extraStudent||managerError?[]:[`Estudante B autorizado. CPF: 000.000.002-72. Valor autorizado: ${missingValue?'NAO INFORMADO':'127,90'}.`]),
+      `Quantidade autorizada: ${extraStudent||managerError?1:2}. Total autorizado: ${extraStudent||managerError?'72,10':'200,00'}. Sem comprovacao de pagamento anterior.`];
+    studentLines.forEach((line,index)=>studentPage.drawText(line,{x:25,y:780-index*30,font:studentFont,size:10}));
     const upload=await admin.storage.from('suap-pdfs').upload(path,await studentPdf.save(),{contentType:'application/pdf',upsert:true});assert(!upload.error,'PDF de estudantes não atualizado.');
-    const updated=await admin.from('processos').update({assunto:'Bolsas assistência estudantil PAFE',dados_completos:{val_nf:'200,00',notas_fiscais:[]}}).eq('id',processId).eq('tenant_id',userId);assert(!updated.error,'Processo de estudantes não atualizado.');
-    const studentCapture=capture('200,00');studentCapture.document={ug:'158366',year:'2026',type:'RP',number:missingValue?'999998':'999997'};
+    const updated=await admin.from('processos').update({assunto:'Bolsas assistência estudantil PAFE',dados_completos:{val_nf:extraStudent?'72,10':'200,00',notas_fiscais:[]}}).eq('id',processId).eq('tenant_id',userId);assert(!updated.error,'Processo de estudantes não atualizado.');
+    const studentCapture=capture(missingStudent||managerError?'72,10':'200,00');studentCapture.document={ug:'158366',year:'2026',type:'RP',number:missingValue?'999998':missingStudent?'999996':extraStudent?'999995':managerError?'999994':'999997'};
     studentCapture.sections[0].text='Programa PAFE, competência 2026-10, parcela 1';
-    studentCapture.sections.push({key:'dados_pagamento',status:'captured',fields:[],tables:[{headers:['CPF','Nome','Valor'],rows:[[{text:'00000000191'},{text:'Estudante A'},{text:'72,10'}],[{text:'00000000272'},{text:'Estudante B'},{text:'127,90'}]]}],text:'Favorecidos PAFE 2026-10 parcela 1'});
+    studentCapture.sections.push({key:'dados_pagamento',status:'captured',fields:[],tables:[{headers:['CPF','Nome','Valor'],rows:[[{text:'00000000191'},{text:'Estudante A'},{text:'72,10'}],...(missingStudent||managerError?[]:[[{text:'00000000272'},{text:'Estudante B'},{text:'127,90'}]])]}],text:'Favorecidos PAFE 2026-10 parcela 1'});
     const started=await action({action:'start',captura:studentCapture,processoId:processId,tipoPagamento:'estudantes',listaAusente:true,competencia:'2026-10'});
     assert(started.runId,'Análise de estudantes não iniciada.');runs.push(started.runId);
     const {run}=await result(started.runId),data=run.result_snapshot;reports.push(data);
     await Deno.writeTextFile('tmp/siafi-checklist-remoto.json',JSON.stringify(reports,null,2));
+    if(rosterOnly) {
+      const coverage=data.checklist.find((item:{id:string})=>item.id==='B02:GERAL');
+      assert(coverage?.status==='divergente',`Cobertura B02 deveria divergir: ${coverage?.status}; ${coverage?.observacao}`);
+      const student=data.checklist.find((item:{id:string})=>item.id==='B02:CPF:00000000272:COBERTURA');
+      assert(student?.status==='divergente','Aluno esquecido/adicional não foi identificado individualmente.');
+      assert(student.acao.includes(managerError?'gestor':missingStudent?'esquecido':'incluído a mais'),'Orientação individual incorreta.');
+      if(managerError) {
+        assert(data.checklist.find((item:{id:string})=>item.id==='B02:SOLICITACAO_AUTORIZACAO')?.status==='divergente','Erro da autorização frente ao pedido não identificado.');
+        assert(data.checklist.find((item:{id:string})=>item.id==='B02:AUTORIZACAO_LIQUIDACAO')?.status==='conforme','DH deveria corresponder à autorização errada desta fixture.');
+      }
+      console.log(`Fixture B02: ${managerError?'2 solicitados, gestor autoriza 1 e DH contém 1':missingStudent?'2 alunos autorizados, 1 liquidado':'1 aluno autorizado, 2 liquidados'}; estudante B identificado como divergente.`);
+      continue;
+    }
     const individual=data.checklist.filter((item:{regraId:string})=>item.regraId==='B03');
     assert(individual.some((item:{entidade:string,status:string})=>item.entidade.includes('00000000191')&&item.status==='conforme'),'Valor individual 72,10 não conferido.');
     const second=individual.find((item:{entidade:string})=>item.entidade.includes('00000000272'));

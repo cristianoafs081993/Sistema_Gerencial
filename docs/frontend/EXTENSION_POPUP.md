@@ -12,6 +12,14 @@ Na versão 1.9.63, o popup e o nome exibido pelo navegador usam **SIAGES** e exi
 
 O campo `Segredo de automação` foi retirado, junto com a leitura e escrita da sua preferência no popup. Esse valor não era utilizado pelos fluxos atuais de sincronização. Não há novo contrato de backend nem alteração em migrations ou Edge Functions.
 
+## Recuperação de sessão (1.9.76)
+
+O worker reconhece o campo REST `error_code` do Supabase, mesmo quando `code` é numérico ou `error` contém um motivo genérico. `refresh_token_not_found`, `refresh_token_already_used`, `session_not_found`, `session_expired`, `invalid_grant` e HTTP 401 encerram a sessão local e orientam abrir o popup e entrar novamente. Assim, uma sessão recusada definitivamente não fica repetindo o aviso de falha temporária. Falhas de rede, HTTP 429 e 5xx preservam a sessão; o aviso HTTP inclui o status para diagnóstico, e o acesso ainda válido continua disponível.
+
+Após atualizar a extensão para 1.9.76, recarregar as abas usadas. Se a sessão anterior tiver sido invalidada, abrir o popup SIAGES, entrar com e-mail e senha e repetir **Conferir com IA**. Não é necessário reinstalar nem apagar o armazenamento da extensão.
+
+Diagnóstico em 16/10/2026: chamada ao Auth com token fictício inexistente retornou HTTP 400 e `{ code: 400, error_code: 'refresh_token_not_found' }`. O worker anterior ignorava `error_code` e reproduzia o aviso genérico da captura. Isso confirma a falha de classificação; não identifica o motivo original da invalidação da sessão do usuário. Referência: [códigos do Supabase Auth](https://supabase.com/docs/guides/auth/debugging/error-codes).
+
 ## Visibilidade administrativa (1.9.63)
 
 O popup segue `src/lib/authz.ts`: sessão com token e usuário cujo e-mail normalizado corresponda a `SUPERADMIN_EMAIL`, ou cujo `app_metadata.role` seja `superadmin`, ou `app_metadata.is_superadmin` seja o booleano `true`. Metadados editáveis pelo usuário (`user_metadata`) não concedem acesso; papel `admin` comum também não.

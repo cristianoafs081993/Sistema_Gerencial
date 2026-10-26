@@ -1,5 +1,21 @@
 # TABLE_CATALOG
 
+## Capturas SIAFI do printup (extensão)
+
+`extension_siafi_uploads` liga cada PDF do comando `printup` ao processo SUAP, por usuário (`tenant_id=auth.uid()`). Colunas: `process_key` (NUP com 17 dígitos), `document_key` (DH, ex. `2026NP000123` ou `2026RP-preenchimento`), `document_label`, `file_name` (nome do PDF, terminado em `.pdf`), `storage_path` (obrigatoriamente `<tenant_id>/<process_key>/<document_key>.pdf`), `byte_size` (até 40 MB), `capture_id`, `open_requested`, `opened_at` e `updated_at` (carimbado pelo servidor em insert/update). Única por `(tenant_id, process_key, document_key)`: nova captura do mesmo DH substitui a anterior; DHs diferentes do mesmo processo coexistem. RLS por usuário para leitura/escrita/exclusão; `anon` sem acesso.
+
+O arquivo fica no bucket privado `siafi-capturas` (somente `application/pdf`, 40 MB). As políticas de `storage.objects` limitam o caminho a `<auth.uid()>/<17 dígitos>/<[0-9A-Za-z-]{1,60}>.pdf` para inserir, atualizar, ler e apagar. Dados temporários: a extensão apaga linha e arquivo ao salvar o upload no SUAP. O cron `siafi-capturas-cleanup-daily` (03:05 UTC, 00:05 em Brasília) chama `cleanup-siafi-capturas`. Essa execução apaga pela API do Storage os objetos anteriores ao início do dia, incluindo órfãos, e remove as linhas com `updated_at` anterior ao corte. `siafi_capturas_cleanup_candidates(p_cutoff, p_limit)` só lista objetos e é exclusiva de `service_role`. Migrations `20261023120000` e `20261023121000`. Fluxo: [SIAFI_EVIDENCE](../integrations/SIAFI_EVIDENCE.md).
+
+## Processos compartilhados entre perfis da extensão (Alt+V)
+
+`extension_process_registry` guarda, por usuário (`tenant_id=auth.uid()`) e perfil do Chrome (`profile_id`, UUID gerado pela extensão), o último resumo de cada processo SUAP aberto: `process_key` (SUAP ID ou número), `suap_id`, `process_number` e `payload` (`process`, `fields`, `title`, `url`; até 256 KB, objeto JSON). Única por `(tenant_id, profile_id, process_key)`; `updated_at` é carimbado pelo servidor em insert/update. RLS permite ao usuário ler, inserir, atualizar e apagar somente os próprios registros; `anon` não tem acesso. A extensão lê só registros de outros perfis das últimas 12 h, apaga o registro ao fechar a aba e remove do próprio perfil o que tiver mais de 24 h. Migration `20261014150000`. Fluxo: [DATA_FLOW](../frontend/DATA_FLOW.md).
+
+### `extension_snippets`
+
+- Atalhos de texto da extensão SIAGES por usuário: `tenant_id` (PK, `auth.uid()`), `snippets jsonb` (objeto `{"/gatilho": "texto"}`, máx. 256 KiB) e `updated_at` (trigger `stamp_extension_snippets`).
+- RLS: SELECT/INSERT/UPDATE apenas do próprio `tenant_id`; `anon` sem acesso e sem DELETE. Migration `20261026120000_extension_snippets.sql`.
+- Escrita exclusiva do `background.js` via `snippets-sync.js` com a sessão SIAGES da extensão.
+
 ## Conferência da liquidação SIAFI
 
 `siafi_liquidacao_analises` guarda jobs, entrada/hash imutáveis e resultado imutável após conclusão, com FK para `processos` e isolamento `tenant_id=auth.uid()`. Escrita/claim exclusivos de service role. `siafi_liquidacao_revisoes` guarda eventos append-only por item existente; usuário só lê/insere revisões de sua análise concluída. Migration `20261013140000`. Contrato: [SIAFI_CHECKLIST](../integrations/SIAFI_CHECKLIST.md).

@@ -216,9 +216,10 @@
         return void getLocalFallbackProcesses().then(onDone);
       }
 
+      // Inclui a consulta ao SIAGES pelos processos abertos em outros perfis do Chrome.
       const timeout = setTimeout(() => {
         void getLocalFallbackProcesses().then(onDone);
-      }, 800);
+      }, 2500);
 
       try {
         chrome.runtime.sendMessage(
@@ -540,6 +541,7 @@
           suapId,
           fields: filteredFields,
           index: procIndex + 1,
+          remote: proc.remote === true,
         });
       }
     });
@@ -550,7 +552,7 @@
       if (currentProcesses.length === 0) {
         emptyEl.innerHTML = `
           <div class="suape-paste-empty-title">Nenhum processo identificado</div>
-          <div class="suape-paste-empty-desc">Abra uma página de processo no SUAP para que os dados sejam detectados e disponibilizados automaticamente.</div>
+          <div class="suape-paste-empty-desc">Abra uma página de processo no SUAP para que os dados sejam detectados e disponibilizados automaticamente. Processos abertos em outro perfil do Chrome aparecem aqui quando os dois perfis estão logados na mesma conta SIAGES.</div>
         `;
       } else {
         emptyEl.innerHTML = `
@@ -576,6 +578,7 @@
           <span class="suape-paste-group-index">PROCESSO ${group.index}</span>
           <span class="suape-paste-group-title">${escapeHtml(group.processNumber)}</span>
           ${group.suapId ? `<span class="suape-paste-group-suapid">SUAP #${escapeHtml(group.suapId)}</span>` : ''}
+          ${group.remote ? '<span class="suape-paste-group-remote" title="Aberto em outro perfil do Chrome logado no SIAGES">outro perfil</span>' : ''}
         </div>
         <span class="suape-paste-group-status">${group.fields.length} itens identificados</span>
       `;

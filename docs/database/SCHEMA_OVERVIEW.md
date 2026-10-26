@@ -1,5 +1,10 @@
 # SCHEMA_OVERVIEW
 
+Extensão SIAGES, `printup`: `extension_siafi_uploads` e o bucket privado `siafi-capturas` levam o PDF da captura SIAFI ao upload do mesmo processo no SUAP. A ponte funciona também entre perfis do Chrome. RLS por usuário; dados do mesmo dia, apagados ao salvar no SUAP e pela limpeza diária `cleanup-siafi-capturas`. Ver [TABLE_CATALOG](TABLE_CATALOG.md).
+
+Extensão SIAGES: `extension_process_registry` compartilha entre perfis do Chrome do mesmo usuário os processos SUAP abertos, para o menu Alt+V. RLS por usuário; registros efêmeros (leitura de 12 h, limpeza de 24 h). Ver [TABLE_CATALOG](TABLE_CATALOG.md).
+Extensão SIAGES: `extension_snippets` guarda uma linha por usuário com os atalhos de texto (`/cn`, `/ifrn`...), para que perfis do Chrome sem sincronização do Google compartilhem os mesmos atalhos. RLS por usuário (sem DELETE); `updated_at` carimbado pelo servidor. Ver [TABLE_CATALOG](TABLE_CATALOG.md).
+
 Conferência SIAFI: `siafi_liquidacao_analises` (jobs e snapshots) e `siafi_liquidacao_revisoes` (revisão humana separada do parecer), com FK ao processo e RLS por usuário. PDFs de entrada são preservados no bucket privado existente. Ver [contrato e implantação](../integrations/SIAFI_CHECKLIST.md).
 
 ## Aviso importante

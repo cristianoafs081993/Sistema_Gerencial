@@ -108,6 +108,7 @@ function openPalette() {
 }
 
 afterEach(() => {
+  (window as typeof window & {__suapeSolrecfin?:{destroy:()=>void}}).__suapeSolrecfin?.destroy();
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -117,6 +118,25 @@ afterEach(() => {
 });
 
 describe('paleta global da extensao Suape', () => {
+  it.each(['https://siafi.tesouro.gov.br/siafiweb/menu','https://suap.ifrn.edu.br/processo_eletronico/processo/123/','https://mail.google.com/mail/','https://contratos.comprasnet.gov.br/'])('abre solrecfin fora de um DH e sem esperar o SIAGES em %s',async href=>{
+    const url=new URL(href);
+    Object.defineProperty(window,'location',{configurable:true,value:{protocol:url.protocol,hostname:url.hostname,pathname:url.pathname,href}});
+    const entries=[{captureId:'global-1',capturedAt:new Date().toISOString(),code:'EXE001',source:'1000000000',valueCents:123456}];
+    const stored={siages_solrecfin_entries:entries};
+    vi.stubGlobal('chrome',{storage:{local:{get:(_keys:unknown,callback:(data:typeof stored)=>void)=>callback(stored),set:(_data:unknown,callback:()=>void)=>callback()}},runtime:{}});
+    vi.stubGlobal('SiagesSiafiEvidence',{available:()=>false,isRunning:()=>false});
+    installExtensionAuth();vi.stubGlobal('fetch',vi.fn(()=>new Promise(()=>{})));
+    const open=vi.spyOn(window,'open').mockImplementation(()=>null);
+    window.eval(contentScript);
+    const input=openPalette();
+    fireEvent.input(input,{target:{value:'solrecfin'}});
+    expect(document.querySelector('.suape-cp-list')).toHaveTextContent('Solicitar financeiro (solrecfin)');
+    fireEvent.keyDown(input,{key:'Enter'});
+    await waitFor(()=>expect(document.querySelector('.suape-cp-detail-table')).toHaveTextContent('1.234,56'));
+    expect(document.querySelector('.suape-cp-detail-table')).toHaveTextContent('EXE001');
+    expect(document.querySelector('.suape-cp-detail-table')).toHaveTextContent('1000000000');
+    expect(open).not.toHaveBeenCalled();
+  });
   it('mantém print disponível no SIAFI mesmo enquanto outra busca espera os dados remotos', async () => {
     Object.defineProperty(window, 'location', { configurable: true, value: {
       protocol: 'https:', hostname: 'siafi.tesouro.gov.br', pathname: '/siafi/editarDH', href: 'https://siafi.tesouro.gov.br/siafi/editarDH',

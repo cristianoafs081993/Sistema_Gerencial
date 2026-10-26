@@ -303,11 +303,12 @@ async function updateRdStatus() {
   const totals = run?.summary;
   const reuse = run?.syncMode === 'incremental' ? ` ${run.reusedDetails || 0} RDs reaproveitadas; ${run.refreshedDetails || 0} relidas; ${run.reusedActivities || 0} relações de atividades reaproveitadas.` : '';
   const publication = Number.isInteger(run?.snapshotCount) ? ` ${run.appliedSnapshots || 0}/${run.snapshotCount} RDs capturadas já disponíveis.` : '';
+  const priority = run?.priorityTotal > 0 && run?.status !== 'applied' ? ` RDs novas (prioridade): ${run.priorityPublished || 0}/${run.priorityTotal} publicadas.` : '';
   const currency = value => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   rdStatusEl.textContent = status?.error || (run?.status === 'preview'
     ? `Conferência completa da unidade ${rdUnit}: ${totals?.rds || 0} RDs.${reuse} Dotação ${currency(totals?.totalDotacao)}, reforços ${currency(totals?.totalReforco)}, anulações ${currency(totals?.totalAnulacao)}. Confira os detalhes no SIAGES.`
     : run?.status === 'applied' ? `RDs da unidade ${rdUnit} aplicadas no SIAGES.${publication}`
-    : run ? `${running ? 'Coletando RDs' : 'Coleta pausada ou interrompida'} — unidade ${rdUnit}: ${run.processed || 0}/${run.sourceCount || 0} RDs conferidas; ${run.activitiesProcessed || 0}/${run.activitiesTotal || 0} relações oficiais verificadas.${publication}${reuse} ${running ? 'Mantenha a aba SUAP aberta.' : 'Clique em coletar / retomar.'}`
+    : run ? `${running ? 'Coletando RDs' : 'Coleta pausada ou interrompida'} — unidade ${rdUnit}: ${run.processed || 0}/${run.sourceCount || 0} RDs conferidas; ${run.activitiesProcessed || 0}/${run.activitiesTotal || 0} relações oficiais verificadas.${priority}${publication}${reuse} ${running ? 'Mantenha a aba SUAP aberta.' : 'Clique em coletar / retomar.'}`
     : `Unidade SUAP ${rdUnit}. A coleta usa sua sessão nesta aba.`);
 }
 

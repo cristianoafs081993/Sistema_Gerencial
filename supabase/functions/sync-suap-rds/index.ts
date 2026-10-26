@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { DOMParser } from 'npm:linkedom@0.18.13';
 import { getSuapPlanUnit, SUAP_PLAN_UNITS } from '../../../src/lib/suapPlanUnits.ts';
-import { collectCapturedRdPage, collectRdChunk, fetchSuapRdHtml, initialRdState, nextRdCaptureUrl, summarizeRdPreview, type RdRun } from '../_shared/suap_rd_sync.ts';
+import { collectCapturedRdPages, collectRdChunk, fetchSuapRdHtml, initialRdState, nextRdCaptureUrl, summarizeRdPreview, upcomingRdCaptureUrls, type RdRun } from '../_shared/suap_rd_sync.ts';
 import { RD_CANCELED_REUSE_MAX_AGE_DAYS, seedRdReuse } from '../_shared/suap_rd_reuse.ts';
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization,apikey,content-type,x-client-info', 'Access-Control-Allow-Methods': 'POST,OPTIONS' };
@@ -127,9 +127,11 @@ Deno.serve(async request => {
       .eq('id',run.id).or(`lease_until.is.null,lease_until.lt.${new Date().toISOString()}`).select('id').maybeSingle();
     if (claimed.error) throw claimed.error;
     if (!claimed.data) { lease=null; return reply({ ...publicRun(run),busy:true }); }
+    let consumedPages = 0;
     if (action === 'sync-extension' || action === 'sync-html') {
       run.state.captureMode = 'extension';
-      if (action === 'sync-html') await collectCapturedRdPage(service,run,body.html,body.sourceUrl,DOMParser as unknown as new()=>globalThis.DOMParser);
+      if (action === 'sync-html') consumedPages = await collectCapturedRdPages(service,run,Array.isArray(body.pages) ? body.pages : [{ html:body.html,sourceUrl:body.sourceUrl }],
+        DOMParser as unknown as new()=>globalThis.DOMParser);
       nextRdCaptureUrl(run);
     } else {
     if (run.state.captureMode === 'extension') throw new Error('Retome a captura pela extensão na aba autenticada do SUAP.');
@@ -162,7 +164,8 @@ Deno.serve(async request => {
         snapshotCount:partialApplication?.snapshotCount,appliedSnapshots:partialApplication?.appliedSnapshots,automaticallyApplied:true });
     }
     return reply({ ...publicRun({ ...run,status:'collecting',complete:false,summary,error_message:null }),partialApplication,
-      snapshotCount:partialApplication?.snapshotCount,appliedSnapshots:partialApplication?.appliedSnapshots });
+      snapshotCount:partialApplication?.snapshotCount,appliedSnapshots:partialApplication?.appliedSnapshots,consumedPages,
+      prefetchUrls:run.state.captureMode === 'extension' ? upcomingRdCaptureUrls(run) : [] });
   } catch (error) {
     const message = error instanceof Error ? error.message : typeof error === 'object' && error && 'message' in error ? String(error.message) : 'Falha na sincronização de RDs.';
     const reauth = message.includes('Sessão do SUAP');
@@ -181,5 +184,6 @@ function publicRun(run: RdRun) {
     activitiesProcessed:run.state.activityCursor,activitiesTotal:run.state.activities.length,
     syncMode:run.state.reuse?.mode ?? 'full',reusedDetails:run.state.reuse?.reusedDetails ?? 0,
     refreshedDetails:run.state.reuse?.refreshedDetails ?? run.state.detailCursor,
-    reusedActivities:run.state.reuse?.reusedActivities ?? 0,canceledReuseMaxAgeDays:RD_CANCELED_REUSE_MAX_AGE_DAYS };
+    reusedActivities:run.state.reuse?.reusedActivities ?? 0,canceledReuseMaxAgeDays:RD_CANCELED_REUSE_MAX_AGE_DAYS,
+    priorityTotal:run.state.priority?.total ?? 0,priorityPublished:run.state.priority?.published.length ?? 0 };
 }

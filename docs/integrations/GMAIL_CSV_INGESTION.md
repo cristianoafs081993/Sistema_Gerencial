@@ -47,6 +47,7 @@ Se a deteccao automatica falhar, a function retorna erro e o e-mail deve ficar c
 - A conta de descentralizacoes e aceita como fluxo agregado separado quando o arquivo/assunto indicar conta de descentralizacoes; esse pipeline grava `descentralizacoes_conta_saldos`, nao a tabela detalhada `descentralizacoes`.
 - No pipeline `descentralizacoes`, a ingestao por e-mail aplica a mesma regra do upload principal: `NC Celula - Tipo = DESTINO` entra positivo; `ORIGEM` so entra negativo em anulacao; `ORIGEM` sem anulacao e ignorado; quando a coluna de tipo nao existir, a ingestao conserva a regra historica e ignora origens inferidas em pares `339000` mais outra natureza da mesma NC/data/descricao/PTRES/PI/valor.
 - Em relatorios de credito disponivel e conta de descentralizacoes, a terceira coluna de valor pode vir sem cabecalho; a ingestao so grava linhas com valor efetivamente preenchido e parseavel para evitar sobrescrever saldos com zero por coluna nao reconhecida.
+- A gravação desses dois agregados usa `ON CONFLICT (campus_uasg, ptres)`, conforme a migration de escopo por campus. Jobs sem sessão conservam o campus padrão do banco (`158366`); o PTRES isolado não é mais uma chave única. A chave antiga fazia a ingestão falhar com `42P10`, mantendo os saldos anteriores. Corrigir a gravação não recalcula um arquivo de origem desatualizado: confira o período/filtro do relatório e reenvie o anexo após a correção.
 - Em `retencoes_efd_reinf`, alguns exports reais deixam o nome do credor na coluna sem cabecalho apos `DH - Credor` e o valor da retencao na ultima coluna sem cabecalho; a ingestao por e-mail usa essas colunas sem nome como `dhCredorNome` e `valorRetencao`, e tambem normaliza variacoes de `DH Item - Liquidado (S/N)`.
 
 ## Script do Gmail
@@ -83,6 +84,14 @@ Resultados que indicam erro de configuracao:
 - `terminaComFunctionPath=false`: `SUPABASE_FUNCTION_URL` nao termina com `/functions/v1/ingest-email-csv`
 
 ## Operacao recomendada
+
+### Conciliação de 22/10/2026
+
+A conta de descentralizações anterior continha R$ 395.178,17 no PTRES `261941`, enquanto as NCs detalhadas somavam R$ 510.304,43. A diferença de R$ 115.126,26 corresponde à NC `2026NC001185`. O relatório atualizado foi importado pelo usuário e passou a registrar R$ 510.304,43 nessa origem, além dos novos saldos de `231796` e `231798`. Sem o PTRES `230446`, o dashboard passou a R$ 3.156.089,94 descentralizados e R$ 3.040.765,58 empenhados. Não se deve ajustar um total artificialmente para fazê-lo coincidir com outro: o agregado deve refletir o relatório atualizado.
+
+A falha `42P10` da ingestão automática desses agregados foi reproduzida em PostgreSQL/WASM e corrigida usando a chave composta de campus/PTRES; a Edge Function `ingest-email-csv` foi publicada. A migration `20260907150000` já constava no histórico remoto. A validação incluiu 30 testes de parser/agregado/encoding, lint dos arquivos alterados e inserção/atualização/idempotência/isolamento por campus no SQL descartável. Nenhum saldo foi regravado pelo diagnóstico.
+
+Pendência independente de integridade: o importador de empenhos ainda associa registros pelo número resumido da NE, sem preservar a identidade da UG emitente na busca. No CSV de 13/10, `2026NE000014` aparece para as UGs `152756`, `158155` e `158366`; o registro atual do campus contém valor empenhado zero e liquidado/pago de R$ 1.864,66, correspondentes à linha da UG `158155` desse arquivo. Esse achado exige correção do isolamento e reconferência com um CSV de empenhos atual antes de reparar valores ou reprocessar anexos. O arquivo antigo não foi usado para alterar o registro remoto.
 
 - criar um gatilho time-driven no Apps Script para executar a cada 5 minutos
 - filtrar apenas a caixa/label operacional que recebe os CSVs
