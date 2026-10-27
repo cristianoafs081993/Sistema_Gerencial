@@ -876,3 +876,142 @@ btnApplyAllRds.addEventListener('click', async () => {
   catch (error) { rdAllStatusEl.textContent = formatExtensionAuthError(error); }
   finally { btnApplyAllRds.disabled = false; }
 });
+
+// Atalhos de texto: mesma chave e mesmas regras do painel do SUAP (process-document.js) e do expansor.
+const SNIPPETS_KEY = 'siages-snippets';
+const DEFAULT_SNIPPETS = {
+  '/ifrn': 'Instituto Federal de Educação, Ciência e Tecnologia do Rio Grande do Norte',
+  '/cn': 'Currais Novos',
+  '/lei14133': 'Lei nº 14.133, de 1º de abril de 2021 (Lei de Licitações e Contratos Administrativos)',
+  '/atpub': 'Atenciosamente, servidor público do IFRN – Campus Currais Novos',
+};
+const snippetForm = document.getElementById('snippet-form');
+const snippetTrigger = document.getElementById('snippet-trigger');
+const snippetExpansion = document.getElementById('snippet-expansion');
+const snippetCancel = document.getElementById('btn-snippet-cancel');
+const snippetMessage = document.getElementById('snippet-message');
+const snippetSearch = document.getElementById('snippet-search');
+const snippetList = document.getElementById('snippet-list');
+let snippets = { ...DEFAULT_SNIPPETS };
+let snippetEditingKey = null;
+
+function normalizeSnippetKey(value) {
+  const compact = String(value || '').trim().replace(/\s+/g, '');
+  if (!compact) return '';
+  return `${compact.startsWith('/') ? '' : '/'}${compact}`.toLowerCase();
+}
+
+function renderSnippets() {
+  if (!snippetList) return;
+  const query = String(snippetSearch?.value || '').trim().toLowerCase();
+  const keys = Object.keys(snippets)
+    .filter((key) => key.includes(query) || String(snippets[key]).toLowerCase().includes(query))
+    .sort();
+  snippetList.replaceChildren(...keys.map((key) => {
+    const item = document.createElement('div');
+    item.className = 'snippet-item';
+    const text = document.createElement('div');
+    text.className = 'snippet-text';
+    const trigger = document.createElement('span');
+    trigger.className = 'snippet-trigger';
+    trigger.textContent = key;
+    const expansion = document.createElement('span');
+    expansion.className = 'snippet-expansion';
+    expansion.textContent = snippets[key];
+    text.append(trigger, expansion);
+    const actions = document.createElement('div');
+    actions.className = 'snippet-actions';
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'secondary';
+    edit.textContent = '✎';
+    edit.setAttribute('aria-label', `Editar ${key}`);
+    edit.addEventListener('click', () => startSnippetEdit(key));
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'secondary';
+    remove.textContent = '×';
+    remove.setAttribute('aria-label', `Remover ${key}`);
+    remove.addEventListener('click', () => { void deleteSnippet(key); });
+    actions.append(edit, remove);
+    item.append(text, actions);
+    return item;
+  }));
+  if (!keys.length) {
+    const empty = document.createElement('p');
+    empty.className = 'helper';
+    empty.textContent = 'Nenhum atalho encontrado.';
+    snippetList.append(empty);
+  }
+}
+
+function resetSnippetForm() {
+  snippetEditingKey = null;
+  snippetForm.reset();
+  snippetCancel.hidden = true;
+}
+
+function startSnippetEdit(key) {
+  snippetEditingKey = key;
+  snippetTrigger.value = key;
+  snippetExpansion.value = snippets[key] || '';
+  snippetCancel.hidden = false;
+  snippetMessage.textContent = '';
+  snippetTrigger.focus();
+}
+
+async function persistSnippets(next) {
+  await chrome.storage.sync.set({ [SNIPPETS_KEY]: next });
+  snippets = next;
+  renderSnippets();
+}
+
+async function saveSnippet(event) {
+  event.preventDefault();
+  const key = normalizeSnippetKey(snippetTrigger.value);
+  const value = snippetExpansion.value.trim();
+  if (!key || key === '/') { snippetMessage.textContent = 'Informe um atalho válido.'; return; }
+  if (!value) { snippetMessage.textContent = 'Informe o texto expandido.'; return; }
+  if (snippets[key] && key !== snippetEditingKey) { snippetMessage.textContent = 'Este atalho já existe. Edite o item existente.'; return; }
+  const next = { ...snippets };
+  if (snippetEditingKey && snippetEditingKey !== key) delete next[snippetEditingKey];
+  next[key] = value;
+  try {
+    await persistSnippets(next);
+    resetSnippetForm();
+    snippetMessage.textContent = `Atalho ${key} salvo.`;
+  } catch (error) {
+    snippetMessage.textContent = formatExtensionAuthError(error);
+  }
+}
+
+async function deleteSnippet(key) {
+  const next = { ...snippets };
+  delete next[key];
+  try {
+    await persistSnippets(next);
+    if (snippetEditingKey === key) resetSnippetForm();
+    snippetMessage.textContent = `Atalho ${key} removido.`;
+  } catch (error) {
+    snippetMessage.textContent = formatExtensionAuthError(error);
+  }
+}
+
+async function initializeSnippets() {
+  if (!snippetForm || !chrome?.storage?.sync?.get) return;
+  const stored = await chrome.storage.sync.get(SNIPPETS_KEY).catch(() => ({}));
+  const value = stored?.[SNIPPETS_KEY];
+  if (value && typeof value === 'object' && Object.keys(value).length) snippets = value;
+  renderSnippets();
+}
+
+snippetForm?.addEventListener('submit', (event) => { void saveSnippet(event); });
+snippetCancel?.addEventListener('click', () => { resetSnippetForm(); snippetMessage.textContent = ''; });
+snippetSearch?.addEventListener('input', renderSnippets);
+chrome.storage?.onChanged?.addListener((changes, area) => {
+  if (area !== 'sync' || !changes?.[SNIPPETS_KEY]) return;
+  const value = changes[SNIPPETS_KEY].newValue;
+  snippets = value && typeof value === 'object' && Object.keys(value).length ? value : { ...DEFAULT_SNIPPETS };
+  renderSnippets();
+});
+void initializeSnippets();

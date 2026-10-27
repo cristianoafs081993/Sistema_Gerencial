@@ -12,57 +12,97 @@
     }
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
-    body { width: 400px; margin: 0; padding: 20px; background: var(--background); color: var(--foreground); font: 13px/1.5 Manrope, 'Segoe UI', Arial, sans-serif; }
-    .brand { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-    .brand-mark { display: flex; align-items: center; gap: 10px; min-width: 0; }
-    .brand-mark img { width: 38px; height: 38px; object-fit: contain; }
-    h1 { margin: 0; color: var(--primary); font-size: 24px; font-weight: 800; letter-spacing: -.6px; }
+    body { width: 400px; margin: 0; padding: 14px; background: var(--background); color: var(--foreground); font: 13px/1.45 Manrope, 'Segoe UI', Arial, sans-serif; }
+    main { display: flex; flex-direction: column; gap: 10px; }
     a { color: var(--primary); text-underline-offset: 3px; }
+
+    /* Cabeçalho */
+    .brand { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .brand-mark { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .brand-mark img { width: 30px; height: 30px; object-fit: contain; }
+    h1 { margin: 0; color: var(--primary); font-size: 20px; font-weight: 800; letter-spacing: -.5px; }
     .portal-link { font-size: 12px; font-weight: 700; }
-    h2 { margin: 0 0 10px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground); }
-    h3 { margin: 0; font-size: 14px; font-weight: 700; }
-    h4 { margin: 0 0 8px; font-size: 12px; }
-    .card { margin: 0 0 12px; padding: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
-    .account-card { margin-bottom: 24px; }
-    .card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .badge { padding: 3px 8px; border-radius: 20px; background: var(--muted); color: var(--muted-foreground); font-size: 11px; font-weight: 700; white-space: nowrap; }
+
+    /* Tipografia de seções */
+    h2 { margin: 6px 2px 0; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground); }
+    h3 { margin: 0; font-size: 13px; font-weight: 700; }
+    h4 { margin: 0 0 6px; font-size: 12px; }
+    .helper, .sync-description, .sync-scope p { color: var(--muted-foreground); font-size: 12px; line-height: 1.45; margin: 8px 0 10px; }
+    [data-error="true"], .status-error { color: var(--danger); }
+
+    /* Cartões e grupos */
+    .card { margin: 0; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+    .group { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .group > .card { border: 0; border-radius: 0; }
+    .group > .card + .card { border-top: 1px solid var(--border); }
+    .card-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .badge { padding: 2px 8px; border-radius: 20px; background: var(--muted); color: var(--muted-foreground); font-size: 11px; font-weight: 700; white-space: nowrap; }
     .badge[data-state="connected"] { color: var(--success); background: #eaf5ee; }
-    #extension-auth-form { margin-top: 14px; }
-    label { display: block; margin-bottom: 12px; font-size: 12px; font-weight: 600; }
-    input, select { width: 100%; margin-top: 5px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--foreground); font: inherit; }
-    button { width: 100%; min-height: 36px; margin: 0 0 8px; padding: 9px 12px; border: 1px solid transparent; border-radius: 8px; background: var(--primary); color: white; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+
+    /* Conta */
+    .account-user { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+    #extension-auth-user-email { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+    #btn-extension-sign-out { width: auto; min-height: 28px; margin: 0; padding: 4px 12px; flex-shrink: 0; }
+    #extension-auth-form { margin-top: 10px; }
+    #extension-auth-status { margin: 8px 0 0; }
+    .account-card:has(#extension-auth-user:not([hidden])) #extension-auth-status:not([data-error="true"]) { display: none; }
+
+    /* Formulários e botões */
+    label { display: block; margin-bottom: 10px; font-size: 12px; font-weight: 600; }
+    input, select, textarea { width: 100%; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--foreground); font: inherit; }
+    textarea { min-height: 60px; resize: vertical; }
+    button { width: 100%; min-height: 34px; margin: 0 0 8px; padding: 7px 12px; border: 1px solid transparent; border-radius: 8px; background: var(--primary); color: white; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
     button:hover { background: #1565c0; }
     button:disabled { opacity: .55; cursor: not-allowed; }
+    button:last-child { margin-bottom: 0; }
     .secondary { background: var(--card); border-color: var(--border); color: var(--foreground); }
     .secondary:hover { background: var(--accent); }
-    button:last-child { margin-bottom: 0; }
-    :is(button, input, select, a, summary):focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
-    .account-user { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
-    #extension-auth-user-email { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
-    #btn-extension-sign-out { width: auto; margin: 0; flex-shrink: 0; }
-    .helper, .sync-description, .sync-scope p { color: var(--muted-foreground); font-size: 12px; line-height: 1.5; margin: 10px 0 12px; }
-    #extension-auth-status { margin: 10px 0 0; }
-    #extension-auth-status[data-error="true"] { color: var(--danger); }
-    [data-error="true"], .status-error { color: var(--danger); }
-    .sync-section { margin-top: 20px; }
-    .sync-scope + .sync-scope { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px; }
-    .sync-option { display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; color: var(--muted-foreground); }
-    .sync-option input { width: auto; margin-top: 3px; }
-    .sync-link { display: inline-block; margin-top: 12px; font-size: 12px; }
+    .button-row { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
+    .button-row button { margin: 0; }
+    :is(button, input, select, textarea, a, summary):focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+    /* Painéis expansíveis */
     details.card { padding: 0; }
-    summary { padding: 16px; cursor: pointer; }
-    summary h3 { display: inline; margin-left: 4px; }
-    .summary-description { display: block; margin: 4px 0 0 18px; color: var(--muted-foreground); font-size: 12px; }
+    summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 14px; cursor: pointer; list-style: none; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: ''; flex-shrink: 0; width: 7px; height: 7px; margin-right: 3px; border-right: 2px solid var(--muted-foreground); border-bottom: 2px solid var(--muted-foreground); transform: rotate(-45deg); transition: transform .15s; }
+    details[open] > summary::after { transform: rotate(45deg); }
+    summary:hover { background: var(--accent); }
+    .summary-text { min-width: 0; }
+    .summary-description { display: block; margin-top: 1px; color: var(--muted-foreground); font-size: 11.5px; }
     details[open] > summary { border-bottom: 1px solid var(--border); }
-    .details-body { padding: 14px 16px 16px; }
+    .details-body { padding: 12px 14px 14px; }
     .details-body > .sync-description:first-child { margin-top: 0; }
+
+    /* SIAFI */
+    #siafi-list-info, #siafi-fill-status { margin: 0 0 10px; color: var(--muted-foreground); font-size: 12px; }
+    #siafi-fill-status:empty { display: none; }
+    #siafi-fill-status { margin: 8px 0 0; }
+
+    /* Sincronização */
+    .sync-scope + .sync-scope { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
+    .sync-option { display: flex; align-items: flex-start; gap: 8px; line-height: 1.45; color: var(--muted-foreground); }
+    .sync-option input { width: auto; margin-top: 3px; }
+    .sync-link { display: inline-block; margin-top: 10px; font-size: 12px; }
     #process-box-sync-status { white-space: pre-line; margin-bottom: 0; }
-    #status { display: none; max-height: 150px; overflow-y: auto; margin-top: 12px; padding: 10px; background: var(--background); border-radius: 8px; overflow-wrap: anywhere; font-size: 12px; }
+    #status { display: none; max-height: 150px; overflow-y: auto; margin-top: 10px; padding: 10px; background: var(--background); border-radius: 8px; overflow-wrap: anywhere; font-size: 12px; }
     .status-line { margin-bottom: 4px; }
     .status-success { color: var(--success); }
     .status-info { color: var(--primary); }
-    footer { margin-top: 20px; text-align: center; font-size: 11px; color: var(--muted-foreground); }
-    kbd { padding: 2px 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); font-family: inherit; }
+
+    /* Atalhos de texto */
+    #snippet-message { min-height: 0; margin: 8px 0; }
+    #snippet-message:empty { display: none; }
+    #snippet-list { margin-top: 8px; max-height: 240px; overflow-y: auto; }
+    .snippet-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
+    .snippet-text { min-width: 0; }
+    .snippet-trigger { display: block; font-weight: 700; color: var(--primary); }
+    .snippet-expansion { display: block; color: var(--muted-foreground); font-size: 12px; overflow-wrap: anywhere; }
+    .snippet-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .snippet-actions button { width: 28px; min-height: 28px; margin: 0; padding: 0; }
+
+    footer { margin-top: 12px; text-align: center; font-size: 11px; color: var(--muted-foreground); }
+    kbd { padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); font-family: inherit; }
   </style>
 </head>
 <body>
@@ -89,25 +129,44 @@
   </section>
   <section id="siafi-favorecidos-card" class="card" hidden aria-labelledby="siafi-favorecidos-title">
     <h3 id="siafi-favorecidos-title">Preencher favorecidos no SIAFI</h3>
-    <label>
+    <label style="margin-top: 10px">
       Lista de trabalho da LC
       <select id="siafi-list-select" aria-label="Lista de trabalho da LC">
         <option value="">Carregando listas...</option>
       </select>
     </label>
     <p id="siafi-list-info" aria-live="polite">Selecione uma lista salva no SIAGES. O preenchimento ocorre em blocos de até 10 favorecidos.</p>
-    <button id="btn-siafi-refresh" type="button" class="secondary">Atualizar listas</button>
-    <button id="btn-siafi-fill" type="button">Preencher SIAFI</button>
+    <div class="button-row">
+      <button id="btn-siafi-refresh" type="button" class="secondary">Atualizar listas</button>
+      <button id="btn-siafi-fill" type="button">Preencher SIAFI</button>
+    </div>
     <p id="siafi-fill-status" aria-live="polite"></p>
   </section>
+  <h2 id="tools-title">Ferramentas</h2>
+  <div class="group" role="group" aria-labelledby="tools-title">
+  <details class="card" id="snippets-panel"><summary><div class="summary-text"><h3 id="snippets-title">Atalhos de texto</h3><span class="summary-description">Criar, editar e remover atalhos como /cn</span></div></summary><div class="details-body">
+    <p class="sync-description">Digite o atalho seguido de espaço em qualquer campo de texto. Com a conta SIAGES conectada, os atalhos valem em todos os perfis do Chrome.</p>
+    <form id="snippet-form">
+      <label>Atalho<input id="snippet-trigger" placeholder="/exemplo" autocomplete="off"></label>
+      <label>Texto expandido<textarea id="snippet-expansion" placeholder="Texto completo..."></textarea></label>
+      <button id="btn-snippet-save" type="submit">Salvar atalho</button>
+      <button id="btn-snippet-cancel" type="button" class="secondary" hidden>Cancelar edição</button>
+    </form>
+    <p id="snippet-message" class="helper" role="status" aria-live="polite"></p>
+    <input id="snippet-search" type="search" placeholder="Buscar atalhos" aria-label="Buscar atalhos">
+    <div id="snippet-list"></div>
+    </div>
+  </details>
+  </div>
   <section id="sync-section" class="sync-section" aria-labelledby="sync-title" hidden>
   <h2 id="sync-title">Sincronização</h2>
+  <div class="group" style="margin-top: 10px">
   <section class="card" aria-labelledby="process-box-sync-title">
     <div class="card-heading"><h3 id="process-box-sync-title">Caixas de processos</h3><span class="badge">Automática</span></div>
     <p class="helper">Dias úteis às 07h, 10h, 13h e 15h. Mantenha o navegador aberto e as sessões do SUAP e SIAGES ativas.</p>
     <p id="process-box-sync-status" class="helper" aria-live="polite">Consultando próxima execução…</p>
   </section>
-  <details class="card" id="plan-sync-panel"><summary><h3 id="plan-sync-title">Atividades — Plano 8</h3><span class="summary-description">Sincronizar atividades e saldos</span></summary><div class="details-body">
+  <details class="card" id="plan-sync-panel"><summary><div class="summary-text"><h3 id="plan-sync-title">Atividades — Plano 8</h3><span class="summary-description">Sincronizar atividades e saldos</span></div></summary><div class="details-body">
     <p class="sync-description">Coleta as atividades e os saldos do plano para conferência. Depois, aplique a prévia no SIAGES. Escolha esta unidade ou todas as unidades.</p>
     <button id="btn-extract-en" type="button">Sincronizar atividades desta unidade</button>
     <button id="btn-extract-all" class="secondary" type="button">Sincronizar atividades de todas as unidades</button>
@@ -115,7 +174,7 @@
     <div id="status" aria-live="polite"></div>
     </div>
   </details>
-  <details class="card" id="rd-sync-panel"><summary><h3 id="rd-sync-title">RDs — Requisições de despesas</h3><span class="summary-description">Coletar e acompanhar requisições</span></summary><div class="details-body">
+  <details class="card" id="rd-sync-panel"><summary><div class="summary-text"><h3 id="rd-sync-title">RDs — Requisições de despesas</h3><span class="summary-description">Coletar e acompanhar requisições</span></div></summary><div class="details-body">
     <p class="sync-description">Coleta RDs, reforços, anulações e vínculos oficiais. Os dados validados ficam disponíveis no SIAGES durante a coleta, que pode ser pausada e retomada.</p>
     <p class="sync-description">Após a primeira aplicação, reaproveita RDs concluídas e seus vínculos. Busca RDs novas e relê as pendentes. Canceladas passam por conferência periódica.</p>
     <label class="sync-option"><input id="rd-force-full" type="checkbox">Revalidar tudo na próxima coleta (mais demorado)</label>
@@ -136,6 +195,7 @@
     <a class="sync-link" href="https://www.siages.com.br/importacao-dados" target="_blank" rel="noopener noreferrer">Conferir RDs no SIAGES</a>
     </div>
   </details>
+  </div>
   </section>
   </main>
   <footer>Comandos e buscas nas páginas: <kbd>Ctrl + K</kbd></footer>

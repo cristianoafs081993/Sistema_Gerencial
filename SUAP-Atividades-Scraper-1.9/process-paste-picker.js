@@ -17,6 +17,7 @@
   let overlayEl = null;
   let searchInputEl = null;
   let listContainerEl = null;
+  let remoteNoteEl = null;
   let activeInputElement = null;
   let activeSelectionStart = null;
   let activeSelectionEnd = null;
@@ -216,14 +217,14 @@
         return void getLocalFallbackProcesses().then(onDone);
       }
 
-      // Inclui a consulta ao SIAGES pelos processos abertos em outros perfis do Chrome.
+      // Mostra os processos deste perfil de imediato; os de outros perfis chegam por loadRemoteProcesses().
       const timeout = setTimeout(() => {
         void getLocalFallbackProcesses().then(onDone);
       }, 2500);
 
       try {
         chrome.runtime.sendMessage(
-          { source: 'suape-process-registry', type: 'get-active-processes' },
+          { source: 'suape-process-registry', type: 'get-active-processes', includeRemote: false },
           (response) => {
             clearTimeout(timeout);
             if (response?.ok && Array.isArray(response.processes) && response.processes.length > 0) {
@@ -238,6 +239,48 @@
         void getLocalFallbackProcesses().then(onDone);
       }
     });
+  }
+
+  function isSameProcess(a, b) {
+    if (a?.suapId && b?.suapId) return String(a.suapId) === String(b.suapId);
+    return Boolean(a?.processNumber && b?.processNumber && a.processNumber === b.processNumber);
+  }
+
+  function setRemoteNote(text) {
+    if (!remoteNoteEl) return;
+    remoteNoteEl.textContent = text;
+    remoteNoteEl.hidden = !text;
+  }
+
+  function describeRemoteResult(result, added) {
+    if (added > 0) return '';
+    const status = result?.remote?.status;
+    if (status === 'sem-sessao') return 'Outros perfis: entre no SIAGES pelo popup da extensão neste perfil para ver os processos abertos neles.';
+    if (status === 'erro') return `Outros perfis: não foi possível consultar o SIAGES agora${result?.remote?.error ? ` (${result.remote.error})` : ''}.`;
+    if (status === 'ok') return 'Outros perfis: nenhum processo aberto. No outro perfil, entre no SIAGES pelo popup e abra ou recarregue a página do processo.';
+    return '';
+  }
+
+  // Acrescenta, sem bloquear a abertura, os processos publicados por outros perfis do Chrome no SIAGES.
+  function loadRemoteProcesses() {
+    if (!globalThis.chrome?.runtime?.sendMessage) return;
+    const picker = overlayEl;
+    setRemoteNote('Consultando outros perfis…');
+    try {
+      chrome.runtime.sendMessage({ source: 'suape-process-registry', type: 'get-remote-processes' }, (result) => {
+        void chrome.runtime?.lastError;
+        if (!overlayEl || overlayEl !== picker) return;
+        const incoming = result?.ok && Array.isArray(result.processes) ? result.processes : [];
+        const additions = incoming.filter((item) => !currentProcesses.some((existing) => isSameProcess(existing, item)));
+        if (additions.length) {
+          currentProcesses = [...currentProcesses, ...additions];
+          renderList();
+        }
+        setRemoteNote(describeRemoteResult(result, additions.length));
+      });
+    } catch {
+      setRemoteNote('');
+    }
   }
 
   async function getLocalFallbackProcesses() {
@@ -744,6 +787,11 @@
     listContainerEl = document.createElement('div');
     listContainerEl.className = 'suape-paste-list';
 
+    remoteNoteEl = document.createElement('div');
+    remoteNoteEl.className = 'suape-paste-remote-note';
+    remoteNoteEl.setAttribute('role', 'status');
+    remoteNoteEl.hidden = true;
+
     // Footer
     const footerEl = document.createElement('div');
     footerEl.className = 'suape-paste-footer';
@@ -762,7 +810,7 @@
       if (e.target === overlayEl) closePicker();
     });
 
-    modalEl.append(headerEl, searchWrapper, listContainerEl, footerEl);
+    modalEl.append(headerEl, searchWrapper, listContainerEl, remoteNoteEl, footerEl);
     overlayEl.appendChild(modalEl);
     document.body.appendChild(overlayEl);
 
@@ -771,6 +819,7 @@
     selectedIndex = 0;
     filterQuery = '';
     renderList();
+    loadRemoteProcesses();
 
     // Foco imediato no campo de busca
     setTimeout(() => {
@@ -784,6 +833,7 @@
     overlayEl = null;
     searchInputEl = null;
     listContainerEl = null;
+    remoteNoteEl = null;
 
     // Restaura o foco no elemento anterior
     if (activeInputElement && typeof activeInputElement.focus === 'function') {

@@ -4,11 +4,14 @@ Na versão 1.9.63, o popup e o nome exibido pelo navegador usam **SIAGES** e exi
 
 ## Organização
 
+Layout compacto (1.9.83): largura de 400 px, espaçamento de 10 px entre blocos e um único padrão de painel. Os blocos são **Sua conta** (linha enxuta; a mensagem de sessão renovada só aparece em caso de erro ou desconectado), **Preencher favorecidos** (só no SIAFI, com `Atualizar listas` e `Preencher SIAFI` lado a lado), grupo **Ferramentas** (Atalhos de texto) e grupo **Sincronização** (superadministrador). Painéis de um grupo dividem uma única borda e usam chevron à direita; títulos e descrições têm o mesmo tamanho em todos os painéis.
+
 - Cabeçalho com a logo institucional, o nome SIAGES e link para abrir o SIAGES.
 - **Sua conta** concentra exclusivamente autenticação. Enquanto verifica a sessão, não exibe formulário nem usuário. Sem sessão, oferece e-mail, senha e `Entrar no SIAGES`, também acionável com Enter. Com sessão, mostra o e-mail, o estado `Conectado` e `Sair`, ocultando o formulário. A senha é limpa após entrar ou sair; alterações da sessão em outros contextos atualizam o popup.
 - **Sincronização** reúne agenda e resultado das caixas de processos, atividades do Plano 8 e RDs. Desde a versão 1.9.63, toda essa seção é exclusiva do superadministrador. Ela começa oculta e só aparece após a confirmação da sessão. Mensagens de autenticação permanecem no bloco da conta.
 - Atividades e RDs usam painéis expansíveis, inicialmente fechados. Prévias de atividades abrem seu painel; coleta de RDs em andamento, prévias ou falhas abrem o painel de RDs. Os controles e estados dos dois fluxos continuam independentes.
 - O preenchimento de favorecidos continua disponível exclusivamente quando a aba atual pertence ao SIAFI.
+- **Atalhos de texto** (1.9.83) é um painel expansível, fechado e visível mesmo sem login, entre o preenchimento de favorecidos e a Sincronização. Permite buscar, criar, editar (inclusive trocar o gatilho) e remover atalhos como `/cn`, usando a mesma chave `siages-snippets` do painel do SUAP e do expansor. Gatilhos são normalizados (barra inicial, minúsculas, sem espaços) e duplicados são recusados. A lista reage a `chrome.storage.onChanged`, então atalhos recebidos de outro perfil pelo SIAGES aparecem sem reabrir o popup.
 
 O campo `Segredo de automação` foi retirado, junto com a leitura e escrita da sua preferência no popup. Esse valor não era utilizado pelos fluxos atuais de sincronização. Não há novo contrato de backend nem alteração em migrations ou Edge Functions.
 

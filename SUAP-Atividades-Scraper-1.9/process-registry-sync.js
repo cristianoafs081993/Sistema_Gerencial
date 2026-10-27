@@ -13,7 +13,8 @@
   const PUSH_DEDUP_MS = 60 * 1000;
   const MAX_PAYLOAD_BYTES = 200000;
   const READ_LIMIT = 20;
-  const DEFAULT_TIMEOUT_MS = 1800;
+  // Cobre renovar a sessão e consultar o SIAGES a partir de redes lentas (SIAFI/gov).
+  const DEFAULT_TIMEOUT_MS = 6000;
 
   function getProcessKey(record) {
     return String(record?.suapId || record?.processNumber || '').trim().slice(0, 80);
@@ -88,6 +89,7 @@
     const lastPushed = new Map();
     let lastPruneAt = 0;
     let profileIdPromise = null;
+    let lastPush = null;
 
     function getProfileId() {
       if (!profileIdPromise) {
@@ -122,7 +124,14 @@
       );
     }
 
+    // Guarda o resultado da última publicação para o Alt+V explicar por que outro perfil não enxerga este.
     async function push(record) {
+      const result = await pushRecord(record);
+      lastPush = { ok: result.ok, skipped: result.skipped || '', error: result.error || '', at: now() };
+      return result;
+    }
+
+    async function pushRecord(record) {
       const processKey = getProcessKey(record);
       if (!processKey) return { ok: false, skipped: 'sem-identificador' };
       const token = await readToken();
@@ -182,30 +191,37 @@
     }
 
     // Sem sessão não há como saber de quem são os registros: não devolve o cache de outro login.
-    async function fetchRemote() {
-      const token = await readToken();
-      if (!token) return [];
+    // O prazo cobre também a leitura/renovação do token, que em redes lentas pode demorar mais que a consulta.
+    async function fetchRemoteWithStatus() {
+      let session = true;
       try {
-        const rows = await withTimeout((async () => {
+        const processes = await withTimeout((async () => {
+          const token = await readToken();
+          if (!token) { session = false; return []; }
           const profileId = await getProfileId();
           const since = new Date(now() - READ_WINDOW_MS).toISOString();
-          return fetchRest(
+          const rows = await fetchRest(
             `${TABLE}?select=profile_id,process_key,suap_id,process_number,payload,updated_at` +
               `&profile_id=neq.${encodeURIComponent(profileId)}` +
               `&updated_at=gte.${encodeURIComponent(since)}` +
               `&order=updated_at.desc&limit=${READ_LIMIT}`,
             token,
           );
+          const list = (Array.isArray(rows) ? rows : []).map(rowToProcess);
+          await storage.set({ [REMOTE_CACHE_KEY]: { fetchedAt: now(), processes: list } }).catch(() => {});
+          return list;
         })(), timeoutMs);
-        const processes = (Array.isArray(rows) ? rows : []).map(rowToProcess);
-        await storage.set({ [REMOTE_CACHE_KEY]: { fetchedAt: now(), processes } }).catch(() => {});
-        return processes;
-      } catch {
-        return readCache();
+        return { status: session ? 'ok' : 'sem-sessao', processes };
+      } catch (error) {
+        return { status: 'erro', error: error instanceof Error ? error.message : String(error), processes: await readCache() };
       }
     }
 
-    return { getProfileId, push, remove, fetchRemote };
+    async function fetchRemote() {
+      return (await fetchRemoteWithStatus()).processes;
+    }
+
+    return { getProfileId, push, remove, fetchRemote, fetchRemoteWithStatus, getLastPush: () => lastPush };
   }
 
   scope.SiagesProcessRegistrySync = {

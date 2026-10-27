@@ -23,6 +23,8 @@ type RegistryModule = {
     push: (record: unknown) => Promise<{ ok: boolean; skipped?: string }>;
     remove: (record: unknown) => Promise<{ ok: boolean }>;
     fetchRemote: () => Promise<RemoteProcess[]>;
+    fetchRemoteWithStatus: () => Promise<{ status: string; error?: string; processes: RemoteProcess[] }>;
+    getLastPush: () => { ok: boolean; skipped: string; error: string } | null;
   };
 };
 
@@ -173,6 +175,47 @@ describe('registro de processos compartilhado entre perfis (Alt+V)', () => {
     await expect(pending).resolves.toEqual([expect.objectContaining({ suapId: '1' })]);
   });
 
+  it('informa se a consulta a outros perfis falhou por falta de sessão, erro ou teve sucesso', async () => {
+    const mod = loadModule();
+    const values: StorageValues = { [mod.PROFILE_KEY]: PROFILE_SIAFI };
+    const fetchRest = vi.fn().mockResolvedValue([remoteRow()]);
+    let token: string | null = null;
+    const sync = mod.createProcessRegistrySync({ storage: createStorage(values), getAccessToken: async () => token, fetchRest, now: () => NOW });
+
+    await expect(sync.fetchRemoteWithStatus()).resolves.toEqual({ status: 'sem-sessao', processes: [] });
+
+    token = 'jwt';
+    await expect(sync.fetchRemoteWithStatus()).resolves.toMatchObject({ status: 'ok', processes: [expect.objectContaining({ suapId: '495256' })] });
+
+    fetchRest.mockRejectedValueOnce(new Error('HTTP 500'));
+    await expect(sync.fetchRemoteWithStatus()).resolves.toMatchObject({ status: 'erro', error: 'HTTP 500', processes: [expect.objectContaining({ suapId: '495256' })] });
+  });
+
+  it('inclui a leitura do token no prazo da consulta, para não abandonar redes lentas cedo demais', async () => {
+    vi.useFakeTimers();
+    try {
+      const mod = loadModule();
+      const values: StorageValues = { [mod.PROFILE_KEY]: PROFILE_SIAFI };
+      const fetchRest = vi.fn().mockResolvedValue([remoteRow()]);
+      const getAccessToken = () => new Promise<string>((resolve) => setTimeout(() => resolve('jwt'), 3000));
+      const sync = mod.createProcessRegistrySync({ storage: createStorage(values), getAccessToken, fetchRest, now: () => NOW });
+      const pending = sync.fetchRemoteWithStatus();
+      await vi.advanceTimersByTimeAsync(3100);
+      await expect(pending).resolves.toMatchObject({ status: 'ok', processes: [expect.objectContaining({ suapId: '495256' })] });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('registra o resultado da última publicação para diagnóstico', async () => {
+    const mod = loadModule();
+    const values: StorageValues = { [mod.PROFILE_KEY]: PROFILE_SUAP };
+    const sync = mod.createProcessRegistrySync({ storage: createStorage(values), getAccessToken: async () => null, fetchRest: vi.fn(), now: () => NOW });
+    expect(sync.getLastPush()).toBeNull();
+    await sync.push({ suapId: '1', processNumber: '', process: null, fields: [] });
+    expect(sync.getLastPush()).toMatchObject({ ok: false, skipped: 'sem-sessao' });
+  });
+
   it('mantém processos locais na frente e não duplica o mesmo processo vindo de outro perfil', () => {
     const mod = loadModule();
     const merged = mod.mergeRemoteProcesses(
@@ -191,6 +234,8 @@ describe('background: Alt+V com processos de outros perfis', () => {
   function loadBackground(values: StorageValues, fetchMock: ReturnType<typeof vi.fn>, tabs: Array<{ id: number; url: string; title: string; active?: boolean }> = []) {
     const messageListeners: Listener[] = [];
     const removedListeners: Array<(tabId: number) => void> = [];
+    const alarmListeners: Array<(alarm: { name: string }) => void> = [];
+    let tabResponse: unknown = null;
     const storage = createStorage(values);
     const chromeApi = {
       storage: { local: storage },
@@ -199,10 +244,10 @@ describe('background: Alt+V com processos de outros perfis', () => {
         onInstalled: { addListener: vi.fn() },
         onStartup: { addListener: vi.fn() },
       },
-      alarms: { create: vi.fn(), get: vi.fn().mockResolvedValue(undefined), onAlarm: { addListener: vi.fn() } },
+      alarms: { create: vi.fn(), get: vi.fn().mockResolvedValue(undefined), onAlarm: { addListener: (listener: (alarm: { name: string }) => void) => alarmListeners.push(listener) } },
       tabs: {
-        query: (_q: unknown, callback: (tabs: unknown[]) => void) => callback(tabs),
-        sendMessage: vi.fn(),
+        query: (_q: unknown, callback?: (tabs: unknown[]) => void) => (callback ? callback(tabs) : Promise.resolve(tabs)),
+        sendMessage: vi.fn((_tabId: number, _message: unknown, callback?: (response: unknown) => void) => callback?.(tabResponse)),
         onRemoved: { addListener: (listener: (tabId: number) => void) => removedListeners.push(listener) },
       },
     };
@@ -216,7 +261,7 @@ describe('background: Alt+V com processos de outros perfis', () => {
         if (listener({ source: 'suape-process-registry', ...message }, sender, resolve as (response: unknown) => void) === true) return;
       }
     });
-    return { send, removedListeners };
+    return { send, removedListeners, alarmListeners, setTabResponse: (value: unknown) => { tabResponse = value; } };
   }
 
   const session = { 'siages-extension-session': { accessToken: 'jwt', refreshToken: 'refresh', expiresAt: Date.now() / 1000 + 7200 } };
@@ -231,6 +276,46 @@ describe('background: Alt+V com processos de outros perfis', () => {
     expect(response).toMatchObject({ ok: true, processes: [expect.objectContaining({ suapId: '495256', remote: true })] });
     expect(String(fetchMock.mock.calls[0][0])).toContain(`/rest/v1/extension_process_registry?select=`);
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ headers: expect.objectContaining({ Authorization: 'Bearer jwt' }) });
+  });
+
+  it('consulta outros perfis em separado, com o estado da consulta, e permite pular essa consulta', async () => {
+    const fetchMock = vi.fn(async () => okJson([remoteRow({ updated_at: new Date().toISOString() })]));
+    const background = loadBackground({ ...session, 'siages-extension-profile-id': PROFILE_SIAFI }, fetchMock);
+
+    const local = await background.send({ type: 'get-active-processes', includeRemote: false });
+    expect(local).toMatchObject({ ok: true, processes: [] });
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const remote = await background.send({ type: 'get-remote-processes' });
+    expect(remote).toMatchObject({
+      ok: true,
+      remote: { status: 'ok' },
+      processes: [expect.objectContaining({ suapId: '495256', remote: true })],
+    });
+  });
+
+  it('avisa quando este perfil não tem sessão do SIAGES para ler outros perfis', async () => {
+    const fetchMock = vi.fn();
+    const background = loadBackground({ 'siages-extension-profile-id': PROFILE_SIAFI }, fetchMock);
+    await expect(background.send({ type: 'get-remote-processes' })).resolves.toMatchObject({ ok: true, remote: { status: 'sem-sessao' }, processes: [] });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('republica as abas de processo já abertas, mas só quando o snapshot do processo está carregado', async () => {
+    const fetchMock = vi.fn(async () => okJson(null));
+    const tabs = [{ id: 9, url: 'https://suap.ifrn.edu.br/processo_eletronico/processo/495256/', title: 'Processo' }];
+    const background = loadBackground({ ...session, 'siages-extension-profile-id': PROFILE_SUAP }, fetchMock, tabs);
+    const posts = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST');
+
+    background.setTabResponse({ processData: { suapId: '495256', processNumber: '23035.002581.2026-60', process: null, fields: [] } });
+    background.alarmListeners.forEach((listener) => listener({ name: 'siages-extension-session-refresh' }));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(posts()).toHaveLength(0);
+
+    background.setTabResponse({ processData: { suapId: '495256', processNumber: '23035.002581.2026-60', process: { cpfCnpj: '1' }, fields: [{ label: 'Assunto', value: 'x' }] } });
+    background.alarmListeners.forEach((listener) => listener({ name: 'siages-extension-session-refresh' }));
+    await vi.waitFor(() => expect(posts()).toHaveLength(1));
+    expect(JSON.parse(String(posts()[0][1]?.body))).toMatchObject({ process_key: '495256', payload: { process: { cpfCnpj: '1' } } });
   });
 
   it('publica ao registrar o processo e retira o registro quando a aba é fechada', async () => {

@@ -157,6 +157,7 @@ async function handleAuthMessage(message) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Use o e-mail cadastrado no SIAGES. A matrícula do SUAP não autentica neste campo.');
     const session = toPublicSession(await signIn(email, password));
     void snippetsSync?.reconcile();
+    void publishOpenProcessTabs().catch(() => undefined);
     return { session };
   }
   if (message.type === 'sign-out') {
@@ -238,8 +239,20 @@ async function handleProcessRegistryMessage(message, sender) {
     return { ok: true, registered: true };
   }
 
+  // Consulta separada para o Alt+V mostrar os processos locais de imediato e acrescentar os de outros perfis quando chegarem.
+  if (message.type === 'get-remote-processes') {
+    if (!processRegistrySync) return { processes: [], remote: { status: 'indisponivel' } };
+    const result = await processRegistrySync.fetchRemoteWithStatus();
+    return {
+      processes: result.processes,
+      remote: { status: result.status, error: result.error || '' },
+      publish: processRegistrySync.getLastPush(),
+    };
+  }
+
   if (message.type === 'get-active-processes') {
-    const remotePromise = processRegistrySync ? processRegistrySync.fetchRemote().catch(() => []) : Promise.resolve([]);
+    const includeRemote = message.includeRemote !== false;
+    const remotePromise = includeRemote && processRegistrySync ? processRegistrySync.fetchRemote().catch(() => []) : Promise.resolve([]);
     const stored = await chrome.storage.local.get(null).catch(() => ({}));
     const activeMap = stored?.[STORAGE_ACTIVE_PROCESSES] || {};
     let recentList = stored?.[STORAGE_RECENT_PROCESSES] || [];
@@ -364,6 +377,31 @@ async function handleProcessRegistryMessage(message, sender) {
   }
 
   throw new Error('Operação de registro de processo desconhecida.');
+}
+
+// Reenvia ao SIAGES os processos já abertos neste perfil. Cobre abas abertas antes do login ou da atualização
+// da extensão e renova o registro, que outros perfis só leem por 12 horas.
+async function publishOpenProcessTabs() {
+  if (!processRegistrySync || !chrome?.tabs?.query) return;
+  const tabs = await Promise.resolve(chrome.tabs.query({ url: 'https://suap.ifrn.edu.br/processo_eletronico/*' })).catch(() => []);
+  for (const tab of Array.isArray(tabs) ? tabs : []) {
+    if (typeof tab?.id !== 'number') continue;
+    const response = await new Promise((resolve) => {
+      try {
+        chrome.tabs.sendMessage(tab.id, { source: PROCESS_REGISTRY_SOURCE, type: 'get-process-data' }, (res) => {
+          void chrome.runtime?.lastError;
+          resolve(res);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+    const data = response?.processData;
+    // Sem o snapshot carregado a aba só tem identificadores: publicá-los apagaria os dados já registrados.
+    if (data?.process && (data.suapId || data.processNumber)) {
+      await processRegistrySync.push({ ...data, tabId: tab.id, fields: data.fields || [] });
+    }
+  }
 }
 
 // Ao fechar a aba de um processo, retira o registro compartilhado deste perfil
@@ -1180,10 +1218,11 @@ function scheduleSessionRefresh() {
   void ensureSessionRefreshAlarm();
   void refreshSessionIfNeeded().catch(() => undefined);
   void snippetsSync?.reconcile();
+  void publishOpenProcessTabs().catch(() => undefined);
 }
 
 // Edição de atalhos neste perfil (painel do SUAP) sobe para o SIAGES; o que acabou de chegar de lá não retorna.
-chrome.storage.onChanged.addListener((changes, area) => {
+chrome.storage.onChanged?.addListener((changes, area) => {
   if (area === 'sync' && changes?.[SNIPPETS_SYNC?.SNIPPETS_KEY]) void snippetsSync?.reconcile();
 });
 
@@ -1195,6 +1234,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === SESSION_REFRESH_ALARM) {
     void refreshSessionIfNeeded().catch(() => undefined);
     void snippetsSync?.reconcileIfStale();
+    void publishOpenProcessTabs().catch(() => undefined);
   }
   if (alarm.name === PROCESS_BOX_SYNC_ALARM) {
     void ensureProcessBoxSyncAlarm().catch(() => undefined);
