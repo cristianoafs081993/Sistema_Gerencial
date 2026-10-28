@@ -198,7 +198,7 @@
           const pageProc = inPage[0];
           const exists = list.some((p) => p.suapId === pageProc.suapId || (p.processNumber && p.processNumber === pageProc.processNumber));
           if (!exists) {
-            list.unshift(pageProc);
+            list.unshift({ ...pageProc, openedAt: pageProc.openedAt || Date.now() });
           } else {
             // Enriquece o processo existente com campos do DOM se faltavam
             const target = list.find((p) => p.suapId === pageProc.suapId || (p.processNumber && p.processNumber === pageProc.processNumber));
@@ -241,6 +241,11 @@
     });
   }
 
+  // Mais recentemente aberto primeiro; sem registro de abertura, usa a última atividade.
+  function processRecency(item) {
+    return Number(item?.openedAt || item?.activeAt || item?.updatedAt || 0);
+  }
+
   function isSameProcess(a, b) {
     if (a?.suapId && b?.suapId) return String(a.suapId) === String(b.suapId);
     return Boolean(a?.processNumber && b?.processNumber && a.processNumber === b.processNumber);
@@ -273,7 +278,7 @@
         const incoming = result?.ok && Array.isArray(result.processes) ? result.processes : [];
         const additions = incoming.filter((item) => !currentProcesses.some((existing) => isSameProcess(existing, item)));
         if (additions.length) {
-          currentProcesses = [...currentProcesses, ...additions];
+          currentProcesses = [...currentProcesses, ...additions].sort((a, b) => processRecency(b) - processRecency(a));
           renderList();
         }
         setRemoteNote(describeRemoteResult(result, additions.length));
@@ -322,7 +327,7 @@
         }
 
         if (processList.length > 0) {
-          processList.sort((a, b) => (b.activeAt || b.updatedAt || 0) - (a.activeAt || a.updatedAt || 0));
+          processList.sort((a, b) => processRecency(b) - processRecency(a));
           return resolve(processList);
         }
 

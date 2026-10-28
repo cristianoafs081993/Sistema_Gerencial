@@ -16,6 +16,12 @@
   // Cobre renovar a sessão e consultar o SIAGES a partir de redes lentas (SIAFI/gov).
   const DEFAULT_TIMEOUT_MS = 6000;
 
+  // Ordem do Alt+V: do processo aberto há menos tempo para o mais antigo.
+  // openedAt é gravado uma vez por aba/processo; updatedAt só serve de reserva, pois muda a cada republicação.
+  function getProcessRecency(item) {
+    return Number(item?.openedAt || item?.activeAt || item?.updatedAt || 0);
+  }
+
   function getProcessKey(record) {
     return String(record?.suapId || record?.processNumber || '').trim().slice(0, 80);
   }
@@ -33,6 +39,7 @@
       title: String(record?.title || '').slice(0, 300),
       url: String(record?.url || '').slice(0, 500),
     };
+    if (Number.isFinite(record?.openedAt) && record.openedAt > 0) payload.openedAt = record.openedAt;
     if (byteLength(payload) <= MAX_PAYLOAD_BYTES) return payload;
     if (payload.process && typeof payload.process === 'object') {
       const { dadosCompletos: _omitido, ...resumo } = payload.process;
@@ -56,6 +63,7 @@
       title: payload.title || '',
       updatedAt,
       activeAt: updatedAt,
+      openedAt: Number(payload.openedAt) > 0 ? Number(payload.openedAt) : updatedAt,
       remote: true,
     };
   }
@@ -65,16 +73,14 @@
     return Boolean(a?.processNumber && b?.processNumber && a.processNumber === b.processNumber);
   }
 
-  // Processos locais vêm antes e prevalecem; os de outros perfis entram depois, do mais recente ao mais antigo.
+  // Se o mesmo processo existe nos dois lados, o local prevalece. O resultado vem ordenado do aberto mais recentemente
+  // ao mais antigo, misturando processos deste perfil e de outros (a ordenação é estável: empate mantém o local na frente).
   function mergeRemoteProcesses(localList, remoteList) {
     const merged = Array.isArray(localList) ? [...localList] : [];
-    const remote = (Array.isArray(remoteList) ? remoteList : [])
-      .slice()
-      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    for (const item of remote) {
+    for (const item of Array.isArray(remoteList) ? remoteList : []) {
       if (!merged.some((existing) => isSameProcess(existing, item))) merged.push(item);
     }
-    return merged;
+    return merged.sort((a, b) => getProcessRecency(b) - getProcessRecency(a));
   }
 
   function withTimeout(promise, timeoutMs) {
@@ -231,6 +237,7 @@
     READ_WINDOW_MS,
     MAX_PAYLOAD_BYTES,
     getProcessKey,
+    getProcessRecency,
     buildPayload,
     rowToProcess,
     mergeRemoteProcesses,

@@ -216,17 +216,33 @@ describe('registro de processos compartilhado entre perfis (Alt+V)', () => {
     expect(sync.getLastPush()).toMatchObject({ ok: false, skipped: 'sem-sessao' });
   });
 
-  it('mantém processos locais na frente e não duplica o mesmo processo vindo de outro perfil', () => {
+  it('ordena todos os processos do aberto mais recentemente ao mais antigo, misturando perfis, sem duplicar', () => {
     const mod = loadModule();
     const merged = mod.mergeRemoteProcesses(
-      [{ suapId: '495256', processNumber: 'A', updatedAt: 1 }],
       [
-        { suapId: '495256', processNumber: 'A', remote: true, updatedAt: 5 },
-        { suapId: '100', processNumber: 'B', remote: true, updatedAt: 2 },
-        { suapId: '200', processNumber: 'C', remote: true, updatedAt: 9 },
+        { suapId: '495256', processNumber: 'A', openedAt: 5 },
+        { suapId: '300', processNumber: 'D', openedAt: 1 },
+      ],
+      [
+        { suapId: '495256', processNumber: 'A', remote: true, openedAt: 50, updatedAt: 50 },
+        { suapId: '100', processNumber: 'B', remote: true, openedAt: 2, updatedAt: 99 },
+        { suapId: '200', processNumber: 'C', remote: true, openedAt: 9, updatedAt: 9 },
       ],
     );
-    expect(merged.map((item) => [item.suapId, item.remote === true])).toEqual([['495256', false], ['200', true], ['100', true]]);
+    // 'updatedAt' de 99 não adianta: vale o momento da abertura. O local de mesmo processo prevalece sobre o remoto.
+    expect(merged.map((item) => [item.suapId, item.remote === true])).toEqual([['200', true], ['495256', false], ['100', true], ['300', false]]);
+  });
+
+  it('leva o momento de abertura no registro compartilhado, com updatedAt só como reserva', () => {
+    const mod = loadModule() as unknown as {
+      buildPayload: (record: unknown) => { openedAt?: number };
+      rowToProcess: (row: unknown) => { openedAt: number; updatedAt: number };
+    };
+    expect(mod.buildPayload({ suapId: '1', openedAt: 1234, fields: [] }).openedAt).toBe(1234);
+    expect(mod.buildPayload({ suapId: '1', fields: [] }).openedAt).toBeUndefined();
+    const updated = '2026-10-14T14:30:00Z';
+    expect(mod.rowToProcess({ payload: { openedAt: 1000 }, updated_at: updated }).openedAt).toBe(1000);
+    expect(mod.rowToProcess({ payload: {}, updated_at: updated }).openedAt).toBe(Date.parse(updated));
   });
 });
 
@@ -316,6 +332,17 @@ describe('background: Alt+V com processos de outros perfis', () => {
     background.alarmListeners.forEach((listener) => listener({ name: 'siages-extension-session-refresh' }));
     await vi.waitFor(() => expect(posts()).toHaveLength(1));
     expect(JSON.parse(String(posts()[0][1]?.body))).toMatchObject({ process_key: '495256', payload: { process: { cpfCnpj: '1' } } });
+  });
+
+  it('guarda o momento de abertura informado pela página e o publica no registro compartilhado', async () => {
+    const fetchMock = vi.fn(async () => okJson(null));
+    const background = loadBackground({ ...session, 'siages-extension-profile-id': PROFILE_SUAP }, fetchMock);
+    const payload = { suapId: '495256', processNumber: '23035.002581.2026-60', process: { cpfCnpj: '1' }, fields: [], openedAt: 1700000000000 };
+
+    await background.send({ type: 'register-process', payload }, { tab: { id: 7, url: 'https://suap.ifrn.edu.br/processo_eletronico/processo/495256/' } });
+    await vi.waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true));
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST');
+    expect(JSON.parse(String(post?.[1]?.body)).payload.openedAt).toBe(1700000000000);
   });
 
   it('publica ao registrar o processo e retira o registro quando a aba é fechada', async () => {

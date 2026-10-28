@@ -395,6 +395,24 @@ describe('Suape - Menu de Colagem Inteligente Alt+V (suapProcessPastePicker)', (
       }
     });
 
+    it('ordena do processo aberto mais recentemente para o mais antigo, misturando perfis', async () => {
+      const older = { ...localProc, openedAt: 1000 };
+      const newerRemote = { ...remoteProc, openedAt: 2000 };
+      const sendMessage = vi.fn((message: { type: string }, callback: (res: unknown) => void) => {
+        callback(message.type === 'get-remote-processes'
+          ? { ok: true, processes: [newerRemote], remote: { status: 'ok' } }
+          : { ok: true, processes: [older] });
+      });
+      (window as unknown as { chrome: unknown }).chrome = { runtime: { sendMessage } };
+      window.eval(pasteScript);
+      const api = (window as unknown as { __suapeProcessPastePicker: { openPicker: () => Promise<void> } }).__suapeProcessPastePicker;
+      await api.openPicker();
+
+      const numbers = Array.from(document.querySelectorAll('.suape-paste-group')).map((group) => group.textContent);
+      expect(numbers[0]).toContain('23035.002581.2026-60');
+      expect(numbers[1]).toContain('23035.000001.2026-11');
+    });
+
     it('não duplica um processo que já está aberto neste perfil', async () => {
       const { api } = openWith({ ok: true, processes: [{ ...localProc, remote: true }], remote: { status: 'ok' } });
       await api.openPicker();

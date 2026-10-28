@@ -135,11 +135,20 @@
         <option value="">Carregando listas...</option>
       </select>
     </label>
+    <label>
+      Bloco inicial
+      <select id="siafi-batch-select" aria-label="Bloco inicial" disabled>
+        <option value="">Selecione uma lista</option>
+      </select>
+    </label>
+    <label class="sync-option"><input id="siafi-auto-continue" type="checkbox" checked>Seguir para o próximo bloco quando o anterior terminar sem erro nem pendência</label>
     <p id="siafi-list-info" aria-live="polite">Selecione uma lista salva no SIAGES. O preenchimento ocorre em blocos de até 10 favorecidos.</p>
     <div class="button-row">
       <button id="btn-siafi-refresh" type="button" class="secondary">Atualizar listas</button>
       <button id="btn-siafi-fill" type="button">Preencher SIAFI</button>
+      <button id="btn-siafi-resume" type="button" class="secondary" disabled>Concluir linhas abertas</button>
     </div>
+    <p>Seleciona o Pix cadastrado, formata o valor e confirma cada linha. Sem Pix ou com várias chaves, deixa a escolha pendente. Para linhas já preenchidas, selecione a lista correspondente e use “Concluir linhas abertas”.</p>
     <p id="siafi-fill-status" aria-live="polite"></p>
   </section>
   <h2 id="tools-title">Ferramentas</h2>

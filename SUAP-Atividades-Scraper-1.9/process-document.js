@@ -240,6 +240,9 @@
     return result;
   }
 
+  // Momento em que esta página de processo foi aberta; base da ordem do Alt+V (mais recente primeiro).
+  const PAGE_OPENED_AT = Date.now();
+
   function syncProcessToRegistry() {
     const suapId = getProcessId();
     const processNumber = getProcessNumber();
@@ -262,6 +265,7 @@
       fields: pageData.fields || [],
       title: document.title,
       url: location.href,
+      openedAt: PAGE_OPENED_AT,
     };
 
     if (globalThis.chrome?.runtime?.sendMessage) {
@@ -285,6 +289,7 @@
         chrome.storage.local.get('suape_active_processes', (stored) => {
           const map = stored?.suape_active_processes || {};
           map['tab_suap_' + suapId] = {
+            openedAt: PAGE_OPENED_AT,
             suapId,
             processNumber: processNumber || `Processo #${suapId}`,
             process,
@@ -1691,6 +1696,7 @@
           processNumber: getProcessNumber(),
           process: state.snapshot?.process || null,
           fields: extractProcessDataFromPage().fields || [],
+          openedAt: PAGE_OPENED_AT,
           title: document.title,
           url: location.href,
         },

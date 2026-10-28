@@ -199,6 +199,8 @@ const snippetsSync = SNIPPETS_SYNC?.createSnippetsSync({
   defaults: DEFAULT_SNIPPETS,
 });
 
+const processRecency = (item) => Number(item?.openedAt || item?.activeAt || item?.updatedAt || 0);
+
 async function handleProcessRegistryMessage(message, sender) {
   if (message.type === 'register-process' || message.type === 'process-updated') {
     const tabId = sender?.tab?.id || message.payload?.tabId || ('tab_' + (message.payload?.suapId || Date.now()));
@@ -211,8 +213,14 @@ async function handleProcessRegistryMessage(message, sender) {
     let recentList = stored?.[STORAGE_RECENT_PROCESSES] || [];
 
     const now = Date.now();
+    // openedAt marca quando a página do processo foi aberta (informado pelo content script).
+    const previous = activeMap[tabId];
+    const reportedOpenedAt = Number(message.payload?.openedAt);
+    const openedAt = reportedOpenedAt > 0 ? reportedOpenedAt
+      : previous?.openedAt && String(previous.suapId || '') === String(suapId || '') ? previous.openedAt : now;
     const processRecord = {
       tabId,
+      openedAt,
       suapId,
       processNumber,
       process: message.payload?.process || null,
@@ -293,6 +301,7 @@ async function handleProcessRegistryMessage(message, sender) {
                 const existing = activeMap[tab.id];
                 activeMap[tab.id] = {
                   tabId: tab.id,
+                  openedAt: existing?.openedAt || Date.now(),
                   suapId: existing?.suapId || suapId,
                   processNumber: existing?.processNumber || processNumber,
                   process: existing?.process || null,
@@ -362,14 +371,14 @@ async function handleProcessRegistryMessage(message, sender) {
     const withRemote = (list) => (PROCESS_REGISTRY_SYNC ? PROCESS_REGISTRY_SYNC.mergeRemoteProcesses(list, remoteList) : list);
 
     if (processList.length > 0) {
-      // Ordena: o processo na aba ativa/mais recente vem em primeiro lugar!
-      processList.sort((a, b) => (b.activeAt || b.updatedAt || 0) - (a.activeAt || a.updatedAt || 0));
+      // O processo aberto mais recentemente vem primeiro.
+      processList.sort((a, b) => processRecency(b) - processRecency(a));
       return { ok: true, processes: withRemote(processList) };
     }
 
     // Fallback para recentList se não houver abas ativas detectadas
     if (recentList.length > 0) {
-      recentList.sort((a, b) => (b.activeAt || b.updatedAt || 0) - (a.activeAt || a.updatedAt || 0));
+      recentList.sort((a, b) => processRecency(b) - processRecency(a));
       return { ok: true, processes: withRemote(recentList) };
     }
 
@@ -383,6 +392,8 @@ async function handleProcessRegistryMessage(message, sender) {
 // da extensão e renova o registro, que outros perfis só leem por 12 horas.
 async function publishOpenProcessTabs() {
   if (!processRegistrySync || !chrome?.tabs?.query) return;
+  const stored = await chrome.storage.local.get(STORAGE_ACTIVE_PROCESSES).catch(() => ({}));
+  const activeMap = stored?.[STORAGE_ACTIVE_PROCESSES] || {};
   const tabs = await Promise.resolve(chrome.tabs.query({ url: 'https://suap.ifrn.edu.br/processo_eletronico/*' })).catch(() => []);
   for (const tab of Array.isArray(tabs) ? tabs : []) {
     if (typeof tab?.id !== 'number') continue;
@@ -399,7 +410,7 @@ async function publishOpenProcessTabs() {
     const data = response?.processData;
     // Sem o snapshot carregado a aba só tem identificadores: publicá-los apagaria os dados já registrados.
     if (data?.process && (data.suapId || data.processNumber)) {
-      await processRegistrySync.push({ ...data, tabId: tab.id, fields: data.fields || [] });
+      await processRegistrySync.push({ ...data, tabId: tab.id, fields: data.fields || [], openedAt: data.openedAt || activeMap[tab.id]?.openedAt });
     }
   }
 }
