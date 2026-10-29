@@ -1,5 +1,7 @@
 # DATA_LINEAGE
 
+Referências de retenção: PDF DCF/UFMG de janeiro/2024 → extração da tabela → `naturezas_rendimento_reinf`; PDF de orientação COAD → texto por página e tabela de percentuais → `referencias_retencao_paginas` e `referencias_retencao_aliquotas`. `referencias_retencao_documentos` registra a origem e ressalva de vigência. Nenhum contrato é vinculado ou classificado nesta etapa.
+
 printup: DH no SIAFI (`siafi-evidence.js`, PDF + campo Processo de Dados Básicos) → cópia local em Downloads + `stage-upload` no `background.js` → `siafi-upload-bridge.js` grava o PDF em `siafi-capturas/<usuário>/<NUP>/<DH>.pdf` e faz upsert em `extension_siafi_uploads`. Na mesma janela com SUAP, ou no perfil que focar uma aba do SUAP, o worker reivindica `opened_at` e resolve o SUAP ID. Fontes do SUAP ID: registro local, `extension_process_registry` ou `processos`. Em seguida abre `documento_upload/<id>/#siagesUpload=` → `upload-document.js` baixa o PDF e preenche o campo Arquivo. Ao salvar, o worker apaga linha e objeto; sobras do dia saem em `cleanup-siafi-capturas` (00:05 em Brasília).
 
 Alt+V entre perfis: página de processo no SUAP (`process-document.js`, snapshot do processo + campos do painel) → `register-process` no `background.js` → `process-registry-sync.js` faz upsert em `extension_process_registry` → `get-active-processes` em outro perfil do mesmo usuário lê os registros recentes de outros perfis → `process-paste-picker.js` (selo "outro perfil").

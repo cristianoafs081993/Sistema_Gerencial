@@ -1,5 +1,7 @@
 # SCHEMA_OVERVIEW
 
+Referências históricas de retenção: `naturezas_rendimento_reinf` contém as naturezas R-4020 e seus códigos de receita da tabela DCF/UFMG de janeiro/2024; `referencias_retencao_documentos`, `referencias_retencao_paginas` e `referencias_retencao_aliquotas` preservam as fontes e os percentuais da orientação COAD. Leitura autenticada, escrita somente administrativa. Não há vínculo com contratos nem validação de vigência.
+
 Extensão SIAGES, `printup`: `extension_siafi_uploads` e o bucket privado `siafi-capturas` levam o PDF da captura SIAFI ao upload do mesmo processo no SUAP. A ponte funciona também entre perfis do Chrome. RLS por usuário; dados do mesmo dia, apagados ao salvar no SUAP e pela limpeza diária `cleanup-siafi-capturas`. Ver [TABLE_CATALOG](TABLE_CATALOG.md).
 
 Extensão SIAGES: `extension_process_registry` compartilha entre perfis do Chrome do mesmo usuário os processos SUAP abertos, para o menu Alt+V. RLS por usuário; registros efêmeros (leitura de 12 h, limpeza de 24 h). Ver [TABLE_CATALOG](TABLE_CATALOG.md).

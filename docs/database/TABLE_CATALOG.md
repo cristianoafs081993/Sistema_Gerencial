@@ -1,5 +1,14 @@
 # TABLE_CATALOG
 
+## Referências históricas de retenção
+
+- `naturezas_rendimento_reinf`: 47 códigos R-4020, descrição e código de receita da tabela DCF/UFMG de janeiro/2024. O código de natureza é chave primária para futuro vínculo; naturezas com a mesma receita continuam distintas.
+- `referencias_retencao_documentos`: identificação, data e ressalvas das fontes.
+- `referencias_retencao_paginas`: texto extraído das 12 páginas da orientação COAD, identificado por documento e página.
+- `referencias_retencao_aliquotas`: nove linhas de percentuais por código de receita da orientação COAD, com IR, CSLL, Cofins, PIS/Pasep e total. São dados históricos, sem inferência automática de aplicabilidade às naturezas ou contratos.
+
+Os dados são globais e somente leitura para usuários autenticados, com RLS; atualização por `service_role` ou migration. As fontes devem ser confrontadas com a legislação vigente e o caso concreto antes do uso. Algumas descrições da tabela original terminam incompletas e foram preservadas como fornecidas.
+
 ## Capturas SIAFI do printup (extensão)
 
 `extension_siafi_uploads` liga cada PDF do comando `printup` ao processo SUAP, por usuário (`tenant_id=auth.uid()`). Colunas: `process_key` (NUP com 17 dígitos), `document_key` (DH, ex. `2026NP000123` ou `2026RP-preenchimento`), `document_label`, `file_name` (nome do PDF, terminado em `.pdf`), `storage_path` (obrigatoriamente `<tenant_id>/<process_key>/<document_key>.pdf`), `byte_size` (até 40 MB), `capture_id`, `open_requested`, `opened_at` e `updated_at` (carimbado pelo servidor em insert/update). Única por `(tenant_id, process_key, document_key)`: nova captura do mesmo DH substitui a anterior; DHs diferentes do mesmo processo coexistem. RLS por usuário para leitura/escrita/exclusão; `anon` sem acesso.
