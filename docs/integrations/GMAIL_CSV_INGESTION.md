@@ -84,6 +84,8 @@ Resultados que indicam erro de configuracao:
 
 ## Operacao recomendada
 
+Empenhos por UG (29/10/2026): o CSV `6 - Empenhos` pode trazer as NEs de todas as UGs do IFRN (3.805 linhas em 24 UGs, das quais 114 da UG 158366). Como o importador buscava a NE só pelo número resumido e `empenhos.numero` era único no banco todo, o reimport sobrescreveu NEs do campus e criou NEs de outras UGs no campus 158366 (empenhado do dashboard foi a R$ 12,9 milhões e depois a R$ 78,9 milhões). A ingestão passou a derivar a UG emitente do prefixo do NE CCor completo e a gravar/buscar por `(campus_uasg, numero)` (migration `20261029130000`); UGs fora do cadastro de campi são ignoradas. Em 03/11/2026 foram cadastrados 5 campi novos/avançados, identificados pelo conteúdo das NEs (favorecido e descrição) e não por um cadastro oficial de UASGs: 158882 Parelhas, 158887 Lajes, 158896 Touros, 158897 São Miguel e 158898 Umarizal (migration `20261103090000`, `src/lib/ifrnCampuses.ts`); confirme os códigos no Compras.gov.br/SIASG. Os demais catálogos de UASG (PNCP, SUAP, cache de itens) não foram alterados. Linhas de outras UGs criadas por engano no campus 158366 precisam ser removidas e o arquivo reimportado.
+
 - criar um gatilho time-driven no Apps Script para executar a cada 5 minutos
 - filtrar apenas a caixa/label operacional que recebe os CSVs
 - usar labels de sucesso e erro para evitar reprocessamento desnecessario

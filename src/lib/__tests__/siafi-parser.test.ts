@@ -9,6 +9,7 @@ vi.mock('@/lib/supabase', () => ({
 }));
 
 import { parseSiafiCsv, parseSiafiCsvText, syncSiafiDataToDb } from '@/lib/siafi-parser';
+import { createEmpenhosTableMock } from './helpers/empenhosTableMock';
 
 describe('siafi-parser', () => {
   beforeEach(() => {
@@ -90,16 +91,10 @@ describe('siafi-parser', () => {
   });
 
   it('persiste saldo RAP ajustado e status liquidado quando ha valor liquidado a pagar sem pagamento', async () => {
-    const updateEqMock = vi.fn().mockResolvedValue({ error: null });
-    const updateMock = vi.fn(() => ({ eq: updateEqMock }));
-    const limitMock = vi.fn().mockResolvedValue({ data: [{ id: 'rap-1', tipo: 'rap' }] });
-    const eqMock = vi.fn(() => ({ limit: limitMock }));
-    const selectMock = vi.fn(() => ({ eq: eqMock }));
-
-    fromMock.mockReturnValue({
-      select: selectMock,
-      update: updateMock,
-    });
+    const tabela = createEmpenhosTableMock([
+      { id: 'rap-1', campus_uasg: '158366', numero: '2025NE000011', tipo: 'rap' },
+    ]);
+    fromMock.mockImplementation(tabela.from);
 
     await syncSiafiDataToDb([
       {
@@ -126,7 +121,8 @@ describe('siafi-parser', () => {
       },
     ]);
 
-    expect(updateMock).toHaveBeenCalledWith(
+    expect(tabela.updates).toHaveLength(1);
+    expect(tabela.updates[0].payload).toEqual(
       expect.objectContaining({
         valor_liquidado_a_pagar: 300,
         data_empenho: '2025-04-20',
@@ -135,20 +131,14 @@ describe('siafi-parser', () => {
         rap_pago: 0,
       }),
     );
-    expect(updateEqMock).toHaveBeenCalledWith('id', 'rap-1');
+    expect(tabela.updates[0]).toMatchObject({ id: 'rap-1', campus_uasg: '158366' });
   });
 
   it('atualiza apenas o saldo oficial quando o CSV de RAP trouxer somente saldo', async () => {
-    const updateEqMock = vi.fn().mockResolvedValue({ error: null });
-    const updateMock = vi.fn(() => ({ eq: updateEqMock }));
-    const limitMock = vi.fn().mockResolvedValue({ data: [{ id: 'rap-2', tipo: 'rap', status: 'liquidado' }] });
-    const eqMock = vi.fn(() => ({ limit: limitMock }));
-    const selectMock = vi.fn(() => ({ eq: eqMock }));
-
-    fromMock.mockReturnValue({
-      select: selectMock,
-      update: updateMock,
-    });
+    const tabela = createEmpenhosTableMock([
+      { id: 'rap-2', campus_uasg: '158366', numero: '2024NE000010', tipo: 'rap', status: 'liquidado' },
+    ]);
+    fromMock.mockImplementation(tabela.from);
 
     await syncSiafiDataToDb([
       {
@@ -176,16 +166,17 @@ describe('siafi-parser', () => {
       },
     ]);
 
-    expect(updateMock).toHaveBeenCalledWith(
+    expect(tabela.updates).toHaveLength(1);
+    expect(tabela.updates[0].payload).toEqual(
       expect.objectContaining({
         saldo_rap_oficial: 3570,
         status: 'liquidado',
         tipo: 'rap',
       }),
     );
-    expect(updateMock.mock.calls[0][0]).not.toHaveProperty('valor_liquidado_a_pagar');
-    expect(updateMock.mock.calls[0][0]).not.toHaveProperty('rap_inscrito');
-    expect(updateEqMock).toHaveBeenCalledWith('id', 'rap-2');
+    expect(tabela.updates[0].payload).not.toHaveProperty('valor_liquidado_a_pagar');
+    expect(tabela.updates[0].payload).not.toHaveProperty('rap_inscrito');
+    expect(tabela.updates[0].id).toBe('rap-2');
   });
 
   it('parseia o CSV de saldo de RAP com separador por virgula e cabecalho NE CCor / Metrica', () => {

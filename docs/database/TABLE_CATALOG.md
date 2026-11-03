@@ -54,9 +54,14 @@ Finalidade:
 
 - empenhos do exercicio e RAP
 
+Chave de negocio:
+
+- `(campus_uasg, numero)` e unica (`empenhos_campus_numero_key`); o numero resumido da NE (`AAAANE000000`) se repete entre as UGs do IFRN, e a UG emitente e o prefixo de 6 digitos do NE CCor completo. A migration `20261029130000` substituiu o `UNIQUE(numero)` global e removeu a FK `documentos_habeis.fk_doc_habil_empenho` (`documentos_habeis` ainda nao tem `campus_uasg`)
+
 Campos-chave:
 
 - `id`
+- `campus_uasg`
 - `numero`
 - `descricao`
 - `valor`

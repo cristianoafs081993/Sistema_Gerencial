@@ -1,5 +1,7 @@
 import { parseCurrency, formatarDocumento } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { isIfrnCampusUasg, DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
+import { agruparNesPorCampus, mesclarNesDuplicadas, type NesIgnoradas } from '@/lib/siafiNe';
 
 export interface SiafiEmpenhoData {
     numeroCompleto: string;
@@ -432,30 +434,64 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
     });
 }
 
+export type SyncSiafiOptions = {
+    /** Campus da sessão: destino das NEs sem UG no número e único destino permitido sem superadmin. */
+    campusUasg?: string;
+    /** Superadmin grava cada NE no campus da sua UG emitente; os demais só gravam no próprio campus. */
+    todasAsUgs?: boolean;
+};
+
+type EmpenhoExistente = { id: string; tipo?: string | null; status?: string | null };
+
+const SIAFI_LOOKUP_CHUNK = 200;
+
 export async function syncSiafiDataToDb(
     data: SiafiEmpenhoData[],
     onProgress?: (processed: number, total: number) => void,
-): Promise<{ atualizados: number; criados: number; erros: number }> {
+    options: SyncSiafiOptions = {},
+): Promise<{ atualizados: number; criados: number; erros: number; ignoradas: NesIgnoradas }> {
     let atualizados = 0;
     let criados = 0;
     let erros = 0;
+
+    const campusPadrao = options.campusUasg ?? DEFAULT_IFRN_CAMPUS_UASG;
+    const { porCampus, ignoradas } = agruparNesPorCampus(mesclarNesDuplicadas(data), {
+        campusPadrao,
+        isCampusValido: isIfrnCampusUasg,
+        apenasCampusPadrao: !options.todasAsUgs,
+    });
+    const entries = Array.from(porCampus.entries()).flatMap(([campus, rows]) =>
+        rows.map((item) => ({ campus, item })),
+    );
+    const existentes = new Map<string, EmpenhoExistente>();
+    const chaveExistente = (campus: string, numero: string) => `${campus}|${numero}`;
+
+    for (const [campus, rows] of porCampus) {
+        const numeros = Array.from(new Set(rows.map((row) => row.numeroResumido)));
+        for (let start = 0; start < numeros.length; start += SIAFI_LOOKUP_CHUNK) {
+            const { data: encontrados, error } = await supabase
+                .from('empenhos')
+                .select('id, numero, tipo, status')
+                .eq('campus_uasg', campus)
+                .in('numero', numeros.slice(start, start + SIAFI_LOOKUP_CHUNK));
+            if (error) throw error;
+            ((encontrados ?? []) as Array<EmpenhoExistente & { numero: string }>).forEach((row) => {
+                existentes.set(chaveExistente(campus, row.numero), row);
+            });
+        }
+    }
 
     const uploadDate = new Date();
     uploadDate.setHours(3, 0, 0, 0);
     const ultimaAtualizacaoSiafiStr = uploadDate.toISOString();
 
-    for (let i = 0; i < data.length; i++) {
-        const item = data[i];
+    for (let i = 0; i < entries.length; i++) {
+        const { campus, item } = entries[i];
 
         try {
-            const { data: empenhos } = await supabase
-                .from('empenhos')
-                .select('id, tipo, status')
-                .eq('numero', item.numeroResumido)
-                .limit(1);
+            const existingEmpenho = existentes.get(chaveExistente(campus, item.numeroResumido));
 
-            if (empenhos && empenhos.length > 0) {
-                const existingEmpenho = empenhos[0] as { id: string; tipo?: string | null; status?: string | null };
+            if (existingEmpenho) {
                 const updatePayload: Record<string, unknown> = {
                     ultima_atualizacao_siafi: ultimaAtualizacaoSiafiStr,
                 };
@@ -503,7 +539,8 @@ export async function syncSiafiDataToDb(
                 const { error } = await supabase
                     .from('empenhos')
                     .update(updatePayload)
-                    .eq('id', existingEmpenho.id);
+                    .eq('id', existingEmpenho.id)
+                    .eq('campus_uasg', campus);
 
                 if (error) {
                     console.error(`Erro update ${item.numeroResumido}:`, error);
@@ -513,9 +550,10 @@ export async function syncSiafiDataToDb(
                 }
             } else if (item.isRap) {
                 const saldoRapOficial = getImportedRapSaldo(item);
-                const { error } = await supabase
+                const { data: inserido, error } = await supabase
                     .from('empenhos')
                     .insert({
+                        campus_uasg: campus,
                         numero: item.numeroResumido,
                         descricao: item.descricao || `Empenho RAP ${item.numeroResumido}`,
                         valor: item.rapSaldoOnly ? saldoRapOficial : item.rapInscrito,
@@ -539,12 +577,15 @@ export async function syncSiafiDataToDb(
                         valor_pago_oficial: item.rapSaldoOnly ? null : item.valorPagoOficial,
                         saldo_rap_oficial: saldoRapOficial,
                         ultima_atualizacao_siafi: ultimaAtualizacaoSiafiStr,
-                    });
+                    })
+                    .select('id, tipo, status')
+                    .single();
 
                 if (error) {
                     console.error(`Erro criando RAP ${item.numeroResumido}:`, error);
                     erros++;
                 } else {
+                    existentes.set(chaveExistente(campus, item.numeroResumido), inserido as EmpenhoExistente);
                     criados++;
                 }
             } else {
@@ -555,9 +596,10 @@ export async function syncSiafiDataToDb(
                     status = 'liquidado';
                 }
 
-                const { error } = await supabase
+                const { data: inserido, error } = await supabase
                     .from('empenhos')
                     .insert({
+                        campus_uasg: campus,
                         numero: item.numeroResumido,
                         descricao: item.descricao || `Empenho ${item.numeroResumido}`,
                         valor: item.valorEmpenhado,
@@ -577,12 +619,15 @@ export async function syncSiafiDataToDb(
                         valor_liquidado_oficial: item.valorLiquidadoOficial,
                         valor_pago_oficial: item.valorPagoOficial,
                         ultima_atualizacao_siafi: ultimaAtualizacaoSiafiStr,
-                    });
+                    })
+                    .select('id, tipo, status')
+                    .single();
 
                 if (error) {
                     console.error(`Erro criando Empenho corrente ${item.numeroResumido}:`, error);
                     erros++;
                 } else {
+                    existentes.set(chaveExistente(campus, item.numeroResumido), inserido as EmpenhoExistente);
                     criados++;
                 }
             }
@@ -592,9 +637,9 @@ export async function syncSiafiDataToDb(
         }
 
         if (onProgress) {
-            onProgress(i + 1, data.length);
+            onProgress(i + 1, entries.length);
         }
     }
 
-    return { atualizados, criados, erros };
+    return { atualizados, criados, erros, ignoradas };
 }

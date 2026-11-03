@@ -26,6 +26,11 @@ export const IFRN_CAMPUSES: IfrnCampus[] = [
   { codigo: '158373', nome: 'João Câmara' },
   { codigo: '158374', nome: 'Pau dos Ferros' },
   { codigo: '158375', nome: 'Macau' },
+  { codigo: '158882', nome: 'Parelhas' },
+  { codigo: '158887', nome: 'Lajes' },
+  { codigo: '158896', nome: 'Touros' },
+  { codigo: '158897', nome: 'São Miguel' },
+  { codigo: '158898', nome: 'Umarizal' },
 ];
 
 export function getIfrnCampus(codigo: string | null | undefined) {

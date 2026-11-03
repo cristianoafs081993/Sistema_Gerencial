@@ -17,6 +17,8 @@ import {
   type RetencaoEfdReinfRegistro,
   type SiafiEmpenhoData,
 } from '../../../src/lib/emailCsvIngestion.ts';
+import { DEFAULT_IFRN_CAMPUS_UASG, isIfrnCampusUasg } from '../../../src/lib/ifrnCampuses.ts';
+import { agruparNesPorCampus, mesclarNesDuplicadas } from '../../../src/lib/siafiNe.ts';
 
 function extractErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -830,19 +832,37 @@ async function applyCreditosDisponiveisImport(
   };
 }
 
+// O número resumido da NE se repete entre as UGs do IFRN: a chave do empenho é campus (UG emitente) + número.
+const empenhoCampusKey = (campus: string, numero: string) => `${campus}|${numero}`;
+
 async function fetchExistingEmpenhosMap(
   supabase: ReturnType<typeof createClient>,
-  numeros: string[],
+  porCampus: Map<string, SiafiEmpenhoData[]>,
 ) {
-  if (!numeros.length) return new Map<string, { id: string; tipo: string; status: string }>();
+  const existing = new Map<string, { id: string; tipo: string; status: string }>();
 
-  const rows = await selectRowsByColumnValues(supabase, 'empenhos', 'id, numero, tipo, status', 'numero', numeros);
-  return new Map(
-    rows.map((row) => [
-      String(row.numero || ''),
-      { id: String(row.id || ''), tipo: String(row.tipo || ''), status: String(row.status || '') },
-    ]),
-  );
+  for (const [campus, campusRows] of porCampus) {
+    const numeros = Array.from(new Set(campusRows.map((row) => row.numeroResumido)));
+
+    for (const chunk of chunkArray(numeros)) {
+      const { data, error } = await supabase
+        .from('empenhos')
+        .select('id, numero, tipo, status')
+        .eq('campus_uasg', campus)
+        .in('numero', chunk);
+      if (error) throw error;
+
+      ((data as Record<string, unknown>[] | null) || []).forEach((row) => {
+        existing.set(empenhoCampusKey(campus, String(row.numero || '')), {
+          id: String(row.id || ''),
+          tipo: String(row.tipo || ''),
+          status: String(row.status || ''),
+        });
+      });
+    }
+  }
+
+  return existing;
 }
 
 function getRapSaldoAjustado(rapAPagar: number, valorLiquidadoAPagar: number) {
@@ -879,17 +899,24 @@ async function applySiafiEmpenhosImport(
   supabase: ReturnType<typeof createClient>,
   rows: SiafiEmpenhoData[],
 ) {
-  const existingEmpenhos = await fetchExistingEmpenhosMap(
-    supabase,
-    rows.map((row) => row.numeroResumido),
+  // Cada NE vai para o campus da sua UG emitente (prefixo do NE CCor). Sem UG no número, vale o campus padrão;
+  // UGs fora do cadastro de campi do IFRN são ignoradas.
+  const { porCampus } = agruparNesPorCampus(mesclarNesDuplicadas(rows), {
+    campusPadrao: DEFAULT_IFRN_CAMPUS_UASG,
+    isCampusValido: isIfrnCampusUasg,
+  });
+  const entries = Array.from(porCampus.entries()).flatMap(([campus, campusRows]) =>
+    campusRows.map((item) => ({ campus, item })),
   );
+  const existingEmpenhos = await fetchExistingEmpenhosMap(supabase, porCampus);
 
   const ultimaAtualizacaoSiafi = createSiafiUploadTimestamp();
   const updates: Array<{ id: string; payload: Record<string, unknown> }> = [];
   const inserts: Record<string, unknown>[] = [];
+  const insertKeys = new Set<string>();
 
-  rows.forEach((item) => {
-    const existing = existingEmpenhos.get(item.numeroResumido);
+  entries.forEach(({ campus, item }) => {
+    const existing = existingEmpenhos.get(empenhoCampusKey(campus, item.numeroResumido));
     if (existing) {
       const payload: Record<string, unknown> = {
         ultima_atualizacao_siafi: ultimaAtualizacaoSiafi,
@@ -943,7 +970,12 @@ async function applySiafiEmpenhosImport(
           ? 'liquidado'
           : 'pendente';
 
+    const insertKey = empenhoCampusKey(campus, item.numeroResumido);
+    if (insertKeys.has(insertKey)) return;
+    insertKeys.add(insertKey);
+
     inserts.push({
+      campus_uasg: campus,
       numero: item.numeroResumido,
       descricao: item.descricao || `Empenho ${item.numeroResumido}`,
       valor: item.isRap ? (item.rapSaldoOnly ? getImportedRapSaldo(item) : item.rapInscrito) : item.valorEmpenhado,

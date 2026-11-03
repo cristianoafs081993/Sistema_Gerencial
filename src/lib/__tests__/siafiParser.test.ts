@@ -1,5 +1,6 @@
 import { parseSiafiCsv, syncSiafiDataToDb, type SiafiEmpenhoData } from '@/lib/siafi-parser';
 import { supabase } from '@/lib/supabase';
+import { createEmpenhosTableMock } from './helpers/empenhosTableMock';
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -43,36 +44,10 @@ describe('siafi-parser', () => {
   });
 
   it('atualiza empenhos existentes e cria empenho corrente ausente no reprocessamento SIAFI', async () => {
-    const existingByNumero = new Map([
-      ['2026NE000003', { id: 'existing-current', tipo: 'exercicio' }],
+    const { from, updates, inserts } = createEmpenhosTableMock([
+      { id: 'existing-current', campus_uasg: '158366', numero: '2026NE000003', tipo: 'exercicio' },
     ]);
-    const updates: Array<{ id: string; payload: Record<string, unknown> }> = [];
-    const inserts: Record<string, unknown>[] = [];
-
-    vi.mocked(supabase.from).mockImplementation((table: string) => {
-      expect(table).toBe('empenhos');
-
-      return {
-        select: () => ({
-          eq: (_column: string, numero: string) => ({
-            limit: async () => ({
-              data: existingByNumero.has(numero) ? [existingByNumero.get(numero)] : [],
-              error: null,
-            }),
-          }),
-        }),
-        update: (payload: Record<string, unknown>) => ({
-          eq: async (_column: string, id: string) => {
-            updates.push({ id, payload });
-            return { error: null };
-          },
-        }),
-        insert: async (payload: Record<string, unknown>) => {
-          inserts.push(payload);
-          return { error: null };
-        },
-      } as never;
-    });
+    vi.mocked(supabase.from).mockImplementation(from as never);
 
     const data: SiafiEmpenhoData[] = [
       {
@@ -123,7 +98,8 @@ describe('siafi-parser', () => {
 
     const result = await syncSiafiDataToDb(data);
 
-    expect(result).toEqual({ atualizados: 1, criados: 1, erros: 0 });
+    expect(result).toMatchObject({ atualizados: 1, criados: 1, erros: 0 });
+    expect(result.ignoradas.total).toBe(0);
     expect(updates).toHaveLength(1);
     expect(updates[0]).toMatchObject({
       id: 'existing-current',
@@ -137,6 +113,7 @@ describe('siafi-parser', () => {
     });
     expect(inserts).toHaveLength(1);
     expect(inserts[0]).toMatchObject({
+      campus_uasg: '158366',
       numero: '2026NE000024',
       tipo: 'exercicio',
       valor: 3217.5,
@@ -144,6 +121,69 @@ describe('siafi-parser', () => {
       valor_liquidado: 0,
       valor_liquidado_oficial: 0,
       valor_pago_oficial: 0,
+    });
+  });
+
+  describe('roteamento por UG (CSV com NEs de varias UGs)', () => {
+    const buildRow = (numeroCompleto: string, valorEmpenhado: number): SiafiEmpenhoData => ({
+      numeroCompleto,
+      numeroResumido: numeroCompleto.match(/(\d{4}NE\d+)/)![1],
+      processo: '',
+      favorecidoNome: '',
+      favorecidoDocumento: '',
+      descricao: 'NE',
+      naturezaDespesa: '339039',
+      planoInterno: 'PI',
+      ptres: '229513',
+      isRap: false,
+      valorEmpenhado,
+      valorLiquidadoOficial: 0,
+      valorPagoOficial: 0,
+      valorLiquidadoAPagar: 0,
+      rapInscrito: 0,
+      rapALiquidar: 0,
+      rapLiquidado: 0,
+      rapPago: 0,
+      rapAPagar: 0,
+    });
+
+    // Mesmo numero resumido (2026NE000126) em duas UGs: uma é do campus, a outra é de outro campus.
+    const csv = [
+      buildRow('158366264352026NE000126', 100),
+      buildRow('158365264352026NE000126', 2511903.04),
+      buildRow('152711264352026NE000001', 50),
+    ];
+
+    it('superadmin grava cada NE no campus da sua UG e nunca altera a NE homonima de outro campus', async () => {
+      const { from, updates, inserts } = createEmpenhosTableMock([
+        { id: 'campus-ne126', campus_uasg: '158366', numero: '2026NE000126', tipo: 'exercicio' },
+      ]);
+      vi.mocked(supabase.from).mockImplementation(from as never);
+
+      const result = await syncSiafiDataToDb(csv, undefined, { campusUasg: '158366', todasAsUgs: true });
+
+      expect(result).toMatchObject({ atualizados: 1, criados: 2, erros: 0 });
+      expect(updates).toHaveLength(1);
+      expect(updates[0]).toMatchObject({ id: 'campus-ne126', campus_uasg: '158366', payload: { valor: 100 } });
+      expect(inserts.map((row) => [row.campus_uasg, row.numero, row.valor]).sort()).toEqual([
+        ['152711', '2026NE000001', 50],
+        ['158365', '2026NE000126', 2511903.04],
+      ]);
+    });
+
+    it('sem superadmin importa so a UG do campus e informa as linhas ignoradas', async () => {
+      const { from, updates, inserts } = createEmpenhosTableMock([
+        { id: 'campus-ne126', campus_uasg: '158366', numero: '2026NE000126', tipo: 'exercicio' },
+      ]);
+      vi.mocked(supabase.from).mockImplementation(from as never);
+
+      const result = await syncSiafiDataToDb(csv, undefined, { campusUasg: '158366' });
+
+      expect(result).toMatchObject({ atualizados: 1, criados: 0, erros: 0 });
+      expect(result.ignoradas).toMatchObject({ total: 2, semPermissao: 2, porUg: { '158365': 1, '152711': 1 } });
+      expect(updates).toHaveLength(1);
+      expect(updates[0].payload).toMatchObject({ valor: 100 });
+      expect(inserts).toHaveLength(0);
     });
   });
 });
