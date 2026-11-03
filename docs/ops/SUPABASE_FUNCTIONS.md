@@ -893,7 +893,12 @@ Dependências de Ambiente:
 Agendamento Automático:
 
 - agendada no `pg_cron` via migration `20260905110000_schedule_daily_sync_precos_referencia.sql`
-- job `sync-precos-referencia-daily` roda diariamente às 04:00 UTC via extensão `pg_net`
+- job `sync-precos-referencia-daily` rodava diariamente às 04:00 UTC via extensão `pg_net`; **desagendado em 03/11/2026** (junto com `sync-precos-referencia-resume` e `precos-embeddings-pending`) pela migration `20261103100000_reduce_database_size_and_log_volume.sql`, porque a base de preços foi esvaziada
+
+## Rotina de logs e crons (03/11/2026)
+
+- `sync-contratos-pncp-documentos-batch` passou de a cada 5 min para de hora em hora (minuto 7); a fila de documentos PNCP é drenada mais devagar.
+- `purge-cron-run-details-daily` (06:40 UTC) chama `public.purge_cron_run_details(10)`: mantém as 10 últimas execuções de cada job em `cron.job_run_details` e remove respostas do `pg_net` com mais de 1 h. Logs de plataforma (Dashboard → Logs) não são apagáveis e expiram pela retenção do plano.
 
 ## cleanup-siafi-capturas
 

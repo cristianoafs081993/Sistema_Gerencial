@@ -280,7 +280,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
 - coleta e sincronizacao:
   - fonte oficial: Compras.gov.br Dados Abertos (API `/modulo-contratacoes/2_consultarItensContratacoes_PNCP_14133`) e PNCP
   - ingestao: Edge Function [sync-precos-referencia/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-precos-referencia/index.ts)
-  - agendamento: `pg_cron` diário (`sync-precos-referencia-daily`) executando delta diário de 24h a 48h
+  - agendamento: `pg_cron` diário (`sync-precos-referencia-daily`) executando delta diário de 24h a 48h — **desagendado em 03/11/2026**, tabela esvaziada (funcionalidade pausada)
   - embeddings vetoriais: gerados via Google AI Studio Gemini API (`gemini-embedding-001`, dimensão 768)
   - persistencia:
     - `preco_referencia_itens`: cotações homologadas, metadados de órgão/fornecedor, `search_tsv` e coluna vetorial `embedding vector(768)`

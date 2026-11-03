@@ -994,7 +994,8 @@ Finalidade:
 - suporte a pesquisa vetorial semântica com pgvector (`embedding vector(768)` e índice HNSW `idx_preco_ref_embedding_hnsw`)
 - suporte a busca Full-Text (`search_tsv tsvector` com dicionário português e índice GIN) e similaridade fonética/trigrama (`pg_trgm`)
 - consumida prioritariamente pelo Assistente Gerencial (`executeConversationalPriceResearch`) antes de consultar APIs externas lentas
-- alimentada pela Edge Function `sync-precos-referencia` e pelo job cron diário `sync-precos-referencia-daily`
+- **desativada em 03/11/2026**: a tabela foi esvaziada (`TRUNCATE`) e os jobs `sync-precos-referencia-daily`, `sync-precos-referencia-resume` e `precos-embeddings-pending` foram desagendados para manter o banco abaixo de 500 MB (plano Free). Para reativar, reagende os jobs (ver `20260907011000_price_sync_authenticated_jobs.sql`) e rode o backfill; considere `halfvec` ou apenas FTS/trigrama para limitar o tamanho
+- era alimentada pela Edge Function `sync-precos-referencia` e pelo job cron diário `sync-precos-referencia-daily`
 
 Campos-chave:
 
@@ -1454,6 +1455,8 @@ Finalidade:
 Campos-chave:
 
 - `id`, `created_by`, `created_at`;
+Retenção: só o snapshot da execução `success` mais recente por organização/plano/unidade é mantido (mais prévias das últimas 24 h, ainda aplicáveis). O trigger `trg_prune_suap_plan_snapshots` em `suap_plan_sync_runs` apaga os snapshots anteriores da mesma unidade quando uma execução passa a `success`. As linhas de `suap_plan_sync_runs` continuam como histórico. Migrations `20261103100000` e `20261103100100`.
+
 - `suap_id`, `document_id`, `document_type`, `document_title`, `process_number`;
 - `checked_at` e `result` (JSONB normalizado da analise).
 
