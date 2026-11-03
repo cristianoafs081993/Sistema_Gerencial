@@ -341,9 +341,11 @@
     let files;
     try {
       files = downloads(lastRecord, pages);
-      status(lastRecord.status === 'complete' ? 'Captura pronta. Baixe o PDF e o JSON.' : `Captura parcial: ${lastRecord.warnings.join(' ')} Confira os avisos no JSON.`);
+      status(lastRecord.status === 'complete' ? 'Captura pronta. O PDF foi baixado; baixe o JSON se precisar.' : `Captura parcial: ${lastRecord.warnings.join(' ')} Confira os avisos no JSON.`);
     } catch (error) { status(`Falha ao gerar os arquivos: ${error.message}`); return; }
+    // print baixa o PDF sozinho; no printup, sendToSuap faz esse download antes do envio.
     if (uploadMode) await sendToSuap(lastRecord, files.name, files.pdfBytes);
+    else toolbar.querySelector('[data-results] a[download$=".pdf"]')?.click();
   }
   function blockDuringCapture(event) {
     if (running && event.type === 'keydown' && event.key === 'Escape') {
