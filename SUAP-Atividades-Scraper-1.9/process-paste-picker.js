@@ -17,6 +17,7 @@
   let overlayEl = null;
   let searchInputEl = null;
   let listContainerEl = null;
+  let remoteNoteEl = null;
   let activeInputElement = null;
   let activeSelectionStart = null;
   let activeSelectionEnd = null;
@@ -197,7 +198,7 @@
           const pageProc = inPage[0];
           const exists = list.some((p) => p.suapId === pageProc.suapId || (p.processNumber && p.processNumber === pageProc.processNumber));
           if (!exists) {
-            list.unshift(pageProc);
+            list.unshift({ ...pageProc, openedAt: pageProc.openedAt || Date.now() });
           } else {
             // Enriquece o processo existente com campos do DOM se faltavam
             const target = list.find((p) => p.suapId === pageProc.suapId || (p.processNumber && p.processNumber === pageProc.processNumber));
@@ -216,13 +217,14 @@
         return void getLocalFallbackProcesses().then(onDone);
       }
 
+      // Mostra os processos deste perfil de imediato; os de outros perfis chegam por loadRemoteProcesses().
       const timeout = setTimeout(() => {
         void getLocalFallbackProcesses().then(onDone);
-      }, 800);
+      }, 2500);
 
       try {
         chrome.runtime.sendMessage(
-          { source: 'suape-process-registry', type: 'get-active-processes' },
+          { source: 'suape-process-registry', type: 'get-active-processes', includeRemote: false },
           (response) => {
             clearTimeout(timeout);
             if (response?.ok && Array.isArray(response.processes) && response.processes.length > 0) {
@@ -237,6 +239,53 @@
         void getLocalFallbackProcesses().then(onDone);
       }
     });
+  }
+
+  // Mais recentemente aberto primeiro; sem registro de abertura, usa a última atividade.
+  function processRecency(item) {
+    return Number(item?.openedAt || item?.activeAt || item?.updatedAt || 0);
+  }
+
+  function isSameProcess(a, b) {
+    if (a?.suapId && b?.suapId) return String(a.suapId) === String(b.suapId);
+    return Boolean(a?.processNumber && b?.processNumber && a.processNumber === b.processNumber);
+  }
+
+  function setRemoteNote(text) {
+    if (!remoteNoteEl) return;
+    remoteNoteEl.textContent = text;
+    remoteNoteEl.hidden = !text;
+  }
+
+  function describeRemoteResult(result, added) {
+    if (added > 0) return '';
+    const status = result?.remote?.status;
+    if (status === 'sem-sessao') return 'Outros perfis: entre no SIAGES pelo popup da extensão neste perfil para ver os processos abertos neles.';
+    if (status === 'erro') return `Outros perfis: não foi possível consultar o SIAGES agora${result?.remote?.error ? ` (${result.remote.error})` : ''}.`;
+    if (status === 'ok') return 'Outros perfis: nenhum processo aberto. No outro perfil, entre no SIAGES pelo popup e abra ou recarregue a página do processo.';
+    return '';
+  }
+
+  // Acrescenta, sem bloquear a abertura, os processos publicados por outros perfis do Chrome no SIAGES.
+  function loadRemoteProcesses() {
+    if (!globalThis.chrome?.runtime?.sendMessage) return;
+    const picker = overlayEl;
+    setRemoteNote('Consultando outros perfis…');
+    try {
+      chrome.runtime.sendMessage({ source: 'suape-process-registry', type: 'get-remote-processes' }, (result) => {
+        void chrome.runtime?.lastError;
+        if (!overlayEl || overlayEl !== picker) return;
+        const incoming = result?.ok && Array.isArray(result.processes) ? result.processes : [];
+        const additions = incoming.filter((item) => !currentProcesses.some((existing) => isSameProcess(existing, item)));
+        if (additions.length) {
+          currentProcesses = [...currentProcesses, ...additions].sort((a, b) => processRecency(b) - processRecency(a));
+          renderList();
+        }
+        setRemoteNote(describeRemoteResult(result, additions.length));
+      });
+    } catch {
+      setRemoteNote('');
+    }
   }
 
   async function getLocalFallbackProcesses() {
@@ -278,7 +327,7 @@
         }
 
         if (processList.length > 0) {
-          processList.sort((a, b) => (b.activeAt || b.updatedAt || 0) - (a.activeAt || a.updatedAt || 0));
+          processList.sort((a, b) => processRecency(b) - processRecency(a));
           return resolve(processList);
         }
 
@@ -540,6 +589,7 @@
           suapId,
           fields: filteredFields,
           index: procIndex + 1,
+          remote: proc.remote === true,
         });
       }
     });
@@ -550,7 +600,7 @@
       if (currentProcesses.length === 0) {
         emptyEl.innerHTML = `
           <div class="suape-paste-empty-title">Nenhum processo identificado</div>
-          <div class="suape-paste-empty-desc">Abra uma página de processo no SUAP para que os dados sejam detectados e disponibilizados automaticamente.</div>
+          <div class="suape-paste-empty-desc">Abra uma página de processo no SUAP para que os dados sejam detectados e disponibilizados automaticamente. Processos abertos em outro perfil do Chrome aparecem aqui quando os dois perfis estão logados na mesma conta SIAGES.</div>
         `;
       } else {
         emptyEl.innerHTML = `
@@ -576,6 +626,7 @@
           <span class="suape-paste-group-index">PROCESSO ${group.index}</span>
           <span class="suape-paste-group-title">${escapeHtml(group.processNumber)}</span>
           ${group.suapId ? `<span class="suape-paste-group-suapid">SUAP #${escapeHtml(group.suapId)}</span>` : ''}
+          ${group.remote ? '<span class="suape-paste-group-remote" title="Aberto em outro perfil do Chrome logado no SIAGES">outro perfil</span>' : ''}
         </div>
         <span class="suape-paste-group-status">${group.fields.length} itens identificados</span>
       `;
@@ -741,6 +792,11 @@
     listContainerEl = document.createElement('div');
     listContainerEl.className = 'suape-paste-list';
 
+    remoteNoteEl = document.createElement('div');
+    remoteNoteEl.className = 'suape-paste-remote-note';
+    remoteNoteEl.setAttribute('role', 'status');
+    remoteNoteEl.hidden = true;
+
     // Footer
     const footerEl = document.createElement('div');
     footerEl.className = 'suape-paste-footer';
@@ -759,7 +815,7 @@
       if (e.target === overlayEl) closePicker();
     });
 
-    modalEl.append(headerEl, searchWrapper, listContainerEl, footerEl);
+    modalEl.append(headerEl, searchWrapper, listContainerEl, remoteNoteEl, footerEl);
     overlayEl.appendChild(modalEl);
     document.body.appendChild(overlayEl);
 
@@ -768,6 +824,7 @@
     selectedIndex = 0;
     filterQuery = '';
     renderList();
+    loadRemoteProcesses();
 
     // Foco imediato no campo de busca
     setTimeout(() => {
@@ -781,6 +838,7 @@
     overlayEl = null;
     searchInputEl = null;
     listContainerEl = null;
+    remoteNoteEl = null;
 
     // Restaura o foco no elemento anterior
     if (activeInputElement && typeof activeInputElement.focus === 'function') {

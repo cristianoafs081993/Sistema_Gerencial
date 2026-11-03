@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { collectCapturedRdPage, collectRdChunk, initialRdState, nextRdCaptureUrl, type RdRun } from '../../../supabase/functions/_shared/suap_rd_sync';
+import { collectCapturedRdPage, collectRdChunk, initialRdState, nextRdCaptureUrl, upcomingRdCaptureUrls, type RdRun } from '../../../supabase/functions/_shared/suap_rd_sync';
 import { seedRdReuse } from '../../../supabase/functions/_shared/suap_rd_reuse';
 import { detailHtml, listHtml, planHtml, rdListUrl } from './suapRdFixtures';
 
@@ -165,9 +165,33 @@ describe('reaproveitamento entre coletas completas de RDs',()=>{
   it('captura RD nova e reconsulta as relações oficiais, sem reler os detalhes estáveis',async()=>{
     const {db,first}=await baseline();const data=fixture(11);
     const second=await finish(db,run('second',first),data);
-    expect(detailIds(data)).toEqual(['11']);
+    // Read first as priority and again in the regular pass, with the final relations.
+    expect(detailIds(data)).toEqual(['11','11']);
     expect(second.state.reuse).toMatchObject({reusedDetails:10,reusedActivities:0});
     expect(db.rows.get('second:11')!.payload.sources).toEqual([expect.objectContaining({activityId:'1011',planId:8})]);
+  });
+  it('prioriza a RD nova: lê o detalhe, verifica primeiro a relação da sua atividade e publica antes de varrer as demais',async()=>{
+    const {db,first}=await baseline();const data=fixture(11);data.names.set(1011,'Energia elétrica');
+    const second=run('second',first);
+    while(!db.rows.has('second:11')) await collectRdChunk(db,second,data.load,DOMParser,1);
+    expect(data.load.mock.calls.map(([url])=>url)).toEqual([rdListUrl,'https://suap.ifrn.edu.br/plan_estrategico/plano_concluido/8/',
+      'https://suap.ifrn.edu.br/plan_estrategico/detalhar_requisicaodespesa/11/','https://suap.ifrn.edu.br/plan_estrategico/listar_requisicoes_despesa/8/1011/']);
+    expect(second.state.phase).toBe('activities');
+    expect(second.state.priority).toMatchObject({total:1,queue:[],published:['11']});
+    expect(db.rows.get('second:11')!.payload).toMatchObject({activityName:'Energia elétrica',sources:[expect.objectContaining({activityId:'1011'})]});
+    await finish(db,second,data);
+    expect(detailIds(data)).toEqual(['11','11']);
+    expect(db.rows.get('second:11')!.payload.sources).toEqual([expect.objectContaining({activityId:'1011',planId:8})]);
+  });
+  it('anuncia as RDs novas como próximas páginas e não prioriza coleta sem base',async()=>{
+    const {db,first}=await baseline();const data=fixture(13);
+    const second=run('second',first);
+    while(second.state.phase!=='activities') await collectRdChunk(db,second,data.load,DOMParser,1);
+    expect(nextRdCaptureUrl(structuredClone(second))).toBe('https://suap.ifrn.edu.br/plan_estrategico/detalhar_requisicaodespesa/11/');
+    expect(upcomingRdCaptureUrls(second)).toEqual(['12','13'].map(id=>`https://suap.ifrn.edu.br/plan_estrategico/detalhar_requisicaodespesa/${id}/`));
+    const full=run('full',first,true);
+    while(full.state.phase!=='activities') await collectRdChunk(db,full,data.load,DOMParser,1);
+    expect(nextRdCaptureUrl(structuredClone(full))).toContain('listar_requisicoes_despesa');
   });
   it('detecta mudança de valor de RD pendente sem reler as concluídas',async()=>{
     const pending=fixture();pending.statuses.set(2,'Em emissão');

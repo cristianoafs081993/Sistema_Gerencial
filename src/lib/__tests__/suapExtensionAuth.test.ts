@@ -160,4 +160,82 @@ describe('autenticação persistente da extensão', () => {
     });
     expect(values[SESSION_KEY]).toBeUndefined();
   });
+
+  it.each(['refresh_token_not_found', 'refresh_token_already_used', 'session_not_found', 'session_expired'])(
+    'reconhece o error_code real do Supabase (%s) e permite entrar novamente', async (errorCode) => {
+      const values: StorageValues = {
+        [SESSION_KEY]: { accessToken: 'expirado', refreshToken: 'invalido', expiresAt: 1 },
+      };
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false, status: 400,
+        json: async () => ({ code: 400, error: 'invalid_request', error_code: errorCode, msg: 'Invalid Refresh Token' }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const background = loadBackground(values);
+
+      await expect(background.send({ type: 'get-session' })).resolves.toEqual({
+        ok: false, error: expect.stringContaining('Abra o popup da extensão e entre novamente'),
+      });
+      expect(values[SESSION_KEY]).toBeUndefined();
+      await expect(background.send({ type: 'get-session' })).resolves.toEqual({ ok: true, session: null });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each([429, 503])('preserva a sessão e informa HTTP %s em falha temporária', async (status) => {
+    const session = { accessToken: 'expirado', refreshToken: 'preservado', expiresAt: 1 };
+    const values: StorageValues = { [SESSION_KEY]: session };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status, json: async () => ({ code: status }) }));
+    const background = loadBackground(values);
+
+    await expect(background.send({ type: 'get-session' })).resolves.toEqual({
+      ok: false, error: expect.stringContaining(`HTTP ${status}`),
+    });
+    expect(values[SESSION_KEY]).toEqual(session);
+    expect(background.storage.remove).not.toHaveBeenCalled();
+  });
+
+  it('trata o payload REST real e aceita novo login após descartar a sessão inválida', async () => {
+    const values: StorageValues = {
+      [SESSION_KEY]: { accessToken: 'expirado', refreshToken: 'inexistente', expiresAt: 1 },
+    };
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token: Refresh Token Not Found' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'novo-login', refresh_token: 'novo-refresh', expires_in: 3600 }) }));
+    const background = loadBackground(values);
+
+    await expect(background.send({ type: 'get-session' })).resolves.toMatchObject({ ok: false, error: expect.stringContaining('entre novamente') });
+    const signIn = { type: 'sign-in', email: 'teste@example.com', password: 'senha-fixture' };
+    await expect(background.send(signIn)).resolves.toMatchObject({ ok: true, session: { accessToken: 'novo-login' } });
+    await expect(background.send({ type: 'get-session' })).resolves.toMatchObject({ ok: true, session: { accessToken: 'novo-login' } });
+    expect(values[SESSION_KEY]).toMatchObject({ refreshToken: 'novo-refresh' });
+  });
+
+  it('mantém a sessão após falha de rede e consegue renová-la depois', async () => {
+    const session = { accessToken: 'expirado', refreshToken: 'preservado', expiresAt: 1 };
+    const values: StorageValues = { [SESSION_KEY]: session };
+    vi.stubGlobal('fetch', vi.fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'renovado', refresh_token: 'novo-refresh', expires_in: 3600 }) }));
+    const background = loadBackground(values);
+
+    await expect(background.send({ type: 'get-session' })).resolves.toMatchObject({ ok: false });
+    expect(values[SESSION_KEY]).toEqual(session);
+    expect(background.storage.remove).not.toHaveBeenCalled();
+    await expect(background.send({ type: 'get-session' })).resolves.toMatchObject({ ok: true, session: { accessToken: 'renovado' } });
+  });
+
+  it('reutiliza o acesso ainda válido e renova na próxima tentativa após falha temporária', async () => {
+    const session = { accessToken: 'ainda-valido', refreshToken: 'preservado', expiresAt: Date.now() / 1000 + 600 };
+    const values: StorageValues = { [SESSION_KEY]: session };
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'renovado', refresh_token: 'novo-refresh', expires_in: 3600 }) }));
+    const background = loadBackground(values);
+
+    await expect(background.send({ type: 'get-session' })).resolves.toMatchObject({ ok: true, session: { accessToken: 'ainda-valido' } });
+    expect(values[SESSION_KEY]).toEqual(session);
+    await expect(background.send({ type: 'get-session' })).resolves.toMatchObject({ ok: true, session: { accessToken: 'renovado' } });
+    expect(values[SESSION_KEY]).toMatchObject({ refreshToken: 'novo-refresh' });
+  });
 });

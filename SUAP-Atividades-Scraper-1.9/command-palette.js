@@ -8,6 +8,7 @@
   const SUAP_APP_URL = 'https://suap.ifrn.edu.br';
   const IS_SUAP_PAGE = window.location.hostname === 'suap.ifrn.edu.br';
   const IS_SIAFI_PAGE = window.location.protocol === 'https:' && window.location.hostname === 'siafi.tesouro.gov.br';
+  const IS_SIAGES_PAGE = window.location.hostname === 'www.siages.com.br';
 
   let empenhosCache = null;
   let contratosCache = null;
@@ -19,6 +20,13 @@
   let condhRequestSequence = 0;
   let condhPermissionToken = '';
   let condhPermissionPromise = null;
+  const SOLRECFIN_STORAGE_KEY = 'siages_solrecfin_entries';
+  let solrecfinEntries = [];
+  let solrecfinReady;
+  let solrecfinQueue = Promise.resolve();
+  let solrecfinDayTimer = null;
+  let solrecfinSelectedDay = null;
+  let solrecfinNativeTimer = null;
 
   // DOM Elements
   let overlayEl = null;
@@ -28,6 +36,256 @@
   let detailOverlayEl = null;
   let detailDialogEl = null;
   let paletteReturnFocus = null;
+  let commandPaletteDisposed = false;
+  let processBadgesCleanup = () => {};
+
+  function normalizeSolrecfinText(value) {
+    return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  function solrecfinDay(value = new Date()) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return null;
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(date);
+    const read = type => parts.find(part => part.type === type)?.value;
+    return `${read('year')}-${read('month')}-${read('day')}`;
+  }
+
+  function solrecfinDays(now = new Date()) {
+    const today = solrecfinDay(now);
+    const reference = new Date(`${today}T12:00:00-03:00`);
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(reference);
+      date.setUTCDate(date.getUTCDate() - index);
+      return solrecfinDay(date);
+    });
+  }
+
+  function retainSolrecfinHistory(entries, now = new Date()) {
+    const days = new Set(solrecfinDays(now));
+    return (Array.isArray(entries) ? entries : []).filter(entry => entry?.captureId)
+      .map(entry => ({ ...entry, day: solrecfinDay(entry.capturedAt) }))
+      .filter(entry => days.has(entry.day));
+  }
+
+  async function refreshSolrecfinHistory() {
+    solrecfinEntries = retainSolrecfinHistory(await readSolrecfinStorage());
+  }
+
+  function queueSolrecfinChange(change) {
+    const operation = solrecfinQueue.then(async () => {
+      await solrecfinReady;
+      await refreshSolrecfinHistory();
+      await change();
+    });
+    solrecfinQueue = operation.catch(() => {});
+    return operation;
+  }
+
+  function solrecfinFields(record) {
+    return (record?.sections || []).flatMap(section => (section?.fields || []).map(field => ({
+      ...field,
+      sectionKey: section.key,
+      sectionTitle: section.title,
+    })));
+  }
+
+  function solrecfinMoneyToCents(value) {
+    if (value === null || value === undefined || typeof value === 'boolean') return null;
+    let raw = String(value).trim().replace(/R\$|\s/gi, '').replace(/[^\d,.-]/g, '');
+    if (!raw || !/[\d]/.test(raw)) return null;
+    const negative = raw.startsWith('-');
+    raw = raw.replace(/-/g, '');
+    const comma = raw.lastIndexOf(','), dot = raw.lastIndexOf('.');
+    let integer = raw, decimal = '';
+    if (comma >= 0 && dot >= 0) {
+      const separator = comma > dot ? comma : dot;
+      integer = raw.slice(0, separator).replace(/[.,]/g, '');
+      decimal = raw.slice(separator + 1).replace(/\D/g, '');
+    } else if (comma >= 0) {
+      const tail = raw.slice(comma + 1).replace(/\D/g, '');
+      if (tail.length <= 2) { integer = raw.slice(0, comma).replace(/\./g, ''); decimal = tail; }
+      else integer = raw.replace(/,/g, '');
+    } else if (dot >= 0) {
+      const tail = raw.slice(dot + 1).replace(/\D/g, '');
+      if (tail.length <= 2) { integer = raw.slice(0, dot).replace(/,/g, ''); decimal = tail; }
+      else integer = raw.replace(/\./g, '');
+    }
+    const cents = Number.parseInt(integer.replace(/\D/g, '') || '0', 10) * 100 + Number.parseInt((decimal + '00').slice(0, 2), 10);
+    return (negative ? -1 : 1) * cents;
+  }
+
+  function solrecfinFindValue(fields, matcher) {
+    const field = fields.find(candidate => matcher.test(normalizeSolrecfinText(candidate.label)) && solrecfinMoneyToCents(candidate.value) !== null);
+    return field ? { field, cents: solrecfinMoneyToCents(field.value) } : null;
+  }
+
+  function buildSolrecfinEntry(record) {
+    const fields = solrecfinFields(record);
+    const basicFields = fields.filter(field => field.sectionKey === 'dados-basicos');
+    const allText = [
+      record?.document?.type,
+      record?.document?.year,
+      ...fields.flatMap(field => [field.label, field.value]),
+      ...(record?.sections || []).flatMap(section => [section.text, ...(section.tables || []).flatMap(table => [table.headers, ...(table.rows || []).flatMap(row => row.map(cell => cell.text))])]),
+    ].flat().filter(value => value !== null && value !== undefined).join(' ');
+    const normalizedText = normalizeSolrecfinText(allText);
+    const valueMatch = solrecfinFindValue(basicFields, /valor\s+(?:do\s+)?documento|valor\s+da\s+liquidacao|valor\s+liquidado/)
+      || solrecfinFindValue(fields, /valor\s+(?:do\s+)?documento|valor\s+da\s+liquidacao|valor\s+liquidado/)
+      || solrecfinFindValue(fields, /^valor$/);
+    const documentYear = String(record?.document?.year || '').match(/\d{4}/)?.[0] || '';
+    const empenhoMatch = normalizedText.match(/(?:\b(\d{4})\s*)?ne\s*\d{3,}/i);
+    const empenho = empenhoMatch?.[0]?.replace(/\s+/g, '').toUpperCase() || '';
+    const empenhoYear = empenhoMatch?.[1] || empenho.match(/^(\d{4})NE/)?.[1] || '';
+    const isRap = empenhoYear ? (documentYear ? empenhoYear !== documentYear : true) : /restos?\s+a\s+pagar|\brap\b/.test(normalizedText);
+    const code = (empenho || isRap) ? (isRap ? 'RAP001' : 'EXE001') : null;
+    const ptres = fields.find(field => /ptres/.test(normalizeSolrecfinText(field.label)))?.value
+      || normalizedText.match(/\bptres\s*[:\-]?\s*(\d{6})/)?.[1] || '';
+    const source = String(ptres).replace(/\D/g, '') === '230446' ? '1333000000' : '1000000000';
+    return {
+      captureId: String(record?.captureId || `${Date.now()}-${Math.random()}`),
+      capturedAt: record?.finishedAt || record?.startedAt || new Date().toISOString(),
+      document: [record?.document?.year, record?.document?.type, record?.document?.number].filter(Boolean).join(' '),
+      empenho,
+      ptres: String(ptres).replace(/\D/g, ''),
+      code,
+      source,
+      valueCents: valueMatch?.cents ?? null,
+      warning: valueMatch ? (code ? '' : 'Empenho não identificado') : 'Valor do documento não identificado',
+    };
+  }
+
+  function aggregateSolrecfinEntries(entries) {
+    const groups = new Map();
+    for (const entry of entries || []) {
+      if (!entry?.code || entry.valueCents === null || entry.valueCents === undefined) continue;
+      const key = `${entry.code}|${entry.source}`;
+      const current = groups.get(key) || { code: entry.code, source: entry.source, valueCents: 0, captures: 0 };
+      current.valueCents += Number(entry.valueCents) || 0;
+      current.captures += 1;
+      groups.set(key, current);
+    }
+    return Array.from(groups.values()).sort((left, right) => left.code.localeCompare(right.code) || left.source.localeCompare(right.source));
+  }
+
+  function readSolrecfinStorage() {
+    return new Promise(resolve => {
+      try {
+        if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+          chrome.storage.local.get([SOLRECFIN_STORAGE_KEY], result => resolve(Array.isArray(result?.[SOLRECFIN_STORAGE_KEY]) ? result[SOLRECFIN_STORAGE_KEY] : []));
+          return;
+        }
+        resolve(JSON.parse(localStorage.getItem(SOLRECFIN_STORAGE_KEY) || '[]'));
+      } catch (_) { resolve([]); }
+    });
+  }
+
+  function writeSolrecfinStorage() {
+    return new Promise((resolve, reject) => {
+      try {
+      if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+        chrome.storage.local.set({ [SOLRECFIN_STORAGE_KEY]: solrecfinEntries }, () => {
+          const error = chrome.runtime?.lastError;
+          if (error) reject(new Error(error.message)); else resolve();
+        });
+      } else { localStorage.setItem(SOLRECFIN_STORAGE_KEY, JSON.stringify(solrecfinEntries)); resolve(); }
+      } catch (error) { reject(error); }
+    });
+  }
+
+  async function rememberSolrecfinCapture(record) {
+    return queueSolrecfinChange(async () => {
+      const entry = buildSolrecfinEntry(record);
+      entry.day = solrecfinDay(entry.capturedAt);
+      if (solrecfinDays().includes(entry.day) && !solrecfinEntries.some(item => item.captureId === entry.captureId)) {
+        solrecfinEntries = [...solrecfinEntries, entry];
+      }
+      await writeSolrecfinStorage();
+    });
+  }
+
+  function solrecfinFormatCents(cents) { return formatCurrency(Number(cents || 0) / 100); }
+
+  function renderSolrecfinGroup(group, index, dailyEntries) {
+    // Use the same inclusion rule as the aggregate, preserving each capture.
+    const entries = dailyEntries.filter(entry => entry?.code === group.code && entry.source === group.source && entry.valueCents !== null && entry.valueCents !== undefined);
+    const panelId = `suape-solrecfin-group-${index}`;
+    const label = escapeHtml(`${group.code}, fonte ${group.source}`);
+    return `<tr class="suape-cp-solrecfin-row" data-solrecfin-row>
+      <td><button type="button" class="suape-cp-solrecfin-toggle" data-solrecfin-toggle aria-expanded="false" aria-controls="${panelId}" aria-label="Expandir NPs/RPs de ${label}"><span class="suape-cp-solrecfin-chevron" aria-hidden="true">›</span><span class="font-mono">${escapeHtml(group.code)}</span><span class="suape-cp-solrecfin-count">${entries.length} ${entries.length === 1 ? 'captura' : 'capturas'}</span></button></td>
+      <td class="font-mono">${escapeHtml(group.source)}</td>
+      <td>${solrecfinFormatCents(group.valueCents)}</td></tr>
+      <tr id="${panelId}" class="suape-cp-solrecfin-panel" hidden><td colspan="3">
+        <div class="suape-cp-solrecfin-scroll" role="region" aria-label="NPs/RPs de ${label}" tabindex="0">
+          <table class="suape-cp-detail-table suape-cp-solrecfin-documents">
+            <caption>Capturas que compõem ${label}</caption>
+            <thead><tr><th scope="col">NP/RP</th><th scope="col">Empenho</th><th scope="col">PTRES</th><th scope="col">Hora (Brasília)</th><th scope="col">Valor</th></tr></thead>
+            <tbody>${entries.map(entry => {
+              const date = new Date(entry.capturedAt);
+              const time = Number.isFinite(date.getTime()) ? date.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Não informada';
+              return `<tr><td>${escapeHtml(entry.document || 'NP/RP não identificada')}</td><td class="font-mono">${escapeHtml(entry.empenho || 'Não informado')}</td><td class="font-mono">${escapeHtml(entry.ptres || 'Não informado')}</td><td>${time}</td><td>${solrecfinFormatCents(entry.valueCents)}</td></tr>`;
+            }).join('')}</tbody>
+            <tfoot><tr><th scope="row" colspan="4">Subtotal (${entries.length} ${entries.length === 1 ? 'captura' : 'capturas'})</th><td>${solrecfinFormatCents(group.valueCents)}</td></tr></tfoot>
+          </table>
+        </div>
+        <p class="suape-cp-empty-desc">Cada linha corresponde a uma captura incluída no cálculo. Capturas repetidas do mesmo documento aparecem separadamente.</p>
+      </td></tr>`;
+  }
+
+  function openSolrecfinDetail(day = solrecfinDay()) {
+    const days = solrecfinDays();
+    solrecfinSelectedDay = days.includes(day) ? day : days[0];
+    solrecfinEntries = retainSolrecfinHistory(solrecfinEntries);
+    const dailyEntries = solrecfinEntries.filter(entry => entry.day === solrecfinSelectedDay);
+    const body = detailDialogEl.querySelector('.suape-cp-detail-body');
+    const groups = aggregateSolrecfinEntries(dailyEntries);
+    const pending = dailyEntries.filter(entry => entry.warning);
+    detailDialogEl.querySelector('.suape-cp-detail-title').textContent = 'Solicitação financeira (solrecfin)';
+    body.innerHTML = `<div class="suape-cp-info-card">
+      <label class="suape-cp-info-row"><span class="suape-cp-info-key">Dia:</span><select data-solrecfin-day aria-label="Dia da solicitação financeira">${days.map(item => `<option value="${item}" ${item === solrecfinSelectedDay ? 'selected' : ''}>${item.split('-').reverse().join('/')}${item === days[0] ? ' (hoje)' : ''}</option>`).join('')}</select></label>
+      <p class="suape-cp-empty-desc">O acumulado reinicia à meia-noite de Brasília. Histórico de 7 dias, incluindo hoje.</p>
+      <div class="suape-cp-info-row"><span class="suape-cp-info-key">Capturas do dia:</span><span class="suape-cp-info-val" data-solrecfin-count>${dailyEntries.length}</span></div>
+      ${groups.length ? `<div class="suape-cp-solrecfin-scroll"><table class="suape-cp-detail-table"><thead><tr><th scope="col">Código</th><th scope="col">Fonte</th><th scope="col">Valor</th></tr></thead><tbody>${groups.map((group, index) => renderSolrecfinGroup(group, index, dailyEntries)).join('')}</tbody></table></div>` : '<p class="suape-cp-empty-desc">Nenhuma captura válida acumulada.</p>'}
+      ${pending.length ? `<p class="suape-cp-empty-desc">Pendências não somadas: ${pending.map(entry => escapeHtml(entry.warning)).join('; ')}.</p>` : ''}
+      ${solrecfinSelectedDay === days[0] ? '<div style="display:flex;justify-content:flex-end;margin-top:14px"><button type="button" data-solrecfin-clear class="suape-cp-detail-close-action">Limpar acumulado de hoje</button></div>' : ''}
+      <p data-solrecfin-status role="status"></p>
+    </div>`;
+    body.querySelector('[data-solrecfin-day]').addEventListener('change', event => openSolrecfinDetail(event.target.value));
+    body.querySelectorAll('[data-solrecfin-toggle]').forEach(button => button.addEventListener('click', () => {
+      const expanded = button.getAttribute('aria-expanded') !== 'true';
+      button.setAttribute('aria-expanded', String(expanded));
+      button.setAttribute('aria-label', button.getAttribute('aria-label').replace(expanded ? 'Expandir' : 'Recolher', expanded ? 'Recolher' : 'Expandir'));
+      body.querySelector(`#${button.getAttribute('aria-controls')}`).hidden = !expanded;
+    }));
+    body.querySelectorAll('[data-solrecfin-row]').forEach(row => row.addEventListener('click', event => {
+      // Native button handles keyboard activation; the whole summary row is clickable.
+      if (!event.target.closest('button')) row.querySelector('[data-solrecfin-toggle]').click();
+    }));
+    body.querySelector('[data-solrecfin-clear]')?.addEventListener('click', async event => {
+      event.target.disabled = true;
+      try {
+        await queueSolrecfinChange(async () => {
+          solrecfinEntries = solrecfinEntries.filter(entry => entry.day !== solrecfinDay());
+          await writeSolrecfinStorage();
+        });
+        openSolrecfinDetail();
+      } catch (_) {
+        body.querySelector('[data-solrecfin-status]').textContent = 'Não foi possível salvar. Tente novamente.';
+        event.target.disabled = false;
+      }
+    });
+    detailOverlayEl.classList.add('suape-cp-visible');
+    clearInterval(solrecfinDayTimer);
+    const displayedToday = days[0];
+    solrecfinDayTimer = setInterval(() => {
+      if (!detailOverlayEl?.classList.contains('suape-cp-visible')) { clearInterval(solrecfinDayTimer); return; }
+      if (solrecfinDay() !== displayedToday) {
+        openSolrecfinDetail(solrecfinSelectedDay === displayedToday ? solrecfinDay() : solrecfinSelectedDay);
+      }
+    }, 1000);
+  }
 
   // Lucide SVG Icons Map
   const ICONS = {
@@ -123,6 +381,24 @@
       icon: 'fileText',
       color: '#1976d2',
       siafiOnly: true,
+    },
+    {
+      id: 'action-siafi-printup',
+      title: 'Capturar e anexar no SUAP (printup)',
+      subtitle: 'Gerar o PDF e abrir o upload do processo no SUAP com o documento anexado',
+      keywords: 'printup print up upload anexar suap captura liquidacao pdf processo',
+      icon: 'upload',
+      color: '#0A7F70',
+      siafiOnly: true,
+    },
+    {
+      id: 'action-solrecfin',
+      title: 'Solicitar financeiro (solrecfin)',
+      subtitle: 'Somar capturas SIAFI por código e fonte',
+      keywords: 'solrecfin solicita financeiro financeiro liquidacoes soma valor exe001 rap001 fonte',
+      icon: 'banknote',
+      color: '#0f766e',
+      localOnly: true,
     },
     {
       id: 'action-suap-sync-now',
@@ -1026,7 +1302,7 @@
     // Input events
     inputEl.addEventListener('input', () => {
       selectedIndex = 0;
-      if (IS_SIAFI_PAGE && !'print'.startsWith(inputEl.value.trim().toLowerCase())) loadData(false);
+      if (IS_SIAFI_PAGE && !['print','printup','solrecfin'].some(command=>command.startsWith(inputEl.value.trim().toLowerCase()))) loadData(false);
       renderResults();
     });
 
@@ -1602,7 +1878,7 @@
 
   // Render Results (Exact visual mirror of SIAGES)
   function renderResults() {
-    if (!listEl) return;
+    if (commandPaletteDisposed || !listEl) return;
 
     const {
       matchingProcessActions,
@@ -1636,7 +1912,7 @@
       return;
     }
 
-    if (isFetching && !empenhosCache && !contratosCache && !matchingActions.some(action => action.siafiOnly)) {
+    if (isFetching && !empenhosCache && !contratosCache && !matchingActions.some(action => action.siafiOnly || action.localOnly)) {
       listEl.innerHTML = `
         <div class="suape-cp-empty">
           <div class="suape-cp-spinner"></div>
@@ -2156,11 +2432,17 @@
 
   // Open Results Detail or Navigate
   async function openResultDetail(result, e) {
-    if (result.type === 'action' && result.data.id === 'action-siafi-print') {
+    if (result.type === 'action' && ['action-siafi-print', 'action-siafi-printup'].includes(result.data.id)) {
       const collector = globalThis.SiagesSiafiEvidence;
       if (!collector?.available()) { renderResults(); return; }
       closePalette();
-      await collector.start();
+      await collector.start({ upload: result.data.id === 'action-siafi-printup' });
+      return;
+    }
+    if (result.type === 'action' && result.data.id === 'action-solrecfin') {
+      closePalette();
+      await queueSolrecfinChange(writeSolrecfinStorage);
+      openSolrecfinDetail();
       return;
     }
     if (result.type === 'action' && result.data.id === 'action-suap-sync-now') {
@@ -2527,17 +2809,19 @@
   }
 
   function closeDetailModal() {
+    clearInterval(solrecfinDayTimer);
     if (detailOverlayEl) detailOverlayEl.classList.remove('suape-cp-visible');
   }
 
-  function openPalette() {
+  function openPalette(localCommand = '') {
+    if (commandPaletteDisposed) return;
     if (globalThis.SiagesSiafiEvidence?.isRunning()) {
       globalThis.SiagesSiafiEvidence.show();
       return;
     }
     paletteReturnFocus = document.activeElement;
     createPaletteDOM();
-    if (IS_SIAFI_PAGE) {
+    if (IS_SIAFI_PAGE || localCommand) {
       activeScope = 'all';
       overlayEl.querySelectorAll('.suape-cp-chip').forEach(chip => chip.classList.toggle('suape-cp-chip-active', chip.dataset.scope === 'all'));
     }
@@ -2545,7 +2829,7 @@
     updateProcessChip();
     overlayEl.classList.add('suape-cp-visible');
     resetCondhSearch();
-    inputEl.value = '';
+    inputEl.value = localCommand;
     const procId = getCurrentProcessId();
     if (procId) {
       inputEl.placeholder = 'Digite um atalho (ex: up, enc, encs), NE, contrato ou módulo...';
@@ -2554,22 +2838,22 @@
     }
     selectedIndex = 0;
     renderResults();
-    if (!IS_SIAFI_PAGE) loadData(false);
+    if (!IS_SIAFI_PAGE && !localCommand) loadData(false);
 
     // Garantir foco imediato e em frames subsequentes
     inputEl.focus();
     requestAnimationFrame(() => {
-      if (!overlayEl?.classList.contains('suape-cp-visible')) return;
+      if (commandPaletteDisposed || !overlayEl?.classList.contains('suape-cp-visible')) return;
       inputEl.focus();
       inputEl.select();
     });
     setTimeout(() => {
-      if (document.activeElement !== inputEl && overlayEl?.classList.contains('suape-cp-visible')) {
+      if (!commandPaletteDisposed && overlayEl?.classList.contains('suape-cp-visible') && document.activeElement !== inputEl) {
         inputEl.focus();
       }
     }, 20);
     setTimeout(() => {
-      if (document.activeElement !== inputEl && overlayEl?.classList.contains('suape-cp-visible')) {
+      if (!commandPaletteDisposed && overlayEl?.classList.contains('suape-cp-visible') && document.activeElement !== inputEl) {
         inputEl.focus();
       }
     }, 80);
@@ -2591,10 +2875,16 @@
   }
 
   // Global keydown listener com fase de captura para precedência imediata
-  document.addEventListener(
-    'keydown',
-    (e) => {
+  const commandPaletteKeydown = (e) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
+        // SIAGES owns the normal palette. The extension takes over only the
+        // local solrecfin command, after the native dialog has closed.
+        if (IS_SIAGES_PAGE) {
+          if (overlayEl?.classList.contains('suape-cp-visible') || detailOverlayEl?.classList.contains('suape-cp-visible')) {
+            e.preventDefault(); e.stopPropagation(); closePalette();
+          }
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         togglePalette();
@@ -2607,14 +2897,21 @@
           closePalette();
         }
       }
-    },
-    true
-  );
+    };
+  document.addEventListener('keydown', commandPaletteKeydown, true);
+  const nativeSolrecfinInput = event => {
+    if (!IS_SIAGES_PAGE || !event.target.matches?.('[cmdk-input]') || !event.target.closest('[role="dialog"]') || event.target.value.trim().toLowerCase() !== 'solrecfin') return;
+    event.target.dispatchEvent(new KeyboardEvent('keydown', { key:'Escape', code:'Escape', bubbles:true, cancelable:true }));
+    clearTimeout(solrecfinNativeTimer);
+    solrecfinNativeTimer = setTimeout(() => openPalette('solrecfin'), 0);
+  };
+  if (IS_SIAGES_PAGE) document.addEventListener('input', nativeSolrecfinInput);
 
   function initProcessBoxIdBadges() {
-    if (!IS_SUAP_PAGE) return;
+    if (!IS_SUAP_PAGE || commandPaletteDisposed) return;
 
     function injectBadges() {
+      if (commandPaletteDisposed) return;
       const processLinks = document.querySelectorAll('a[href*="/processo_eletronico/processo/"]');
       processLinks.forEach((link) => {
         const href = link.getAttribute('href') || '';
@@ -2729,7 +3026,21 @@
     if (document.body) {
       observer.observe(document.body, { childList: true, subtree: true });
     }
+    const priorCleanup=processBadgesCleanup;
+    processBadgesCleanup=()=>{priorCleanup();observer.disconnect();clearTimeout(debounceTimer);};
   }
+
+  solrecfinReady = readSolrecfinStorage().then(entries => {
+    solrecfinEntries = retainSolrecfinHistory(entries);
+  }).catch(() => { solrecfinEntries = []; });
+  const solrecfinCaptureListener = event => {
+    if (!IS_SIAFI_PAGE) return;
+    const record = event?.detail?.record || event?.detail;
+    if (record) void rememberSolrecfinCapture(record).catch(() => {
+      showProcessSyncNotice('Não foi possível salvar a captura no solrecfin.');
+    });
+  };
+  window.addEventListener('siages-siafi-capture-complete', solrecfinCaptureListener);
 
   // No SUAP a consulta antecipada preserva a resposta imediata da paleta atual.
   // Em sites comuns, os dados do SIAGES so sao carregados quando o usuario abre a paleta.
@@ -2758,6 +3069,13 @@
     window.__suapeParseExplicitProcessQuery = parseExplicitProcessQuery;
     window.__suapeBuildUploadAutomationData = buildUploadAutomationData;
     window.__suapePersistUploadAutomation = persistUploadAutomation;
+    window.__suapeSolrecfin = { buildEntry: buildSolrecfinEntry, aggregate: aggregateSolrecfinEntries, parseCents: solrecfinMoneyToCents,
+      getEntries: () => solrecfinEntries, day: solrecfinDay, days: solrecfinDays, retain: retainSolrecfinHistory,
+      remember: rememberSolrecfinCapture, show: () => { createPaletteDOM(); openSolrecfinDetail(); },
+      destroy: () => { commandPaletteDisposed=true;processBadgesCleanup();closePalette();
+        clearInterval(solrecfinDayTimer); clearTimeout(solrecfinNativeTimer);
+        document.removeEventListener('keydown',commandPaletteKeydown,true); document.removeEventListener('input',nativeSolrecfinInput);
+        window.removeEventListener('siages-siafi-capture-complete', solrecfinCaptureListener); } };
   }
 
   function showProcessSyncNotice(message) {

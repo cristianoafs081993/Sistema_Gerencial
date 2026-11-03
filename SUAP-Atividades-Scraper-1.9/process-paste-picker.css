@@ -203,6 +203,15 @@
   border: 1px solid #e2e8f0;
 }
 
+.suape-paste-group-remote {
+  font-size: 10px;
+  font-weight: 600;
+  color: #0369a1;
+  background: #e0f2fe;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
 .suape-paste-group-status {
   font-size: 10px;
   color: #059669;
@@ -360,6 +369,19 @@
   max-width: 380px;
   line-height: 1.5;
   color: #94a3b8;
+}
+
+.suape-paste-remote-note {
+  padding: 8px 18px;
+  background: #fffbeb;
+  border-top: 1px solid #fde68a;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #92400e;
+}
+
+.suape-paste-remote-note[hidden] {
+  display: none;
 }
 
 /* Footer */

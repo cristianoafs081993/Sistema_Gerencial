@@ -8,6 +8,7 @@ import {
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { supabase } from '@/lib/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { touchSuapPdfUsage } from '@/services/suapPdfUsage';
 
 type SuapProcessoRow = {
   id: string;
@@ -110,7 +111,11 @@ const upsertWorkflow = async (processoId: string, dadosCompletos: SuapDadosCompl
 };
 
 export const suapProcessosService = {
+  async touchPdfUsage(processId: string) {
+    await touchSuapPdfUsage(supabase, {processId});
+  },
   async getById(id: string): Promise<SuapProcesso | null> {
+    await touchSuapPdfUsage(supabase, {processId: id});
     const {data,error} = await supabase.from('processos').select(PROCESSOS_SELECT).eq('id',id).maybeSingle();
     if (error) throw error;
     return data ? mapProcessoRow(data as SuapProcessoRow) : null;
@@ -155,6 +160,8 @@ export const suapProcessosService = {
     const normalizedSuapId = suapId.trim();
     if (!normalizedSuapId) return null;
 
+    await touchSuapPdfUsage(client, {suapId: normalizedSuapId});
+
     const { data, error } = await client
       .from('processos')
       .select(PROCESSOS_SELECT)
@@ -166,6 +173,7 @@ export const suapProcessosService = {
     return data ? mapProcessoRow(data as SuapProcessoRow) : null;
   },
   async getPdfSignedUrl(path: string): Promise<string | null> {
+    await touchSuapPdfUsage(supabase, {path});
     const { data, error } = await supabase.storage
       .from('suap-pdfs')
       .createSignedUrl(path, 60);

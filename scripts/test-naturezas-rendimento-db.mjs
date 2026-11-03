@@ -1,0 +1,23 @@
+import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
+import assert from 'node:assert/strict';
+
+const require = createRequire(resolve(process.env.SIAFI_SQL_RUNTIME || '.codex-temp/rd-sql', 'package.json'));
+const { PGlite } = require('@electric-sql/pglite');
+const db = new PGlite();
+await db.exec('create role anon; create role authenticated; create role service_role bypassrls;');
+await db.exec(await readFile(new URL('../supabase/migrations/20261029120000_catalogo_naturezas_rendimento.sql', import.meta.url), 'utf8'));
+assert.equal((await db.query('select count(*)::int as n from naturezas_rendimento_reinf')).rows[0].n, 47);
+assert.equal((await db.query('select count(*)::int as n from referencias_retencao_aliquotas')).rows[0].n, 9);
+assert.equal((await db.query('select count(*)::int as n from referencias_retencao_paginas')).rows[0].n, 12);
+assert.equal((await db.query("select codigo_receita from naturezas_rendimento_reinf where codigo='17031'")).rows[0].codigo_receita, '6190');
+assert.equal((await db.query("select descricao from naturezas_rendimento_reinf where codigo='17001'")).rows[0].descricao, 'Alimentação');
+assert.equal((await db.query("select ir::text from referencias_retencao_aliquotas where codigo_receita='8863'")).rows[0].ir, '0.00');
+await db.exec('set role authenticated');
+assert.equal((await db.query('select count(*)::int as n from naturezas_rendimento_reinf')).rows[0].n, 47);
+await assert.rejects(db.query("delete from naturezas_rendimento_reinf where codigo='17001'"), /permission denied/);
+await db.exec('set role anon');
+await assert.rejects(db.query('select * from naturezas_rendimento_reinf'), /permission denied/);
+await db.close();
+console.log('Catálogo de naturezas: dados, origem, leitura autenticada e proteção de escrita validados.');

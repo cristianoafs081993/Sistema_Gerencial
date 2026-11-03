@@ -347,24 +347,26 @@ export default function LCPage() {
   };
 
   const handleOpenSavedWorkList = (savedList: LcSavedList<LcGridRow>) => {
-    const macroRows = buildMacroRows(savedList.rows);
-    if (!macroRows.length) {
-      toast.error('A lista salva nao possui linhas aptas para preenchimento.');
+    if (!savedList.rows.length) {
+      toast.error('A lista salva nao possui linhas.');
       return;
     }
 
+    const macroRows = buildMacroRows(savedList.rows);
     const hasPendencias = savedList.rows.some((row) => row.status !== 'ok');
-    const macro = buildSiafiListaCredoresMacro(macroRows, {
-      scriptName: hasPendencias ? 'Lista de Credores - Pendencias' : 'Lista de Credores',
-      author: 'sistema-gerencial',
-      includeFirstConfirmationEnter: true,
-    });
+    const macro = macroRows.length > 0
+      ? buildSiafiListaCredoresMacro(macroRows, {
+          scriptName: hasPendencias ? 'Lista de Credores - Pendencias' : 'Lista de Credores',
+          author: 'sistema-gerencial',
+          includeFirstConfirmationEnter: true,
+        })
+      : '';
 
     setGridRows(savedList.rows);
     setPdfFileNames(savedList.sourcePdfNames);
     setTotalBolsistasProcessados(savedList.rows.length);
     setMacroContent(macro);
-    setMacroFileName(buildMacroFileName(savedList.sourcePdfNames));
+    setMacroFileName(macroRows.length > 0 ? buildMacroFileName(savedList.sourcePdfNames) : '');
     setMacroRowsCount(macroRows.length);
     setMacroContext(hasPendencias ? 'com_pendencias' : 'sem_pendencias');
     setDialogMacroRows(macroRows);
@@ -495,33 +497,31 @@ export default function LCPage() {
         // 2. Gerar linhas da macro a partir de fullGridRows, filtrando 'aluno_nao_encontrado'
         const macroRows = buildMacroRows(fullGridRows);
 
-        if (macroRows.length > 0) {
-          const generatedFileName = buildMacroFileName(sourcePdfNames);
-          const macro = buildSiafiListaCredoresMacro(macroRows, {
-            scriptName: resultado.length === 0 ? 'Lista de Credores' : 'Lista de Credores - Pendencias',
-            author: 'sistema-gerencial',
-            includeFirstConfirmationEnter: true,
-          });
+        // A grade (e o salvamento da lista) fica disponivel mesmo quando nenhuma
+        // linha esta apta para a macro; nesse caso so a macro fica indisponivel.
+        const macro = macroRows.length > 0
+          ? buildSiafiListaCredoresMacro(macroRows, {
+              scriptName: resultado.length === 0 ? 'Lista de Credores' : 'Lista de Credores - Pendencias',
+              author: 'sistema-gerencial',
+              includeFirstConfirmationEnter: true,
+            })
+          : '';
 
-          setMacroContent(macro);
-          setMacroFileName(generatedFileName);
-          setMacroRowsCount(macroRows.length);
-          setMacroContext(resultado.length === 0 ? 'sem_pendencias' : 'com_pendencias');
-          setDialogMacroRows(macroRows);
-          setGridRows(fullGridRows);
-          setExpandedRowId(null);
-          setChunkIndex(0);
-          setDialogTab('grid');
-          setIsCopied(false);
-          setWorkListName(getDefaultWorkListName(sourcePdfNames));
-          setActiveSavedListId(null);
-          setMacroDialogOpen(true);
-        } else {
-          setMacroContent('');
-          setMacroFileName('');
-          setMacroRowsCount(0);
-          setMacroDialogOpen(false);
-          toast.warning('Nao ha linhas aptas para gerar macro nesta comparacao.');
+        setMacroContent(macro);
+        setMacroFileName(macroRows.length > 0 ? buildMacroFileName(sourcePdfNames) : '');
+        setMacroRowsCount(macroRows.length);
+        setMacroContext(resultado.length === 0 ? 'sem_pendencias' : 'com_pendencias');
+        setDialogMacroRows(macroRows);
+        setGridRows(fullGridRows);
+        setExpandedRowId(null);
+        setChunkIndex(0);
+        setDialogTab('grid');
+        setIsCopied(false);
+        setWorkListName(getDefaultWorkListName(sourcePdfNames));
+        setActiveSavedListId(null);
+        setMacroDialogOpen(true);
+        if (macroRows.length === 0) {
+          toast.warning('Nao ha linhas aptas para gerar macro; a lista ainda pode ser salva.');
         }
       } else {
         setMacroContent('');
@@ -1137,6 +1137,7 @@ export default function LCPage() {
                 <div className="flex justify-end pt-3">
                   <Button
                     onClick={handleConfirmarGeracaoMacro}
+                    disabled={macroRowsCount === 0}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
                   >
                     <Download className="h-4 w-4" />

@@ -147,6 +147,27 @@ describe('LCPage', () => {
     expect(within(reopenedDialog).getByRole('textbox', { name: 'Nome da lista de trabalho' })).toHaveValue('Pagamento de agosto');
   });
 
+  it('permite salvar a lista mesmo quando todos os credores têm pendência e a macro fica indisponível', async () => {
+    mockedLoadLatestLCRowsFromDb.mockResolvedValue({ sourceFile: 'lista-credores.csv', rows: [] });
+    mockedCompararBolsistasComLC.mockReturnValue([{} as never]);
+
+    const { container } = render(<LCPage />);
+    await waitFor(() => expect(mockedLoadLatestLCRowsFromDb).toHaveBeenCalled());
+
+    fireEvent.change(container.querySelector('input[type="file"]')!, {
+      target: {
+        files: [new File(['pdf'], 'pagamento.pdf', { type: 'application/pdf' })],
+      },
+    });
+
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar lista' }));
+
+    await waitFor(() => expect(mockedSaveSharedLcSavedList).toHaveBeenCalledWith(expect.objectContaining({
+      rows: [expect.objectContaining({ cpf: '12345678901', status: 'aluno_nao_encontrado' })],
+    })));
+  });
+
   it('exibe listas salvas por outro usuário do mesmo órgão', async () => {
     mockedLoadSharedLcSavedLists.mockResolvedValueOnce([
       {

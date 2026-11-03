@@ -697,6 +697,12 @@ export default function Suap() {
   const [selectedProcesso, setSelectedProcesso] = useState<SuapProcesso | null>(null);
   const [detailsProcesso, setDetailsProcesso] = useState<SuapProcesso | null>(null);
   useEffect(() => {
+    if (!detailsProcesso?.id || !session) return;
+    void suapProcessosService.touchPdfUsage(detailsProcesso.id).catch(() => {
+      toast.error('Não foi possível registrar o uso do PDF. Tente abrir o processo novamente.');
+    });
+  }, [detailsProcesso?.id, session]);
+  useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('processo');
     if (!session || !id || !/^[0-9a-f-]{36}$/i.test(id)) return;
     let active = true;

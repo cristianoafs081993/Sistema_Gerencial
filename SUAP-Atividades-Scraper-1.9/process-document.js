@@ -240,6 +240,9 @@
     return result;
   }
 
+  // Momento em que esta página de processo foi aberta; base da ordem do Alt+V (mais recente primeiro).
+  const PAGE_OPENED_AT = Date.now();
+
   function syncProcessToRegistry() {
     const suapId = getProcessId();
     const processNumber = getProcessNumber();
@@ -262,6 +265,7 @@
       fields: pageData.fields || [],
       title: document.title,
       url: location.href,
+      openedAt: PAGE_OPENED_AT,
     };
 
     if (globalThis.chrome?.runtime?.sendMessage) {
@@ -285,6 +289,7 @@
         chrome.storage.local.get('suape_active_processes', (stored) => {
           const map = stored?.suape_active_processes || {};
           map['tab_suap_' + suapId] = {
+            openedAt: PAGE_OPENED_AT,
             suapId,
             processNumber: processNumber || `Processo #${suapId}`,
             process,
@@ -1190,7 +1195,7 @@
   }
   function renderShortcuts(filter = '') {
     const container = panel('shortcuts'); container.innerHTML = '';
-    const help = createElement('p', 'suape-help', 'Digite um atalho seguido de espaço em qualquer campo de texto. Os atalhos são sincronizados pelo navegador.'); container.appendChild(help);
+    const help = createElement('p', 'suape-help', 'Digite um atalho seguido de espaço em qualquer campo de texto. Com a conta SIAGES conectada, os atalhos são compartilhados entre os perfis do Chrome.'); container.appendChild(help);
     const form = createElement('form', 'suape-form'); form.innerHTML = '<label>Atalho<input class="suape-input" name="trigger" placeholder="/exemplo" autocomplete="off"></label><label>Texto expandido<textarea class="suape-input" name="expansion" placeholder="Texto completo..."></textarea></label><div class="suape-form-actions"><button class="suape-button" type="submit">Salvar atalho</button><button class="suape-button suape-button-secondary" type="button" data-cancel hidden>Cancelar</button></div><div class="suape-help" data-form-message aria-live="polite"></div>';
     if (state.editingKey) { form.elements.trigger.value = state.editingKey; form.elements.expansion.value = state.snippets[state.editingKey]; form.querySelector('[data-cancel]').hidden = false; }
     form.addEventListener('submit', saveShortcut); form.querySelector('[data-cancel]').addEventListener('click', () => { state.editingKey = null; renderShortcuts(filter); }); container.appendChild(form);
@@ -1690,6 +1695,8 @@
           suapId: getProcessId(),
           processNumber: getProcessNumber(),
           process: state.snapshot?.process || null,
+          fields: extractProcessDataFromPage().fields || [],
+          openedAt: PAGE_OPENED_AT,
           title: document.title,
           url: location.href,
         },

@@ -849,6 +849,8 @@ export async function fetchProcessRecord(tenantId: string, suapId: string) {
   if (processoError || !processo) {
     throw new Error("Processo not found");
   }
+  const {error: usageError} = await supabase.rpc('touch_suap_process_pdf', {p_processo_id: processo.id});
+  if (usageError) throw new Error(usageError.message);
   return processo as ProcessRecord;
 }
 

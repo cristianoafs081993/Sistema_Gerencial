@@ -1,5 +1,7 @@
 # COMPONENT_CATALOG
 
+`solrecfin` (extensão 1.9.78): a tabela mantém Código, Fonte e Valor, com linhas expansíveis/recolhíveis por clique em qualquer célula. O código contém botão nativo transparente com seta de estado e quantidade de capturas, `aria-expanded`/`aria-controls`, foco preservado e ativação por Enter/Espaço. Hover/foco destacam toda a linha com tokens da paleta. A composição aparece abaixo, com subtotal, cabeçalhos, legenda e rolagem horizontal acessível. Operação: [SUAP_COMMAND_PALETTE](../integrations/SUAP_COMMAND_PALETTE.md).
+
 Este catalogo resume os blocos oficiais do design system do GovAnalytics.
 
 Esta documentacao foi atualizada porque a mudanca altera comportamento visual real em area critica de design system.

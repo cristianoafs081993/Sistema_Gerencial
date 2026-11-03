@@ -3,6 +3,8 @@
   const STORAGE_KEY = 'siagesUploadPendingV1';
   const TTL_MS = 30 * 60 * 1000;
   const NOTICE_ID = 'siages-suap-upload-notice';
+  const SIAFI_UPLOAD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const PROCESS_NUMBER = /\b\d{5}\.\d{6}[./]\d{4}-\d{2}\b/g;
 
   function cleanText(text) {
     return text ? text.replace(/\s+/g, ' ').trim() : '';
@@ -38,6 +40,7 @@
         action: 'suap_upload_document',
         suapId: String(payload.suapId || ''),
         ...(payload.processNumber ? { processNumber: String(payload.processNumber) } : {}),
+        ...(SIAFI_UPLOAD_ID.test(payload.siafiUploadId || '') ? { siafiUploadId: payload.siafiUploadId } : {}),
         tipoConferencia: cleanText(payload.tipoConferencia || 'Cópia Simples'),
         tipoDocumento: cleanText(payload.tipoDocumento || 'Liquidação'),
         assunto: cleanText(payload.assunto || 'Liquidação'),
@@ -71,6 +74,7 @@
         action: 'suap_upload_document',
         suapId: String(payload.suapId || ''),
         ...(payload.processNumber ? { processNumber: String(payload.processNumber) } : {}),
+        ...(SIAFI_UPLOAD_ID.test(payload.siafiUploadId || '') ? { siafiUploadId: payload.siafiUploadId } : {}),
         tipoConferencia: cleanText(payload.tipoConferencia || 'Cópia Simples'),
         tipoDocumento: cleanText(payload.tipoDocumento || 'Liquidação'),
         assunto: cleanText(payload.assunto || 'Liquidação'),
@@ -200,6 +204,83 @@
     document.body.appendChild(button);
     fileInput.focus();
     return false;
+  }
+
+  function sendExtensionMessage(message) {
+    return new Promise((resolve) => {
+      try {
+        globalThis.chrome.runtime.sendMessage({ source: 'siages-upload', ...message }, (response) => {
+          const runtimeError = globalThis.chrome.runtime.lastError;
+          resolve(runtimeError ? { ok: false, error: runtimeError.message } : (response || { ok: false }));
+        });
+      } catch (error) {
+        resolve({ ok: false, error: error?.message || 'A extensão não respondeu.' });
+      }
+    });
+  }
+
+  // Processos exibidos no cabeçalho do upload; o corpo só entra quando o cabeçalho não traz nenhum.
+  function pageProcessNumbers(root) {
+    const doc = root || document;
+    const heading = [doc.title, ...Array.from(doc.querySelectorAll('h1, h2, .breadcrumbs, #breadcrumbs'), (el) => el.textContent)].join(' ');
+    const fromHeading = heading.match(PROCESS_NUMBER) || [];
+    const found = fromHeading.length ? fromHeading : (cleanText(doc.body?.textContent || '').match(PROCESS_NUMBER) || []);
+    return { numbers: [...new Set(found)].slice(0, 5), fromHeading: fromHeading.length > 0 };
+  }
+
+  function base64ToBytes(text) {
+    const binary = atob(text);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+    return bytes;
+  }
+
+  function setInputFile(fileInput, file) {
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    fileInput.files = transfer.files;
+    fileInput.dispatchEvent(new Event('input', { bubbles: true }));
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    return fileInput.files?.length === 1;
+  }
+
+  // Anexa o PDF guardado pelo printup do SIAFI para este processo. O envio continua no botão Salvar do SUAP.
+  async function attachSiafiCapture(payload, fileInput) {
+    if (!fileInput || fileInput.files?.length || !globalThis.chrome?.runtime?.sendMessage) return { attached: false };
+    const page = pageProcessNumbers(document);
+    const found = await sendExtensionMessage({
+      type: 'find-siafi-capture',
+      uploadId: payload?.siafiUploadId || '',
+      processNumber: payload?.processNumber || '',
+      pageNumbers: page.numbers,
+    });
+    const capture = found?.ok ? found.capture : null;
+    if (!capture) {
+      if (found?.reason === 'ambiguo') {
+        return { attached: false, error: `há capturas SIAFI de processos diferentes (${(found.processes || []).join(', ')}). Anexe o PDF manualmente.` };
+      }
+      // Um up comum sem captura não gera aviso; só o printup informa a falha.
+      return { attached: false, error: payload?.siafiUploadId ? (found?.error || 'a captura SIAFI do printup não está mais disponível. Gere um novo printup.') : '' };
+    }
+    if (page.fromHeading && !page.numbers.some((number) => number.replace(/\D/g, '') === capture.processKey)) {
+      return { attached: false, error: `a captura SIAFI é do processo ${capture.processNumber}, diferente do processo desta página. Anexe manualmente.` };
+    }
+    showNotice(`SIAGES: anexando a captura SIAFI ${capture.documentLabel}…`);
+    const downloaded = await sendExtensionMessage({ type: 'download-siafi-capture', id: capture.id });
+    if (!downloaded?.ok || !downloaded.file?.pdfBase64) {
+      return { attached: false, error: downloaded?.error || 'não foi possível baixar a captura SIAFI.' };
+    }
+    // O usuário pode ter escolhido outro arquivo enquanto o PDF era baixado.
+    if (fileInput.files?.length) return { attached: false };
+    const file = new File([base64ToBytes(downloaded.file.pdfBase64)], downloaded.file.fileName, { type: 'application/pdf' });
+    if (!setInputFile(fileInput, file)) return { attached: false, error: 'o navegador não permitiu anexar a captura SIAFI.' };
+    (fileInput.form || fileInput.closest('form'))?.addEventListener('submit', () => {
+      const current = fileInput.files?.[0];
+      if (current && current.name === file.name && current.size === file.size) {
+        void sendExtensionMessage({ type: 'consume-siafi-capture', id: capture.id });
+      }
+    }, { once: true });
+    return { attached: true, capture, others: Number(found.others || 0) };
   }
 
   function selectOptionByText(selectEl, targetText) {
@@ -449,16 +530,10 @@
 
     if (filledCount > 0) {
       clearPendingUploadAutomation();
-      if (missing.length) {
-        showNotice(`SIAGES: não foi possível selecionar ${missing.join(' e ')}. Escolha manualmente antes de salvar.`, 'error');
-      } else {
-        showNotice(
-          `SIAGES: Campos preenchidos automaticamente (${payload.tipoDocumento || 'Liquidação'} / ${payload.tipoConferencia || 'Cópia Simples'}).`,
-          'success'
-        );
-      }
-
-      promptFileChooser(findArquivoField(document));
+      const fieldsMessage = missing.length
+        ? `SIAGES: não foi possível selecionar ${missing.join(' e ')}. Escolha manualmente antes de salvar.`
+        : `SIAGES: Campos preenchidos automaticamente (${payload.tipoDocumento || 'Liquidação'} / ${payload.tipoConferencia || 'Cópia Simples'}).`;
+      showNotice(fieldsMessage, missing.length ? 'error' : 'success');
 
       // The page may reset fields while it finishes loading; reapply only what was lost.
       window.setTimeout(() => {
@@ -472,6 +547,17 @@
           fillTextInput(assuntoField, payload.assunto);
         }
       }, 350);
+
+      const fileInput = findArquivoField(document);
+      const siafi = await attachSiafiCapture(payload, fileInput);
+      if (siafi.attached) {
+        const others = siafi.others ? ` Há mais ${siafi.others} captura(s) deste processo aguardando.` : '';
+        const attachedMessage = `SIAGES: captura SIAFI ${siafi.capture.documentLabel} anexada (processo ${siafi.capture.processNumber}). Confira e clique em Salvar.${others}`;
+        showNotice(missing.length ? `${fieldsMessage} ${attachedMessage}` : attachedMessage, missing.length ? 'error' : 'success');
+      } else {
+        if (siafi.error) showNotice(`${missing.length ? `${fieldsMessage} ` : ''}SIAGES: ${siafi.error}`, 'error');
+        promptFileChooser(fileInput);
+      }
 
       return true;
     } else {
@@ -505,6 +591,7 @@
             action: 'suap_upload_document',
             suapId: String(stored.suapId || ''),
             ...(stored.processNumber ? { processNumber: String(stored.processNumber) } : {}),
+            ...(SIAFI_UPLOAD_ID.test(stored.siafiUploadId || '') ? { siafiUploadId: stored.siafiUploadId } : {}),
             tipoConferencia: cleanText(stored.tipoConferencia || 'Cópia Simples'),
             tipoDocumento: cleanText(stored.tipoDocumento || 'Liquidação'),
             assunto: cleanText(stored.assunto || 'Liquidação'),
@@ -529,6 +616,8 @@
     findAssuntoField,
     findArquivoField,
     promptFileChooser,
+    pageProcessNumbers,
+    attachSiafiCapture,
     selectOptionByText,
     updateSelect2Display,
     pickSelect2ViaPage,

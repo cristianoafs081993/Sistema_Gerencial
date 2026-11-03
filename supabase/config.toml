@@ -87,3 +87,11 @@ verify_jwt = false
 
 [functions.sync-contratos-pncp-documentos]
 verify_jwt = true
+
+# Internal cron secret or service_role, validated in handler.
+[functions.cleanup-suap-pdfs]
+verify_jwt = false
+
+# Internal cron secret or service_role, validated in handler.
+[functions.cleanup-siafi-capturas]
+verify_jwt = false

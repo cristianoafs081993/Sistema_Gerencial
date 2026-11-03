@@ -1,4 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { readFileSync } from 'node:fs';
+import { useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -6,8 +8,40 @@ import { CommandPalette } from '@/components/CommandPalette';
 import { useAuth, useOptionalAuth } from '@/contexts/AuthContext';
 import type { Empenho, Contrato, Atividade, DocumentoDespesa } from '@/types';
 import { contratosApiService } from '@/services/contratosApi';
+import { extensionFixturePath } from '@/test/extensionFixtures';
 
 vi.mock('@/services/contratosApi', () => ({ contratosApiService: { getContratosApi: vi.fn().mockResolvedValue([]) } }));
+
+it('abre solrecfin pela paleta nativa SIAGES sem duplicar Ctrl+K nem depender do SIAFI',async()=>{
+  const location=Object.getOwnPropertyDescriptor(window,'location');
+  Object.defineProperty(window,'location',{configurable:true,value:{hostname:'www.siages.com.br',protocol:'https:',pathname:'/suap',href:'https://www.siages.com.br/suap'}});
+  const entries=[{captureId:'native-solrecfin',capturedAt:new Date().toISOString(),code:'RAP001',source:'1000000000',valueCents:4250}];
+  vi.stubGlobal('chrome',{storage:{local:{get:(_keys:unknown,callback:(value:unknown)=>void)=>callback({siages_solrecfin_entries:entries}),set:(_values:unknown,callback:()=>void)=>callback()}},runtime:{}});
+  vi.mocked(useAuth).mockReturnValue({canAccessScreen:()=>true,session:null} as unknown as ReturnType<typeof useAuth>);
+  vi.mocked(useOptionalAuth).mockReturnValue(undefined);
+  function NativePalette(){const [open,setOpen]=useState(false);return <CommandPalette open={open} onOpenChange={setOpen}/>;}
+  const view=render(<MemoryRouter><QueryClientProvider client={queryClient}><NativePalette/></QueryClientProvider></MemoryRouter>);
+  const extensionWindow=window as typeof window & {__suapeCommandPaletteLoaded?:boolean;__suapeSolrecfin?:{destroy:()=>void}};
+  try {
+    delete extensionWindow.__suapeCommandPaletteLoaded;
+    window.eval(readFileSync(extensionFixturePath('command-palette.js'),'utf8'));
+    fireEvent.keyDown(document,{key:'k',code:'KeyK',ctrlKey:true});
+    const nativeInput=await screen.findByRole('combobox');
+    expect(document.querySelector('#suape-cp-overlay')).toBeNull();
+    fireEvent.input(nativeInput,{target:{value:'solrecfin'}});
+    await waitFor(()=>expect(document.querySelector<HTMLInputElement>('.suape-cp-input')?.value).toBe('solrecfin'));
+    expect(nativeInput.isConnected).toBe(false);
+    fireEvent.keyDown(document.querySelector('.suape-cp-input')!,{key:'Enter'});
+    await waitFor(()=>expect(document.querySelector('.suape-cp-detail-table')).toHaveTextContent('42,50'));
+    expect(document.querySelector('.suape-cp-detail-table')).toHaveTextContent('RAP001');
+  } finally {
+    extensionWindow.__suapeSolrecfin?.destroy();
+    delete extensionWindow.__suapeCommandPaletteLoaded;
+    document.querySelector('#suape-cp-overlay')?.remove();document.querySelector('#suape-cp-detail-overlay')?.remove();
+    view.unmount();vi.unstubAllGlobals();
+    if(location)Object.defineProperty(window,'location',location);
+  }
+});
 
 it('loads contract search only when the command palette opens', async () => {
   vi.mocked(useAuth).mockReturnValue({ canAccessScreen: () => true, session: null } as unknown as ReturnType<typeof useAuth>);

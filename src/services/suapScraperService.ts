@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { touchSuapPdfUsage } from '@/services/suapPdfUsage';
 import {
   normalizeSuapDocumentText,
   parseSuapProcessDocumentManifest,
@@ -293,6 +294,7 @@ async function storeProcessPdf(
   }
 
   log(`[${proc.suapId}] Fazendo upload do PDF para o bucket suap-pdfs...`);
+  await touchSuapPdfUsage(client, {suapId: proc.suapId});
   const storagePath = `${tenantId}/${proc.suapId}.pdf`;
   const { error: uploadErr } = await client.storage
     .from('suap-pdfs')
@@ -430,6 +432,7 @@ async function downloadEligibleIndividualDocuments(
           throw new Error('O documento retornado pelo SUAP não é um PDF válido.');
         }
         const storagePath = buildProcessDocumentStoragePath(tenantId, proc.suapId, document.suapDocumentId);
+        await touchSuapPdfUsage(supabase, {suapId: proc.suapId});
         const { error: uploadError } = await supabase.storage
           .from('suap-pdfs')
           .upload(storagePath, new Blob([bytes], { type: 'application/pdf' }), {

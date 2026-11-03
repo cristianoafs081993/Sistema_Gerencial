@@ -977,6 +977,96 @@ body.dark #suape-cp-overlay:not([data-theme="light"]),
   text-align: right !important;
 }
 
+.suape-cp-detail-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  font-size: 13px !important;
+}
+
+.suape-cp-detail-table th,
+.suape-cp-detail-table td {
+  padding: 9px 10px !important;
+  border-bottom: 1px solid var(--suape-cp-border-subtle) !important;
+  text-align: left !important;
+}
+
+.suape-cp-detail-table th:last-child,
+.suape-cp-detail-table td:last-child { text-align: right !important; }
+
+.suape-cp-detail-table th {
+  color: var(--suape-cp-text-muted) !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+}
+
+.suape-cp-detail-close-action {
+  border: 1px solid var(--suape-cp-border) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  background: var(--suape-cp-screen-icon-bg) !important;
+  color: var(--suape-cp-text-muted) !important;
+  cursor: pointer !important;
+}
+
+.suape-cp-solrecfin-scroll {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+}
+
+.suape-cp-solrecfin-toggle {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  border: none !important;
+  padding: 0 !important;
+  width: 100% !important;
+  background: transparent !important;
+  color: var(--suape-cp-text) !important;
+  font: inherit !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.suape-cp-solrecfin-row { cursor: pointer !important; }
+.suape-cp-solrecfin-row:hover > td,
+.suape-cp-solrecfin-row:focus-within > td {
+  background: var(--suape-cp-primary-soft) !important;
+}
+.suape-cp-solrecfin-chevron {
+  display: inline-block !important;
+  font-size: 22px !important;
+  line-height: 1 !important;
+  color: var(--suape-cp-primary) !important;
+}
+.suape-cp-solrecfin-toggle[aria-expanded="true"] .suape-cp-solrecfin-chevron {
+  transform: rotate(90deg) !important;
+}
+.suape-cp-solrecfin-count {
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  color: var(--suape-cp-text-muted) !important;
+  white-space: nowrap !important;
+}
+
+.suape-cp-solrecfin-toggle:focus-visible,
+.suape-cp-solrecfin-scroll:focus-visible {
+  outline: 2px solid var(--suape-cp-primary) !important;
+  outline-offset: 2px !important;
+}
+
+.suape-cp-solrecfin-panel[hidden] { display: none !important; }
+.suape-cp-detail-table .suape-cp-solrecfin-panel > td { text-align: left !important; }
+.suape-cp-solrecfin-documents { min-width: 560px !important; }
+.suape-cp-solrecfin-documents caption {
+  text-align: left !important;
+  padding: 8px 10px !important;
+  color: var(--suape-cp-text-muted) !important;
+  font-weight: 600 !important;
+}
+.suape-cp-solrecfin-documents td:last-child { white-space: nowrap !important; }
+.suape-cp-solrecfin-documents tfoot { font-weight: 700 !important; }
+
 .suape-cp-tabs {
   display: flex !important;
   gap: 8px !important;

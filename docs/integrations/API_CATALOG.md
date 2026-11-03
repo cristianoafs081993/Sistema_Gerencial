@@ -60,6 +60,8 @@ Observacao:
 - ao perder a sessao, qualquer rota protegida redireciona novamente para `/auth`
 - botoes de upload/importacao no frontend so aparecem para o superadministrador autenticado
 
+Extensão SIAGES 1.9.76: a renovação por `/auth/v1/token?grant_type=refresh_token` reconhece `error_code` no JSON REST (o campo `code` pode ser numérico). Token/sessão definitivamente inválidos encerram a sessão local e orientam novo login no popup; rede, 429 e 5xx preservam o refresh token privado para tentar novamente. [Contrato e recuperação](../frontend/EXTENSION_POPUP.md#recuperação-de-sessão-1976).
+
 ## 1B. Validação de relatório de pesquisa de preços
 
 Uso:
@@ -489,6 +491,7 @@ Buckets observados:
 
 - `suap-pdfs`
 - `manutencao-ocorrencias`
+- `siafi-capturas`
 
 Contrato de `manutencao-ocorrencias`:
 
@@ -496,6 +499,15 @@ Contrato de `manutencao-ocorrencias`:
 - upload publico restrito por policy a um diretorio UUID de ambiente e arquivo UUID com extensao `jpg`, `png` ou `webp`
 - limite de 5 MB e MIME types `image/jpeg`, `image/png` e `image/webp`
 - leitura autenticada; o frontend administrativo usa URL assinada temporaria
+
+Contrato de `siafi-capturas` (extensão 1.9.81, comando `printup`):
+
+- bucket privado, somente `application/pdf`, até 40 MB
+- chamador: `SUAP-Atividades-Scraper-1.9/siafi-upload-bridge.js`, no service worker, com o JWT da sessão SIAGES da extensão
+- `POST /storage/v1/object/siafi-capturas/<usuário>/<NUP>/<DH>.pdf` com `x-upsert: true`; leitura por `GET /storage/v1/object/authenticated/...`; exclusão por `DELETE /storage/v1/object/siafi-capturas` (`prefixes`)
+- policies: cada usuário grava, lê e apaga somente na própria pasta, com NUP de 17 dígitos e nome do DH `[0-9A-Za-z-]`
+- metadados e vínculo com o processo em `extension_siafi_uploads` (REST, RLS por usuário); reivindicação da abertura por `PATCH ...?id=eq.<id>&opened_at=is.null`
+- temporário: apagado ao salvar o upload no SUAP e pela limpeza diária `cleanup-siafi-capturas` (00:05 em Brasília)
 
 ## 9. Bibliotecas com contrato operacional relevante
 
@@ -781,7 +793,7 @@ Camada determinística de domínio e ferramentas agênticas baseadas no Model Co
 
 ## sync-suap-rds
 
-`POST /functions/v1/sync-suap-rds`: ações `units`, `sync-extension`, `sync-html`, `status`, `apply`, `apply-partial`, `discard`, `revert`, `revert-partial` e `sync` (compatibilidade backend), com JWT SIAGES validado internamente e permissão superadmin. A extensão captura na aba SUAP autenticada; o backend determina a próxima URL, valida HTML, campus e cursor e publica automaticamente os snapshots validados durante a coleta. O parser normaliza cabeçalhos de cadastro do inventário e datas locais/ISO no payload, expostos pela view como `suap_rd_movimentacoes.data_cadastro`; o horário de captura permanece separado. A conferência completa reconcilia toda a unidade. O lote da extensão percorre as 44 unidades, com aplicação por unidade e suporte de reversão parcial. A coleta por HTML dispensa `suap_connections`. Contrato, tipos e prévia: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).
+`POST /functions/v1/sync-suap-rds`: ações `units`, `sync-extension`, `sync-html`, `status`, `apply`, `apply-partial`, `discard`, `revert`, `revert-partial` e `sync` (compatibilidade backend), com JWT SIAGES validado internamente e permissão superadmin. A extensão captura na aba SUAP autenticada; o backend determina a próxima URL (e anuncia até 10 páginas seguintes em `prefetchUrls`, para leitura paralela), aceita `sync-html` com uma página ou com `pages` (até 6, processadas em ordem, `consumedPages` na resposta), prioriza RDs novas em relação à base (`priorityTotal`/`priorityPublished`), valida HTML, campus e cursor e publica automaticamente os snapshots validados durante a coleta. O parser normaliza cabeçalhos de cadastro do inventário e datas locais/ISO no payload, expostos pela view como `suap_rd_movimentacoes.data_cadastro`; o horário de captura permanece separado. A conferência completa reconcilia toda a unidade. O lote da extensão percorre as 44 unidades, com aplicação por unidade e suporte de reversão parcial. A coleta por HTML dispensa `suap_connections`. Contrato, tipos e prévia: [SUAP_RD_SYNC](../ops/SUAP_RD_SYNC.md).
 
 O parser aceita, sem linhas de empenho, somente RDs canceladas em que o detalhe SUAP exiba explicitamente “Nenhuma natureza de despesa cadastrada”. Outros detalhes sem tabela permanecem erro para proteger a cobertura da conferência. Para dotações provisórias canceladas, também lê o valor sob o rótulo “Valor provisório”.
 

@@ -1,5 +1,13 @@
 # DATA_LINEAGE
 
+Referências de retenção: PDF DCF/UFMG de janeiro/2024 → extração da tabela → `naturezas_rendimento_reinf`; PDF de orientação COAD → texto por página e tabela de percentuais → `referencias_retencao_paginas` e `referencias_retencao_aliquotas`. `referencias_retencao_documentos` registra a origem e ressalva de vigência. Nenhum contrato é vinculado ou classificado nesta etapa.
+
+printup: DH no SIAFI (`siafi-evidence.js`, PDF + campo Processo de Dados Básicos) → cópia local em Downloads + `stage-upload` no `background.js` → `siafi-upload-bridge.js` grava o PDF em `siafi-capturas/<usuário>/<NUP>/<DH>.pdf` e faz upsert em `extension_siafi_uploads`. Na mesma janela com SUAP, ou no perfil que focar uma aba do SUAP, o worker reivindica `opened_at` e resolve o SUAP ID. Fontes do SUAP ID: registro local, `extension_process_registry` ou `processos`. Em seguida abre `documento_upload/<id>/#siagesUpload=` → `upload-document.js` baixa o PDF e preenche o campo Arquivo. Ao salvar, o worker apaga linha e objeto; sobras do dia saem em `cleanup-siafi-capturas` (00:05 em Brasília).
+
+Alt+V entre perfis: página de processo no SUAP (`process-document.js`, snapshot do processo + campos do painel) → `register-process` no `background.js` → `process-registry-sync.js` faz upsert em `extension_process_registry` → `get-active-processes` em outro perfil do mesmo usuário lê os registros recentes de outros perfis → `process-paste-picker.js` (selo "outro perfil").
+
+Atalhos de texto entre perfis: painel de atalhos do SUAP (`process-document.js`) grava em `chrome.storage.sync` → `storage.onChanged` no `background.js` aciona `snippets-sync.js`, que faz upsert em `extension_snippets`. Em outro perfil, `text-expander.js` pede `refresh` ao carregar a aba principal (no máximo a cada 5 min) e o alarme de 15 min também reconcilia: a cópia remota é gravada no `chrome.storage.sync` local e o expansor/painel recebem por `onChanged`. A primeira sincronização do perfil une as cópias sem perder atalhos personalizados; depois vence o lado que mudou.
+
 Checklist SIAFI: captura JSON original + processo autorizado + snapshot da extração + documentos originais preservados/hash + listas autorizadas → IA Gemini → validação de citações/cálculos/cobertura → resultado imutável. Revisões humanas são eventos separados; não alteram parecer nem treinam automaticamente. Citações vinculam documento/página ou campo/registro; fontes sem comprovação geram pendência. [SIAFI_CHECKLIST](../integrations/SIAFI_CHECKLIST.md).
 
 ## Objetivo
@@ -272,7 +280,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
 - coleta e sincronizacao:
   - fonte oficial: Compras.gov.br Dados Abertos (API `/modulo-contratacoes/2_consultarItensContratacoes_PNCP_14133`) e PNCP
   - ingestao: Edge Function [sync-precos-referencia/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-precos-referencia/index.ts)
-  - agendamento: `pg_cron` diário (`sync-precos-referencia-daily`) executando delta diário de 24h a 48h
+  - agendamento: `pg_cron` diário (`sync-precos-referencia-daily`) executando delta diário de 24h a 48h — **desagendado em 03/11/2026**, tabela esvaziada (funcionalidade pausada)
   - embeddings vetoriais: gerados via Google AI Studio Gemini API (`gemini-embedding-001`, dimensão 768)
   - persistencia:
     - `preco_referencia_itens`: cotações homologadas, metadados de órgão/fornecedor, `search_tsv` e coluna vetorial `embedding vector(768)`

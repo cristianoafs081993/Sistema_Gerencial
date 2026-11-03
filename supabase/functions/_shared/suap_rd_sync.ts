@@ -16,7 +16,11 @@ export type RdState = {
   reuse?: RdReuse;
   rowFingerprintVersion?: number;
   mutableRdIds?: string[]; detailRechecks?: string[]; verificationRetries?: number; inventoryRetries?: number;
+  priority?: RdPriority;
 };
+/** RDs absent from the base run: details read first, published once an official relation confirms them. */
+export type RdPriority = { total: number; queue: string[]; details: Record<string, { detail: SuapRdDetail; capturedAt: string }>; published: string[] };
+export const RD_PRIORITY_LIMIT = 60;
 export type RdRun = { id: string; org_id: string; user_id: string; campus_uasg: string; suap_unit_code: string;
   status: string; state: RdState; source_count: number; summary: Record<string, number>; complete: boolean;
   error_message?: string | null; started_at?: string; updated_at?: string };
@@ -28,9 +32,47 @@ export function initialRdState(unit: string): RdState {
     rowFingerprintVersion: 2 };
 }
 
+const rdDetailUrl = (rdId: string) => `${SUAP_RD_ORIGIN}/plan_estrategico/detalhar_requisicaodespesa/${rdId}/`;
+
+/** Also starts the priority on runs already past the plan, so a resumed collection benefits from it. */
+function ensureRdPriority(state: RdState) {
+  if (state.priority || state.phase !== 'activities' || !state.reuse?.baseRunId) return;
+  const previous = new Set((state.reuse.previousInventory ?? []).map(ref => ref.rdId));
+  const queue = state.inventory.filter(ref => !previous.has(ref.rdId)).map(ref => ref.rdId).slice(0, RD_PRIORITY_LIMIT);
+  state.priority = { total: queue.length, queue, details: {}, published: [] };
+}
+
+/** Names only choose the reading order; the official relation still provides the activity ID. */
+function prioritizeRdActivities(state: RdState) {
+  const names = new Set(Object.values(state.priority?.details ?? {}).map(item => foldRdText(item.detail.activityName)).filter(Boolean));
+  if (!names.size) return;
+  const start = state.activityCursor + (state.activityNextUrl ? 1 : 0);
+  const pending = state.activities.slice(start);
+  state.activities = [...state.activities.slice(0, start), ...pending.filter(activity => names.has(foldRdText(activity.name))),
+    ...pending.filter(activity => !names.has(foldRdText(activity.name)))];
+}
+
+/** Provisional snapshot of a new RD; the regular detail pass rereads it with the final relations. */
+async function publishPriorityRds(db: RdDatabase, run: RdRun) {
+  const priority = run.state.priority;
+  for (const [rdId, { detail, capturedAt }] of Object.entries(priority?.details ?? {})) {
+    const sources = run.state.sources[rdId] ?? [];
+    if (!sources.length || sources.some(source => foldRdText(source.activityName) !== foldRdText(detail.activityName))) continue;
+    const payload = { ...detail, dataCadastro: run.state.inventory.find(ref => ref.rdId === rdId)?.dataCadastro ?? null, sources };
+    const { error } = await db.from('suap_rd_snapshots').upsert({ run_id: run.id, org_id: run.org_id,
+      campus_uasg: run.campus_uasg, suap_unit_code: run.suap_unit_code, suap_rd_id: rdId, payload,
+      checksum: await rdChecksum(payload), captured_at: capturedAt }, { onConflict: 'run_id,suap_rd_id' });
+    if (error) throw error;
+    priority!.published.push(rdId);
+    delete priority!.details[rdId];
+  }
+}
+
 /** The server chooses every page; the extension supplies only that page's HTML. */
 export function nextRdCaptureUrl(run: RdRun): string | null {
   const state = run.state;
+  ensureRdPriority(state);
+  if (state.phase === 'activities' && state.priority?.queue.length) return rdDetailUrl(state.priority.queue[0]);
   while (state.phase === 'activities' && state.activities[state.activityCursor]?.reused) state.activityCursor++;
   if (state.phase === 'activities' && state.activityCursor >= state.activities.length) state.phase = 'details';
   const reused = new Set(state.reuse?.reusedIds ?? []);
@@ -43,6 +85,46 @@ export function nextRdCaptureUrl(run: RdRun): string | null {
   if (state.phase === 'activities') return state.activityNextUrl ?? `${SUAP_RD_ORIGIN}/plan_estrategico/listar_requisicoes_despesa/8/${state.activities[state.activityCursor].id}/`;
   if (state.phase === 'details') return `${SUAP_RD_ORIGIN}/plan_estrategico/detalhar_requisicaodespesa/${state.detailRechecks?.[0] ?? state.inventory[state.detailCursor].rdId}/`;
   return null;
+}
+
+/** Deterministic pages after nextUrl, so the extension can read SUAP concurrently. Hints only: each page is still validated in order. */
+export function upcomingRdCaptureUrls(run: RdRun, limit = 10): string[] {
+  const probe = structuredClone(run);
+  if (!nextRdCaptureUrl(probe)) return [];
+  const state = probe.state;
+  const urls: string[] = [];
+  // Relations are reordered once the new RDs are read, so only the remaining queue is predictable.
+  if (state.phase === 'activities' && state.priority?.queue.length) return state.priority.queue.slice(1, limit + 1).map(rdDetailUrl);
+  if (state.phase === 'activities') {
+    for (let index = state.activityCursor + 1; index < state.activities.length && urls.length < limit; index++)
+      if (!state.activities[index].reused) urls.push(`${SUAP_RD_ORIGIN}/plan_estrategico/listar_requisicoes_despesa/8/${state.activities[index].id}/`);
+  } else if (state.phase === 'details') {
+    const reused = new Set(state.reuse?.reusedIds ?? []);
+    const ids = state.detailRechecks?.length ? state.detailRechecks.slice(1)
+      : state.inventory.slice(state.detailCursor + 1).map(ref => ref.rdId).filter(id => !reused.has(id));
+    for (const id of ids.slice(0, limit)) urls.push(`${SUAP_RD_ORIGIN}/plan_estrategico/detalhar_requisicaodespesa/${id}/`);
+  }
+  return urls;
+}
+
+export const MAX_RD_PAGES_PER_CALL = 6;
+/**
+ * Processes captured pages in server order. The first page must be the expected one; later pages stop the batch
+ * when they no longer match, fail or exceed the time budget, and the extension recaptures them individually.
+ */
+export async function collectCapturedRdPages(db: RdDatabase, run: RdRun, pages: unknown, Parser: HtmlParser, budgetMs = 20000) {
+  if (!Array.isArray(pages) || !pages.length || pages.length > MAX_RD_PAGES_PER_CALL) throw new Error('Lote de páginas SUAP inválido.');
+  const started = Date.now();
+  let consumed = 0;
+  for (const page of pages) {
+    const { html, sourceUrl } = (page ?? {}) as { html?: unknown; sourceUrl?: unknown };
+    if (consumed) {
+      if (Date.now() - started > budgetMs || sourceUrl !== nextRdCaptureUrl(structuredClone(run))) break;
+      try { await collectCapturedRdPage(db, run, html, sourceUrl, Parser); } catch { break; }
+    } else await collectCapturedRdPage(db, run, html, sourceUrl, Parser);
+    consumed++;
+  }
+  return consumed;
 }
 
 export async function collectCapturedRdPage(db: RdDatabase, run: RdRun, html: unknown, sourceUrl: unknown, Parser: HtmlParser) {
@@ -104,6 +186,7 @@ function restartInventorySweep(run: RdRun) {
   state.inventory=[];state.total=null;state.verify=[];state.verifyTotal=null;
   state.activityCursor=0;state.activityNextUrl=null;state.detailCursor=0;
   state.detailRechecks=[];state.mutableRdIds=[];state.verificationRetries=0;
+  delete state.priority;
 }
 /** Inventory identity changes restart the scan; mutable pending rows use targeted detail retries. */
 function reconcileRdInventory(run: RdRun) {
@@ -167,6 +250,18 @@ export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: str
           const plan = parseSuapPlanHtml(html, Parser);
           await prepareRdActivities(state,plan.activities);
           state.phase = 'activities';
+    } else if (state.phase === 'activities' && state.priority?.queue.length) {
+      const rdId = state.priority.queue[0];
+      const ref = state.inventory.find(item => item.rdId === rdId);
+      if (ref) {
+        const detail = parseSuapRdDetail(await load(rdDetailUrl(rdId)), rdId, run.suap_unit_code, Parser);
+        if (detail.numero !== ref.numero || foldRdText(detail.tipoRaw) !== foldRdText(ref.tipo) ||
+          foldRdText(detail.situacao) !== foldRdText(ref.situacao) && foldRdText(ref.situacao) === 'concluida') throw new Error('RD alterada durante a captura; inicie nova conferência.');
+        state.priority.details[rdId] = { detail, capturedAt: new Date().toISOString() };
+      }
+      state.priority.queue.shift();
+      await publishPriorityRds(db, run);
+      if (!state.priority.queue.length) prioritizeRdActivities(state);
     } else if (state.phase === 'activities') {
       const activity = state.activities[state.activityCursor];
       if (!activity) { state.phase = 'details'; continue; }
@@ -190,6 +285,7 @@ export async function collectRdChunk(db: RdDatabase, run: RdRun, load: (url: str
           if (state.reuse) state.reuse.reusedActivities = 0;
         } else { activity.checkedAt = new Date().toISOString(); state.activityCursor++; }
       }
+      if (Object.keys(state.priority?.details ?? {}).length) await publishPriorityRds(db, run);
     } else if (state.phase === 'details') {
       const ref = state.detailRechecks?.length ? state.inventory.find(ref => ref.rdId === state.detailRechecks![0])! : state.inventory[state.detailCursor];
       if (!ref) { state.phase = 'verify'; state.nextUrl = rdInventoryUrl(run.suap_unit_code); continue; }

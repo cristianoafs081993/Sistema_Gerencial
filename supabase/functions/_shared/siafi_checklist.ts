@@ -1,6 +1,6 @@
 // Pure, shared by the Edge Functions, web UI and regression tests.
 export const CHECKLIST_VERSION = '2.0.0';
-export const RULES_VERSION = '2026-10-13.1';
+export const RULES_VERSION = '2026-10-14.2';
 export type ChecklistStatus = 'divergente' | 'nao_verificavel' | 'conforme' | 'nao_aplicavel';
 export type PaymentKind = 'fornecedor_pj' | 'estudantes' | 'indefinido';
 export type Evidence = {
@@ -160,10 +160,32 @@ export function valueAtPath(root: unknown, path: string): unknown {
     return value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value,key) ? (value as Record<string,unknown>)[key] : undefined;
   },root);
 }
+export function captureEvidenceCatalog(capture:unknown) {
+  const entries:{ref:string;caminho:string;label:string;valor:unknown}[]=[];
+  const add=(caminho:string,label:string,valor:unknown)=>{
+    if(str(valor))entries.push({ref:`S${String(entries.length+1).padStart(4,'0')}`,caminho,label,valor});
+  };
+  for(const [key,value] of Object.entries(obj(obj(capture).document)))add(`document.${key}`,key,value);
+  for(const group of ['sections','predocs'])for(const [index,value] of arr(obj(capture)[group]).entries()) {
+    const section=obj(value);
+    for(const [fieldIndex,value] of arr(section.fields).entries()) {
+      const field=obj(value);add(`${group}.${index}.fields.${fieldIndex}.value`,str(field.label),field.value);
+    }
+    for(const [tableIndex,value] of arr(section.tables).entries()) {
+      const table=obj(value);
+      for(const [rowIndex,row] of arr(table.rows).entries())for(const [cellIndex,cell] of arr(row).entries()) {
+        add(`${group}.${index}.tables.${tableIndex}.rows.${rowIndex}.${cellIndex}.text`,str(arr(table.headers)[cellIndex]),obj(cell).text);
+      }
+    }
+  }
+  return entries;
+}
 export function validEvidence(value: unknown, capture: unknown, sources: SourceDescriptor[], lists: unknown): Evidence | null {
-  const e = obj(value), fonte = str(e.fonte), sourceId = str(e.sourceId), trecho = str(e.trecho).trim();
+  const e = obj(value), fonte = e.fonte==='captura'?'siafi':str(e.fonte), sourceId = str(e.sourceId), trecho = str(e.trecho).trim();
   if (!trecho || trecho.length > 4000 || !sourceId) return null;
-  const caminho = str(e.caminho).replace(/\[(\d+)\]/g,'.$1').replace(fonte==='siafi'?/^captura\./:/^listas\./,'');
+  const reference=fonte==='siafi'&&str(e.ref)?captureEvidenceCatalog(capture).find(entry=>entry.ref===e.ref):null;
+  if(fonte==='siafi'&&str(e.ref)&&!reference)return null;
+  const caminho = (reference?.caminho || str(e.caminho)).replace(/\[(\d+)\]/g,'.$1').replace(fonte==='siafi'?/^captura\./:/^listas\./,'');
   if (fonte === 'siafi' || fonte === 'lista') {
     const root = fonte === 'siafi' ? capture : lists;
     const canonicalId=fonte==='siafi'?str(obj(capture).captureId):str(obj(arr(lists)[Number(caminho.split('.')[0])]).id);
@@ -229,6 +251,145 @@ export function selectInvoices(capture: unknown, invoices: unknown[]) {
 }
 const statusRank: Record<ChecklistStatus,number> = {divergente:0,nao_verificavel:1,conforme:2,nao_aplicavel:3};
 const mandatoryRules=new Set(['C01','C02','C04','C05','C06','C07','C08','P01','P02','P03','P04','F01','F02','B01','B02','B03','B04','B05','B06','B07','B08']);
+
+// Count recipients independently of amounts. A correct total can conceal an
+// omitted student or a different student with the same individual amount.
+export function studentRosterChecks(raw: unknown, context: {capture:unknown;sources:SourceDescriptor[];lists:unknown}) {
+  const roster=obj(obj(raw).conferenciaEstudantes);
+  const readStudents=(values:unknown)=>arr(values).map(value=>{
+    const row=obj(value);
+    const verified=arr(row.evidencias).map(e=>validEvidence(e,context.capture,context.sources,context.lists))
+      .filter((e):e is Evidence=>!!e && e.fonte==='processo' && e.verificacao==='texto');
+    const citedCpfs=[...new Set(verified.flatMap(e=>[...e.trecho.matchAll(/(?<!\d)(?:\d{3}\.\d{3}\.\d{3}-\d{2}|\d{11})(?!\d)/g)].map(match=>digits(match[0]))))];
+    // The literal PDF citation is authoritative if the model mistypes digits.
+    const supplied=digits(row.cpf),cpf=citedCpfs.includes(supplied)?supplied:citedCpfs.length===1?citedCpfs[0]:'';
+    const evidence=verified.filter(e=>cpf && digits(e.trecho).includes(cpf));
+    return {cpf,nome:str(row.nome),evidence};
+  }).filter(row=>row.cpf.length===11 && row.evidence.length>0);
+  const authorized=readStudents(roster.autorizados);
+  const scopeEvidence=arr(roster.evidenciasEscopo).map(e=>validEvidence(e,context.capture,context.sources,context.lists))
+    .filter((e):e is Evidence=>!!e && e.fonte==='processo' && e.verificacao==='texto');
+  const expected=new Map(authorized.map(row=>[row.cpf,row]));
+  // An explicit, unique authorized headcount on the cited scope pages also
+  // establishes completeness. It must match the verified CPF inventory.
+  const scopePages=[...new Set(scopeEvidence.map(e=>`${e.sourceId}:${e.pagina}`))];
+  const documentedCounts=scopePages.flatMap(key=>{
+    const evidence=scopeEvidence.find(e=>`${e.sourceId}:${e.pagina}`===key)!;
+    const text=normalized(context.sources.find(source=>source.id===evidence.sourceId)?.paginasTexto?.[evidence.pagina!-1]);
+    return [...text.matchAll(/\bquantidade autorizada\s*:\s*(\d+)\b/g)].map(match=>({count:Number(match[1]),evidence:{...evidence,trecho:match[0]}}));
+  });
+  const headcountComplete=documentedCounts.length===1 && documentedCounts[0].count===expected.size;
+  const expectedComplete=roster.escopoConfirmado===true && (roster.listaCompleta===true || headcountComplete) && expected.size>0 && scopeEvidence.length>0 &&
+    (!documentedCounts.length || headcountComplete) &&
+    (headcountComplete || authorized.length===arr(roster.autorizados).length);
+  const actual=new Map<string,{nome:string;evidence:Evidence[];count:number}>();
+  const paymentSections=arr(obj(context.capture).sections).map((value,index)=>({section:obj(value),index}))
+    .filter(({section})=>/dados[-_ ](?:de[-_ ])?pagamento|dados de pagamento/.test(normalized(section.key || section.title)));
+  let recognized=false,incomplete=false;
+  const cpfFrom=(value:unknown)=>str(value).trim().match(/^(?:\d{11}|\d{3}\.\d{3}\.\d{3}-\d{2})$/)?.[0];
+  for(const {section,index} of paymentSections) {
+    if(section.status!=='captured')incomplete=true;
+    for(const [tableIndex,value] of arr(section.tables).entries()) {
+      const table=obj(value),headers=arr(table.headers).map(normalized);
+      if(/deduc|tribut|recolh|retenc/.test(normalized(table.id)+' '+headers.join(' ')))continue;
+      const cpfIndex=headers.findIndex(header=>/cpf|favorecido|beneficiario/.test(header) && !/nome|conta|valor/.test(header));
+      if(cpfIndex<0)continue;
+      recognized=true;
+      const nameIndex=headers.findIndex(header=>/nome/.test(header));
+      for(const [rowIndex,value] of arr(table.rows).entries()) {
+        const cells=arr(value),text=str(obj(cells[cpfIndex]).text).trim();
+        if(!text && cells.every(cell=>!str(obj(cell).text).trim()))continue;
+        if(/^total\b/i.test(text))continue;
+        let cpf=digits(cpfFrom(text));
+        let evidence:Evidence|null=null,nome=str(obj(cells[nameIndex]).text);
+        if(cpf.length!==11) {
+          const predocIndex=arr(obj(context.capture).predocs).findIndex(value=>{
+            const predoc=obj(value);
+            return predoc.id===`${str(table.id)}:${rowIndex}:btnPredoc` && predoc.status==='captured' && /dados[-_ ](?:de[-_ ])?pagamento/.test(normalized(predoc.sectionKey));
+          });
+          if(predocIndex>=0) {
+            const fields=arr(obj(arr(obj(context.capture).predocs)[predocIndex]).fields).map(obj);
+            const fieldIndex=fields.findIndex(field=>/:codFavorecido_output$/.test(str(field.id)) || normalized(field.label)==='favorecido');
+            if(fieldIndex>=0) {
+              cpf=digits(cpfFrom(fields[fieldIndex].value));
+              evidence=validEvidence({fonte:'siafi',sourceId:obj(context.capture).captureId,caminho:`predocs.${predocIndex}.fields.${fieldIndex}.value`,trecho:str(fields[fieldIndex].value)},context.capture,context.sources,context.lists);
+              nome=str(fields.find(field=>/:nomeFavorecido$/.test(str(field.id)))?.value);
+            }
+          }
+        }
+        // Bank intermediaries, masked CPFs and opaque RB/LX references do not
+        // establish the complete list of final student recipients.
+        if(cpf.length!==11) {incomplete=true;continue;}
+        evidence ||= validEvidence({fonte:'siafi',sourceId:obj(context.capture).captureId,
+          caminho:`sections.${index}.tables.${tableIndex}.rows.${rowIndex}.${cpfIndex}.text`,trecho:text},context.capture,context.sources,context.lists);
+        if(!evidence) {incomplete=true;continue;}
+        const previous=actual.get(cpf);
+        actual.set(cpf,{nome,evidence:[...(previous?.evidence || []),evidence],count:(previous?.count || 0)+1});
+      }
+    }
+  }
+  const deductionOnlyPartial=obj(context.capture).status==='partial' && arr(obj(context.capture).warnings).length>0 &&
+    arr(obj(context.capture).warnings).every(warning=>normalized(warning)==='aba nao disponivel: deducoes');
+  const actualComplete=recognized && !incomplete && (obj(context.capture).status==='complete' || deductionOnlyPartial);
+  const request=obj(roster.solicitacao),requestedRows=readStudents(request.alunos);
+  const requested=new Map(requestedRows.map(row=>[row.cpf,row]));
+  const requestScope=arr(request.evidenciasEscopo).map(e=>validEvidence(e,context.capture,context.sources,context.lists))
+    .filter((e):e is Evidence=>!!e && e.fonte==='processo' && e.verificacao==='texto');
+  const requestPages=[...new Set(requestScope.map(e=>`${e.sourceId}:${e.pagina}`))];
+  const requestCounts=requestPages.flatMap(key=>{
+    const evidence=requestScope.find(e=>`${e.sourceId}:${e.pagina}`===key)!;
+    const text=normalized(context.sources.find(source=>source.id===evidence.sourceId)?.paginasTexto?.[evidence.pagina!-1]);
+    return [...text.matchAll(/\bquantidade solicitada\s*:\s*(\d+)\b/g)].map(match=>({count:Number(match[1]),evidence:{...evidence,trecho:match[0]}}));
+  });
+  const quantity=requestCounts.length===1?requestCounts[0].count:Number(request.quantidade);
+  const quantityEvidence=[...requestCounts.map(value=>value.evidence),...arr(request.evidenciasQuantidade).map(e=>validEvidence(e,context.capture,context.sources,context.lists))
+    .filter((e):e is Evidence=>!!e && e.fonte==='processo' && e.verificacao==='texto' && new RegExp(`(?<![\\d.,])${quantity}(?!\\d|[.,]\\d)`).test(e.trecho))
+  ];
+  const explicitQuantity=Number.isSafeInteger(quantity) && quantity>0 && quantityEvidence.length>0;
+  const requestScopeKnown=request.escopoConfirmado===true && requestScope.length>0 && requestCounts.length<=1;
+  const requestedComplete=requestScopeKnown && request.listaCompleta===true && requested.size>0 &&
+    requestedRows.length===arr(request.alunos).length && (!explicitQuantity || quantity===requested.size);
+  const requestedCount=requestScopeKnown ? explicitQuantity?quantity:requestedComplete?requested.size:null : null;
+  const authorizedCount=roster.escopoConfirmado===true && scopeEvidence.length>0 ?
+    documentedCounts.length===1?documentedCounts[0].count:expectedComplete?expected.size:null : null;
+  const baseline=requestedComplete?requested:expected;
+  const missing=[...baseline.keys()].filter(cpf=>!actual.has(cpf));
+  const additional=[...actual.keys()].filter(cpf=>!baseline.has(cpf));
+  const repeated=[...actual.keys()].filter(cpf=>actual.get(cpf)!.count>1);
+  const complete=requestedComplete && expectedComplete && actualComplete;
+  const evidence=[...requestScope,...quantityEvidence,...requestedRows.flatMap(row=>row.evidence),...scopeEvidence,...documentedCounts.map(value=>value.evidence),...authorized.flatMap(row=>row.evidence),...actual.values()].flatMap(value=>'evidence' in value?value.evidence:[value]);
+  const rule=RULES.find(rule=>rule.id==='B02')!;
+  const item=(entity:string,status:ChecklistStatus,esperado:string,encontrado:string,acao:string,evidencias:Evidence[]):ChecklistItem=>({
+    id:`B02:${entity}`,regraId:'B02',entidade:entity,descricao:rule.descricao,prioridade:0,status,esperado,encontrado,acao,evidencias,
+    observacao:complete?'Comparação da solicitação original, autorização do gestor e liquidação para a mesma competência/parcela.':
+      'Conferência em três etapas: a autorização pode conter erro. Falta comprovar parte das quantidades/relações solicitada, autorizada e liquidada. Banco ou lista de trabalho não identifica sozinho os alunos liquidados.',
+  });
+  const different=(left:Map<string,unknown>,right:Map<string,unknown>)=>left.size!==right.size || [...left.keys()].some(cpf=>!right.has(cpf));
+  const requestAuthMismatch=requestedCount!==null && authorizedCount!==null && requestedCount!==authorizedCount || requestedComplete && expectedComplete && different(requested,expected);
+  const requestActualMismatch=requestedCount!==null && actualComplete && requestedCount!==actual.size || requestedComplete && actualComplete && different(requested,actual);
+  const authActualMismatch=authorizedCount!==null && actualComplete && authorizedCount!==actual.size || expectedComplete && actualComplete && different(expected,actual);
+  const items=[item('GERAL',requestAuthMismatch||requestActualMismatch||authActualMismatch||actualComplete&&repeated.length>0?'divergente':complete?'conforme':'nao_verificavel',
+    `Solicitação: ${requestedCount ?? 'quantidade não comprovada'} aluno(s); autorização: ${authorizedCount ?? 'quantidade não comprovada'} aluno(s)`,
+    `Liquidação: ${actualComplete?actual.size:'quantidade não comprovada'} aluno(s); ausentes identificados: ${missing.length}; adicionais: ${additional.length}; repetidos: ${repeated.length}`,
+    requestAuthMismatch?'Solicite ao gestor conferir e corrigir a autorização frente ao pedido original antes de ajustar a liquidação.':complete?'Confira os alunos ausentes, adicionais e repetidos antes de registrar o DH.':'Complete a solicitação, autorização e captura dos destinatários finais para esta competência/parcela.',evidence)];
+  for(const [entity,left,right,mismatch,known] of [
+    ['SOLICITACAO_AUTORIZACAO',requestedCount,authorizedCount,requestAuthMismatch,requestedCount!==null&&authorizedCount!==null],
+    ['SOLICITACAO_LIQUIDACAO',requestedCount,actualComplete?actual.size:null,requestActualMismatch,requestedCount!==null&&actualComplete],
+    ['AUTORIZACAO_LIQUIDACAO',authorizedCount,actualComplete?actual.size:null,authActualMismatch,authorizedCount!==null&&actualComplete],
+  ] as const) {
+    items.push(item(entity,mismatch?'divergente':known?'conforme':'nao_verificavel',`Quantidade de alunos: ${left ?? 'não comprovada'}`,`Quantidade de alunos: ${right ?? 'não comprovada'}`,
+      entity==='SOLICITACAO_AUTORIZACAO'?'Confira a autorização do gestor contra a solicitação original; eventual exclusão ou alteração precisa estar documentada.':'Confira a relação de alunos e eventuais exclusões/parcelas justificadas antes de registrar.',evidence));
+  }
+  for(const cpf of new Set([...requested.keys(),...expected.keys(),...actual.keys()])) {
+    const wanted=baseline.get(cpf),found=actual.get(cpf),authorizedStudent=expected.get(cpf);
+    const status:ChecklistStatus=complete?(!wanted||!found||found.count>1||requested.has(cpf)!==expected.has(cpf)?'divergente':'conforme'):'nao_verificavel';
+    items.push(item(`CPF:${cpf}:COBERTURA`,status,wanted?`${wanted.nome || 'Aluno'} — CPF ${cpf}: ${requestedComplete?'solicitado':'autorizado; solicitação não comprovada'}`:`CPF ${cpf}: não consta na solicitação completa desta liquidação`,
+      found?`${found.nome || 'Aluno'} — CPF ${cpf}: ${found.count} ocorrência(s) capturada(s)`:`CPF ${cpf}: não localizado entre os destinatários capturados`,
+      !complete?'Confirme a solicitação, autorização e relação completa dos destinatários.':requested.has(cpf)&&!authorizedStudent?'Aluno solicitado ausente da autorização: peça ao gestor a correção ou justificativa antes de incluí-lo no DH.':!found?'Confira a inclusão do aluno solicitado e autorizado que foi esquecido, seu valor e pré-doc.':!wanted?'Aluno incluído a mais: confira a solicitação e a autorização desta competência/parcela.':found.count>1?'Confira se as ocorrências são parcelas distintas autorizadas ou duplicação.':'Identificação conferida; confira também valor individual e conta.',
+      [...(wanted?.evidence || []),...(authorizedStudent?.evidence || []),...(found?.evidence || []),...requestScope,...scopeEvidence]));
+  }
+  return {items,cpfs:[...new Set([...requested.keys(),...expected.keys(),...actual.keys()])]};
+}
 export const sortChecklist = (items: ChecklistItem[]) => [...items].sort((a,b) => statusRank[a.status]-statusRank[b.status] || a.prioridade-b.prioridade || a.id.localeCompare(b.id));
 export function compareChecklists(items: ChecklistItem[], previous: ChecklistItem[]) {
   const old = new Map(previous.map(item => [item.id,item]));
@@ -305,7 +466,16 @@ export function finalizeChecklist(raw: unknown, context: { capture: unknown; sou
     }
   }
   if (context.kind==='estudantes') {
-    const cpfs=[...new Set(arr(context.lists).flatMap(list=>arr(obj(list).rows).map(row=>digits(obj(row).cpf || obj(row).favorecido_documento))).filter(cpf=>cpf.length===11))];
+    const coverage=studentRosterChecks(raw,context);
+    // A model-wide B02 approval cannot substitute for the membership check.
+    for(const item of result.filter(item=>item.regraId==='B02' && item.status==='conforme')) {
+      item.status='nao_verificavel';item.observacao='A identificação depende da conferência completa por CPF. '+item.observacao;
+    }
+    const global=result.findIndex(item=>item.regraId==='B02' && item.entidade==='GERAL');
+    if(global>=0)result.splice(global,1);
+    result.push(...coverage.items);
+    const listedCpfs=arr(context.lists).flatMap(list=>arr(obj(list).rows).map(row=>digits(obj(row).cpf || obj(row).favorecido_documento)));
+    const cpfs=[...new Set([...coverage.cpfs,...listedCpfs].filter(cpf=>cpf.length===11))];
     for (const cpf of cpfs) for (const ruleId of ['B02','B03','B05']) {
       if (result.some(item=>item.regraId===ruleId && item.entidade.includes(cpf))) continue;
       const rule=RULES.find(rule=>rule.id===ruleId)!;

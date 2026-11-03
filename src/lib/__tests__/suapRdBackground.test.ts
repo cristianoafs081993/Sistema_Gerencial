@@ -61,6 +61,24 @@ describe('worker de RDs',()=>{
     await vi.waitFor(()=>expect(instance.values['siages-suap-rd-status:19']).toMatchObject({running:false,error:'Aba fechada'}));
     expect(fetcher.mock.calls.map(([,options])=>JSON.parse(options.body).action)).toEqual(['sync-extension','status']);
   });
+  it('encerra com erro, sem travar, quando a aba SUAP não responde à leitura',async()=>{
+    vi.useFakeTimers({toFake:['setTimeout','clearTimeout']});
+    try {
+      const fetcher=vi.fn(async(_url:string,options:{body:string})=>response(JSON.parse(options.body).action==='status'?{run:{id:'r',status:'collecting'}}:{runId:'r',status:'collecting',nextUrl:rdListUrl}));
+      const instance=worker(fetcher);instance.chromeApi.scripting.executeScript.mockReturnValue(new Promise(()=>{}));
+      await instance.send({type:'start',unit:'19',tabId:5});
+      await vi.waitFor(()=>expect(instance.chromeApi.scripting.executeScript).toHaveBeenCalled());
+      await vi.advanceTimersByTimeAsync(90000);
+      await vi.waitFor(()=>expect(instance.values['siages-suap-rd-status:19']).toMatchObject({running:false,error:expect.stringContaining('parou de responder')}));
+      await expect(instance.send({type:'status',unit:'19'})).resolves.toMatchObject({running:false});
+    } finally { vi.useRealTimers(); }
+  });
+  it('exibe o motivo real quando a leitura dentro da aba SUAP falha',async()=>{
+    const fetcher=vi.fn(async(_url:string,options:{body:string})=>response(JSON.parse(options.body).action==='status'?{run:{id:'r',status:'collecting'}}:{runId:'r',status:'collecting',nextUrl:rdListUrl}));
+    const instance=worker(fetcher);instance.chromeApi.scripting.executeScript.mockResolvedValue([{result:{error:'Leitura SUAP recusada (HTTP 403). Retome a coleta.'}}]);
+    await instance.send({type:'start',unit:'19',tabId:5});
+    await vi.waitFor(()=>expect(instance.values['siages-suap-rd-status:19']).toMatchObject({running:false,error:'Leitura SUAP recusada (HTTP 403). Retome a coleta.'}));
+  });
   it('aplica somente as prévias completas do lote com conferência de usuário e execução no servidor',async()=>{
     const units=[{value:'19',code:'DG/CN',parentUasg:'158366'},{value:'25',code:'DG/JUC',parentUasg:'158366'}];
     const fetcher=vi.fn(async(_url:string,options:{body:string})=>{

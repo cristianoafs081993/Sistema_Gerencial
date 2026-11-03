@@ -313,6 +313,113 @@ describe('Suape - Menu de Colagem Inteligente Alt+V (suapProcessPastePicker)', (
     api.closePicker();
   });
 
+  it('identifica os processos vindos de outro perfil do Chrome', async () => {
+    window.eval(pasteScript);
+    const api = (window as unknown as { __suapeProcessPastePicker: { openPicker: () => Promise<void>; closePicker: () => void } }).__suapeProcessPastePicker;
+
+    (window as unknown as { chrome: unknown }).chrome = {
+      runtime: {
+        sendMessage: vi.fn((_msg: unknown, cb: (res: unknown) => void) => {
+          cb({
+            ok: true,
+            processes: [
+              { suapId: '1', processNumber: '23035.000001.2026-01', process: { cpfCnpj: '111.111.111-11' } },
+              { suapId: '2', processNumber: '23035.000002.2026-02', process: { cpfCnpj: '222.222.222-22' }, remote: true },
+            ],
+          });
+        }),
+      },
+    };
+
+    await api.openPicker();
+
+    const headers = Array.from(document.querySelectorAll('.suape-paste-group-header'));
+    expect(headers).toHaveLength(2);
+    expect(headers[0].querySelector('.suape-paste-group-remote')).toBeNull();
+    expect(headers[1].querySelector('.suape-paste-group-remote')?.textContent).toBe('outro perfil');
+    expect(pasteCss).toContain('.suape-paste-group-remote');
+
+    api.closePicker();
+  });
+
+  describe('processos de outros perfis', () => {
+    const remoteProc = {
+      suapId: '495256',
+      processNumber: '23035.002581.2026-60',
+      remote: true,
+      process: { numProcesso: '23035.002581.2026-60', suapId: '495256', cpfCnpj: '12.345.678/0001-90' },
+    };
+    const localProc = {
+      suapId: '111',
+      processNumber: '23035.000001.2026-11',
+      process: { numProcesso: '23035.000001.2026-11', suapId: '111', cpfCnpj: '11.111.111/0001-11' },
+    };
+
+    function openWith(remoteResponse: unknown) {
+      const sendMessage = vi.fn((message: { type: string }, callback: (res: unknown) => void) => {
+        callback(message.type === 'get-remote-processes' ? remoteResponse : { ok: true, processes: [localProc] });
+      });
+      (window as unknown as { chrome: unknown }).chrome = { runtime: { sendMessage } };
+      window.eval(pasteScript);
+      const api = (window as unknown as { __suapeProcessPastePicker: { openPicker: () => Promise<void> } }).__suapeProcessPastePicker;
+      return { api, sendMessage };
+    }
+    const note = () => document.querySelector('.suape-paste-remote-note') as HTMLElement;
+    const groups = () => document.querySelectorAll('.suape-paste-group');
+
+    it('mostra primeiro os processos deste perfil e acrescenta os de outros perfis em seguida', async () => {
+      const { api, sendMessage } = openWith({ ok: true, processes: [remoteProc], remote: { status: 'ok' } });
+      await api.openPicker();
+
+      expect(sendMessage.mock.calls[0][0]).toMatchObject({ type: 'get-active-processes', includeRemote: false });
+      expect(sendMessage.mock.calls[1][0]).toMatchObject({ type: 'get-remote-processes' });
+      expect(groups()).toHaveLength(2);
+      expect(document.querySelectorAll('.suape-paste-group-remote')).toHaveLength(1);
+      expect(note().hidden).toBe(true);
+    });
+
+    it('explica por que nenhum processo de outro perfil apareceu', async () => {
+      const cases: Array<[unknown, string]> = [
+        [{ ok: true, processes: [], remote: { status: 'sem-sessao' } }, 'entre no SIAGES pelo popup'],
+        [{ ok: true, processes: [], remote: { status: 'erro', error: 'Tempo esgotado' } }, 'Tempo esgotado'],
+        [{ ok: true, processes: [], remote: { status: 'ok' } }, 'nenhum processo aberto'],
+      ];
+      for (const [response, text] of cases) {
+        document.body.innerHTML = '';
+        delete (window as unknown as { __suapeProcessPastePickerLoaded?: boolean }).__suapeProcessPastePickerLoaded;
+        const { api } = openWith(response);
+        await api.openPicker();
+        expect(note().hidden).toBe(false);
+        expect(note().textContent).toContain(text);
+        (document.querySelector('.suape-paste-close-btn') as HTMLButtonElement).click();
+      }
+    });
+
+    it('ordena do processo aberto mais recentemente para o mais antigo, misturando perfis', async () => {
+      const older = { ...localProc, openedAt: 1000 };
+      const newerRemote = { ...remoteProc, openedAt: 2000 };
+      const sendMessage = vi.fn((message: { type: string }, callback: (res: unknown) => void) => {
+        callback(message.type === 'get-remote-processes'
+          ? { ok: true, processes: [newerRemote], remote: { status: 'ok' } }
+          : { ok: true, processes: [older] });
+      });
+      (window as unknown as { chrome: unknown }).chrome = { runtime: { sendMessage } };
+      window.eval(pasteScript);
+      const api = (window as unknown as { __suapeProcessPastePicker: { openPicker: () => Promise<void> } }).__suapeProcessPastePicker;
+      await api.openPicker();
+
+      const numbers = Array.from(document.querySelectorAll('.suape-paste-group')).map((group) => group.textContent);
+      expect(numbers[0]).toContain('23035.002581.2026-60');
+      expect(numbers[1]).toContain('23035.000001.2026-11');
+    });
+
+    it('não duplica um processo que já está aberto neste perfil', async () => {
+      const { api } = openWith({ ok: true, processes: [{ ...localProc, remote: true }], remote: { status: 'ok' } });
+      await api.openPicker();
+      expect(groups()).toHaveLength(1);
+    });
+  });
+
   it('fecha o menu com a tecla Escape sem alterar o campo de texto', async () => {
     window.eval(pasteScript);
     const api = (window as unknown as { __suapeProcessPastePicker: { openPicker: () => Promise<void>; closePicker: () => void } }).__suapeProcessPastePicker;

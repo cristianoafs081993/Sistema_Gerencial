@@ -40,6 +40,10 @@ it('mostra quantas RDs e relações foram reaproveitadas sem bloquear atividades
   await waitFor(()=>expect(document.getElementById('rd-sync-status')?.textContent).toContain('450 RDs reaproveitadas; 12 relidas; 300 relações'));
   expect(button('btn-extract-en').disabled).toBe(false);
 });
+it('mostra o progresso das RDs novas publicadas com prioridade',async()=>{
+  popup([],true,{priorityTotal:18,priorityPublished:5});
+  await waitFor(()=>expect(document.getElementById('rd-sync-status')?.textContent).toContain('RDs novas (prioridade): 5/18 publicadas.'));
+});
 it.each([
   ['btn-extract-en','sync-html','apply','Aplicar atividades desta unidade'],
   ['btn-extract-all','sync-all','apply-batch','Aplicar atividades das unidades conferidas'],

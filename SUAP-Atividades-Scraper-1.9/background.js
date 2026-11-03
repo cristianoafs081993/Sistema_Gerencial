@@ -2,6 +2,9 @@ if (typeof importScripts === 'function') importScripts('scheduled-process-sync.j
 if (typeof importScripts === 'function') importScripts('rd-sync.js');
 if (typeof importScripts === 'function') importScripts('siafi-evidence-background.js');
 if (typeof importScripts === 'function') importScripts('siafi-analysis-background.js');
+if (typeof importScripts === 'function') importScripts('process-registry-sync.js');
+if (typeof importScripts === 'function') importScripts('siafi-upload-bridge.js');
+if (typeof importScripts === 'function') importScripts('snippets-sync.js');
 
 const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
@@ -48,19 +51,21 @@ function getAuthErrorMessage(response, payload, grantType) {
 }
 
 function isTerminalRefreshFailure(response, payload) {
-  const code = String(payload?.error || payload?.code || '').toLowerCase();
+  // A API REST do Auth envia code numérico e o motivo em error_code.
+  // code/error textuais continuam aceitos para respostas legadas.
+  const codes = [payload?.error_code, payload?.code, payload?.error].map((code) => String(code || '').toLowerCase());
   return response.status === 401 ||
-    code === 'refresh_token_not_found' ||
-    code === 'refresh_token_already_used' ||
-    code === 'session_expired' ||
-    code === 'invalid_grant';
+    codes.some((code) => [
+      'refresh_token_not_found', 'refresh_token_already_used',
+      'session_not_found', 'session_expired', 'invalid_grant',
+    ].includes(code));
 }
 
 function getRefreshErrorMessage(response, payload) {
   if (isTerminalRefreshFailure(response, payload)) {
-    return 'A sessão da extensão foi encerrada pelo SIAGES. Entre novamente para continuar.';
+    return 'A sessão da extensão foi encerrada pelo SIAGES. Abra o popup da extensão e entre novamente para continuar.';
   }
-  return 'Não foi possível renovar a sessão agora. Ela continua salva e a extensão tentará novamente.';
+  return `Não foi possível renovar a sessão agora (HTTP ${response.status}). Ela continua salva e a extensão tentará novamente.`;
 }
 
 async function signIn(email, password) {
@@ -150,11 +155,17 @@ async function handleAuthMessage(message) {
     const password = String(message.password || '');
     if (!email || !password) throw new Error('Informe o e-mail e a senha cadastrados no SIAGES.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Use o e-mail cadastrado no SIAGES. A matrícula do SUAP não autentica neste campo.');
-    return { session: toPublicSession(await signIn(email, password)) };
+    const session = toPublicSession(await signIn(email, password));
+    void snippetsSync?.reconcile();
+    void publishOpenProcessTabs().catch(() => undefined);
+    return { session };
   }
   if (message.type === 'sign-out') {
     sessionGeneration += 1;
     await chrome.storage.local.remove(EXTENSION_SESSION_STORAGE_KEY);
+    if (PROCESS_REGISTRY_SYNC) await chrome.storage.local.remove(PROCESS_REGISTRY_SYNC.REMOTE_CACHE_KEY);
+    // Outro login deve reconciliar do zero em vez de reaproveitar o estado do usuário anterior.
+    if (SNIPPETS_SYNC) await chrome.storage.local.remove(SNIPPETS_SYNC.STATE_KEY);
     return { session: null };
   }
   throw new Error('Operação de autenticação desconhecida.');
@@ -163,6 +174,32 @@ async function handleAuthMessage(message) {
 const PROCESS_REGISTRY_SOURCE = 'suape-process-registry';
 const STORAGE_ACTIVE_PROCESSES = 'suape_active_processes';
 const STORAGE_RECENT_PROCESSES = 'suape_recent_processes';
+const PROCESS_REGISTRY_SYNC = globalThis.SiagesProcessRegistrySync;
+// Compartilha os processos com os outros perfis do Chrome logados na mesma conta SIAGES.
+const processRegistrySync = PROCESS_REGISTRY_SYNC?.createProcessRegistrySync({
+  storage: chrome.storage.local,
+  getAccessToken: async () => (await refreshSessionIfNeeded())?.accessToken || null,
+  fetchRest: (path, accessToken, options) => fetchSupabaseRest(path, accessToken, options),
+});
+
+const SNIPPETS_SYNC_SOURCE = 'siages-snippets-sync';
+const SNIPPETS_SYNC = globalThis.SiagesSnippetsSync;
+const DEFAULT_SNIPPETS = {
+  '/ifrn': 'Instituto Federal de Educação, Ciência e Tecnologia do Rio Grande do Norte',
+  '/cn': 'Currais Novos',
+  '/lei14133': 'Lei nº 14.133, de 1º de abril de 2021 (Lei de Licitações e Contratos Administrativos)',
+  '/atpub': 'Atenciosamente, servidor público do IFRN – Campus Currais Novos',
+};
+// Mantém os atalhos de texto iguais em todos os perfis do Chrome logados na mesma conta SIAGES.
+const snippetsSync = SNIPPETS_SYNC?.createSnippetsSync({
+  syncStorage: chrome.storage.sync,
+  localStorage: chrome.storage.local,
+  getAccessToken: async () => (await refreshSessionIfNeeded())?.accessToken || null,
+  fetchRest: (path, accessToken, options) => fetchSupabaseRest(path, accessToken, options),
+  defaults: DEFAULT_SNIPPETS,
+});
+
+const processRecency = (item) => Number(item?.openedAt || item?.activeAt || item?.updatedAt || 0);
 
 async function handleProcessRegistryMessage(message, sender) {
   if (message.type === 'register-process' || message.type === 'process-updated') {
@@ -176,8 +213,14 @@ async function handleProcessRegistryMessage(message, sender) {
     let recentList = stored?.[STORAGE_RECENT_PROCESSES] || [];
 
     const now = Date.now();
+    // openedAt marca quando a página do processo foi aberta (informado pelo content script).
+    const previous = activeMap[tabId];
+    const reportedOpenedAt = Number(message.payload?.openedAt);
+    const openedAt = reportedOpenedAt > 0 ? reportedOpenedAt
+      : previous?.openedAt && String(previous.suapId || '') === String(suapId || '') ? previous.openedAt : now;
     const processRecord = {
       tabId,
+      openedAt,
       suapId,
       processNumber,
       process: message.payload?.process || null,
@@ -199,11 +242,25 @@ async function handleProcessRegistryMessage(message, sender) {
       [STORAGE_ACTIVE_PROCESSES]: activeMap,
       [STORAGE_RECENT_PROCESSES]: recentList,
     });
+    if (processRegistrySync) void processRegistrySync.push(processRecord);
 
     return { ok: true, registered: true };
   }
 
+  // Consulta separada para o Alt+V mostrar os processos locais de imediato e acrescentar os de outros perfis quando chegarem.
+  if (message.type === 'get-remote-processes') {
+    if (!processRegistrySync) return { processes: [], remote: { status: 'indisponivel' } };
+    const result = await processRegistrySync.fetchRemoteWithStatus();
+    return {
+      processes: result.processes,
+      remote: { status: result.status, error: result.error || '' },
+      publish: processRegistrySync.getLastPush(),
+    };
+  }
+
   if (message.type === 'get-active-processes') {
+    const includeRemote = message.includeRemote !== false;
+    const remotePromise = includeRemote && processRegistrySync ? processRegistrySync.fetchRemote().catch(() => []) : Promise.resolve([]);
     const stored = await chrome.storage.local.get(null).catch(() => ({}));
     const activeMap = stored?.[STORAGE_ACTIVE_PROCESSES] || {};
     let recentList = stored?.[STORAGE_RECENT_PROCESSES] || [];
@@ -244,6 +301,7 @@ async function handleProcessRegistryMessage(message, sender) {
                 const existing = activeMap[tab.id];
                 activeMap[tab.id] = {
                   tabId: tab.id,
+                  openedAt: existing?.openedAt || Date.now(),
                   suapId: existing?.suapId || suapId,
                   processNumber: existing?.processNumber || processNumber,
                   process: existing?.process || null,
@@ -309,23 +367,189 @@ async function handleProcessRegistryMessage(message, sender) {
     }
 
     let processList = Object.values(activeMap);
+    const remoteList = await remotePromise;
+    const withRemote = (list) => (PROCESS_REGISTRY_SYNC ? PROCESS_REGISTRY_SYNC.mergeRemoteProcesses(list, remoteList) : list);
 
     if (processList.length > 0) {
-      // Ordena: o processo na aba ativa/mais recente vem em primeiro lugar!
-      processList.sort((a, b) => (b.activeAt || b.updatedAt || 0) - (a.activeAt || a.updatedAt || 0));
-      return { ok: true, processes: processList };
+      // O processo aberto mais recentemente vem primeiro.
+      processList.sort((a, b) => processRecency(b) - processRecency(a));
+      return { ok: true, processes: withRemote(processList) };
     }
 
     // Fallback para recentList se não houver abas ativas detectadas
     if (recentList.length > 0) {
-      recentList.sort((a, b) => (b.activeAt || b.updatedAt || 0) - (a.activeAt || a.updatedAt || 0));
-      return { ok: true, processes: recentList };
+      recentList.sort((a, b) => processRecency(b) - processRecency(a));
+      return { ok: true, processes: withRemote(recentList) };
     }
 
-    return { ok: true, processes: [] };
+    return { ok: true, processes: withRemote([]) };
   }
 
   throw new Error('Operação de registro de processo desconhecida.');
+}
+
+// Reenvia ao SIAGES os processos já abertos neste perfil. Cobre abas abertas antes do login ou da atualização
+// da extensão e renova o registro, que outros perfis só leem por 12 horas.
+async function publishOpenProcessTabs() {
+  if (!processRegistrySync || !chrome?.tabs?.query) return;
+  const stored = await chrome.storage.local.get(STORAGE_ACTIVE_PROCESSES).catch(() => ({}));
+  const activeMap = stored?.[STORAGE_ACTIVE_PROCESSES] || {};
+  const tabs = await Promise.resolve(chrome.tabs.query({ url: 'https://suap.ifrn.edu.br/processo_eletronico/*' })).catch(() => []);
+  for (const tab of Array.isArray(tabs) ? tabs : []) {
+    if (typeof tab?.id !== 'number') continue;
+    const response = await new Promise((resolve) => {
+      try {
+        chrome.tabs.sendMessage(tab.id, { source: PROCESS_REGISTRY_SOURCE, type: 'get-process-data' }, (res) => {
+          void chrome.runtime?.lastError;
+          resolve(res);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+    const data = response?.processData;
+    // Sem o snapshot carregado a aba só tem identificadores: publicá-los apagaria os dados já registrados.
+    if (data?.process && (data.suapId || data.processNumber)) {
+      await processRegistrySync.push({ ...data, tabId: tab.id, fields: data.fields || [], openedAt: data.openedAt || activeMap[tab.id]?.openedAt });
+    }
+  }
+}
+
+// Ao fechar a aba de um processo, retira o registro compartilhado deste perfil
+// (a menos que o mesmo processo continue aberto em outra aba).
+function releaseSharedProcess(closed, remainingMap) {
+  if (!processRegistrySync || !closed) return;
+  const key = PROCESS_REGISTRY_SYNC.getProcessKey(closed);
+  const stillOpen = Object.values(remainingMap).some((item) =>
+    typeof item?.tabId === 'number' && PROCESS_REGISTRY_SYNC.getProcessKey(item) === key);
+  if (!stillOpen) void processRegistrySync.remove(closed);
+}
+
+const SIAFI_UPLOAD_BRIDGE = globalThis.SiagesSiafiUploadBridge;
+const SUAP_ORIGIN = 'https://suap.ifrn.edu.br';
+// printup: o PDF do SIAFI vai ao Storage do SIAGES e o upload abre no perfil que estiver usando o SUAP.
+const siafiUploadBridge = SIAFI_UPLOAD_BRIDGE?.createSiafiUploadBridge({
+  supabaseUrl: SUPABASE_URL,
+  apiKey: SUPABASE_KEY,
+  getSession: refreshSessionIfNeeded,
+  fetchImpl: (...args) => fetch(...args),
+});
+let pendingSiafiUploadPoll = null;
+
+function isSuapUrl(value) {
+  try { return new URL(value).origin === SUAP_ORIGIN; } catch { return false; }
+}
+
+async function queryTabs(query) {
+  try { return (await chrome.tabs.query(query)) || []; } catch { return []; }
+}
+
+function assertSiafiSender(sender) {
+  let url = null;
+  try { url = new URL(sender?.url || ''); } catch { /* Origem inválida. */ }
+  if (url?.origin !== 'https://siafi.tesouro.gov.br' || sender?.frameId !== 0) throw new Error('Envio permitido somente na tela principal do SIAFI.');
+}
+
+function uploadPageSuapId(sender) {
+  let url;
+  try { url = new URL(sender?.url || ''); } catch { return ''; }
+  if (url.origin !== SUAP_ORIGIN || sender?.frameId !== 0) return '';
+  return url.pathname.match(/^\/processo_eletronico\/documento_upload\/(\d+)\/?$/)?.[1] || '';
+}
+
+async function localProcessRecords() {
+  const stored = await chrome.storage.local.get([STORAGE_ACTIVE_PROCESSES, STORAGE_RECENT_PROCESSES]).catch(() => ({}));
+  const recent = stored?.[STORAGE_RECENT_PROCESSES];
+  return [...Object.values(stored?.[STORAGE_ACTIVE_PROCESSES] || {}), ...(Array.isArray(recent) ? recent : [])];
+}
+
+async function localSuapIdForProcess(processKey) {
+  const match = (await localProcessRecords()).find((item) =>
+    /^\d+$/.test(String(item?.suapId || '')) && SIAFI_UPLOAD_BRIDGE.processKey(item.processNumber) === processKey);
+  return match ? String(match.suapId) : '';
+}
+
+async function localProcessKeysForSuapId(suapId) {
+  return (await localProcessRecords())
+    .filter((item) => String(item?.suapId || '') === String(suapId))
+    .map((item) => SIAFI_UPLOAD_BRIDGE.processKey(item.processNumber))
+    .filter(Boolean);
+}
+
+async function openSiafiUploadTab(capture, windowId) {
+  const suapId = (await localSuapIdForProcess(capture.processKey)) ||
+    (await siafiUploadBridge.resolveSuapId(capture.processKey).catch(() => ''));
+  // Sem o ID interno, abre a pesquisa do processo; o up manual ainda encontra a captura.
+  await chrome.tabs.create({ url: SIAFI_UPLOAD_BRIDGE.buildUploadUrl(capture, suapId), active: true, ...(typeof windowId === 'number' ? { windowId } : {}) });
+  return { suapId };
+}
+
+async function openPendingSiafiUploads(windowId) {
+  if (!siafiUploadBridge) return 0;
+  let opened = 0;
+  for (const capture of await siafiUploadBridge.pendingOpen().catch(() => [])) {
+    if (!(await siafiUploadBridge.claim(capture.id).catch(() => false))) continue;
+    await openSiafiUploadTab(capture, windowId);
+    opened += 1;
+  }
+  return opened;
+}
+
+// Ao voltar para uma aba do SUAP (inclusive em outro perfil), abre o upload pedido pelo printup.
+// O usuário costuma trocar de janela enquanto o PDF ainda sobe: reconfere por ~20 s enquanto o SUAP segue em foco.
+async function checkPendingSiafiUploads(windowId) {
+  const poll = {};
+  pendingSiafiUploadPoll = poll;
+  if (typeof windowId !== 'number' || windowId < 0) return;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    if (attempt) await new Promise((resolve) => setTimeout(resolve, 4000));
+    if (pendingSiafiUploadPoll !== poll) return;
+    const [tab] = await queryTabs({ active: true, windowId });
+    if (!isSuapUrl(tab?.url)) return;
+    if (await openPendingSiafiUploads(windowId)) return;
+  }
+}
+
+async function handleSiafiUploadStage(message, sender) {
+  assertSiafiSender(sender);
+  if (!siafiUploadBridge) throw new Error('Recarregue a extensão para usar o printup.');
+  if (message.type === 'open-upload-here') {
+    const capture = message.capture;
+    if (!SIAFI_UPLOAD_BRIDGE.processKey(capture?.processKey)) throw new Error('Captura inválida.');
+    if (!(await siafiUploadBridge.claim(capture.id))) throw new Error('O upload desta captura já foi aberto em outra janela ou perfil.');
+    await openSiafiUploadTab(capture, sender.tab?.windowId);
+    return { opened: true };
+  }
+  const capture = await siafiUploadBridge.stage(message.payload || {});
+  let opened = false;
+  if (message.payload?.openUp) {
+    const suapTabs = await queryTabs({ url: `${SUAP_ORIGIN}/*` });
+    if (suapTabs.length && await siafiUploadBridge.claim(capture.id)) {
+      await openSiafiUploadTab(capture, sender.tab?.windowId);
+      opened = true;
+    }
+  }
+  return { capture, opened };
+}
+
+async function handleSiafiUploadPageMessage(message, sender) {
+  const suapId = uploadPageSuapId(sender);
+  if (!suapId) throw new Error('A captura SIAFI só pode ser anexada na página de upload do SUAP.');
+  if (!siafiUploadBridge) throw new Error('Recarregue a extensão para anexar a captura SIAFI.');
+  if (message.type === 'find-siafi-capture') {
+    const informed = [message.processNumber].map(SIAFI_UPLOAD_BRIDGE.processKey).filter(Boolean);
+    if (message.uploadId) {
+      const direct = await siafiUploadBridge.find({ uploadId: message.uploadId, keys: [] });
+      if (direct.capture) return direct;
+    }
+    // O vínculo suapId → número vem do próprio SUAP; o texto da página só é usado quando ele falta.
+    const known = [...informed, ...(await localProcessKeysForSuapId(suapId)), ...(await siafiUploadBridge.processKeysForSuapId(suapId))];
+    const pageKeys = (Array.isArray(message.pageNumbers) ? message.pageNumbers : []).slice(0, 5);
+    return siafiUploadBridge.find({ keys: known.length ? known : pageKeys });
+  }
+  if (message.type === 'download-siafi-capture') return { file: await siafiUploadBridge.download(message.id) };
+  if (message.type === 'consume-siafi-capture') return { consumed: await siafiUploadBridge.consume(message.id) };
+  throw new Error('Operação de captura SIAFI desconhecida.');
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -333,6 +557,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     void globalThis.SiagesSiafiAnalysisBackground.handle(message,sender,postSiafiAnalysis,options=>chrome.tabs.create(options))
       .then(result=>sendResponse({ok:true,...result}))
       .catch(error=>sendResponse({ok:false,error:error instanceof Error?error.message:'Falha na conferência.'}));
+    return true;
+  }
+  if (message?.source === 'siages-siafi-evidence' && ['stage-upload', 'open-upload-here'].includes(message.type)) {
+    void handleSiafiUploadStage(message, sender)
+      .then(result => sendResponse({ ok: true, ...result }))
+      .catch(error => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Falha ao enviar a captura ao SUAP.' }));
+    return true;
+  }
+  if (message?.source === 'siages-upload' && ['find-siafi-capture', 'download-siafi-capture', 'consume-siafi-capture'].includes(message.type)) {
+    void handleSiafiUploadPageMessage(message, sender)
+      .then(result => sendResponse({ ok: true, ...result }))
+      .catch(error => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Falha ao anexar a captura SIAFI.' }));
     return true;
   }
   if (message?.source === 'siages-extension-rd-sync') {
@@ -377,6 +613,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Falha no registro de processos.' }));
     return true;
   }
+  if (message?.source === SNIPPETS_SYNC_SOURCE) {
+    if (!snippetsSync) {
+      sendResponse({ ok: false, error: 'Sincronização de atalhos indisponível.' });
+      return undefined;
+    }
+    void (message.type === 'reconcile' ? snippetsSync.reconcile() : snippetsSync.reconcileIfStale())
+      .then((result) => sendResponse(result))
+      .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Falha na sincronização dos atalhos.' }));
+    return true;
+  }
   if (message?.source === PROCESS_BOX_SYNC_SOURCE) {
     void handleProcessBoxSyncMessage(message, sender)
       .then((result) => sendResponse({ ok: true, ...result }))
@@ -399,6 +645,7 @@ async function postSiafiAnalysis(body) {
   return payload;
 }
 const RD_STATUS_KEY = 'siages-suap-rd-status';
+const RD_CAPTURE_TIMEOUT_MS = 90000;
 async function postRdAction(body) {
   const session = await refreshSessionIfNeeded();
   if (!session?.accessToken) throw new Error('Entre no SIAGES no popup da extensão.');
@@ -468,8 +715,14 @@ async function handleRdSyncMessage(message) {
   rdJobs.set(unit, job);
   // Execution belongs to the worker, so closing the popup does not cancel it.
   const capture = async url => {
-      const results = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: globalThis.SuapeRdSync.capturePage, args: [url] });
+      // A frozen or discarded tab never settles the injected fetch; fail instead of stalling the collection forever.
+      let timer;
+      const results = await Promise.race([
+        chrome.scripting.executeScript({ target: { tabId: tab.id }, func: globalThis.SuapeRdSync.capturePage, args: [url] }),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('A aba do SUAP parou de responder. Deixe-a aberta (sem suspender) e retome a coleta.')), RD_CAPTURE_TIMEOUT_MS); }),
+      ]).finally(() => clearTimeout(timer));
       const captured = results?.[0]?.result;
+      if (captured?.error) throw new Error(captured.error);
       if (!captured) throw new Error('Não foi possível ler a aba SUAP. Faça login e retome.');
       return captured;
   };
@@ -512,14 +765,23 @@ if (chrome?.tabs?.onActivated) {
   });
 }
 
+if (chrome?.tabs?.onActivated) {
+  chrome.tabs.onActivated.addListener(({ windowId }) => { void checkPendingSiafiUploads(windowId).catch(() => {}); });
+}
+if (chrome?.windows?.onFocusChanged) {
+  chrome.windows.onFocusChanged.addListener((windowId) => { void checkPendingSiafiUploads(windowId).catch(() => {}); });
+}
+
 if (chrome?.tabs?.onRemoved) {
   chrome.tabs.onRemoved.addListener(async (tabId) => {
     try {
       const stored = await chrome.storage.local.get(STORAGE_ACTIVE_PROCESSES);
       const activeMap = stored?.[STORAGE_ACTIVE_PROCESSES];
       if (activeMap && activeMap[tabId]) {
+        const closed = activeMap[tabId];
         delete activeMap[tabId];
         await chrome.storage.local.set({ [STORAGE_ACTIVE_PROCESSES]: activeMap });
+        releaseSharedProcess(closed, activeMap);
       }
     } catch {
       // Ignora erro
@@ -966,14 +1228,25 @@ async function scheduleProcessBoxSync() {
 function scheduleSessionRefresh() {
   void ensureSessionRefreshAlarm();
   void refreshSessionIfNeeded().catch(() => undefined);
+  void snippetsSync?.reconcile();
+  void publishOpenProcessTabs().catch(() => undefined);
 }
+
+// Edição de atalhos neste perfil (painel do SUAP) sobe para o SIAGES; o que acabou de chegar de lá não retorna.
+chrome.storage.onChanged?.addListener((changes, area) => {
+  if (area === 'sync' && changes?.[SNIPPETS_SYNC?.SNIPPETS_KEY]) void snippetsSync?.reconcile();
+});
 
 void ensureSessionRefreshAlarm();
 void scheduleProcessBoxSync().catch(() => undefined);
 chrome.runtime.onInstalled.addListener(scheduleSessionRefresh);
 chrome.runtime.onStartup.addListener(scheduleSessionRefresh);
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === SESSION_REFRESH_ALARM) void refreshSessionIfNeeded().catch(() => undefined);
+  if (alarm.name === SESSION_REFRESH_ALARM) {
+    void refreshSessionIfNeeded().catch(() => undefined);
+    void snippetsSync?.reconcileIfStale();
+    void publishOpenProcessTabs().catch(() => undefined);
+  }
   if (alarm.name === PROCESS_BOX_SYNC_ALARM) {
     void ensureProcessBoxSyncAlarm().catch(() => undefined);
     void runProcessBoxSync('scheduled').catch(() => undefined);

@@ -1,8 +1,40 @@
 # TABLE_CATALOG
 
+## Referências históricas de retenção
+
+- `naturezas_rendimento_reinf`: 47 códigos R-4020, descrição e código de receita da tabela DCF/UFMG de janeiro/2024. O código de natureza é chave primária para futuro vínculo; naturezas com a mesma receita continuam distintas.
+- `referencias_retencao_documentos`: identificação, data e ressalvas das fontes.
+- `referencias_retencao_paginas`: texto extraído das 12 páginas da orientação COAD, identificado por documento e página.
+- `referencias_retencao_aliquotas`: nove linhas de percentuais por código de receita da orientação COAD, com IR, CSLL, Cofins, PIS/Pasep e total. São dados históricos, sem inferência automática de aplicabilidade às naturezas ou contratos.
+
+Os dados são globais e somente leitura para usuários autenticados, com RLS; atualização por `service_role` ou migration. As fontes devem ser confrontadas com a legislação vigente e o caso concreto antes do uso. Algumas descrições da tabela original terminam incompletas e foram preservadas como fornecidas.
+
+## Capturas SIAFI do printup (extensão)
+
+`extension_siafi_uploads` liga cada PDF do comando `printup` ao processo SUAP, por usuário (`tenant_id=auth.uid()`). Colunas: `process_key` (NUP com 17 dígitos), `document_key` (DH, ex. `2026NP000123` ou `2026RP-preenchimento`), `document_label`, `file_name` (nome do PDF, terminado em `.pdf`), `storage_path` (obrigatoriamente `<tenant_id>/<process_key>/<document_key>.pdf`), `byte_size` (até 40 MB), `capture_id`, `open_requested`, `opened_at` e `updated_at` (carimbado pelo servidor em insert/update). Única por `(tenant_id, process_key, document_key)`: nova captura do mesmo DH substitui a anterior; DHs diferentes do mesmo processo coexistem. RLS por usuário para leitura/escrita/exclusão; `anon` sem acesso.
+
+O arquivo fica no bucket privado `siafi-capturas` (somente `application/pdf`, 40 MB). As políticas de `storage.objects` limitam o caminho a `<auth.uid()>/<17 dígitos>/<[0-9A-Za-z-]{1,60}>.pdf` para inserir, atualizar, ler e apagar. Dados temporários: a extensão apaga linha e arquivo ao salvar o upload no SUAP. O cron `siafi-capturas-cleanup-daily` (03:05 UTC, 00:05 em Brasília) chama `cleanup-siafi-capturas`. Essa execução apaga pela API do Storage os objetos anteriores ao início do dia, incluindo órfãos, e remove as linhas com `updated_at` anterior ao corte. `siafi_capturas_cleanup_candidates(p_cutoff, p_limit)` só lista objetos e é exclusiva de `service_role`. Migrations `20261023120000` e `20261023121000`. Fluxo: [SIAFI_EVIDENCE](../integrations/SIAFI_EVIDENCE.md).
+
+## Processos compartilhados entre perfis da extensão (Alt+V)
+
+`extension_process_registry` guarda, por usuário (`tenant_id=auth.uid()`) e perfil do Chrome (`profile_id`, UUID gerado pela extensão), o último resumo de cada processo SUAP aberto: `process_key` (SUAP ID ou número), `suap_id`, `process_number` e `payload` (`process`, `fields`, `title`, `url`; até 256 KB, objeto JSON). Única por `(tenant_id, profile_id, process_key)`; `updated_at` é carimbado pelo servidor em insert/update. RLS permite ao usuário ler, inserir, atualizar e apagar somente os próprios registros; `anon` não tem acesso. A extensão lê só registros de outros perfis das últimas 12 h, apaga o registro ao fechar a aba e remove do próprio perfil o que tiver mais de 24 h. Migration `20261014150000`. Fluxo: [DATA_FLOW](../frontend/DATA_FLOW.md).
+
+### `extension_snippets`
+
+- Atalhos de texto da extensão SIAGES por usuário: `tenant_id` (PK, `auth.uid()`), `snippets jsonb` (objeto `{"/gatilho": "texto"}`, máx. 256 KiB) e `updated_at` (trigger `stamp_extension_snippets`).
+- RLS: SELECT/INSERT/UPDATE apenas do próprio `tenant_id`; `anon` sem acesso e sem DELETE. Migration `20261026120000_extension_snippets.sql`.
+- Escrita exclusiva do `background.js` via `snippets-sync.js` com a sessão SIAGES da extensão.
+
 ## Conferência da liquidação SIAFI
 
 `siafi_liquidacao_analises` guarda jobs, entrada/hash imutáveis e resultado imutável após conclusão, com FK para `processos` e isolamento `tenant_id=auth.uid()`. Escrita/claim exclusivos de service role. `siafi_liquidacao_revisoes` guarda eventos append-only por item existente; usuário só lê/insere revisões de sua análise concluída. Migration `20261013140000`. Contrato: [SIAFI_CHECKLIST](../integrations/SIAFI_CHECKLIST.md).
+
+## Configurações do sistema (`system_settings`)
+
+`system_settings` armazena configurações operacionais globais da aplicação em chave/valor JSONB (`key text PRIMARY KEY`, `value jsonb`, `description text`, `updated_at timestamptz`, `updated_by text`).
+- RLS: Leitura pública (`public`, anônimo e autenticado) para que a aplicação e visitantes consultem configurações globais como o modo de manutenção (`key = 'maintenance_mode'`).
+- Escrita/Atualização: Restrita estritamente a superadministradores autenticados (`public.is_superadmin_jwt()`).
+- Migration `20261103080000_create_system_settings.sql`.
 
 Este catalogo resume as tabelas e views mais relevantes para manutencao. Nao substitui as migrations.
 
@@ -974,7 +1006,8 @@ Finalidade:
 - suporte a pesquisa vetorial semântica com pgvector (`embedding vector(768)` e índice HNSW `idx_preco_ref_embedding_hnsw`)
 - suporte a busca Full-Text (`search_tsv tsvector` com dicionário português e índice GIN) e similaridade fonética/trigrama (`pg_trgm`)
 - consumida prioritariamente pelo Assistente Gerencial (`executeConversationalPriceResearch`) antes de consultar APIs externas lentas
-- alimentada pela Edge Function `sync-precos-referencia` e pelo job cron diário `sync-precos-referencia-daily`
+- **desativada em 03/11/2026**: a tabela foi esvaziada (`TRUNCATE`) e os jobs `sync-precos-referencia-daily`, `sync-precos-referencia-resume` e `precos-embeddings-pending` foram desagendados para manter o banco abaixo de 500 MB (plano Free). Para reativar, reagende os jobs (ver `20260907011000_price_sync_authenticated_jobs.sql`) e rode o backfill; considere `halfvec` ou apenas FTS/trigrama para limitar o tamanho
+- era alimentada pela Edge Function `sync-precos-referencia` e pelo job cron diário `sync-precos-referencia-daily`
 
 Campos-chave:
 
@@ -1421,6 +1454,8 @@ Agrupa a sincronização de todas as unidades do seletor do Plano 8. Registra qu
 
 ### `suap_plan_activity_snapshots`
 Snapshot normalizado e bruto de cada atividade capturada, por execução, unidade (`suap_unit_code`), UASG-pai (`campus_uasg`) e ID estável do SUAP. Preserva `saldo_disponivel`, lido da coluna "Saldo disponível para empenho da atividade".
+
+Retenção: só o snapshot da execução `success` mais recente por organização/plano/unidade é mantido (mais prévias das últimas 24 h, ainda aplicáveis). O trigger `trg_prune_suap_plan_snapshots` em `suap_plan_sync_runs` apaga os snapshots anteriores da mesma unidade quando uma execução passa a `success`. As linhas de `suap_plan_sync_runs` continuam como histórico. Migrations `20261103100000` e `20261103100100`.
 
 ### Campos de sincronização em `atividades`
 `sync_source`, `suap_plan_id`, `suap_unit_code`, `suap_activity_id`, `campus_uasg`, `sync_active` e `sync_last_seen_run_id` permitem upsert idempotente e arquivamento lógico dos itens ausentes. A chave é composta também pela unidade SUAP, evitando colisão entre campi com o mesmo ID de atividade. Para registros `suap_plan_8`, `saldo_disponivel` é a fonte oficial do saldo exibido no drill-down do Dashboard.

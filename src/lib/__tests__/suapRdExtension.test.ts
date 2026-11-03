@@ -2,11 +2,12 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { extensionFixturePath } from '@/test/extensionFixtures';
 import { SUAP_PLAN_UNITS } from '@/lib/suapPlanUnits';
-import { collectCapturedRdPage, initialRdState, nextRdCaptureUrl, type RdRun } from '../../../supabase/functions/_shared/suap_rd_sync';
+import { collectCapturedRdPages, initialRdState, nextRdCaptureUrl, upcomingRdCaptureUrls, type RdRun } from '../../../supabase/functions/_shared/suap_rd_sync';
 import { activityUrl, detailHtml, listHtml, planHtml, rdListUrl } from '@/services/__tests__/suapRdFixtures';
 
-type PublicRun = { runId:string; status:string; nextUrl:string|null; complete:boolean };
-type Request = { action:string; suapUnitCode:string; runId?:string; html?:string; sourceUrl?:string };
+type PublicRun = { runId:string; status:string; nextUrl:string|null; complete:boolean; prefetchUrls?:string[] };
+type Page = { html:string; sourceUrl:string };
+type Request = { action:string; suapUnitCode:string; runId?:string; html?:string; sourceUrl?:string; pages?:Page[] };
 type Result = { unit:string; code:string; campusUasg:string; run?:PublicRun; error?:string };
 type Options = { unit:string; post:(body:Request)=>Promise<PublicRun>; capture:(url:string)=>Promise<{html:string;sourceUrl:string}>; progress:(run:PublicRun)=>Promise<void>; stopped?:()=>boolean };
 type Api = {
@@ -17,12 +18,13 @@ type Api = {
 const context: { SuapeRdSync?:Api } = {};
 new Function('globalThis',readFileSync(extensionFixturePath('rd-sync.js'),'utf8'))(context);
 const api=context.SuapeRdSync!;
-const publicRun=(run:RdRun):PublicRun=>({runId:run.id,status:run.state.phase==='ready'?'preview':'collecting',complete:run.state.phase==='ready',nextUrl:nextRdCaptureUrl(structuredClone(run))});
+const publicRun=(run:RdRun):PublicRun=>({runId:run.id,status:run.state.phase==='ready'?'preview':'collecting',complete:run.state.phase==='ready',nextUrl:nextRdCaptureUrl(structuredClone(run)),prefetchUrls:upcomingRdCaptureUrls(run)});
+const pagesOf=(body:Request)=>body.pages ?? [{html:body.html!,sourceUrl:body.sourceUrl!}];
 function fixtureServer() {
   const run:RdRun={id:'run19',org_id:'org',user_id:'user',campus_uasg:'158366',suap_unit_code:'19',state:initialRdState('19'),status:'collecting',complete:false,source_count:0,summary:{}};
   const upsert=vi.fn().mockResolvedValue({error:null});
   const post=vi.fn(async (body:Request)=>{
-    if(body.action==='sync-html') await collectCapturedRdPage({from:()=>({upsert}),rpc:vi.fn()},run,body.html,body.sourceUrl,DOMParser);
+    if(body.action==='sync-html') await collectCapturedRdPages({from:()=>({upsert}),rpc:vi.fn()},run,pagesOf(body),DOMParser);
     nextRdCaptureUrl(run); return publicRun(run);
   });
   const capture=vi.fn(async (url:string)=>({sourceUrl:url,html:url===rdListUrl?listHtml():url===activityUrl?listHtml({activity:true}):url.includes('plano_concluido')?planHtml:detailHtml()}));
@@ -43,7 +45,7 @@ describe('RDs pela sessão da extensão',()=>{
   it('reconhece como sucesso o estado aplicado automaticamente após fechar a conferência',async()=>{
     const server=fixtureServer();
     server.post.mockImplementation(async(body:Request)=>{
-      if(body.action==='sync-html') await collectCapturedRdPage({from:()=>({upsert:server.upsert}),rpc:vi.fn()},server.run,body.html,body.sourceUrl,DOMParser);
+      if(body.action==='sync-html') await collectCapturedRdPages({from:()=>({upsert:server.upsert}),rpc:vi.fn()},server.run,pagesOf(body),DOMParser);
       nextRdCaptureUrl(server.run);
       return server.run.state.phase==='ready' ? {runId:server.run.id,status:'applied',complete:true,nextUrl:null} : publicRun(server.run);
     });
@@ -71,6 +73,63 @@ describe('RDs pela sessão da extensão',()=>{
     post.mockResolvedValue({status:'collecting',runId:'r',nextUrl:rdListUrl});capture.mockResolvedValue({sourceUrl:activityUrl,html:'<html/>'});
     await expect(api.collect({unit:'19',post,capture,progress:async()=>{}})).rejects.toThrow('inválida');expect(post).toHaveBeenCalledTimes(2);
     expect(api.allowedUrl(rdListUrl+'&q=outro')).toBe(false);
+  });
+  it('lê as páginas anunciadas em paralelo e envia em lotes, na ordem do servidor',async()=>{
+    const urls=Array.from({length:20},(_,index)=>`https://suap.ifrn.edu.br/plan_estrategico/listar_requisicoes_despesa/8/${1000+index}/`);
+    let position=0;
+    const state=()=>position>=urls.length?{runId:'r',status:'preview',complete:true,nextUrl:null}
+      :{runId:'r',status:'collecting',complete:false,nextUrl:urls[position],prefetchUrls:urls.slice(position+1,position+11)};
+    const batches:number[]=[];
+    const post=vi.fn(async(body:Request)=>{
+      if(body.action==='sync-html'){
+        const pages=pagesOf(body);batches.push(pages.length);
+        pages.forEach((page,index)=>expect(page.sourceUrl).toBe(urls[position+index]));
+        position+=pages.length;
+      }
+      return state();
+    });
+    let inFlight=0,maxInFlight=0;
+    const capture=vi.fn(async(url:string)=>{
+      inFlight++;maxInFlight=Math.max(maxInFlight,inFlight);
+      await new Promise(resolve=>setTimeout(resolve,5));
+      inFlight--;return {sourceUrl:url,html:`<html>${url}</html>`};
+    });
+    const result=await api.collect({unit:'19',post,capture,progress:async()=>{}});
+    expect(result).toMatchObject({status:'preview'});
+    expect(position).toBe(20);
+    expect(maxInFlight).toBeGreaterThan(1);expect(maxInFlight).toBeLessThanOrEqual(4);
+    expect(batches.length).toBeLessThan(20);expect(Math.max(...batches)).toBeLessThanOrEqual(6);
+    expect(new Set(capture.mock.calls.map(([url])=>url)).size).toBe(capture.mock.calls.length);
+  });
+  it('relê como etapa atual uma página antecipada que falhou',async()=>{
+    const urls=['1001','1002'].map(id=>`https://suap.ifrn.edu.br/plan_estrategico/listar_requisicoes_despesa/8/${id}/`);
+    let position=0;
+    const post=vi.fn(async(body:Request)=>{
+      if(body.action==='sync-html') position+=pagesOf(body).length;
+      return position>=urls.length?{runId:'r',status:'preview',complete:true,nextUrl:null}:{runId:'r',status:'collecting',complete:false,nextUrl:urls[position],prefetchUrls:urls.slice(position+1)};
+    });
+    let failedOnce=false;
+    const capture=vi.fn(async(url:string)=>{
+      if(url===urls[1] && !failedOnce){failedOnce=true;throw new Error('Tempo esgotado');}
+      return {sourceUrl:url,html:'<html/>'};
+    });
+    await expect(api.collect({unit:'19',post,capture,progress:async()=>{}})).resolves.toMatchObject({status:'preview'});
+    expect(capture.mock.calls.map(([url])=>url)).toEqual([urls[0],urls[1],urls[1]]);
+  });
+  it('anuncia somente páginas determinísticas e interrompe o lote na primeira página fora da ordem',async()=>{
+    const server=fixtureServer();
+    await collectCapturedRdPages({from:()=>({upsert:server.upsert}),rpc:vi.fn()},server.run,[{html:listHtml(),sourceUrl:rdListUrl}],DOMParser);
+    expect(upcomingRdCaptureUrls(server.run)).toEqual([]);
+    const planUrl='https://suap.ifrn.edu.br/plan_estrategico/plano_concluido/8/';
+    await expect(collectCapturedRdPages({from:()=>({upsert:server.upsert}),rpc:vi.fn()},server.run,[{html:'<html/>',sourceUrl:activityUrl}],DOMParser)).rejects.toThrow('Página diferente');
+    const consumed=await collectCapturedRdPages({from:()=>({upsert:server.upsert}),rpc:vi.fn()},server.run,
+      [{html:planHtml,sourceUrl:planUrl},{html:'<html/>',sourceUrl:rdListUrl}],DOMParser);
+    expect(consumed).toBe(1);expect(server.run.state.phase).toBe('activities');
+    const run=structuredClone(server.run);
+    run.state.activities=['1','2','3','4'].map(id=>({id,name:`A${id}`,reused:id==='3'})) as RdRun['state']['activities'];
+    run.state.activityCursor=0;
+    expect(upcomingRdCaptureUrls(run)).toEqual(['2','4'].map(id=>`https://suap.ifrn.edu.br/plan_estrategico/listar_requisicoes_despesa/8/${id}/`));
+    await expect(collectCapturedRdPages({from:()=>({upsert:server.upsert}),rpc:vi.fn()},server.run,Array(7).fill({html:'',sourceUrl:''}),DOMParser)).rejects.toThrow('Lote');
   });
   it('percorre as 44 unidades e preserva a UASG-pai sem misturar unidades irmãs',async()=>{
     const post=vi.fn(async (body:Request)=>({status:'preview',runId:`run${body.suapUnitCode}`,complete:true,nextUrl:null}));

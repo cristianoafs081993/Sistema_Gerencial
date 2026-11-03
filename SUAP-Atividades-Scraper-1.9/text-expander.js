@@ -105,6 +105,12 @@
   document.addEventListener('input', handleInput, true);
   globalThis.chrome?.storage?.onChanged?.addListener(handleStorageChange);
   loadSnippets();
+  // Os atalhos de outros perfis chegam pelo SIAGES; o resultado volta por storage.onChanged.
+  if (window === window.top && globalThis.chrome?.runtime?.sendMessage) {
+    try {
+      chrome.runtime.sendMessage({ source: 'siages-snippets-sync', type: 'refresh' }, () => void chrome.runtime.lastError);
+    } catch { /* Contexto da extensão invalidado. */ }
+  }
 
   window.__siagesTextExpander = {
     DEFAULT_SNIPPETS,
