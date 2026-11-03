@@ -348,6 +348,7 @@ describe('ImportacaoDados', () => {
       atualizados: 1,
       criados: 0,
       erros: 0,
+      ignoradas: { total: 0, porUg: {}, ugDesconhecida: 0, semPermissao: 0 },
     });
 
     const { container } = renderPage();

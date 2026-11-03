@@ -117,7 +117,9 @@ const parseDateBR = (dateStr?: string): Date | undefined => {
 
 export default function ImportacaoDados() {
   const queryClient = useQueryClient();
-  const userCampus = useOptionalAuth()?.userCampus;
+  const auth = useOptionalAuth();
+  const userCampus = auth?.userCampus;
+  const isSuperAdmin = auth?.isSuperAdmin ?? false;
   const campusUasg = userCampus?.codigo ?? DEFAULT_IFRN_CAMPUS_UASG;
   const {
     descentralizacoes,
@@ -642,17 +644,23 @@ export default function ImportacaoDados() {
         toast.error(msg, { id: toastId });
         return;
       }
-      const syncResult = await syncSiafiDataToDb(parsedRows);
+      const syncResult = await syncSiafiDataToDb(parsedRows, undefined, {
+        campusUasg,
+        todasAsUgs: isSuperAdmin,
+      });
       await refreshData();
       await dataImportLogsService.recordImportRunSuccess(runId, {
         rowsDetected: parsedRows.length,
         rowsWritten: syncResult.criados,
         rowsUpdated: syncResult.atualizados,
-        rowsSkipped: syncResult.erros,
+        rowsSkipped: syncResult.erros + syncResult.ignoradas.total,
       });
       void loadDatasetsStatus();
+      const ignoradasMsg = syncResult.ignoradas.total
+        ? ` ${syncResult.ignoradas.total} linha(s) de outras UGs ignorada(s) (sem permissão ou UG não cadastrada).`
+        : '';
       toast.success(
-        `SIAFI processado: ${syncResult.atualizados} atualizado(s), ${syncResult.criados} criado(s), ${syncResult.erros} erro(s).`,
+        `SIAFI processado: ${syncResult.atualizados} atualizado(s), ${syncResult.criados} criado(s), ${syncResult.erros} erro(s).${ignoradasMsg}`,
         { id: toastId },
       );
     } catch (error) {
@@ -684,7 +692,10 @@ export default function ImportacaoDados() {
         toast.error(msg, { id: toastId });
         return;
       }
-      const syncResult = await syncSiafiDataToDb(parsedRows);
+      const syncResult = await syncSiafiDataToDb(parsedRows, undefined, {
+        campusUasg,
+        todasAsUgs: isSuperAdmin,
+      });
       await refreshData();
       await dataImportLogsService.recordImportRunSuccess(runId, {
         rowsDetected: parsedRows.length,
