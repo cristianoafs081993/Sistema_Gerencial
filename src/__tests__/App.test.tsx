@@ -25,6 +25,7 @@ vi.mock('@/components/ui/tooltip', () => ({
 
 vi.mock('@/contexts/AuthContext', () => ({
   AuthProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+  useAuth: () => ({ isSuperAdmin: false, user: null }),
 }));
 
 vi.mock('@/contexts/DataContext', () => ({
