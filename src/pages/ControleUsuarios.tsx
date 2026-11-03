@@ -24,6 +24,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { buildInviteRedirectUrl, isLocalAuthRedirectUrl, resolveAuthRedirectOrigin } from '@/lib/auth';
 import { env } from '@/lib/env';
+import { useOptionalAuth } from '@/contexts/AuthContext';
+import { MaintenanceAdminPanel } from '@/components/admin/MaintenanceAdminPanel';
 import {
   createDirectUser,
   deleteAdminUser,
@@ -54,6 +56,8 @@ function sortScreens(screens: AdminScreen[], screenGroups: AdminScreenGroup[]) {
 }
 
 export default function ControleUsuarios() {
+  const auth = useOptionalAuth();
+  const isSuperAdmin = auth?.isSuperAdmin ?? true;
   const [state, setState] = useState<AdminUsersState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -303,6 +307,8 @@ export default function ControleUsuarios() {
         title="Controle de usuários"
         description="Crie usuários, envie convites e defina quais telas cada grupo pode acessar."
       />
+
+      {isSuperAdmin && <MaintenanceAdminPanel />}
 
       {isLoading && !state ? (
         <SectionPanel>

@@ -55,7 +55,7 @@ A migration `20260716103000` adiciona `public.default_org_id()` como default de 
 
 ### Tabelas globais/compartilhadas (sem org_id)
 
-`contratos_api*`, `licitacoes_pncp*`, `atas_registro_precos*`, `price_research_ead_videos`, `normativos*`,
+`contratos_api*`, `licitacoes_pncp*`, `atas_registro_precos*`, `price_research_ead_videos`, `normativos*`, `system_settings`,
 `document_templates`, `dimensoes`, `componentes_funcionais`, `naturezas_despesa`,
 `origens_recurso`
 

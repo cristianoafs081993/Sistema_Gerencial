@@ -21,12 +21,14 @@ import {
   Settings2,
   UtensilsCrossed,
   Warehouse,
+  Wrench,
   Zap,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useMaintenance } from '@/contexts/MaintenanceContext';
 import { AIAssistantWidget } from '@/components/ai/AIAssistantWidget';
 import { useOptionalData } from '@/contexts/DataContext';
 import { appScreenGroups, appScreens, type AppScreenGroupId } from '@/lib/appScreens';
@@ -156,7 +158,9 @@ export function Layout({ children }: LayoutProps) {
     userCampus,
     updateUserCampus,
     userGroups = [],
+    isSuperAdmin,
   } = useAuth();
+  const { settings: maintenanceSettings, toggleMaintenance } = useMaintenance();
   const dataContext = useOptionalData();
   const { hasPageHeader, registry: pageHeaderRegistry, Provider: PageHeaderProvider } = usePageHeaderRegistry();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -610,6 +614,31 @@ export function Layout({ children }: LayoutProps) {
 
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Header */}
+          {/* Superadmin Maintenance Banner */}
+          {isSuperAdmin && maintenanceSettings.enabled ? (
+            <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-950 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-semibold z-40">
+              <div className="flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-amber-700 animate-spin" />
+                <span>
+                  <strong>Modo de Manutenção ATIVO:</strong> Usuários comuns estão bloqueados nesta sessão.
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs bg-white text-amber-900 border-amber-300 hover:bg-amber-100 shadow-2xs"
+                  onClick={() => void toggleMaintenance(false)}
+                >
+                  Desativar Manutenção Agora
+                </Button>
+                <Link to="/controle-usuarios" className="underline text-amber-800 hover:text-amber-950">
+                  Configurar
+                </Link>
+              </div>
+            </div>
+          ) : null}
           <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-sidebar-border bg-card px-4 lg:px-8">
             <div className="flex min-w-0 flex-1 items-center gap-3">
               {/* Mobile menu trigger */}

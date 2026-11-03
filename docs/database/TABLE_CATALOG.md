@@ -29,6 +29,13 @@ O arquivo fica no bucket privado `siafi-capturas` (somente `application/pdf`, 40
 
 `siafi_liquidacao_analises` guarda jobs, entrada/hash imutáveis e resultado imutável após conclusão, com FK para `processos` e isolamento `tenant_id=auth.uid()`. Escrita/claim exclusivos de service role. `siafi_liquidacao_revisoes` guarda eventos append-only por item existente; usuário só lê/insere revisões de sua análise concluída. Migration `20261013140000`. Contrato: [SIAFI_CHECKLIST](../integrations/SIAFI_CHECKLIST.md).
 
+## Configurações do sistema (`system_settings`)
+
+`system_settings` armazena configurações operacionais globais da aplicação em chave/valor JSONB (`key text PRIMARY KEY`, `value jsonb`, `description text`, `updated_at timestamptz`, `updated_by text`).
+- RLS: Leitura pública (`public`, anônimo e autenticado) para que a aplicação e visitantes consultem configurações globais como o modo de manutenção (`key = 'maintenance_mode'`).
+- Escrita/Atualização: Restrita estritamente a superadministradores autenticados (`public.is_superadmin_jwt()`).
+- Migration `20261103080000_create_system_settings.sql`.
+
 Este catalogo resume as tabelas e views mais relevantes para manutencao. Nao substitui as migrations.
 
 ## Escopo por campus IFRN
@@ -1448,6 +1455,8 @@ Agrupa a sincronização de todas as unidades do seletor do Plano 8. Registra qu
 ### `suap_plan_activity_snapshots`
 Snapshot normalizado e bruto de cada atividade capturada, por execução, unidade (`suap_unit_code`), UASG-pai (`campus_uasg`) e ID estável do SUAP. Preserva `saldo_disponivel`, lido da coluna "Saldo disponível para empenho da atividade".
 
+Retenção: só o snapshot da execução `success` mais recente por organização/plano/unidade é mantido (mais prévias das últimas 24 h, ainda aplicáveis). O trigger `trg_prune_suap_plan_snapshots` em `suap_plan_sync_runs` apaga os snapshots anteriores da mesma unidade quando uma execução passa a `success`. As linhas de `suap_plan_sync_runs` continuam como histórico. Migrations `20261103100000` e `20261103100100`.
+
 ### Campos de sincronização em `atividades`
 `sync_source`, `suap_plan_id`, `suap_unit_code`, `suap_activity_id`, `campus_uasg`, `sync_active` e `sync_last_seen_run_id` permitem upsert idempotente e arquivamento lógico dos itens ausentes. A chave é composta também pela unidade SUAP, evitando colisão entre campi com o mesmo ID de atividade. Para registros `suap_plan_8`, `saldo_disponivel` é a fonte oficial do saldo exibido no drill-down do Dashboard.
 
@@ -1460,8 +1469,6 @@ Finalidade:
 Campos-chave:
 
 - `id`, `created_by`, `created_at`;
-Retenção: só o snapshot da execução `success` mais recente por organização/plano/unidade é mantido (mais prévias das últimas 24 h, ainda aplicáveis). O trigger `trg_prune_suap_plan_snapshots` em `suap_plan_sync_runs` apaga os snapshots anteriores da mesma unidade quando uma execução passa a `success`. As linhas de `suap_plan_sync_runs` continuam como histórico. Migrations `20261103100000` e `20261103100100`.
-
 - `suap_id`, `document_id`, `document_type`, `document_title`, `process_number`;
 - `checked_at` e `result` (JSONB normalizado da analise).
 

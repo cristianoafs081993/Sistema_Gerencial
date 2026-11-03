@@ -1,0 +1,14 @@
+.git
+node_modules
+*.zip
+SUAP-Atividades-Scraper-*
+outputs
+*.sqlite
+*.docx
+*.txt
+.aios*
+.gemini
+.temp
+tmp*
+scratch
+docs

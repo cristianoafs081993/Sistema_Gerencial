@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { RouteLoadingFallback } from '@/components/design-system/RouteLoadingFallback';
 import { Layout } from '@/components/Layout';
@@ -10,7 +10,11 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { DataProvider } from '@/contexts/DataContext';
 
+import { MaintenanceProvider, useMaintenance } from '@/contexts/MaintenanceContext';
+
 const AuthPage = lazy(() => import('./pages/Auth'));
+const Maintenance = lazy(() => import('./pages/Maintenance'));
+
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Atividades = lazy(() => import('./pages/Atividades'));
 const Descentralizacoes = lazy(() => import('./pages/Descentralizacoes'));
@@ -84,21 +88,58 @@ const SuapExtensionFrameShell = () => (
   </Suspense>
 );
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter
-          future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true,
-          }}
-        >
-          <Suspense fallback={<RouteLoadingFallback mode="screen" />}>
-            <Routes>
-              <Route path="/auth" element={<AuthPage />} />
+
+const MaintenanceGate = ({ children }: { children: React.ReactNode }) => {
+  const { isMaintenanceBlocking } = useMaintenance();
+  const location = useLocation();
+
+  if (
+    location.pathname === '/manutencao-sistema' ||
+    location.pathname === '/sistema-em-manutencao'
+  ) {
+    return (
+      <Suspense fallback={<RouteLoadingFallback mode="screen" />}>
+        <Maintenance />
+      </Suspense>
+    );
+  }
+
+  // Always allow /auth so administrators can authenticate from any browser/device
+  if (location.pathname === '/auth') {
+    return <>{children}</>;
+  }
+
+  if (isMaintenanceBlocking) {
+    return (
+      <Suspense fallback={<RouteLoadingFallback mode="screen" />}>
+        <Maintenance />
+      </Suspense>
+    );
+  }
+
+  return <>{children}</>;
+};
+
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <MaintenanceProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter
+              future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true,
+              }}
+            >
+              <MaintenanceGate>
+                <Suspense fallback={<RouteLoadingFallback mode="screen" />}>
+              <Routes>
+                <Route path="/manutencao-sistema" element={<Maintenance />} />
+                <Route path="/sistema-em-manutencao" element={<Maintenance />} />
+                <Route path="/auth" element={<AuthPage />} />
               <Route path="/feedback-ambiente/:codigo" element={<PublicFeedback />} />
               <Route path="/suap-callback" element={<SuapCallback />} />
               <Route element={<SuapExtensionFrameShell />}>
@@ -172,10 +213,13 @@ const App = () => (
               </Route>
             </Routes>
           </Suspense>
-        </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+        </MaintenanceGate>
+      </BrowserRouter>
+    </MaintenanceProvider>
+  </AuthProvider>
+</TooltipProvider>
+</QueryClientProvider>
+  );
+};
 
 export default App;
