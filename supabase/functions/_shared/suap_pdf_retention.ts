@@ -1,39 +1,40 @@
-export type Candidate = { object_id: string; object_path: string; byte_size: number };
-type Result<T> = {data: T; error: {message: string} | null};
-export interface RetentionStore {
-  candidates(): Promise<Result<Candidate[]>>;
-  claim(): Promise<Result<Candidate[]>>;
-  confirm(id: string): Promise<Result<boolean>>;
-  remove(path: string): Promise<Result<unknown>>;
-  finish(id: string, deleted: boolean): Promise<Result<unknown>>;
-}
-function unwrap<T>(result: Result<T>): T {
-  if (result.error) throw new Error(result.error.message);
-  return result.data;
-}
-export async function runSuapPdfRetention(store: RetentionStore, dryRun: boolean) {
-  const rows = unwrap(await (dryRun ? store.candidates() : store.claim())) || [];
-  const summary = {selected: rows.length, deleted: 0, bytes: 0, failed: 0, skipped: 0, dryRun};
-  if (dryRun) return {...summary, eligibleBytes: rows.reduce((sum, row) => sum + Number(row.byte_size), 0)};
-  for (const row of rows) {
-    let removed = false;
+export type RetentionCandidate = {
+  object_name: string;
+  object_updated_at: string;
+  object_size: number;
+};
+
+export type RetentionStore = {
+  reconcile(): Promise<void>;
+  candidates(name?: string): Promise<RetentionCandidate[]>;
+  remove(name: string): Promise<void>;
+  clearReference(name: string): Promise<void>;
+};
+
+export async function cleanExpiredSuapPdfs(store: RetentionStore) {
+  await store.reconcile();
+  const candidates = await store.candidates();
+  let removed = 0;
+  let skipped = 0;
+  let failed = 0;
+  let bytes = 0;
+
+  for (const candidate of candidates) {
     try {
-      if (!unwrap(await store.confirm(row.object_id))) {
-        unwrap(await store.finish(row.object_id, false));
-        summary.skipped++;
+      // Recheck immediately before removal: a new upload or extraction may
+      // have changed eligibility after the initial inventory.
+      const current = (await store.candidates(candidate.object_name))[0];
+      if (!current || current.object_updated_at !== candidate.object_updated_at) {
+        skipped++;
         continue;
       }
-      // Use Storage API: deleting storage.objects in SQL would orphan the physical file.
-      unwrap(await store.remove(row.object_path));
-      removed = true;
-      unwrap(await store.finish(row.object_id, true));
-      summary.deleted++;
-      summary.bytes += Number(row.byte_size);
+      await store.remove(candidate.object_name);
+      await store.clearReference(candidate.object_name);
+      removed++;
+      bytes += Number(candidate.object_size) || 0;
     } catch {
-      summary.failed++;
-      // After removal, keep the lease so reconciliation can repair references on restart.
-      if (!removed) await store.finish(row.object_id, false).catch(() => undefined);
+      failed++;
     }
   }
-  return summary;
+  return { checked: candidates.length, removed, skipped, failed, bytes };
 }
