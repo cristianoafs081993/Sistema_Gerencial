@@ -1,14 +1,89 @@
-import {describe,expect,it,vi} from 'vitest';
-import {runSuapPdfRetention,type RetentionStore} from '../../../supabase/functions/_shared/suap_pdf_retention';
-const row={object_id:'1',object_path:'tenant/1.pdf',byte_size:123};
-function store():RetentionStore{
-  return {candidates:vi.fn().mockResolvedValue({data:[row],error:null}),claim:vi.fn().mockResolvedValue({data:[row],error:null}),
-    confirm:vi.fn().mockResolvedValue({data:true,error:null}),remove:vi.fn().mockResolvedValue({data:[],error:null}),finish:vi.fn().mockResolvedValue({data:null,error:null})};
+import { describe, expect, it, vi } from 'vitest';
+import {
+  cleanExpiredSuapPdfs,
+  type RetentionCandidate,
+  type RetentionStore,
+} from '../../../supabase/functions/_shared/suap_pdf_retention';
+
+const candidate = (name: string, size = 100, updatedAt = '2026-10-01T10:00:00Z'): RetentionCandidate => ({
+  object_name: name,
+  object_updated_at: updatedAt,
+  object_size: size,
+});
+
+function createStore(candidates: RetentionCandidate[]) {
+  const calls: string[] = [];
+  const store: RetentionStore = {
+    reconcile: vi.fn(async () => {
+      calls.push('reconcile');
+    }),
+    // A chamada sem nome lista o inventario; com nome, revalida o objeto antes da remocao.
+    candidates: vi.fn(async (name?: string) => (name ? candidates.filter((item) => item.object_name === name) : candidates)),
+    remove: vi.fn(async (name: string) => {
+      calls.push(`remove:${name}`);
+    }),
+    clearReference: vi.fn(async (name: string) => {
+      calls.push(`clear:${name}`);
+    }),
+  };
+  return { store, calls };
 }
-describe('retention worker',()=>{
-  it('dry-run não reclama, remove ou altera referências',async()=>{const s=store();expect(await runSuapPdfRetention(s,true)).toMatchObject({selected:1,eligibleBytes:123,deleted:0});expect(s.claim).not.toHaveBeenCalled();expect(s.remove).not.toHaveBeenCalled();expect(s.finish).not.toHaveBeenCalled();});
-  it('revalida, remove pela API e só depois limpa referências',async()=>{const s=store();expect(await runSuapPdfRetention(s,false)).toMatchObject({deleted:1,bytes:123,failed:0});expect(s.remove).toHaveBeenCalledWith(row.object_path);expect(s.finish).toHaveBeenCalledWith('1',true);expect(vi.mocked(s.finish).mock.invocationCallOrder[0]).toBeGreaterThan(vi.mocked(s.remove).mock.invocationCallOrder[0]);});
-  it('recência/versão alterada cancela a remoção',async()=>{const s=store();vi.mocked(s.confirm).mockResolvedValue({data:false,error:null});expect(await runSuapPdfRetention(s,false)).toMatchObject({skipped:1,deleted:0});expect(s.remove).not.toHaveBeenCalled();expect(s.finish).toHaveBeenCalledWith('1',false);});
-  it('falha do Storage mantém as referências',async()=>{const s=store();vi.mocked(s.remove).mockResolvedValue({data:null,error:{message:'offline'}});expect(await runSuapPdfRetention(s,false)).toMatchObject({failed:1,deleted:0});expect(s.finish).toHaveBeenCalledWith('1',false);});
-  it('falha depois da remoção preserva a lease para reconciliação',async()=>{const s=store();vi.mocked(s.finish).mockRejectedValue(new Error('offline'));expect(await runSuapPdfRetention(s,false)).toMatchObject({failed:1});expect(s.finish).toHaveBeenCalledExactlyOnceWith('1',true);});
+
+describe('retencao de PDFs do SUAP', () => {
+  it('reconcilia antes, remove pela API do Storage e so depois limpa a referencia', async () => {
+    const { store, calls } = createStore([candidate('tenant/1.pdf', 100), candidate('tenant/2.pdf', 250)]);
+
+    await expect(cleanExpiredSuapPdfs(store)).resolves.toEqual({
+      checked: 2,
+      removed: 2,
+      skipped: 0,
+      failed: 0,
+      bytes: 350,
+    });
+    expect(calls).toEqual([
+      'reconcile',
+      'remove:tenant/1.pdf',
+      'clear:tenant/1.pdf',
+      'remove:tenant/2.pdf',
+      'clear:tenant/2.pdf',
+    ]);
+  });
+
+  it('pula o objeto que deixou de ser elegivel ou foi reenviado entre o inventario e a remocao', async () => {
+    const { store } = createStore([candidate('tenant/1.pdf'), candidate('tenant/2.pdf')]);
+    vi.mocked(store.candidates).mockImplementation(async (name?: string) => {
+      if (!name) return [candidate('tenant/1.pdf'), candidate('tenant/2.pdf')];
+      if (name === 'tenant/1.pdf') return []; // passou a ser usado por uma extracao ativa
+      return [candidate('tenant/2.pdf', 100, '2026-11-02T10:00:00Z')]; // novo upload no mesmo caminho
+    });
+
+    await expect(cleanExpiredSuapPdfs(store)).resolves.toMatchObject({ checked: 2, removed: 0, skipped: 2, failed: 0 });
+    expect(store.remove).not.toHaveBeenCalled();
+    expect(store.clearReference).not.toHaveBeenCalled();
+  });
+
+  it('mantem a referencia quando o Storage falha e segue com os demais', async () => {
+    const { store } = createStore([candidate('tenant/1.pdf', 100), candidate('tenant/2.pdf', 50)]);
+    vi.mocked(store.remove).mockImplementation(async (name: string) => {
+      if (name === 'tenant/1.pdf') throw new Error('offline');
+    });
+
+    await expect(cleanExpiredSuapPdfs(store)).resolves.toEqual({
+      checked: 2,
+      removed: 1,
+      skipped: 0,
+      failed: 1,
+      bytes: 50,
+    });
+    expect(store.clearReference).toHaveBeenCalledTimes(1);
+    expect(store.clearReference).toHaveBeenCalledWith('tenant/2.pdf');
+  });
+
+  it('propaga a falha da reconciliacao sem remover nada', async () => {
+    const { store } = createStore([candidate('tenant/1.pdf')]);
+    vi.mocked(store.reconcile).mockRejectedValue(new Error('rpc indisponivel'));
+
+    await expect(cleanExpiredSuapPdfs(store)).rejects.toThrow('rpc indisponivel');
+    expect(store.remove).not.toHaveBeenCalled();
+  });
 });

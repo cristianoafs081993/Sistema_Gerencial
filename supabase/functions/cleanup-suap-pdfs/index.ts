@@ -1,37 +1,44 @@
-import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
-import {createClient} from 'npm:@supabase/supabase-js@2.94.1';
-import {runSuapPdfRetention} from '../_shared/suap_pdf_retention.ts';
-const key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const admin=createClient(Deno.env.get('SUPABASE_URL')!,key,{auth:{persistSession:false,autoRefreshToken:false}});
-const response=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
-Deno.serve(async req=>{
-  if(req.method!=='POST')return response({error:'Method not allowed'},405);
-  const token=req.headers.get('x-cleanup-secret');
-  const serviceAuth=req.headers.get('authorization')===`Bearer ${key}`;
-  if(!serviceAuth){
-    if(!token)return response({error:'Unauthorized'},401);
-    const {data,error}=await admin.rpc('validate_suap_pdf_retention_secret',{p_secret:token});
-    if(error||!data)return response({error:'Unauthorized'},401);
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { cleanExpiredSuapPdfs, type RetentionCandidate } from "../_shared/suap_pdf_retention.ts";
+
+const supabase = createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "", {
+  auth: { persistSession: false },
+});
+
+Deno.serve(async (request: Request) => {
+  const secret = Deno.env.get("SUAP_PDF_RETENTION_SECRET");
+  if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+  if (!secret || request.headers.get("x-retention-secret") !== secret) {
+    return new Response("Unauthorized", { status: 401 });
   }
-  try{
-    const body=await req.json().catch(()=>({}));
-    const dryRun=body.dryRun===true;
-    if(!dryRun){const {error}=await admin.rpc('reconcile_suap_pdf_retention');if(error)throw error;}
-    const {data:run,error:runError}=dryRun?{data:null,error:null}:await admin.from('suap_pdf_retention_runs').insert({}).select('id').single();
-    if(runError)throw runError;
-    try{
-      const summary=await runSuapPdfRetention({
-        candidates:async()=>await admin.rpc('suap_pdf_retention_candidates'),
-        claim:async()=>await admin.rpc('claim_suap_pdf_retention',{p_limit:50}),
-        confirm:async id=>await admin.rpc('confirm_suap_pdf_retention',{p_object_id:id}),
-        remove:async path=>await admin.storage.from('suap-pdfs').remove([path]),
-        finish:async(id,deleted)=>await admin.rpc('finish_suap_pdf_retention',{p_object_id:id,p_deleted:deleted}),
-      },dryRun);
-      if(run){const {error}=await admin.from('suap_pdf_retention_runs').update({finished_at:new Date().toISOString(),deleted_count:summary.deleted,deleted_bytes:summary.bytes,failed_count:summary.failed,status:summary.failed?'partial':'completed'}).eq('id',run.id);if(error)throw error;}
-      return response(summary);
-    }catch(error){
-      if(run)await admin.from('suap_pdf_retention_runs').update({finished_at:new Date().toISOString(),status:'failed',error_message:'Falha na execução da retenção; consultar logs do servidor.'}).eq('id',run.id);
-      throw error;
-    }
-  }catch(error){console.error('SUAP PDF retention failed',error instanceof Error?error.message:'unknown');return response({error:'Falha na retenção dos PDFs SUAP.'},500);}
+
+  try {
+    const result = await cleanExpiredSuapPdfs({
+      async reconcile() {
+        const { error } = await supabase.rpc("suap_reconcile_missing_pdf_references");
+        if (error) throw error;
+      },
+      async candidates(name) {
+        const { data, error } = await supabase.rpc("suap_expired_pdf_candidates", {
+          p_limit: 50,
+          p_name: name ?? null,
+        });
+        if (error) throw error;
+        return (data || []) as RetentionCandidate[];
+      },
+      async remove(name) {
+        const { error } = await supabase.storage.from("suap-pdfs").remove([name]);
+        if (error) throw error;
+      },
+      async clearReference(name) {
+        const { error } = await supabase.rpc("suap_clear_deleted_pdf_reference", { p_name: name });
+        if (error) throw error;
+      },
+    });
+    return Response.json(result, { status: result.failed ? 500 : 200 });
+  } catch {
+    console.error("[cleanup-suap-pdfs] Falha ao executar a limpeza.");
+    return Response.json({ error: "Falha ao executar a limpeza." }, { status: 500 });
+  }
 });

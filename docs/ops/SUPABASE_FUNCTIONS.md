@@ -170,6 +170,32 @@ Dependencias:
 - `OPENAI_API_KEY` e opcional `OPENAI_MODEL`, com default `gpt-5-mini`, como segundo provedor
 - opcional `OPENROUTER_API_KEY` e `OPENROUTER_MODEL` como terceiro provedor de reparo de JSON
 
+### `cleanup-suap-pdfs`
+
+Finalidade:
+
+- limpa diariamente os PDFs operacionais do bucket `suap-pdfs` (cache recuperavel do SUAP; dados extraidos e evidencias ficam preservados)
+
+Contrato:
+
+- `POST` com o header `x-retention-secret`, igual ao secret `SUAP_PDF_RETENTION_SECRET` da function; sem ele responde `401`
+- agendada por `pg_cron` (job `cleanup-suap-pdfs`, 06:15 UTC = 03:15 em Brasilia) via `public.dispatch_suap_pdf_retention()`, que usa o mesmo segredo guardado no Vault
+
+Fluxo (`supabase/functions/_shared/suap_pdf_retention.ts`):
+
+1. `suap_reconcile_missing_pdf_references()` zera referencias a objetos que ja nao existem no Storage
+2. `suap_expired_pdf_candidates(p_limit, p_name)` lista objetos com mais de 3 dias (maior entre `created_at` e `updated_at`) que nao estejam em uso: sem job de extracao `queued/processing/retryable`, sem download de documento em andamento e sem processo em extracao atualizado nos ultimos 30 minutos
+3. antes de remover, cada candidato e reconsultado pelo nome; se sumiu da lista ou mudou `object_updated_at` (novo upload ou uso ativo), e pulado
+4. a remocao e feita pela API do Storage; so depois `suap_clear_deleted_pdf_reference(p_name)` limpa a referencia (e nao limpa se ja existe novo objeto no mesmo caminho)
+5. falha em um objeto mantem a referencia e nao interrompe o lote; a resposta traz `checked`, `removed`, `skipped`, `failed` e `bytes` (`500` se houve falha)
+
+Observacoes:
+
+- o uso de um PDF nao e mais registrado: o desenho anterior (`processos.pdf_last_used_at`, `suap_pdf_retention_leases`/`_runs` e a RPC `touch_suap_process_pdf`, migration `20261019110000`) nao existe mais no banco remoto e o arquivo dessa migration permanece no repo apenas como historico
+- `touch_suap_process_pdf` continua existindo como funcao de compatibilidade sem efeito (migration `20261103110000`); o codigo nao a chama mais, e ela pode ser removida quando nao houver bundles antigos do app em uso
+- `process-pdf` e `process-pdf-worker` nao chamam mais essa RPC: antes, qualquer falha dela quebrava o processamento de PDFs
+- testes: `src/lib/__tests__/suapPdfRetention.test.ts`
+
 ### `suap-token-exchange`
 
 Local:
