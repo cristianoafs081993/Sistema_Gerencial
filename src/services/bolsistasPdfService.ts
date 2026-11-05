@@ -62,8 +62,9 @@ function parseCurrencyValue(value: string): number {
   return parseFloat(value.replace(/\./g, '').replace(',', '.'));
 }
 
+// Marcadores de rodape no fim do nome: sobrescritos (\u00b9\u00b2\u00b3), caractere de substituicao e asteriscos (*, **, ***).
 function cleanStudentName(value: string): string {
-  return normalizeWhitespace(value).replace(/\s*[\u00b9\u00b2\u00b3\uFFFD]+$/g, '').trim();
+  return normalizeWhitespace(value).replace(/\s*[\u00b9\u00b2\u00b3\uFFFD*]+$/g, '').trim();
 }
 
 function extractPafeTableRows(text: string, sourceFile: string): BolsistaPdfRecord[] {
@@ -113,12 +114,12 @@ export function extractFromText(text: string, sourceFile: string): BolsistaPdfRe
   const isNewTableFormat = !isOldTableFormat && /VR\s+R\$/i.test(text) && /MATRÍCULA/i.test(text);
 
   if (isOldTableFormat) {
-    const studentRegex = /(\d+)\s+([A-ZÀ-ÿ][A-Za-zÀ-ÿ'`´\s.-]{4,80}?)\s+(\d{10,15})\s+(\d{3}\.\d{3}\.\d{3}-\d{2})\s+(\d{2,4})\s+([0-9A-Za-z.-]+)\s+(?:([0-9A-Za-z.-]+)\s+)?([0-9A-Za-z.-]+)\s+(?:R\$\s*)?([0-9.,]+)/g;
+    const studentRegex = /(\d+)\s+([A-ZÀ-ÿ][A-Za-zÀ-ÿ'`´\s.*-]{4,80}?)\s+(\d{10,15})\s+(\d{3}\.\d{3}\.\d{3}-\d{2})\s+(\d{2,4})\s+([0-9A-Za-z.-]+)\s+(?:([0-9A-Za-z.-]+)\s+)?([0-9A-Za-z.-]+)\s+(?:R\$\s*)?([0-9.,]+)/g;
     const matches = [...cleanText.matchAll(studentRegex)];
     
     for (const m of matches) {
       const cpf = m[4];
-      const nome = m[2].trim();
+      const nome = cleanStudentName(m[2]);
       const banco = m[5];
       const agencia = m[6];
       const conta = m[8];
@@ -129,12 +130,12 @@ export function extractFromText(text: string, sourceFile: string): BolsistaPdfRe
     }
   } else if (isNewTableFormat) {
     // Regex: seq  nome  matrícula  setor  turno  valor R$  CPF  banco  agência  [op]  conta
-    const studentRegex = /(\d{1,3})\s+([A-ZÀ-ÿ][A-Za-zÀ-ÿ'`´\s.²¹³-]{4,80}?)\s+(\d{10,15})\s+([A-Za-zÀ-ÿ.\s]+?)\s+(?:MAT\.|VESP\.|NOT\.)\s+([0-9.,]+)\s*R\$\s+(\d{3}\.\d{3}\.\d{3}-\d{2})\s+(\d{2,4})\s+([0-9A-Za-z-]+)\s+(?:(\d{3,4})\s+)?([0-9A-Za-z.-]+)/g;
+    const studentRegex = /(\d{1,3})\s+([A-ZÀ-ÿ][A-Za-zÀ-ÿ'`´\s.²¹³*-]{4,80}?)\s+(\d{10,15})\s+([A-Za-zÀ-ÿ.\s]+?)\s+(?:MAT\.|VESP\.|NOT\.)\s+([0-9.,]+)\s*R\$\s+(\d{3}\.\d{3}\.\d{3}-\d{2})\s+(\d{2,4})\s+([0-9A-Za-z-]+)\s+(?:(\d{3,4})\s+)?([0-9A-Za-z.-]+)/g;
     const matches = [...cleanText.matchAll(studentRegex)];
 
     for (const m of matches) {
       const cpf = m[6];
-      const nome = m[2].trim().replace(/\s*[¹²³]+$/, '');
+      const nome = cleanStudentName(m[2]);
       const banco = m[7];
       const agencia = m[8];
       const conta = m[10];

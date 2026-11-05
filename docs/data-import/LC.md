@@ -77,6 +77,8 @@ O sistema extrai os bolsistas e compara com a base carregada na LC. Suporta este
 3. **Layout PAFE com dados bancarios (Format C)**:
    - Apresenta cabecalho com `NOME`, `MATRICULA`, `SETOR`, `TURNO`, `VR R$`, `CPF` e `DADOS BANCARIOS`.
    - Extrai valor antes do CPF e, depois dele, Banco, Agencia, Operacao opcional e Conta. A Operacao do PDF e ignorada; a conta e preservada com pontuacao e `X`.
+   - O valor pode vir como `R$ 300,00` ou `300,00 R$` (o pdfjs entrega a segunda forma no PDF do SUAP).
+   - Nomes com marcadores de rodape (`*`, `**`, `***`, `¹²³`) sao aceitos e o marcador e removido do nome extraido. Antes, linhas com `*` nao casavam no regex e o aluno era omitido silenciosamente (ex.: 33 de 41 alunos reconhecidos).
 
 O fluxo de comparação gera pendências de cruzamento e permite ao usuário:
 - Na grade de dados para cópia, exibir o ícone de cópia em todas as linhas e em cada campo disponível (CPF, banco, agência e conta). Os ícones só ficam habilitados depois que o usuário seleciona a linha correspondente.

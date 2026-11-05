@@ -133,6 +133,17 @@ describe('coletor completo de comprovantes SIAFI',()=>{
     await vi.runAllTimersAsync(); await task;
     expect(document.querySelector('#siages-siafi-evidence a[download]')).toHaveAttribute('download', '23035.002988.2026-97 - 2026NP000123 - EMPRESA SERVIÇOS LTDA.pdf');
   });
+  it('print baixa o PDF automaticamente ao fim da captura, sem baixar o JSON nem enviar ao SUAP', async () => {
+    creditor = { code: '12345678000190', name: 'EMPRESA LTDA' };
+    document.getElementById(`${prefix}:codigoTipoDocHabil_outputText`)!.textContent = 'NP';
+    document.getElementById(`${prefix}:numeroDocumentoHabil_outputText`)!.textContent = '000123';
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const task = (window as TestWindow).__siagesSiafiEvidence!.start({ upload: false });
+    await vi.runAllTimersAsync(); await task;
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(click.mock.contexts[0]).toHaveAttribute('download', '23035.002988.2026-97 - 2026NP000123 - EMPRESA LTDA.pdf');
+    expect(screenshots.mock.calls.some(([message]) => (message as { type: string }).type === 'stage-upload')).toBe(false);
+  });
   it('printup salva a cópia local, envia o PDF ao worker e repete o modo em Nova captura', async () => {
     creditor = { code: '12345678000190', name: 'EMPRESA LTDA' };
     document.getElementById(`${prefix}:codigoTipoDocHabil_outputText`)!.textContent = 'NP';
@@ -164,7 +175,7 @@ describe('coletor completo de comprovantes SIAFI',()=>{
     fireEvent.click(document.querySelector('[data-start]')!); await vi.runAllTimersAsync();
     expect(messages().filter(message => message.type === 'stage-upload')).toHaveLength(1);
   });
-  it('printup informa falha do envio e mantém a cópia local; print não envia nem baixa sozinho', async () => {
+  it('printup informa falha do envio e mantém a cópia local; print baixa o PDF mas não envia', async () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     screenshots.mockImplementation(async (message: { type: string }) => message.type === 'stage-upload'
       ? { ok: false, error: 'Entre no SIAGES pelo popup da extensão para enviar a captura ao SUAP.' }
@@ -177,7 +188,7 @@ describe('coletor completo de comprovantes SIAFI',()=>{
     task = (window as TestWindow).__siagesSiafiEvidence!.start({ upload: false });
     await vi.runAllTimersAsync(); await task;
     expect(screenshots.mock.calls.some(([message]) => (message as { type: string }).type === 'stage-upload')).toBe(false);
-    expect(click).not.toHaveBeenCalled();
+    expect(click).toHaveBeenCalledTimes(1);
     expect(document.querySelector('[data-suap-upload]')).toHaveAttribute('hidden');
   });
   it('printup sem processo em Dados Básicos não envia ao SIAGES', async () => {
