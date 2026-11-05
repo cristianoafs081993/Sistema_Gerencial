@@ -211,6 +211,40 @@ describe('bolsistasPdfService', () => {
       expect(results[0].valor).toBe(245.00);
     });
 
+    it('should keep students whose names end with asterisk footnote markers (*, **, ***)', () => {
+      const header = 'N°   NOME   MATRÍCULA   SETOR   VR R$   CPF  BANCO   AGÊNCIA   OP.   CONTA   TURNO   DADOS BANCÁRIOS';
+      const text = `
+        ${header}
+        1   Allyson Fernando Miranda de Castro   20251034010037   DIAD   MAT.   300,00 R$   129.220.414-17   104   3880   1288   718134525-8
+        3   Dayanna Mirelly da Silva *   20261030480033   Lab. Química   MAT.   341,00 R$   126.951.114-95   104   3880   1288   749983329-2
+        10   Emilayne Carla de Oliveira Silva ***   20231031120014   Música   VESP.   41,00 R$   709.711.584-01   341   0500   23713937-8
+        17   Hevelly Mariana Conceicao Fernandes da Silva **   20261030480025   COADESC   MAT.   136,00 R$   711.521.464-67   0260   0001   985864867-1
+        18   Joanderson Pereira da Silva   20231031120027   Extensão   VESP.   300,00 R$   712.297.064-70   001   361-1   46856-8
+      `;
+      const results = extractFromText(text, 'pafe.pdf');
+      expect(results.map((r) => r.nome)).toEqual([
+        'Allyson Fernando Miranda de Castro',
+        'Dayanna Mirelly da Silva',
+        'Emilayne Carla de Oliveira Silva',
+        'Hevelly Mariana Conceicao Fernandes da Silva',
+        'Joanderson Pereira da Silva',
+      ]);
+      expect(results[1]).toMatchObject({ cpf: '126.951.114-95', banco: '104', agencia: '3880', conta: '749983329-2', valor: 341 });
+      expect(results[2]).toMatchObject({ cpf: '709.711.584-01', banco: '341', agencia: '0500', conta: '23713937-8', valor: 41 });
+      expect(results[3]).toMatchObject({ cpf: '711.521.464-67', banco: '0260', agencia: '0001', conta: '985864867-1', valor: 136 });
+    });
+
+    it('should keep students with asterisk markers in the old table layout too', () => {
+      const text = `
+        Nº   NOME   MATRÍCULA   CPF   BANCO   AGÊNCIA   OP.   CONTA  VALOR  REFERÊNCIA
+        1   Alison Rafael da Silva Pereira *   20241034010039   168.469.274-17   001   0075-2   20920-1   91,00 R$
+      `;
+      const results = extractFromText(text, 'old.pdf');
+      expect(results).toHaveLength(1);
+      expect(results[0].nome).toBe('Alison Rafael da Silva Pereira');
+      expect(results[0].cpf).toBe('168.469.274-17');
+    });
+
     it('should parse multiple students with mixed OP presence', () => {
       const text = `
         N°   NOME   MATRÍCULA   SETOR   TURNO   VR R$   CPF  BANCO   AGÊNCIA   OP.   CONTA
