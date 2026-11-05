@@ -1,7 +1,9 @@
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 
-import { Plus, Pencil, Search, Filter, Calendar, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Layers, X, Star } from 'lucide-react';
+import { Plus, Pencil, Search, Filter, Calendar, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Layers, X, Star, Download } from 'lucide-react';
+import { toast } from 'sonner';
+import { exportEmpenhosToExcel } from '@/lib/empenhosExport';
 import { useData } from '@/contexts/DataContext';
 import { Empenho, DIMENSOES, COMPONENTES_POR_DIMENSAO } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -664,6 +666,17 @@ function EmpenhosTable({
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const rapReferenceYear = useMemo(() => getRapReferenceYear(empenhos), [empenhos]);
 
+  // Exporta todos os registros ja filtrados da aba (independe de paginacao/agrupamento)
+  const handleExportExcel = () => {
+    try {
+      const total = exportEmpenhosToExcel(empenhos, type);
+      toast.success(`${total} empenho(s) exportado(s) para Excel.`);
+    } catch (error) {
+      console.error('Erro ao exportar empenhos:', error);
+      toast.error('Não foi possível exportar os empenhos.');
+    }
+  };
+
   const toggleGroup = (name: string) => {
     setExpandedGroups(prev => ({ ...prev, [name]: !prev[name] }));
   };
@@ -760,15 +773,28 @@ function EmpenhosTable({
   return (
     <DataTablePanel
       actions={
-        <Button
-          variant={groupBy === 'favorecido' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setGroupBy(g => g === 'none' ? 'favorecido' : 'none')}
-          className="h-8 gap-2 btn-secondary"
-        >
-          <Layers className="h-4 w-4" />
-          {groupBy === 'favorecido' ? 'Desagrupar' : 'Agrupar por Favorecido'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            disabled={isLoading || empenhos.length === 0}
+            className="h-8 gap-2 btn-secondary"
+            title="Exporta todos os empenhos desta aba, respeitando os filtros aplicados"
+          >
+            <Download className="h-4 w-4" />
+            Exportar Excel
+          </Button>
+          <Button
+            variant={groupBy === 'favorecido' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setGroupBy(g => g === 'none' ? 'favorecido' : 'none')}
+            className="h-8 gap-2 btn-secondary"
+          >
+            <Layers className="h-4 w-4" />
+            {groupBy === 'favorecido' ? 'Desagrupar' : 'Agrupar por Favorecido'}
+          </Button>
+        </div>
       }>
         <Table>
           <TableHeader className="bg-muted/50">

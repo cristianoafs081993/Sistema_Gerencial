@@ -37,6 +37,15 @@ vi.mock('@/components/JsonImportDialog', () => ({
   JsonImportDialog: () => null,
 }));
 
+const mockedExportEmpenhosToExcel = vi.hoisted(() => vi.fn<(empenhos: Empenho[], tipo: string) => number>(() => 0));
+vi.mock('@/lib/empenhosExport', () => ({
+  exportEmpenhosToExcel: mockedExportEmpenhosToExcel,
+}));
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
 const mockedEmpenhoDialog = vi.fn();
 vi.mock('@/components/modals/EmpenhoDialog', () => ({
   EmpenhoDialog: (props: { open: boolean; onOpenChange: (open: boolean) => void; readOnly?: boolean }) => {
@@ -288,6 +297,26 @@ describe('Empenhos', () => {
         empenho: expect.objectContaining({ numero: '2026NE000002' }),
       }),
     );
+  });
+
+  it('exporta para Excel apenas os empenhos filtrados da aba ativa', () => {
+    renderEmpenhos();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Favoritos$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Exportar Excel/i }));
+
+    expect(mockedExportEmpenhosToExcel).toHaveBeenCalledTimes(1);
+    const [exportados, tipo] = mockedExportEmpenhosToExcel.mock.calls[0];
+    expect(tipo).toBe('execucao');
+    expect(exportados.map((e) => e.numero)).toEqual(['2026NE000001']);
+  });
+
+  it('desabilita a exportacao quando nao ha empenhos na aba', () => {
+    renderEmpenhos();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Restos a Pagar/i }));
+
+    expect(screen.getByRole('button', { name: /Exportar Excel/i })).toBeDisabled();
   });
 
   it('permite que administradores visualizem todos os empenhos e abram o dialog sem readOnly', () => {

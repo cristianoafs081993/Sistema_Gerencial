@@ -106,6 +106,10 @@ Consulta dedicada com React Query:
 
 - [CreditoDisponivel.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/CreditoDisponivel.tsx) consulta o snapshot mais recente em `creditos_disponiveis_detalhes`, com filtro e paginacao por PI; seu upload atualiza tambem o agregado `creditos_disponiveis`. A tela de Empenhos nao apresenta mais cards nem importacao de credito disponivel. Ao clicar em qualquer linha do relatório, o modal `CreditoDisponivelMovimentacoesModal` abre diretamente na aba de empenhos do ano corrente (desconsiderando RAPs/anos anteriores e ordenando do mais recente para o mais antigo).
 
+Exportacao de empenhos:
+
+- `/empenhos` possui o botao `Exportar Excel` no painel da tabela. Ele gera um `.xlsx` (via `src/lib/empenhosExport.ts`) com **todos** os empenhos da aba ativa (Execucao ou Restos a Pagar) que passaram pelos filtros atuais (busca, status, dimensao, componente, origem, PI, periodo e favoritos), independentemente de paginacao ou agrupamento. As colunas de valores seguem os mesmos calculos da tabela (Execucao: Empenhado/Liquidado/Pago/A Liquidar; RAP: Inscrito-Reinscrito/Pago no Ano/Saldo Atual). Exportacao e 100% client-side; nao ha alteracao de schema, API ou Edge Function.
+
 Observacao:
 
 - a pagina [Atividades.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Atividades.tsx) agora atende a rota `/planejamento/:scope`
