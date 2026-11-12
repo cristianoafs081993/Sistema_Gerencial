@@ -293,14 +293,19 @@ export default function SuapExtensionProcessInfo() {
           extractFromPdf: async (document) => {
             const warnings: string[] = [];
             let expected: number | undefined;
+            let imageOnlyPages = 0;
             const file = new File([document.bytes!], `${document.title || document.id}.pdf`, { type: 'application/pdf' });
+            // Sem OCR aqui: o Chrome congela a renderizacao deste iframe oculto (1px, outra origem), e o
+            // pdfjs nunca terminaria. Paginas escaneadas ficam para a IA, que le a imagem do PDF.
             const records = await extractBolsistasFromPdfFiles([file], {
+              ocr: false,
               onWarning: (warning) => {
                 if (warning.reason === 'count_mismatch') expected = warning.expected;
-                else warnings.push(`${document.title}: páginas ${warning.imageOnlyPages?.join(', ')} não lidas por OCR.`);
+                else if (warning.reason === 'ocr_disabled') imageOnlyPages += warning.imageOnlyPages?.length ?? 0;
+                else warnings.push(`${document.title}: páginas ${warning.imageOnlyPages?.join(', ')} não lidas.`);
               },
             });
-            return { records, expected, warnings };
+            return { records, expected, warnings, imageOnlyPages };
           },
           extractWithAi: (input) => extractBolsistasWithAi(input, client),
           loadLcRows: async () => (await loadLatestLCRowsFromDb(client)).rows,

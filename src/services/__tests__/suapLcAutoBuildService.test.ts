@@ -98,7 +98,7 @@ describe('runSuapLcAutoBuild', () => {
       ['ALUNA FICTICIA UM', 'ok', '001'],
       ['ALUNO FICTICIO DOIS', 'aluno_nao_encontrado', '260'],
     ]);
-    expect(statuses.map((status) => status.stage)).toEqual(['collecting', 'reading', 'saving', 'ready']);
+    expect(statuses.map((status) => status.stage)).toEqual(['collecting', 'reading', 'reading', 'saving', 'ready']);
     expect(result).toMatchObject({ stage: 'ready', listId: '11111111-1111-4111-8111-111111111111', found: 2, pendencias: 1, method: 'script' });
   });
 
@@ -168,6 +168,43 @@ describe('runSuapLcAutoBuild', () => {
     });
 
     await expect(runSuapLcAutoBuild(info, deps)).resolves.toMatchObject({ stage: 'existing', listId: concurrent.id });
+  });
+
+  it('le o texto primeiro e nao abre o PDF anexado quando o oficio ja traz todos os alunos', async () => {
+    // Caso real do 505643: a Liquidacao (captura do SIAFI, PDF so de imagem) vinha antes do oficio
+    // na leitura e travava a etapa "Lendo 3 documento(s)...".
+    const pdf: SuapExtensionLcDocument = { id: '2790848', title: 'Liquidação', type: 'Liquidação', kind: 'pdf', bytes: new ArrayBuffer(8) };
+    const { deps, statuses } = makeDeps({
+      requestDocuments: vi.fn(async () => [pdf, textDoc('1', 'Despacho 526/2026', 'Autorização.'), textDoc('2', 'Ofício Nº 156/2026', oficio(2, [ALUNO_A, ALUNO_B]))]),
+    });
+
+    await expect(runSuapLcAutoBuild(info, deps)).resolves.toMatchObject({ stage: 'ready', found: 2 });
+    expect(deps.extractFromPdf).not.toHaveBeenCalled();
+    expect(statuses.filter((s) => s.stage === 'reading').map((s) => s.message)).toEqual([
+      'Lendo Despacho 526/2026 (1 de 3)...',
+      'Lendo Ofício Nº 156/2026 (2 de 3)...',
+    ]);
+  });
+
+  it('nao trava quando a leitura de um PDF nunca termina e envia o PDF escaneado para a IA', async () => {
+    const pdf: SuapExtensionLcDocument = { id: '3', title: 'Relação escaneada', type: 'Planilha', kind: 'pdf', bytes: new ArrayBuffer(8) };
+    const stuck: SuapExtensionLcDocument = { id: '4', title: 'PDF que trava', type: 'Anexo', kind: 'pdf', bytes: new ArrayBuffer(8) };
+    const { deps, save } = makeDeps({
+      pdfReadTimeoutMs: 20,
+      requestDocuments: vi.fn(async () => [stuck, pdf]),
+      extractFromPdf: vi.fn(async (doc: SuapExtensionLcDocument) => (doc.id === '4'
+        ? new Promise<never>(() => undefined)
+        : { records: [], warnings: [], imageOnlyPages: 2 })),
+      extractWithAi: vi.fn(async () => ({
+        records: [{ cpf: '529.982.247-25', nome: 'ALUNA FICTICIA UM', banco: '001', agencia: '1234', conta: '12345678-9', sourceFile: 'Relação escaneada' }],
+      })),
+    });
+
+    const result = await runSuapLcAutoBuild(info, deps);
+
+    expect(deps.extractWithAi).toHaveBeenCalledWith(expect.objectContaining({ document: pdf }));
+    expect(save.mock.calls[0][0].extraction?.warnings).toContain('PDF que trava: leitura do PDF excedeu o tempo limite.');
+    expect(result).toMatchObject({ stage: 'ready', method: 'ia', found: 1 });
   });
 
   it('informa erro quando a extensao nao entrega os documentos', async () => {

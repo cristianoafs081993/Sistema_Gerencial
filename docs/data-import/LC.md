@@ -109,8 +109,12 @@ Ao abrir no SUAP um processo cujo **Tipo** ou **Assunto** contenha `bolsa`/`bols
 
 1. `process-document.js` lê os documentos da timeline (até 15), primeiro os de título ou tipo Ofício/Memorando/Relação/Lista/Planilha/Folha/bolsa.
    - **Documentos eletrônicos** (o ofício com os alunos é desse tipo): o HTML de `/documento_eletronico/conteudo_documento/<id>/` vira texto com uma linha por bloco (`htmlToBlockText`). O layout é o Format A, com rótulos.
-   - **Documentos digitalizados/anexados**: PDF de `?original=sim`, lido por `extractBolsistasFromPdfFiles` (inclusive OCR).
+   - **Documentos digitalizados/anexados**: PDF de `?original=sim`, lido por `extractBolsistasFromPdfFiles` só pela camada de texto (`ocr: false`).
+     - Não há OCR aqui: o Chrome congela a renderização do iframe oculto, que tem 1px e é de outra origem, e o pdfjs nunca terminava. O card ficava parado em "Lendo 3 documento(s)..." no 505643, quando a Liquidação (captura do SIAFI, só imagem) foi anexada.
+     - Páginas escaneadas vão para a IA, que lê a imagem do PDF.
+     - Cada PDF tem prazo de 60 s (`LC_PDF_READ_TIMEOUT_MS`); estourado o prazo, vira aviso.
 2. O iframe `/suap-extensao/processo-info` roda `runSuapLcAutoBuild` ([suapLcAutoBuildService.ts](/C:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/services/suapLcAutoBuildService.ts)).
+   - Lê **os documentos de texto primeiro** e para assim que a lista está completa: há alunos com agência e conta, e o total declarado foi atingido. PDFs só são abertos se ainda faltar aluno. O card mostra qual documento está sendo lido ("Lendo Ofício … (2 de 3)...").
    - Escolhe o documento com mais alunos que tenham agência e conta.
    - Compara com o total declarado (`N (extenso) bolsas`).
 3. **IA só se o script falhar**: com zero alunos ou menos que o declarado, o documento vai para a Edge Function `extrair-bolsistas-documento` (Gemini, com OpenAI de reserva). O resultado da IA só substitui o do script se tiver mais alunos, e as linhas saem com `ia: true`. A grade mostra o selo **IA · conferir**.

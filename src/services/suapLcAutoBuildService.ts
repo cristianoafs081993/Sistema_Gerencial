@@ -24,7 +24,12 @@ export type PdfExtractionResult = {
   records: BolsistaPdfRecord[];
   expected?: number;
   warnings: string[];
+  /** Paginas so com imagem (escaneadas): sem OCR no iframe, ficam para a IA. */
+  imageOnlyPages?: number;
 };
+
+/** Prazo para ler um PDF: um PDF problematico nao pode travar a montagem. */
+export const LC_PDF_READ_TIMEOUT_MS = 60_000;
 
 export type AiExtractionInput = {
   document: SuapExtensionLcDocument;
@@ -47,6 +52,7 @@ export type SuapLcAutoBuildDeps = {
   onStatus: (status: SuapExtensionLcStatus) => void;
   contaPagadora: string;
   now?: () => Date;
+  pdfReadTimeoutMs?: number;
 };
 
 type DocumentReading = {
@@ -99,20 +105,35 @@ async function readDocument(document: SuapExtensionLcDocument, deps: SuapLcAutoB
   }
 
   if (!document.bytes) return empty;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
-    const result = await deps.extractFromPdf(document);
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('leitura do PDF excedeu o tempo limite.')), deps.pdfReadTimeoutMs ?? LC_PDF_READ_TIMEOUT_MS);
+    });
+    const result = await Promise.race([deps.extractFromPdf(document), timeout]);
     const records = dedupeByCpf(result.records);
     return {
       document,
       records,
       complete: records.filter(hasBankData).length,
       expected: result.expected,
-      mentionsBolsa: records.length > 0,
+      // PDF escaneado sem alunos lidos e candidato natural para a IA.
+      mentionsBolsa: records.length > 0 || Boolean(result.imageOnlyPages),
       warnings: result.warnings,
     };
   } catch (error) {
     return { ...empty, warnings: [`${document.title}: ${error instanceof Error ? error.message : 'falha ao ler o PDF.'}`] };
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
   }
+}
+
+/** A lista ja esta completa: ha alunos com dados bancarios e nenhum total declarado maior. */
+function isSatisfied(readings: DocumentReading[]): boolean {
+  const best = pickBest(readings);
+  if (!best || best.complete === 0) return false;
+  const expected = best.expected ?? readings.find((reading) => reading.expected !== undefined)?.expected;
+  return expected === undefined || best.complete >= expected;
 }
 
 function pickBest(readings: DocumentReading[]): DocumentReading | undefined {
@@ -183,9 +204,15 @@ export async function runSuapLcAutoBuild(
       return emit({ suapId, stage: 'empty', message: 'Nenhum documento legível foi encontrado no processo.', retryable: true });
     }
 
-    emit({ suapId, stage: 'reading', message: `Lendo ${documents.length} documento(s)...` });
+    // Texto primeiro (o oficio com os alunos e documento eletronico) e PDFs so se ainda faltar aluno:
+    // assim um PDF anexado sem relacao (ex.: captura do SIAFI) nem chega a ser lido.
+    const ordered = [...documents.filter((doc) => doc.kind === 'text'), ...documents.filter((doc) => doc.kind !== 'text')];
     const readings: DocumentReading[] = [];
-    for (const document of documents) readings.push(await readDocument(document, deps));
+    for (const [index, document] of ordered.entries()) {
+      if (isSatisfied(readings)) break;
+      emit({ suapId, stage: 'reading', message: `Lendo ${document.title} (${index + 1} de ${ordered.length})...` });
+      readings.push(await readDocument(document, deps));
+    }
 
     const warnings = readings.flatMap((reading) => reading.warnings);
     const best = pickBest(readings);
