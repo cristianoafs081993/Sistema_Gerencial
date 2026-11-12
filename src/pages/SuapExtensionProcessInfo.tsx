@@ -3,8 +3,12 @@ import { Loader2 } from 'lucide-react';
 
 import {
   getSuapExtensionProcessContext,
+  isValidSuapExtensionLcDocumentsResult,
+  isValidSuapExtensionLcRebuild,
   isValidSuapExtensionProcessPdfResult,
   isValidSuapExtensionProcessRetry,
+  SUAP_EXTENSION_LC_DOCUMENTS_REQUEST_TYPE,
+  SUAP_EXTENSION_LC_STATUS_TYPE,
   SUAP_EXTENSION_ORIGIN,
   SUAP_EXTENSION_PROCESS_FINANCE_SUMMARY_TYPE,
   SUAP_EXTENSION_PROCESS_FLOW_TYPE,
@@ -12,9 +16,17 @@ import {
   SUAP_EXTENSION_PROCESS_PDF_REQUEST_TYPE,
   SUAP_EXTENSION_PROCESS_SNAPSHOT_TYPE,
   SUAP_EXTENSION_PROCESS_SYNC_STATUS_TYPE,
+  type SuapExtensionLcDocument,
+  type SuapExtensionLcStatus,
   type SuapExtensionProcessContext,
   type SuapExtensionProcessSyncStatus,
 } from '@/lib/suapExtensionDispatch';
+import { env } from '@/lib/env';
+import { extractBolsistasFromPdfFiles } from '@/services/bolsistasPdfService';
+import { loadLatestLCRowsFromDb } from '@/services/lcImportService';
+import { findSharedLcSavedListBySuapId, saveSharedLcSavedList } from '@/services/lcSavedListsService';
+import type { LcGridRow } from '@/services/lcWorkListBuilder';
+import { extractBolsistasWithAi, isBolsaProcess, runSuapLcAutoBuild } from '@/services/suapLcAutoBuildService';
 import { suapProcessFinanceService, type SuapProcessFinanceSummary } from '@/services/suapProcessFinance';
 import { suapProcessosService } from '@/services/suapProcessos';
 import { suapScraperService } from '@/services/suapScraperService';
@@ -149,6 +161,40 @@ function waitForPdf(context: SuapExtensionProcessContext, isActive: () => boolea
   });
 }
 
+function postLcStatus(status: SuapExtensionLcStatus) {
+  postMessageToSuapParent({ source: 'siages', type: SUAP_EXTENSION_LC_STATUS_TYPE, version: 1, payload: status });
+}
+
+const LC_DOCUMENTS_TIMEOUT_MS = 3 * 60 * 1000;
+
+/** Pede ao content script do SUAP os documentos do processo (texto dos eletronicos e PDF dos anexados). */
+function requestLcDocuments(suapId: string, isActive: () => boolean) {
+  postMessageToSuapParent({
+    source: 'siages',
+    type: SUAP_EXTENSION_LC_DOCUMENTS_REQUEST_TYPE,
+    version: 1,
+    payload: { suapId },
+  });
+
+  return new Promise<SuapExtensionLcDocument[]>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener('message', receive);
+      reject(new Error('A extensão não enviou os documentos do processo. Atualize a extensão e recarregue a página.'));
+    }, LC_DOCUMENTS_TIMEOUT_MS);
+
+    const receive = (event: MessageEvent) => {
+      if (!isValidSuapExtensionLcDocumentsResult(event, window.parent, suapId)) return;
+      window.clearTimeout(timeout);
+      window.removeEventListener('message', receive);
+      if (!isActive()) return;
+      if (event.data.payload.error) reject(new Error(event.data.payload.error));
+      else resolve(event.data.payload.documents);
+    };
+
+    window.addEventListener('message', receive);
+  });
+}
+
 async function delay(milliseconds: number) {
   await new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
@@ -169,6 +215,7 @@ async function withTimeout<T>(promise: Promise<T>, milliseconds: number, message
 export default function SuapExtensionProcessInfo() {
   const [context, setContext] = useState<SuapExtensionProcessContext | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [lcRebuildCount, setLcRebuildCount] = useState(0);
   const [status, setStatus] = useState('Aguardando o contexto do processo SUAP...');
 
   useEffect(() => {
@@ -214,6 +261,70 @@ export default function SuapExtensionProcessInfo() {
     window.addEventListener('message', receiveRetry);
     return () => window.removeEventListener('message', receiveRetry);
   }, [context]);
+
+  useEffect(() => {
+    if (!context) return;
+    const receiveRebuild = (event: MessageEvent) => {
+      if (isValidSuapExtensionLcRebuild(event, window.parent, context.suapId)) {
+        setLcRebuildCount((current) => current + 1);
+      }
+    };
+    window.addEventListener('message', receiveRebuild);
+    return () => window.removeEventListener('message', receiveRebuild);
+  }, [context]);
+
+  // Lista de credores: em processos de bolsa, monta e salva a lista de trabalho da LC sem intervencao.
+  useEffect(() => {
+    if (!context?.extensionSession) return;
+    // Tipo e assunto vem dos dados gerais da pagina do SUAP; processos que nao sao de bolsa nao fazem nada.
+    const assunto = context.assunto?.trim() || context.route?.assunto?.trim() || '';
+    if (!isBolsaProcess({ assunto, tipoProcesso: context.tipoProcesso })) return;
+    let active = true;
+    const isActive = () => active;
+
+    void (async () => {
+      const { client } = await authenticateExtensionAccessToken(context.extensionSession!.accessToken);
+      if (!active) return;
+
+      await runSuapLcAutoBuild(
+        { suapId: context.suapId, processNumber: context.processNumber, assunto, tipoProcesso: context.tipoProcesso },
+        {
+          requestDocuments: () => requestLcDocuments(context.suapId, isActive),
+          extractFromPdf: async (document) => {
+            const warnings: string[] = [];
+            let expected: number | undefined;
+            const file = new File([document.bytes!], `${document.title || document.id}.pdf`, { type: 'application/pdf' });
+            const records = await extractBolsistasFromPdfFiles([file], {
+              onWarning: (warning) => {
+                if (warning.reason === 'count_mismatch') expected = warning.expected;
+                else warnings.push(`${document.title}: páginas ${warning.imageOnlyPages?.join(', ')} não lidas por OCR.`);
+              },
+            });
+            return { records, expected, warnings };
+          },
+          extractWithAi: (input) => extractBolsistasWithAi(input, client),
+          loadLcRows: async () => (await loadLatestLCRowsFromDb(client)).rows,
+          findExisting: (suapId) => findSharedLcSavedListBySuapId<LcGridRow>(suapId, client),
+          save: (input) => saveSharedLcSavedList<LcGridRow>(input, client),
+          onStatus: (status) => {
+            if (active) postLcStatus(status);
+          },
+          contaPagadora: env.siafiContaPagadora || '',
+        },
+        { force: lcRebuildCount > 0 },
+      );
+    })().catch((caught) => {
+      if (!active) return;
+      postLcStatus({
+        suapId: context.suapId,
+        stage: 'error',
+        message: caught instanceof Error ? caught.message : 'Não foi possível montar a lista de credores.',
+        retryable: true,
+      });
+    });
+
+    return () => { active = false; };
+  }, [context, lcRebuildCount]);
 
   useEffect(() => {
     if (!context) return;

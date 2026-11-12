@@ -23,6 +23,7 @@ import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { LCRegistro, loadLatestLCRowsFromDb, parseLCCsv, saveLCRows } from '@/services/lcImportService';
 import { extractBolsistasFromPdfFiles } from '@/services/bolsistasPdfService';
+import { isValidCPF } from '@/services/supplierCompliance';
 import { compararBolsistasComLC, type ComparacaoBolsista, type PendenciaStatus } from '@/services/lcComparisonService';
 import {
   deleteSharedLcSavedList,
@@ -36,6 +37,7 @@ import {
   type SiafiMacroInputRow,
 } from '@/services/siafiMacroService';
 import { env } from '@/lib/env';
+import { buildLcGridRows, buildMacroRows, type LcGridRow } from '@/services/lcWorkListBuilder';
 import { deleteLcSavedList, loadLcSavedLists, saveLcSavedList, type LcSavedList } from '@/lib/lcSavedLists';
 import { normalizeLcAccount, padLeftLcAccount } from '@/utils/lcAccount';
 
@@ -45,28 +47,7 @@ const statusLabel: Record<PendenciaStatus, string> = {
   conta_divergente: 'Conta divergente',
 };
 
-type LcAccountOption = {
-  bancoCodigo: string;
-  agenciaCodigo: string;
-  contaBancaria: string;
-};
-
-type LcGridRow = {
-  id: string;
-  cpf: string;
-  nome: string;
-  bancoPdf: string;
-  agenciaPdf: string;
-  contaPdf: string;
-  valor?: number;
-  selectedBanco: string;
-  selectedAgencia: string;
-  selectedConta: string;
-  contaPagadora: string;
-  status: 'ok' | 'aluno_nao_encontrado' | 'conta_nao_encontrada';
-  lcAccounts: LcAccountOption[];
-  originalLcAccounts: LcAccountOption[];
-};
+const OCR_TOAST_ID = 'lc-pdf-ocr';
 
 const isUuid = (value: string | null): value is string =>
   Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
@@ -136,6 +117,10 @@ export default function LCPage() {
   const [pageSizeLC, setPageSizeLC] = useState(100);
   const [pageSizePendencias, setPageSizePendencias] = useState(100);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
+  const [sharedListsLoaded, setSharedListsLoaded] = useState(false);
+  const requestedListIdRef = useRef<string | null>(
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('lista') : null,
+  );
   const queryLCDeferred = useDeferredValue(queryLC);
   const queryPendenciasDeferred = useDeferredValue(queryPendencias);
 
@@ -175,12 +160,36 @@ export default function LCPage() {
         // Mantem as listas locais como fallback temporario para indisponibilidade
         // do backend, sem usar dados locais para preencher a lista compartilhada.
         console.warn('Nao foi possivel carregar listas compartilhadas da LC:', error);
+      })
+      .finally(() => {
+        if (mounted) setSharedListsLoaded(true);
       });
 
     return () => {
       mounted = false;
     };
   }, [isAuthLoading, isAuthenticated]);
+
+  // `/lc?lista=<id>`: link "Abrir no SIAGES" da extensao no SUAP abre direto a lista montada.
+  useEffect(() => {
+    const requestedId = requestedListIdRef.current;
+    if (!requestedId) return;
+    const requested = savedWorkLists.find((list) => list.id === requestedId);
+    if (!requested && !sharedListsLoaded) return;
+
+    requestedListIdRef.current = null;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('lista');
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // Sem acesso ao historico, o parametro apenas permanece na URL.
+    }
+    if (requested) handleOpenSavedWorkList(requested);
+    else toast.error('A lista de trabalho indicada não foi encontrada (pode ter sido excluída).');
+    // handleOpenSavedWorkList so usa setters de estado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedWorkLists, sharedListsLoaded]);
 
   const consolidatedRows = useMemo(() => {
     const byCpf = new Map<string, LCRegistro[]>();
@@ -279,18 +288,6 @@ export default function LCPage() {
     const base = baseRaw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'lista-credores';
     return `${base}-siafi-${stamp}.mac`;
   };
-
-  const buildMacroRows = (workRows: LcGridRow[]): SiafiMacroInputRow[] =>
-    workRows
-      .filter((row) => row.status !== 'aluno_nao_encontrado')
-      .map((row) => ({
-        cpf: row.cpf,
-        bancoCodigo: row.selectedBanco,
-        agenciaCodigo: row.selectedAgencia,
-        contaPagadora: row.contaPagadora,
-        contaFavorecido: row.selectedConta,
-        valor: row.valor,
-      }));
 
   const getDefaultWorkListName = (sourcePdfNames: string[]) => {
     if (sourcePdfNames.length !== 1) return 'Lista de trabalho';
@@ -429,8 +426,32 @@ export default function LCPage() {
     try {
       setIsComparingPdf(true);
       const list = Array.from(files);
-      const bolsistas = await extractBolsistasFromPdfFiles(list);
+      const bolsistas = await extractBolsistasFromPdfFiles(list, {
+        onOcrProgress: ({ sourceFile, page, done, total }) => {
+          toast.loading(`Lendo página escaneada ${done + 1} de ${total} (pág. ${page} de ${sourceFile}) por OCR…`, { id: OCR_TOAST_ID });
+        },
+        onWarning: ({ sourceFile, reason, imageOnlyPages = [], expected, found }) => {
+          const message = reason === 'count_mismatch'
+            ? `${sourceFile}: o documento declara ${expected} bolsa(s), mas só ${found} bolsista(s) foram identificados. Algum aluno ficou de fora — confira o PDF.`
+            : `${sourceFile}: não foi possível ler por OCR a(s) página(s) ${imageOnlyPages.join(', ')} (imagem escaneada). Bolsistas nelas não foram identificados — confira o total ou gere o PDF novamente a partir do SUAP.`;
+          toast.warning(message, { duration: 15000 });
+        },
+      });
+      toast.dismiss(OCR_TOAST_ID);
       setTotalBolsistasProcessados(bolsistas.length);
+
+      const bolsistasOcr = bolsistas.filter((b) => b.ocr);
+      if (bolsistasOcr.length > 0) {
+        const cpfsInvalidos = bolsistasOcr.filter((b) => !isValidCPF(b.cpf));
+        toast.warning(
+          `${bolsistasOcr.length} bolsista(s) foram lidos de página escaneada (OCR): confira CPF, agência e conta na grade antes de gerar a macro.${
+            cpfsInvalidos.length
+              ? ` ATENÇÃO: CPF com dígito verificador inválido (provável erro de leitura): ${cpfsInvalidos.map((b) => b.nome || b.cpf).join(', ')}.`
+              : ''
+          }`,
+          { duration: 20000 },
+        );
+      }
       if (!bolsistas.length) {
         toast.warning('Nenhum CPF de bolsista foi encontrado nos PDFs enviados.');
       }
@@ -442,57 +463,7 @@ export default function LCPage() {
 
       if (bolsistas.length > 0) {
         // 1. Gerar linhas para a Grade do Excel (Sempre todos os bolsistas na sequencia do PDF!)
-        const fullGridRows = bolsistas.map((b) => {
-          const doc = onlyDigits(b.cpf);
-          const lcList = rows.filter((r) => onlyDigits(r.favorecidoDocumento) === doc);
-          
-          const lcAccounts = lcList.map((r) => ({
-            bancoCodigo: onlyDigits(r.bancoCodigo) || '001',
-            agenciaCodigo: onlyDigits(r.agenciaCodigo) || '0001',
-            contaBancaria: normalizeLcAccount(r.contaBancaria) || '',
-          })).filter(acc => acc.contaBancaria);
-
-          const hasCpfInLc = lcList.length > 0;
-          const pdfContaNormalized = normalizeLcAccount(b.conta);
-          const matchedLcAcc = lcAccounts.find(acc => acc.contaBancaria === pdfContaNormalized);
-          
-          let status: 'ok' | 'aluno_nao_encontrado' | 'conta_nao_encontrada' = 'ok';
-          let selectedBanco = b.banco || '001';
-          let selectedAgencia = b.agencia || '0001';
-          let selectedConta = pdfContaNormalized;
-
-          if (!hasCpfInLc) {
-            status = 'aluno_nao_encontrado';
-          } else if (!matchedLcAcc) {
-            status = 'conta_nao_encontrada';
-            // Mantém a conta do PDF como selecionada por padrão,
-            // mas a LC tem outras contas disponíveis.
-          } else {
-            // Encontrou correspondência exata de conta!
-            selectedBanco = matchedLcAcc.bancoCodigo;
-            selectedAgencia = matchedLcAcc.agenciaCodigo;
-            selectedConta = matchedLcAcc.contaBancaria;
-          }
-
-          const contaPagadora = env.siafiContaPagadora || '';
-
-          return {
-            id: `${doc}-${b.sourceFile}`,
-            cpf: doc,
-            nome: b.nome,
-            bancoPdf: onlyDigits(b.banco) || '001',
-            agenciaPdf: onlyDigits(b.agencia) || '0001',
-            contaPdf: pdfContaNormalized,
-            valor: b.valor,
-            selectedBanco: onlyDigits(selectedBanco) || '001',
-            selectedAgencia: onlyDigits(selectedAgencia) || '0001',
-            selectedConta: normalizeLcAccount(selectedConta),
-            contaPagadora,
-            status,
-            lcAccounts,
-            originalLcAccounts: lcAccounts,
-          };
-        });
+        const fullGridRows = buildLcGridRows(bolsistas, rows, env.siafiContaPagadora || '');
 
         // 2. Gerar linhas da macro a partir de fullGridRows, filtrando 'aluno_nao_encontrado'
         const macroRows = buildMacroRows(fullGridRows);
@@ -535,6 +506,7 @@ export default function LCPage() {
       console.error('Erro ao comparar PDFs com LC:', error);
       toast.error(`Erro ao comparar PDFs: ${(error as Error).message}`);
     } finally {
+      toast.dismiss(OCR_TOAST_ID);
       setIsComparingPdf(false);
       if (pdfInputRef.current) pdfInputRef.current.value = '';
     }
@@ -845,6 +817,22 @@ export default function LCPage() {
                                           Credor não localizado
                                         </span>
                                       )}
+                                      {row.ocr && (
+                                        <span
+                                          title="Dados lidos de página escaneada por OCR. Confira CPF, agência e conta no PDF."
+                                          className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-violet-100 text-violet-800 dark:bg-violet-950/80 dark:text-violet-300"
+                                        >
+                                          OCR · conferir
+                                        </span>
+                                      )}
+                                      {row.ia && (
+                                        <span
+                                          title="Dados extraídos por IA porque o script não leu o documento. Confira CPF, agência e conta no processo."
+                                          className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300"
+                                        >
+                                          IA · conferir
+                                        </span>
+                                      )}
                                     </TableCell>
                                     <TableCell className="px-4 py-2.5 text-xs font-mono">
                                       <div className="flex items-center gap-1">
@@ -917,7 +905,7 @@ export default function LCPage() {
                                                           selectedBanco: row.bancoPdf,
                                                           selectedAgencia: row.agenciaPdf,
                                                           selectedConta: row.contaPdf,
-                                                          status: row.lcAccounts.length > 0 ? 'conta_nao_encontrada' : 'aluno_nao_encontrado'
+                                                          status: (row.lcAccounts.length > 0 ? 'conta_nao_encontrada' : 'aluno_nao_encontrado') as LcGridRow['status']
                                                         };
                                                       }
                                                       return g;
@@ -960,7 +948,7 @@ export default function LCPage() {
                                                                     selectedBanco: acc.bancoCodigo,
                                                                     selectedAgencia: acc.agenciaCodigo,
                                                                     selectedConta: acc.contaBancaria,
-                                                                    status: 'ok'
+                                                                    status: 'ok' as const
                                                                   };
                                                                 }
                                                                 return g;
@@ -1210,6 +1198,12 @@ export default function LCPage() {
                     <p className="text-xs text-muted-foreground">
                       {savedList.rows.length} aluno(s) • salvo em {new Date(savedList.updatedAt).toLocaleString('pt-BR')}
                     </p>
+                    {savedList.origin === 'extensao' && (
+                      <p className="text-xs text-muted-foreground">
+                        Montada pela extensão · processo {savedList.processNumber || savedList.suapId}
+                        {savedList.extraction?.method === 'ia' ? ' · via IA, conferir' : ''}
+                      </p>
+                    )}
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <Button

@@ -864,6 +864,19 @@ Function versionada para revisão temporária de Termo de Referência e Estudo T
 - Retorna status, resumo, achados com severidade/página, texto sugerido, bases legais, fontes consultadas e limitações.
 - Os segredos `OPENAI_API_KEY` e `GEMINI_API_KEY`, além dos modelos opcionais, são lidos apenas no ambiente da Edge Function.
 
+## extrair-bolsistas-documento
+
+IA de reserva da montagem automática da Lista de Credores pela extensão (1.9.92). Só é chamada quando o parser (script) não identifica alunos com dados bancários ou encontra menos alunos que o total declarado no documento.
+
+- Local: [extrair-bolsistas-documento/index.ts](/C:/Users/3128880/Desktop/Programação/Sistema_Gerencial/supabase/functions/extrair-bolsistas-documento/index.ts) e normalização em [_shared/bolsistas_extraction.ts](/C:/Users/3128880/Desktop/Programação/Sistema_Gerencial/supabase/functions/_shared/bolsistas_extraction.ts), testada por `_shared/bolsistas_extraction_test.ts`.
+- Chamador: `extractBolsistasWithAi` em [suapLcAutoBuildService.ts](/C:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/services/suapLcAutoBuildService.ts), no iframe `/suap-extensao/processo-info`, com o JWT da extensão.
+- `verify_jwt = false` no `supabase/config.toml`; o bearer token é validado internamente (`authenticateUserFromToken`).
+- Entrada: `text` (documento eletrônico, até 200 mil caracteres) ou `pdfBase64` (até 20 MB), `title`, `processNumber` e `expectedCount` opcional.
+- Gemini `generateContent` com `responseSchema` é a rota principal (`GEMINI_LC_BOLSISTAS_MODEL`, padrão `gemini-2.5-flash`); a OpenAI Responses é a reserva (`OPENAI_LC_BOLSISTAS_MODEL`, padrão `gpt-5.6-luna`).
+- Saída: `{ bolsistas: [{ nome, cpf, banco, agencia, conta, valor? }], declaredCount?, discardedInvalidCpf, provider }`. Os CPFs com dígito verificador inválido ou repetidos são descartados, e a matrícula sai do nome.
+- Não persiste nada. O log registra só contagens (provedor, tipo, encontrados, descartados), nunca CPF ou conta.
+- Após alterações: `supabase functions deploy extrair-bolsistas-documento`.
+
 ## gerar-etp-comprasnet
 
 - Function versionada para gerar prévias gerais de ETP destinadas à revisão na extensão do Comprasnet.

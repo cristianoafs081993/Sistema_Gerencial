@@ -48,7 +48,7 @@ A migration `20260716103000` adiciona `public.default_org_id()` como default de 
 
 `process_mappings` tambem e isolada por `org_id`; somente mapas publicados sao consumidos pela extensao, enquanto a escrita e a publicacao ficam restritas ao administrador do orgao ou superadmin.
 
-`lc_saved_lists` tambem e isolada por `org_id`; as listas de trabalho da Lista de Credores ficam disponiveis para todos os usuarios autenticados do mesmo orgao.
+`lc_saved_lists` tambem e isolada por `org_id`; as listas de trabalho da Lista de Credores ficam disponiveis para todos os usuarios autenticados do mesmo orgao. Desde `20261112100000`, listas montadas pela extensao em processos de bolsa guardam `suap_id`, `process_number`, `origin = 'extensao'` e `extraction`, com no maximo uma lista por `(org_id, suap_id)`.
 
 `data_import_runs` tambem e isolada por `org_id`; registra auditoria e metricas de cada execucao de importacao manual por usuario e orgao.
 

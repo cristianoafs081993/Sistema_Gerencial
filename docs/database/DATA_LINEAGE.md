@@ -72,6 +72,13 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - tabela: `lc_saved_lists`
   - observacao: o `org_id` e aplicado pelo banco e as policies RLS permitem acesso compartilhado somente entre usuarios do mesmo orgao; o espelho em `localStorage` serve apenas como fallback offline
 
+- lista de trabalho montada pela extensao em processo de bolsa do SUAP (1.9.92)
+  - origem: documentos do processo lidos por `process-document.js` com a sessao do SUAP (texto de `conteudo_documento/<id>/` ou PDF `?original=sim`)
+  - orquestracao: iframe `/suap-extensao/processo-info` -> [suapLcAutoBuildService.ts](/C:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/services/suapLcAutoBuildService.ts)
+  - extracao: `extractFromText`/`extractBolsistasFromPdfFiles` (script); IA de reserva `extrair-bolsistas-documento` somente quando o script falha
+  - cruzamento: `lc_credores` mais recente via [lcWorkListBuilder.ts](/C:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/services/lcWorkListBuilder.ts)
+  - tabela: `lc_saved_lists` com `suap_id`, `origin = 'extensao'` e `extraction`; uma lista por processo e orgao
+
 - PDFs de pagamento
   - extracao: [bolsistasPdfService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/bolsistasPdfService.ts)
   - comparacao: [lcComparisonService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/lcComparisonService.ts)

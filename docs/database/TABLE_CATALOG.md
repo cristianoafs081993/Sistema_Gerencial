@@ -649,6 +649,10 @@ Campos-chave:
 - `name`
 - `source_pdf_names`
 - `rows`
+- `suap_id` (desde `20261112100000`): processo SUAP de origem quando a lista foi montada pela extensão. O índice único parcial `lc_saved_lists_org_suap_id_key (org_id, suap_id) WHERE suap_id IS NOT NULL` garante uma lista por processo e órgão.
+- `process_number`: NUP do processo de origem, só para exibição
+- `origin`: `manual` (padrão, salva na tela `/lc`) ou `extensao` (montada no SUAP)
+- `extraction`: objeto com `method` (`script`/`ia`), `documents`, `expected`, `found`, `pendencias`, `warnings`, `builtAt`
 - `created_by`
 - `created_at`
 - `updated_at`

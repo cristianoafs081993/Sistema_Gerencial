@@ -72,13 +72,16 @@ export const EXTRACTION_PROMPT = `Analise o PDF deste processo do SUAP e extraia
   "assunto": "Descricao breve",
   "dados_bancarios": { "banco": "", "agencia": "", "conta": "" },
   "notas_fiscais": [ { "numero": "", "data_emissao": "", "valor": "" } ],
-  "retencoes_tributarias": { "optante_simples_nacional": false, "iss": null, "inss": null, "ir": null, "csll": null, "cofins": null, "pis_pasep": null },
+  "retencoes_tributarias": { "optante_simples_nacional": null, "iss": null, "inss": null, "ir": null, "csll": null, "cofins": null, "pis_pasep": null },
   "empenhos": []
 }
 Regras adicionais:
 - percorra todas as paginas do PDF e todos os documentos de cobranca anexados ao processo;
 - em "notas_fiscais", retorne uma entrada para cada nota fiscal ou DANFE distinta encontrada, sem limitar a resposta a primeira nota e sem substituir varias notas por um unico numero;
 - preserve o numero, a data de emissao e o valor de cada nota individualmente; retorne [] somente quando nenhuma nota fiscal estiver presente;
+- examine notas fiscais, demonstrativos e despachos do processo procurando valores de ISS, INSS, IR, CSLL, COFINS e PIS/PASEP efetivamente informados; extraia somente valores monetarios identificados, sem trocar aliquota percentual por valor em reais;
+- retencoes_tributarias e apenas um resumo global: se o valor de um tributo divergir entre documentos ou nao puder ser associado com seguranca a este pagamento, retorne null para esse tributo; nunca some parcelas ambiguas ou use valores historicos do fornecedor;
+- optante_simples_nacional deve ser true ou false apenas quando a condicao estiver explicitamente comprovada nos documentos; se nao houver prova, retorne null, nunca presuma false;
 - assunto nunca pode ser rotulo de interface como "Assunto", "Nivel de prioridade", "Nivel de acesso", "Solicitar" ou "Acoes".
 - cpf_cnpj so pode ser retornado se estiver em formato valido de CPF/CNPJ ou um placeholder claro como "Varios (Folha de Pagamento)".
 Retorne APENAS o JSON, sem markdown, sem comentarios e sem HTML.`;

@@ -1,5 +1,26 @@
 # Testes
 
+Lista de credores automática 1.9.92: as regressões ficam em:
+- `bolsistasPdfService.test.ts`: ofício eletrônico fictício com nome em linha própria, banco pelo nome, conta `12.345-X` e total declarado;
+- `bancoCodigo.test.ts`;
+- `lcWorkListBuilder.test.ts`: status e macro;
+- `suapLcAutoBuildService.test.ts`:
+  - processo que não é de bolsa;
+  - script sem IA;
+  - IA por contagem menor e por zero alunos;
+  - lista existente preservada;
+  - remontar;
+  - corrida no índice único;
+  - erro da extensão;
+- `SuapExtensionProcessInfo.test.tsx`: pedido de documentos, validação de origem, status e remontar;
+- `suapProcessDocumentExtension.test.ts`: `dt`/`dd`, `htmlToBlockText`, coleta priorizada, resposta com PDF transferido e card com link e remontar;
+- `LC.test.tsx`: `?lista=`, lista inexistente e origem;
+- Deno `_shared/bolsistas_extraction_test.ts`.
+
+O parser foi validado no ofício real do processo 505643 (10/10 alunos). O caminho de IA tem só testes com mocks e o smoke test 401 da função publicada; ainda não houve chamada real com documento.
+
+Dedução assistida 1.9.91: regressões focadas verificam extração do valor rotulado de conta vinculada, recusa de valores conflitantes, comparação do processo e da UG, datas inválidas, preservação de campos existentes, situação de item distinta, substituição de elemento durante eventos e ausência de clique em confirmar. O teste do prompt garante Simples desconhecido como null e distinção de alíquota e valor. O preenchimento em SIAFI real e o fluxo das outras situações ainda exigem validação específica.
+
 Catálogo histórico de naturezas de rendimento: `node scripts/test-naturezas-rendimento-db.mjs` executa a migration em PGlite e verifica 47 naturezas, nove conjuntos de alíquotas, 12 páginas, exemplos de conteúdo, leitura autenticada e restrição de escrita e acesso anônimo. A implantação da migration é verificada também com `supabase migration list`.
 
 SIAFI blocos (1.9.90): 63 testes focados aprovados (popup, favorecidos, pacote e pré-doc); sintaxe e lint aprovados. Novas regressões do popup: lista de blocos e escolha do bloco inicial; aviso ao repetir bloco anterior ao progresso; `Fim da lista alcançado` desabilita o envio até nova escolha; três blocos encadeados em um clique, com progresso salvo em 10, 20 e 21; parada no bloco com pendência; erro no segundo bloco informando o bloco concluído e oferecendo `Retomar da posição 14`. O teste manual de blocos agora desmarca a continuação automática. Suíte completa: 1.639 aprovados e somente as falhas já conhecidas `ManutencaoAdmin.test.tsx:353` e `suapProcessDocumentExtension.test.ts:294`; log em `outputs/siafi-blocos-1.9.90-full-suite.log`. Pacote `outputs/SIAGES-1.9.90.zip`: 43 arquivos idênticos à pasta por SHA-256. Sem operação na aba autenticada, migrations ou Edge Functions. Documentação de fluxo atualizada.

@@ -34,7 +34,11 @@
     financeSummary: null, hasFinanceSummary: false, flow: null, selectedMappingId: '', manualStepNodeId: '', mappings: [], customMappings: [], snippets: { ...DEFAULT_SNIPPETS }, editingKey: null,
     collapsedSections: new Set(),
     authSession: null,
+    lcStatus: null,
   };
+  const LC_MAX_DOCUMENTS = 15;
+  const LC_MAX_TEXT_CHARS = 500000;
+  const LC_DOCUMENT_PRIORITY = /oficio|memorando|relacao|lista|planilha|folha|bolsa|bolsista|pagamento|requerimento/;
   let documentAnalysisObserver = null;
   let documentAnalysisCleanup = null;
 
@@ -169,6 +173,7 @@
       manualStepNodeId: state.manualStepNodeId || '',
       ...(state.hasFinanceSummary ? { financeSummary: state.financeSummary } : {}),
       ...(state.flow ? { flow: state.flow } : {}),
+      ...(state.lcStatus ? { lcStatus: state.lcStatus } : {}),
     };
     try {
       globalThis.sessionStorage?.setItem(key, JSON.stringify(persisted));
@@ -237,7 +242,17 @@
       }
     });
 
+    // "Dados gerais" do SUAP usam <dt>Rótulo</dt><dd>Valor</dd>, sem dois-pontos.
+    if (!result.assunto) result.assunto = readDefinitionField('Assunto').slice(0, 250);
+    result.tipoProcesso = readDefinitionField('Tipo').slice(0, 200);
+
     return result;
+  }
+  function readDefinitionField(label) {
+    const wanted = normalizeDocumentReviewText(label);
+    const term = Array.from(document.querySelectorAll('dt')).find((dt) => normalizeDocumentReviewText(dt.textContent) === wanted);
+    const value = term?.nextElementSibling;
+    return value?.tagName === 'DD' ? cleanText(value.textContent) : '';
   }
 
   // Momento em que esta página de processo foi aberta; base da ordem do Alt+V (mais recente primeiro).
@@ -325,6 +340,7 @@
       window.__siagesLatestFinanceSummary = persisted.financeSummary;
     }
     if (persisted.flow) { state.flow = persisted.flow; state.mappings = persisted.flow.mappings || []; }
+    if (persisted.lcStatus?.stage && persisted.lcStatus?.suapId === getProcessId()) state.lcStatus = persisted.lcStatus;
     const storedCustom = await storageGet('local', 'siages_custom_process_mappings', null);
     if (Array.isArray(storedCustom) && storedCustom.length > 0) {
       state.customMappings = storedCustom;
@@ -666,6 +682,7 @@
       payload: {
         suapId, processNumber: getProcessNumber(), processUrl: getProcessUrl(),
         assunto: pageData.assunto || '',
+        tipoProcesso: pageData.tipoProcesso || '',
         beneficiario: pageData.beneficiario || '',
         cpfCnpj: pageData.cpfCnpj || '',
         caixa: pageData.caixa || '',
@@ -916,7 +933,7 @@
   }
   function renderSummary(snapshot = state.snapshot) {
     const container = panel('summary'); if (!container) return;
-    container.innerHTML = ''; renderSyncStatus(container);
+    container.innerHTML = ''; renderSyncStatus(container); renderLcCard(container);
     const process = snapshot?.process; const fallback = snapshot?.fallback || { suapId: getProcessId(), processNumber: getProcessNumber() };
     appendSection(container, 'Processo', (section) => {
       appendCopyRow(section, 'Processo', process?.numProcesso || fallback.processNumber, true);
@@ -1569,6 +1586,114 @@
     const bytes = await response.arrayBuffer(); const signature = new TextDecoder().decode(bytes.slice(0, 4)); if (signature !== '%PDF') throw new Error('O SUAP não devolveu um PDF válido.'); return bytes;
   }
 
+  // --- Lista de credores (processos de bolsa) ------------------------------------------------------
+  // O iframe do SIAGES pede os documentos; aqui eles sao lidos com a sessao do SUAP: o texto dos
+  // documentos eletronicos (onde fica o oficio com os alunos) e o PDF original dos anexados.
+
+  /** Texto com quebras de linha por bloco, sem depender de layout (innerText nao existe fora da pagina). */
+  function htmlToBlockText(html) {
+    const parsed = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    parsed.querySelectorAll('script, style, noscript, template').forEach((node) => node.remove());
+    const BLOCK = /^(P|DIV|TR|LI|UL|OL|TABLE|TBODY|THEAD|SECTION|ARTICLE|HEADER|FOOTER|H[1-6]|BLOCKQUOTE|PRE|DL|DT|DD)$/;
+    let out = '';
+    const walk = (node) => {
+      if (node.nodeType === 3) { out += node.nodeValue.replace(/\s+/g, ' '); return; }
+      if (node.nodeType !== 1) return;
+      const tag = node.tagName;
+      if (tag === 'BR') { out += '\n'; return; }
+      const block = BLOCK.test(tag);
+      if (block) out += '\n';
+      node.childNodes.forEach(walk);
+      if (tag === 'TD' || tag === 'TH') out += '\t';
+      if (block) out += '\n';
+    };
+    if (parsed.body) walk(parsed.body);
+    return out.replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+  function collectLcDocumentSources() {
+    const seen = new Set();
+    const sources = [];
+    document.querySelectorAll('a[href]').forEach((link) => {
+      const source = getDocumentSource(link);
+      if (!source || seen.has(source.documentId)) return;
+      const url = new URL(link.getAttribute('href') || '', location.origin);
+      if (url.searchParams.has('original')) return;
+      seen.add(source.documentId);
+      const type = cleanText(link.querySelector('strong')?.textContent).replace(/:\s*$/, '');
+      const fullText = cleanText(link.textContent);
+      const title = (type && fullText.startsWith(`${type}:`) ? cleanText(fullText.slice(type.length + 1)) : fullText) || type || `Documento ${source.documentId}`;
+      const scanned = /visualizar_documento_digitalizado/.test(url.pathname);
+      sources.push({ ...source, title: title.slice(0, 500), type: type.slice(0, 200), kind: scanned ? 'pdf' : 'text' });
+    });
+    const priority = (item) => (LC_DOCUMENT_PRIORITY.test(normalizeDocumentReviewText(`${item.type} ${item.title}`)) ? 0 : 1);
+    return sources.sort((a, b) => priority(a) - priority(b)).slice(0, LC_MAX_DOCUMENTS);
+  }
+  async function readLcDocument(source) {
+    const base = { id: source.documentId, title: source.title, type: source.type, kind: source.kind };
+    try {
+      if (source.kind === 'text') {
+        const response = await fetch(`/documento_eletronico/conteudo_documento/${source.documentId}/`, { credentials: 'include' });
+        if (!response.ok) throw new Error(`O SUAP respondeu ${response.status}.`);
+        return { ...base, text: htmlToBlockText(await response.text()).slice(0, LC_MAX_TEXT_CHARS) };
+      }
+      const response = await fetch(source.originalPath, { credentials: 'include' });
+      if (!response.ok) throw new Error(`O SUAP respondeu ${response.status}.`);
+      const bytes = await response.arrayBuffer();
+      if (bytes.byteLength > DOCUMENT_REVIEW_MAX_BYTES) throw new Error('O PDF excede o limite de 20 MB.');
+      if (new TextDecoder().decode(bytes.slice(0, 4)) !== '%PDF') throw new Error('O SUAP não devolveu um PDF válido.');
+      return { ...base, bytes };
+    } catch (error) {
+      return { ...base, error: error instanceof Error ? error.message : 'Falha ao ler o documento.' };
+    }
+  }
+  async function collectLcDocuments() {
+    const documents = [];
+    for (const source of collectLcDocumentSources()) documents.push(await readLcDocument(source));
+    return documents;
+  }
+  function requestLcRebuild() {
+    const frame = document.getElementById(BRIDGE_FRAME_ID); const suapId = getProcessId();
+    if (!frame?.contentWindow || !suapId) return;
+    if (state.lcStatus?.listId && !window.confirm('Remontar a lista substitui as linhas salvas (inclusive contas escolhidas na grade). Continuar?')) return;
+    state.lcStatus = { suapId, stage: 'collecting', message: 'Remontando a lista de credores...' };
+    renderSummary();
+    frame.contentWindow.postMessage({ source: 'siages-suap-extension', type: 'siages:suap-lc-rebuild', version: 1, payload: { suapId } }, SIAGES_ORIGIN);
+  }
+  function renderLcCard(container) {
+    const status = state.lcStatus;
+    if (!status || status.suapId !== getProcessId()) return;
+    const section = createElement('section', 'suape-section suape-lc-card');
+    section.dataset.stage = status.stage;
+    section.setAttribute('aria-live', 'polite');
+    section.appendChild(createElement('h3', 'suape-section-title', 'Lista de credores'));
+    const body = createElement('div', 'suape-lc-body');
+    body.appendChild(createElement('p', 'suape-lc-message', status.message));
+    if (status.listId) {
+      const facts = [`${status.found ?? 0} aluno(s)`];
+      if (status.expected) facts.push(`${status.expected} declarado(s)`);
+      facts.push(`${status.pendencias ?? 0} pendência(s)`);
+      if (status.method === 'ia') facts.push('via IA · conferir');
+      body.appendChild(createElement('p', 'suape-lc-facts', facts.join(' · ')));
+    }
+    (status.warnings || []).slice(0, 3).forEach((warning) => body.appendChild(createElement('p', 'suape-lc-warning', warning)));
+    const actions = createElement('div', 'suape-lc-actions');
+    if (status.listId) {
+      const open = createElement('a', 'suape-button', 'Abrir no SIAGES');
+      open.href = `${SIAGES_ORIGIN}/lc?lista=${encodeURIComponent(status.listId)}`;
+      open.target = '_blank'; open.rel = 'noopener noreferrer';
+      actions.appendChild(open);
+    }
+    const busy = ['collecting', 'reading', 'ai', 'saving'].includes(status.stage);
+    if (!busy) {
+      const rebuild = createElement('button', 'suape-button suape-button-secondary', status.listId ? 'Remontar' : 'Tentar novamente');
+      rebuild.type = 'button'; rebuild.addEventListener('click', requestLcRebuild);
+      actions.appendChild(rebuild);
+    }
+    if (actions.childNodes.length) body.appendChild(actions);
+    section.appendChild(body);
+    container.appendChild(section);
+  }
+
   function retrySync() { const frame = document.getElementById(BRIDGE_FRAME_ID); const suapId = getProcessId(); if (frame?.contentWindow && suapId) frame.contentWindow.postMessage({ source: 'siages-suap-extension', type: 'siages:suap-process-retry', version: 1, payload: { suapId } }, SIAGES_ORIGIN); }
   function restartBridge() { document.getElementById(BRIDGE_FRAME_ID)?.remove(); openProcessBridge(); }
   function openProcessBridge() {
@@ -1605,6 +1730,18 @@
           return;
         }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-finance-summary')) { renderFinanceSummary(event.data.payload); return; }
+        if (isSiagesFrameMessage(event, frame, 'siages:suap-lc-status')) {
+          if (event.data.payload?.suapId !== getProcessId()) return;
+          state.lcStatus = event.data.payload; persistProcessState(); renderSummary(); return;
+        }
+        if (isSiagesFrameMessage(event, frame, 'siages:suap-lc-documents-request')) {
+          const suapId = event.data.payload?.suapId; if (suapId !== getProcessId()) return;
+          let documents = []; let error;
+          try { documents = await collectLcDocuments(); } catch (caught) { error = caught instanceof Error ? caught.message : 'Falha ao ler os documentos do processo.'; }
+          const transfer = documents.map((item) => item.bytes).filter(Boolean);
+          frame.contentWindow?.postMessage({ source: 'siages-suap-extension', type: 'siages:suap-lc-documents-result', version: 1, payload: { suapId, documents, ...(error ? { error } : {}) } }, SIAGES_ORIGIN, transfer);
+          return;
+        }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-pdf-request')) {
           const suapId = event.data.payload?.suapId; if (suapId !== getProcessId()) return;
           try { const bytes = await downloadProcessPdfFromSuap(suapId, (message) => { state.syncStatus = { stage: 'requesting-pdf', message }; renderSummary(); }); frame.contentWindow?.postMessage({ source: 'siages-suap-extension', type: 'siages:suap-process-pdf-result', version: 1, payload: { suapId, bytes } }, SIAGES_ORIGIN, [bytes]); }
@@ -1705,6 +1842,6 @@
     }
     return undefined;
   });
-  window.__siagesSuapProcessDocument = { isScannedDocumentPage, getProcessId, getProcessNumber, buildContext, parseProcessRoute, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, renderAiPanel, openModal, closeModal, openDocumentAnalysisModal, closeDocumentAnalysisModal, scanDocumentCards, installDocumentAnalysis, disposeDocumentAnalysis, classifyDocumentForAnalysis, downloadProcessPdfFromSuap, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed, syncProcessToRegistry };
+  window.__siagesSuapProcessDocument = { isScannedDocumentPage, getProcessId, getProcessNumber, buildContext, parseProcessRoute, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, renderAiPanel, openModal, closeModal, openDocumentAnalysisModal, closeDocumentAnalysisModal, scanDocumentCards, installDocumentAnalysis, disposeDocumentAnalysis, classifyDocumentForAnalysis, downloadProcessPdfFromSuap, htmlToBlockText, collectLcDocumentSources, collectLcDocuments, readDefinitionField, renderLcCard, requestLcRebuild, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed, syncProcessToRegistry };
   if (!window.__SIAGES_SUAP_PROCESS_TEST__) void installToolkit();
 })();

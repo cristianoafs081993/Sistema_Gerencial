@@ -1,5 +1,15 @@
 # DATA_FLOW
 
+Extensão 1.9.92, lista de credores automática: em processo de bolsa, `process-document.js` passa `tipoProcesso` e o `Assunto` lidos dos `dt`/`dd` dos dados gerais. O iframe `/suap-extensao/processo-info` então segue estes passos:
+1. pede os documentos (`siages:suap-lc-documents-request`);
+2. a extensão responde com o texto dos documentos eletrônicos e o PDF dos anexados (`siages:suap-lc-documents-result`);
+3. `runSuapLcAutoBuild` extrai os alunos por script e chama a IA `extrair-bolsistas-documento` só se o script falhar;
+4. cruza com `lc_credores` e salva em `lc_saved_lists` (`suap_id`, `origin = 'extensao'`);
+5. publica `siages:suap-lc-status` para o card do painel.
+Se já há lista do processo, ela é mantida. `siages:suap-lc-rebuild` remonta. O link do card abre `/lc?lista=<id>`, que abre a grade direto e remove o parâmetro da URL. Contrato: [LC](../data-import/LC.md#montagem-automática-pela-extensão-processos-de-bolsa-1992) e [API_CATALOG](../integrations/API_CATALOG.md).
+
+Extensão 1.9.91: `Ctrl+K → Preencher dedução DOB035` abre uma entrada local para valores conferidos. A ação identifica o processo e a situação no formulário SIAFI, e preenche apenas os campos comuns do item DOB035 aberto, sem confirmar ou registrar; opção local lê valor explicitamente rotulado em trecho colado pelo usuário. Detalhes e limites: [SIAFI_DEDUCOES_MAPEAMENTO](../integrations/SIAFI_DEDUCOES_MAPEAMENTO.md).
+
 Extensão 1.9.78: as linhas de código/fonte de `solrecfin` expandem/recolhem o detalhamento ao clicar em qualquer célula. O botão nativo integrado ao código oferece Enter/Espaço e indica o estado na seta, sem coluna de ações. O detalhamento filtra as mesmas entradas locais por dia, código e fonte usadas na agregação. Cada captura mostra documento, empenho, PTRES, horário de Brasília e valor, com subtotal. Capturas repetidas permanecem separadas; registros legados sem identificação usam indicação explícita. Expansão e recolhimento são locais, sem novas consultas. Contrato: [paleta global](../integrations/SUAP_COMMAND_PALETTE.md).
 
 Extensão 1.9.75: `solrecfin` consulta o acumulado diário e histórico de sete dias em `chrome.storage.local` de qualquer página compatível, sem exigir DH ou login SIAGES. No SIAGES, a ponte observa somente o comando exato no input da paleta nativa e encaminha ao diálogo local após fechar o original; consultas nativas e Ctrl+K permanecem disponíveis. A coleta continua restrita ao SIAFI. Operação: [paleta global](../integrations/SUAP_COMMAND_PALETTE.md).

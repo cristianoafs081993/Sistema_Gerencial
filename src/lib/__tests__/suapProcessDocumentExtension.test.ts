@@ -1103,4 +1103,113 @@ describe('process-document 1.9', () => {
     button.click();
     expect(document.getElementById('siages-suap-dispatch-modal')).toBeTruthy();
   });
+
+  describe('lista de credores automatica', () => {
+    const bolsaPage = `<main><aside id="timeline"><div>Recebido por COFINC/CN</div></aside><p>Processo 23035.003293.2026-22</p>
+      <div class="list-item"><dt>Tipo</dt><dd>Ensino: Pagamento de Bolsa</dd></div>
+      <div class="list-item"><dt>Assunto</dt><dd>Bolsa TAL 2026 - Outubro.</dd></div>
+      <div class="primary-info"><a href="https://suap.ifrn.edu.br/documento_eletronico/visualizar_documento/1169322/"><strong>Despacho:</strong> Despacho 526/2026 - DIAD/DG/CN/RE/IFRN</a>
+        <a href="https://suap.ifrn.edu.br/documento_eletronico/visualizar_documento/1169322/?original=sim">Visualizar Documento Original</a></div>
+      <div class="primary-info"><a href="https://suap.ifrn.edu.br/documento_eletronico/visualizar_documento/1168328/"><strong>Ofício:</strong> Ofício Nº 156/2026 - DIAC/DG/CN/RE/IFRN</a></div>
+      <div class="primary-info"><a href="https://suap.ifrn.edu.br/documento_eletronico/visualizar_documento_digitalizado/2000001/"><strong>Planilha:</strong> Relação de bolsistas</a></div>
+    </main>`;
+
+    type LcApi = ExtensionApi & {
+      htmlToBlockText: (html: string) => string;
+      collectLcDocumentSources: () => Array<{ documentId: string; title: string; type: string; kind: string }>;
+    };
+
+    function frameMessage(frame: HTMLIFrameElement, type: string, payload: unknown) {
+      window.dispatchEvent(new MessageEvent('message', {
+        origin: 'https://www.siages.com.br', source: frame.contentWindow,
+        data: { source: 'siages', type, version: 1, payload },
+      }));
+    }
+
+    beforeEach(() => {
+      document.body.innerHTML = bolsaPage;
+      window.history.replaceState(null, '', '/processo_eletronico/processo/505643/');
+    });
+
+    it('envia Tipo e Assunto dos dados gerais (dt/dd) no contexto', () => {
+      const api = loadProcessScript();
+      expect(api.buildContext()).toMatchObject({ payload: { suapId: '505643', assunto: 'Bolsa TAL 2026 - Outubro.', tipoProcesso: 'Ensino: Pagamento de Bolsa' } });
+    });
+
+    it('converte o HTML do documento em texto com uma linha por bloco, sem estilos nem scripts', () => {
+      const api = loadProcessScript() as LcApi;
+      const text = api.htmlToBlockText('<style>p{color:red}</style><script>alert(1)</script><p>ALUNA FICTICIA (20241031120001)</p><table><tr><td>CPF</td><td>529.982.247-25</td></tr></table><div>Banco<br>Banco do Brasil S.A</div>');
+      expect(text).toBe('ALUNA FICTICIA (20241031120001)\n\nCPF\t529.982.247-25\n\nBanco\nBanco do Brasil S.A');
+    });
+
+    it('lista os documentos do processo uma vez cada, priorizando oficio e relacao', () => {
+      const api = loadProcessScript() as LcApi;
+      expect(api.collectLcDocumentSources().map(({ documentId, title, type, kind }) => ({ documentId, title, type, kind }))).toEqual([
+        { documentId: '1168328', title: 'Ofício Nº 156/2026 - DIAC/DG/CN/RE/IFRN', type: 'Ofício', kind: 'text' },
+        { documentId: '2000001', title: 'Relação de bolsistas', type: 'Planilha', kind: 'pdf' },
+        { documentId: '1169322', title: 'Despacho 526/2026 - DIAD/DG/CN/RE/IFRN', type: 'Despacho', kind: 'text' },
+      ]);
+    });
+
+    it('responde ao pedido do iframe com o texto dos documentos eletronicos e o PDF dos anexados', async () => {
+      const pdfBytes = new TextEncoder().encode('%PDF-1.7 ficticio').buffer;
+      const fetchMock = vi.fn(async (url: string) => {
+        if (url.includes('/conteudo_documento/1168328/')) return new Response('<p>Ofício com alunos</p><p>CPF 529.982.247-25</p>');
+        if (url.includes('/conteudo_documento/1169322/')) return new Response('<p>Despacho</p>');
+        if (url.includes('/visualizar_documento_digitalizado/2000001/?original=sim')) return new Response(pdfBytes);
+        return new Response('', { status: 404 });
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const api = loadProcessScript();
+      await api.installToolkit();
+      await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+      const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+      const framePost = vi.spyOn(frame.contentWindow!, 'postMessage').mockImplementation(() => undefined);
+
+      frameMessage(frame, 'siages:suap-lc-documents-request', { suapId: '999' });
+      frameMessage(frame, 'siages:suap-lc-documents-request', { suapId: '505643' });
+
+      await waitFor(() => expect(framePost.mock.calls.some(([message]) => (message as { type?: string }).type === 'siages:suap-lc-documents-result')).toBe(true));
+      const resultCalls = framePost.mock.calls.filter(([message]) => (message as { type?: string }).type === 'siages:suap-lc-documents-result');
+      expect(resultCalls).toHaveLength(1);
+      const [message, origin, transfer] = resultCalls[0] as [{ payload: { suapId: string; documents: Array<Record<string, unknown>> } }, string, ArrayBuffer[]];
+      expect(origin).toBe('https://www.siages.com.br');
+      expect(message.payload.suapId).toBe('505643');
+      expect(message.payload.documents).toEqual([
+        { id: '1168328', title: 'Ofício Nº 156/2026 - DIAC/DG/CN/RE/IFRN', type: 'Ofício', kind: 'text', text: 'Ofício com alunos\n\nCPF 529.982.247-25' },
+        expect.objectContaining({ id: '2000001', kind: 'pdf', bytes: expect.any(ArrayBuffer) }),
+        { id: '1169322', title: 'Despacho 526/2026 - DIAD/DG/CN/RE/IFRN', type: 'Despacho', kind: 'text', text: 'Despacho' },
+      ]);
+      expect(transfer).toHaveLength(1);
+    });
+
+    it('mostra o card com link para a lista no SIAGES e remonta sob confirmacao', async () => {
+      const api = loadProcessScript();
+      await api.installToolkit();
+      await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+      const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+      const framePost = vi.spyOn(frame.contentWindow!, 'postMessage').mockImplementation(() => undefined);
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      frameMessage(frame, 'siages:suap-lc-status', { suapId: '505643', stage: 'reading', message: 'Lendo 3 documento(s)...' });
+      let card = document.querySelector('.suape-lc-card');
+      expect(card).toHaveTextContent('Lendo 3 documento(s)...');
+      expect(card?.querySelector('button')).toBeNull();
+
+      frameMessage(frame, 'siages:suap-lc-status', {
+        suapId: '505643', stage: 'ready', message: 'Lista de credores montada com 10 aluno(s).',
+        listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', found: 10, expected: 10, pendencias: 2, method: 'script',
+      });
+      card = document.querySelector('.suape-lc-card');
+      expect(card).toHaveTextContent('10 aluno(s) · 10 declarado(s) · 2 pendência(s)');
+      expect(card?.querySelector('a')).toHaveAttribute('href', 'https://www.siages.com.br/lc?lista=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+
+      (card?.querySelector('button') as HTMLButtonElement).click();
+      expect(window.confirm).toHaveBeenCalled();
+      expect(framePost).toHaveBeenCalledWith(
+        { source: 'siages-suap-extension', type: 'siages:suap-lc-rebuild', version: 1, payload: { suapId: '505643' } },
+        'https://www.siages.com.br',
+      );
+    });
+  });
 });

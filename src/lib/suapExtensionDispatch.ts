@@ -10,6 +10,8 @@ export type SuapExtensionProcessContext = {
   processNumber?: string;
   processUrl: string;
   assunto?: string;
+  /** Campo "Tipo" dos dados gerais do SUAP (ex.: "Ensino: Pagamento de Bolsa"). */
+  tipoProcesso?: string;
   beneficiario?: string;
   cpfCnpj?: string;
   caixa?: string;
@@ -252,6 +254,105 @@ export function isValidSuapExtensionDocumentPdfResult(
     (payload.bytes instanceof ArrayBuffer || typeof payload.error === 'string');
 }
 
+// --- Lista de credores montada pela extensao em processos de bolsa ---------------------------------
+
+export const SUAP_EXTENSION_LC_DOCUMENTS_REQUEST_TYPE = 'siages:suap-lc-documents-request' as const;
+export const SUAP_EXTENSION_LC_DOCUMENTS_RESULT_TYPE = 'siages:suap-lc-documents-result' as const;
+export const SUAP_EXTENSION_LC_STATUS_TYPE = 'siages:suap-lc-status' as const;
+export const SUAP_EXTENSION_LC_REBUILD_TYPE = 'siages:suap-lc-rebuild' as const;
+export const SUAP_EXTENSION_LC_MAX_DOCUMENTS = 15;
+
+/** Documento do processo lido pela extensao: texto do documento eletronico ou bytes do PDF anexado. */
+export type SuapExtensionLcDocument = {
+  id: string;
+  title: string;
+  type: string;
+  kind: 'text' | 'pdf';
+  text?: string;
+  bytes?: ArrayBuffer;
+  error?: string;
+};
+
+export type SuapExtensionLcDocumentsResultMessage = {
+  source: 'siages-suap-extension';
+  type: typeof SUAP_EXTENSION_LC_DOCUMENTS_RESULT_TYPE;
+  version: 1;
+  payload: {
+    suapId: string;
+    documents: SuapExtensionLcDocument[];
+    error?: string;
+  };
+};
+
+export type SuapExtensionLcStage =
+  | 'collecting'
+  | 'reading'
+  | 'ai'
+  | 'saving'
+  | 'ready'
+  | 'existing'
+  | 'empty'
+  | 'error';
+
+export type SuapExtensionLcStatus = {
+  suapId: string;
+  stage: SuapExtensionLcStage;
+  message: string;
+  listId?: string;
+  listName?: string;
+  found?: number;
+  expected?: number;
+  pendencias?: number;
+  method?: 'script' | 'ia';
+  warnings?: string[];
+  retryable?: boolean;
+};
+
+function isValidLcDocument(value: unknown): value is SuapExtensionLcDocument {
+  if (!value || typeof value !== 'object') return false;
+  const doc = value as Partial<SuapExtensionLcDocument>;
+  return typeof doc.id === 'string' && /^\d{1,12}$/.test(doc.id) &&
+    typeof doc.title === 'string' && doc.title.length <= 500 &&
+    typeof doc.type === 'string' && doc.type.length <= 200 &&
+    (doc.kind === 'text' || doc.kind === 'pdf') &&
+    (doc.text === undefined || (typeof doc.text === 'string' && doc.text.length <= 500_000)) &&
+    (doc.bytes === undefined || doc.bytes instanceof ArrayBuffer) &&
+    (doc.error === undefined || typeof doc.error === 'string');
+}
+
+export function isValidSuapExtensionLcDocumentsResult(
+  event: MessageEvent,
+  expectedSource: WindowProxy | null,
+  expectedSuapId: string,
+): event is MessageEvent<SuapExtensionLcDocumentsResultMessage> {
+  if (event.origin !== SUAP_EXTENSION_ORIGIN || event.source !== expectedSource) return false;
+  const message = event.data as Partial<SuapExtensionLcDocumentsResultMessage> | null;
+  const payload = message?.payload;
+  return message?.source === 'siages-suap-extension' &&
+    message.type === SUAP_EXTENSION_LC_DOCUMENTS_RESULT_TYPE &&
+    message.version === 1 &&
+    Boolean(payload) &&
+    payload?.suapId === expectedSuapId &&
+    Array.isArray(payload.documents) &&
+    payload.documents.length <= SUAP_EXTENSION_LC_MAX_DOCUMENTS &&
+    payload.documents.every(isValidLcDocument) &&
+    (payload.error === undefined || typeof payload.error === 'string');
+}
+
+export function isValidSuapExtensionLcRebuild(
+  event: MessageEvent,
+  expectedSource: WindowProxy | null,
+  expectedSuapId: string,
+) {
+  const message = event.data as { source?: string; type?: string; version?: number; payload?: { suapId?: string } } | null;
+  return event.origin === SUAP_EXTENSION_ORIGIN &&
+    event.source === expectedSource &&
+    message?.source === 'siages-suap-extension' &&
+    message.type === SUAP_EXTENSION_LC_REBUILD_TYPE &&
+    message.version === 1 &&
+    message.payload?.suapId === expectedSuapId;
+}
+
 export function isValidSuapExtensionProcessRetry(
   event: MessageEvent,
   expectedSource: WindowProxy | null,
@@ -320,6 +421,7 @@ export function isValidSuapExtensionProcessContext(value: unknown): value is Sua
     typeof payload.processUrl !== 'string' ||
     (payload.processNumber !== undefined && typeof payload.processNumber !== 'string') ||
     (payload.assunto !== undefined && typeof payload.assunto !== 'string') ||
+    (payload.tipoProcesso !== undefined && typeof payload.tipoProcesso !== 'string') ||
     (payload.beneficiario !== undefined && typeof payload.beneficiario !== 'string') ||
     (payload.cpfCnpj !== undefined && typeof payload.cpfCnpj !== 'string') ||
     (payload.caixa !== undefined && typeof payload.caixa !== 'string') ||
@@ -357,12 +459,13 @@ export function getSuapExtensionProcessContext(event: MessageEvent, expectedSour
     return null;
   }
 
-  const { suapId, processUrl, processNumber, assunto, beneficiario, cpfCnpj, caixa, extensionSession, route } = event.data.payload;
+  const { suapId, processUrl, processNumber, assunto, tipoProcesso, beneficiario, cpfCnpj, caixa, extensionSession, route } = event.data.payload;
   return {
     suapId,
     processUrl,
     processNumber: processNumber?.trim() || undefined,
     assunto: typeof assunto === 'string' ? assunto.trim() || undefined : undefined,
+    ...(typeof tipoProcesso === 'string' && tipoProcesso.trim() ? { tipoProcesso: tipoProcesso.trim().slice(0, 200) } : {}),
     beneficiario: typeof beneficiario === 'string' ? beneficiario.trim() || undefined : undefined,
     cpfCnpj: typeof cpfCnpj === 'string' ? cpfCnpj.trim() || undefined : undefined,
     caixa: typeof caixa === 'string' ? caixa.trim() || undefined : undefined,

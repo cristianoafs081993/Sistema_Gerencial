@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
 export interface LCRegistro {
@@ -120,8 +121,10 @@ export async function saveLCRows(rows: LCRegistro[], sourceFile: string) {
   if (error) throw error;
 }
 
-export async function loadLatestLCRowsFromDb(): Promise<{ rows: LCRegistro[]; sourceFile: string }> {
-  const { data: latest, error: latestError } = await supabase
+export async function loadLatestLCRowsFromDb(
+  client: SupabaseClient = supabase,
+): Promise<{ rows: LCRegistro[]; sourceFile: string }> {
+  const { data: latest, error: latestError } = await client
     .from('lc_credores')
     .select('imported_at, source_file')
     .order('imported_at', { ascending: false })
@@ -137,7 +140,7 @@ export async function loadLatestLCRowsFromDb(): Promise<{ rows: LCRegistro[]; so
 
   while (true) {
     const to = from + pageSize - 1;
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('lc_credores')
       .select('ob_lista_credores, sequencial, favorecido_documento, favorecido_nome, banco_codigo, banco_nome, agencia_codigo, agencia_nome, conta_bancaria, source_file, imported_at')
       .eq('imported_at', latest.imported_at)

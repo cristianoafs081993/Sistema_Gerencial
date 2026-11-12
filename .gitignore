@@ -60,3 +60,6 @@ supabase/.temp/
 *.docx
 .expo/
 local-backups/
+
+# OCR (copiado de node_modules por scripts/copy-ocr-assets.mjs)
+public/ocr/

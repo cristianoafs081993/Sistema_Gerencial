@@ -740,6 +740,19 @@ Function chamada pela extensão na rota oficial de edição de ETP.
 
 - O consumo do cache de itens de empenho revalida registros not_found e faz fallback direto ao Portal da Transparencia para evitar que uma falha transitoria oculte subitens reais.
 
+## Lista de credores automática em processos de bolsa (extensão 1.9.92)
+
+`process-document.js` -> iframe `/suap-extensao/processo-info` -> `suapLcAutoBuildService` -> (script) `extractFromText`/`extractBolsistasFromPdfFiles` -> (só se falhar) `extrair-bolsistas-documento` -> `lc_saved_lists`.
+
+- Gatilho: abrir no SUAP um processo cujo Tipo ou Assunto (dados gerais, `dt`/`dd`) contenha `bolsa`/`bolsista`. O contexto passa a levar `tipoProcesso`.
+- Mensagens da ponte, todas validadas por origem, `source` e `suapId`:
+  - `siages:suap-lc-documents-request`, do iframe para a extensão;
+  - `siages:suap-lc-documents-result`, da extensão para o iframe. Leva até 15 documentos com `{ id, title, type, kind: 'text'|'pdf', text?, bytes?, error? }`, e os PDFs vão por transferência;
+  - `siages:suap-lc-status`, do iframe para a extensão. Leva `stage`, `message`, `listId`, `found`, `expected`, `pendencias`, `method` e `warnings`;
+  - `siages:suap-lc-rebuild`, da extensão para o iframe.
+- A extensão lê os documentos com a sessão do SUAP: o texto dos documentos eletrônicos vem de `/documento_eletronico/conteudo_documento/<id>/`, convertido em texto com uma linha por bloco, e os PDFs dos digitalizados vêm de `?original=sim`. Cookies do SUAP não saem da aba.
+- Se já existe uma lista para o `suap_id`, nada é sobrescrito e o painel só aponta para ela. "Remontar" substitui as linhas, depois de confirmação.
+
 ## Revisão normativa de documentos SUAP
 
 `process-document.js` -> iframe `/suap-extensao/documento-analise` -> `analisar-documento-licitacao` -> OpenAI Responses com PDF inline (principal) -> Gemini `generateContent` com grounding de busca (fallback).

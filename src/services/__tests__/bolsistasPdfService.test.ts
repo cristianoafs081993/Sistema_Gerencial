@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { extractFromText } from '../bolsistasPdfService';
+import { extractFromText, findExpectedBolsasCount } from '../bolsistasPdfService';
 
 describe('bolsistasPdfService', () => {
   describe('extractFromText in Table Layout (Format B)', () => {
@@ -164,6 +164,94 @@ describe('bolsistasPdfService', () => {
         agencia: '0001-9',
         conta: '29365574-0',
       });
+    });
+  });
+
+  describe('extractFromText no texto do oficio eletronico do SUAP (montagem pela extensao)', () => {
+    // Dados ficticios, com a mesma estrutura do conteudo_documento do SUAP convertido em texto por bloco:
+    // nome (matricula) em linha propria, rotulos em linha propria e banco pelo nome.
+    const oficioEletronico = [
+      'Assunto: Pagamento de bolsa TAL - Outubro de 2026.',
+      'O auxílio referido por pessoa corresponde a R$ 400,00. Venho solicitar a despesa no valor de R$ 1.200,00, relativa à 3 (três) bolsas para os bolsistas abaixo relacionados, na ação de bolsas de Tutoria de Aprendizagem em Laboratório – TAL',
+      'ALUNA FICTICIA UM DA SILVA (20241031120001)',
+      'Curso',
+      'Tecnologia em Sistemas para Internet',
+      'E-mail',
+      'aluna.um@escolar.ifrn.edu.br',
+      'CPF',
+      '529.982.247-25',
+      'Empenho',
+      '2026NE000123',
+      'Dados bancários',
+      'Banco',
+      'Banco do Brasil S.A',
+      'Agência',
+      '1234',
+      'Conta',
+      '12345678-9 (Conta corrente)',
+      'ALUNO FICTICIO DOIS DOS SANTOS (20241031120002)',
+      'Curso',
+      'Técnico em Eletrônica',
+      'E-mail',
+      'aluno.dois@escolar.ifrn.edu.br',
+      'CPF',
+      '111.444.777-35',
+      'Empenho',
+      '2026NE000123',
+      'Dados bancários',
+      'Banco',
+      'Banco do Brasil S.A.',
+      'Agência',
+      '4321-0',
+      'Conta',
+      '12.345-X',
+      'ALUNO FICTICIO TRES DE ARAUJO (20241031120003)',
+      'Curso',
+      'Técnico em Informática',
+      'E-mail',
+      'aluno.tres@escolar.ifrn.edu.br',
+      'CPF',
+      '123.456.789-09',
+      'Empenho',
+      '2026NE000123',
+      'Dados bancários',
+      'Banco',
+      'Nu Pagamentos S.A. (Nubank)',
+      'Agência',
+      '0001',
+      'Conta',
+      '9876543-2 (Conta corrente)',
+    ].join('\n');
+
+    it('le os tres alunos com nomes limpos, banco pelo nome e conta com ponto e X', () => {
+      const results = extractFromText(oficioEletronico, 'Ofício Nº 1/2026');
+      expect(results.map((r) => r.nome)).toEqual([
+        'ALUNA FICTICIA UM DA SILVA',
+        'ALUNO FICTICIO DOIS DOS SANTOS',
+        'ALUNO FICTICIO TRES DE ARAUJO',
+      ]);
+      expect(results[0]).toMatchObject({ cpf: '529.982.247-25', banco: 'Banco do Brasil S.A', agencia: '1234', conta: '12345678-9', valor: 400 });
+      expect(results[1]).toMatchObject({ cpf: '111.444.777-35', agencia: '4321-0', conta: '12.345-X' });
+      expect(results[2]).toMatchObject({ banco: 'Nu Pagamentos S.A. (Nubank)', agencia: '0001', conta: '9876543-2' });
+    });
+
+    it('reconhece o total de bolsas declarado para conferir se algum aluno ficou de fora', () => {
+      expect(findExpectedBolsasCount(oficioEletronico)).toBe(3);
+    });
+  });
+
+  describe('extractFromText in labeled layout (oficio por bolsista)', () => {
+    const oficio = `
+      Pagamento de bolsa TAL_I - Setembro de 2026.  Senhor Diretor,  na ação de bolsas de Tutoria de Aprendizagem em Laboratório 3 TAL.  Ana Larissia Paixão de Lima (20231031120033) Curso   Técnico em Manutenção e Suporte em Informática  E-mail   l.larissia@escolar.ifrn.edu.br  CPF   128.375.504-18  Empenho   2026NE000028  Dados bancários Banco   Caixa Econômica Federal  Agência   3880  Conta   729602681-3  Fernanda Gabriella da Silva Medeiros (20231031160030) Curso   Técnico em Alimentos  E-mail   f.gabriella@escolar.ifrn.edu.br  CPF   094.043.564-09  Empenho   2026NE000028  Dados bancários Banco   Nu Pagamentos S.A. (Nubank)  Agência   0001  Conta   983711539-2
+    `;
+
+    it('should not prepend the end of the previous sentence (e.g. "TAL.") to the first student name', () => {
+      const results = extractFromText(oficio, 'oficio.pdf');
+      expect(results.map((r) => r.nome)).toEqual([
+        'Ana Larissia Paixão de Lima',
+        'Fernanda Gabriella da Silva Medeiros',
+      ]);
+      expect(results[0]).toMatchObject({ cpf: '128.375.504-18', agencia: '3880', conta: '729602681-3' });
     });
   });
 

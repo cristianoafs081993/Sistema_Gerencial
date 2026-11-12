@@ -374,6 +374,13 @@
   // Quick actions
   const systemActions = [
     {
+      id: 'action-siafi-deducao',
+      title: 'Preencher dedução DOB035',
+      subtitle: 'Informar dados conferidos para o item aberto',
+      keywords: 'deducao dedução dob035 conta vinculada preenchimento',
+      icon: 'fileText', color: '#1976d2', siafiOnly: true,
+    },
+    {
       id: 'action-siafi-print',
       title: 'Capturar liquidação (PDF e JSON)',
       subtitle: 'Capturar abas e pré-docs preenchidos no SIAFI',
@@ -2432,6 +2439,12 @@
 
   // Open Results Detail or Navigate
   async function openResultDetail(result, e) {
+    if (result.type === 'action' && result.data.id === 'action-siafi-deducao') {
+      if (!globalThis.SiagesDeducoesAssistidas) return;
+      closePalette();
+      globalThis.SiagesDeducoesAssistidas.open();
+      return;
+    }
     if (result.type === 'action' && ['action-siafi-print', 'action-siafi-printup'].includes(result.data.id)) {
       const collector = globalThis.SiagesSiafiEvidence;
       if (!collector?.available()) { renderResults(); return; }

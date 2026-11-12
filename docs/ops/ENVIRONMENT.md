@@ -62,6 +62,17 @@ Sem isso:
   - chave `chave-api-dados` do Portal da Transparencia
   - usada pelo proxy local do Vite para injetar a credencial nas chamadas `/api-transparencia`; se ausente, o proxy usa o fallback operacional atual do codigo
 
+## OCR de PDFs escaneados (frontend)
+
+A tela LC le paginas de PDF sem camada de texto com `tesseract.js` (ver [LC.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/LC.md)). Nao ha variavel de ambiente nem CDN externa: os arquivos pesados sao servidos pelo proprio app em `/ocr`.
+
+- dependencias: `tesseract.js` (runtime, carregado por `import()` sob demanda) e `@tesseract.js-data/por` (devDependency; so fonte do idioma portugues `4.0.0_best_int`)
+- `scripts/copy-ocr-assets.mjs` copia de `node_modules` para `public/ocr` o worker (`worker.min.js`), os nucleos `core/tesseract-core-simd-lstm.wasm.js` e `core/tesseract-core-lstm.wasm.js` e `lang/por.traineddata.gz` (~9 MB). Roda em `predev`, `prebuild` e `prebuild:dev`; falha com mensagem clara se faltar algo em `node_modules`
+- `public/ocr/` e gerado e esta no `.gitignore`; vai para `dist/ocr` no build e o Vercel serve como arquivo estatico (precede o rewrite para `index.html`)
+- o worker do Tesseract roda a partir de `blob:`, por isso `pdfOcrService.ts` monta URLs absolutas para `/ocr/...`
+- usar `tesseract.js` 6.x: a 7.0.0 depende de sintaxe (`import.source`) que o Node 20 nao entende; no navegador usa-se o bundle pronto de `dist/`. Os testes unitarios mockam `pdfOcrService`, pois o Tesseract nao roda em Node 20 neste projeto
+- sem isso o OCR falha, a tela LC avisa as paginas nao lidas (`ocr_failed`) e as demais paginas seguem normalmente
+
 ## Variaveis necessarias em funcoes e integracoes
 
 ### `suap-token-exchange`

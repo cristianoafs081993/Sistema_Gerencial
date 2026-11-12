@@ -3,6 +3,14 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('SUAP process PDF AI extraction flow', () => {
+  it('pede prova do Simples e não transforma alíquotas em valores de retenção', () => {
+    const shared = readFileSync(path.resolve(process.cwd(), 'supabase/functions/_shared/process_pdf_shared.ts'), 'utf8');
+    const prompt = shared.slice(shared.indexOf('export const EXTRACTION_PROMPT'), shared.indexOf('export const INVOICE_VERIFICATION_PROMPT'));
+    expect(prompt).toContain('"optante_simples_nacional": null');
+    expect(prompt).toContain('nunca presuma false');
+    expect(prompt).toContain('sem trocar aliquota percentual por valor em reais');
+    expect(prompt).toContain('nunca some parcelas ambiguas');
+  });
   it('enqueues the async worker without treating a pending job as completed', () => {
     const serviceSource = readFileSync(
       path.resolve(process.cwd(), 'src/services/suapScraperService.ts'),

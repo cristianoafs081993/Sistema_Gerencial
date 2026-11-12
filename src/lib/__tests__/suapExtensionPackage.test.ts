@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.90');
+    expect(manifest.version).toBe('1.9.92');
     expect(manifest.name).toBe('SIAGES');
     expect(manifest.icons['128']).toBe('logo-transparent.png');
     expect(manifest.action.default_icon['32']).toBe('logo-transparent.png');
@@ -90,7 +90,7 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(siafiPredocAlert).toMatchObject({
       matches: ['https://siafi.tesouro.gov.br/*'],
       css: ['siafi-predoc-alert.css', 'siafi-evidence.css'],
-      js: ['siafi-predoc-alert.js', 'siafi-evidence-core.js', 'siafi-evidence-pdf.js', 'siafi-analysis.js', 'siafi-evidence.js'],
+      js: ['siafi-predoc-alert.js', 'siafi-deducoes-assistidas.js', 'siafi-evidence-core.js', 'siafi-evidence-pdf.js', 'siafi-analysis.js', 'siafi-evidence.js'],
       run_at: 'document_idle',
     });
     expect(comprasnetPredocAlert).toMatchObject({

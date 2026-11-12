@@ -182,6 +182,11 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 
 ## Regra pratica
 
+- `SuapeLcCard` (`.suape-lc-card`, extensão 1.9.92): card "Lista de credores" no topo da aba Resumo do painel do processo SUAP, logo abaixo do status de sincronização. Aparece só em processos de bolsa.
+  - Estado e conteúdo: `aria-live="polite"`, `data-stage` (`collecting`, `reading`, `ai`, `saving`, `ready`, `existing`, `empty`, `error`), a mensagem da etapa, a linha de fatos (`N aluno(s) · N declarado(s) · N pendência(s) · via IA · conferir`) e até 3 avisos em `.suape-lc-warning`.
+  - Ações: `Abrir no SIAGES` (link `suape-button` para `/lc?lista=<id>`, em nova aba) e `Remontar`/`Tentar novamente` (`suape-button-secondary`, com `confirm` quando já existe lista). Durante as etapas de trabalho nenhum botão aparece.
+  - Visual: usa só os tokens `--suape-*` do toolkit (`--suape-muted`, `--suape-primary-soft`, `--suape-danger` no erro). Na tela `/lc`, as linhas extraídas por IA ganham o selo `IA · conferir` (âmbar), ao lado do selo `OCR · conferir` (violeta).
+
 - `SiagesSiafiEvidence` (extensão 1.9.70): diálogo isolado `#siages-siafi-evidence`, criado somente pelo comando Ctrl+K → `print` no DH SIAFI. Inclui opção de pré-docs, nova captura, cancelamento, progresso acessível, downloads PDF/JSON e Fechar/Esc, com retorno de foco e ciclo de Tab. Não há card permanente; o diálogo e seu fundo ficam ocultos nos screenshots. O PDF começa nas telas, sem capa, cabeçalho ou rodapé; avisos de captura parcial ficam no diálogo e no JSON. Usa a paleta clara e botões de 8px do Céu, sem sobrescrever o formulário do SIAFI. Contrato: [SIAFI_EVIDENCE](../integrations/SIAFI_EVIDENCE.md).
 
 - Filtros: `FilterPanel`.

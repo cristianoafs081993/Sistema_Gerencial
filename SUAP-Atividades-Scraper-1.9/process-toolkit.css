@@ -82,6 +82,15 @@
 .suape-status { margin-bottom: 10px; padding: 9px 10px; border: 1px solid var(--suape-border); border-radius: 9px; background: var(--suape-primary-soft); color: var(--suape-text); font-size: 11px; }
 .suape-status[data-stage="error"] { border-color: color-mix(in srgb, var(--suape-danger) 55%, transparent); color: var(--suape-danger); }
 .suape-status button { margin-top: 7px; }
+.suape-lc-card { margin-bottom: 10px; }
+.suape-lc-card .suape-section-title { display: block; padding: 10px 12px 0; }
+.suape-lc-body { display: grid; gap: 6px; padding: 6px 12px 12px; font-size: 11px; color: var(--suape-text); }
+.suape-lc-body p { margin: 0; }
+.suape-lc-facts { color: var(--suape-muted); font-weight: 700; }
+.suape-lc-warning { padding: 6px 8px; border-radius: 7px; background: var(--suape-primary-soft); color: var(--suape-text); }
+.suape-lc-card[data-stage="error"] .suape-lc-message { color: var(--suape-danger); }
+.suape-lc-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.suape-lc-actions .suape-button { min-height: 32px; padding: 6px 10px; text-decoration: none; font-size: 11px; }
 .suape-button { display: inline-flex; min-height: 36px; align-items: center; justify-content: center; border: 0; border-radius: 8px; padding: 8px 12px; background: var(--suape-primary-strong); color: #fff; cursor: pointer; font-weight: 750; }
 .suape-button:hover, .suape-button:focus-visible { filter: brightness(1.08); outline: none; box-shadow: 0 0 0 3px var(--suape-primary-soft); }
 .suape-button-secondary { border: 1px solid var(--suape-border); background: var(--suape-surface-2); color: var(--suape-text); }

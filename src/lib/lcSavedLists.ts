@@ -1,3 +1,17 @@
+export type LcSavedListOrigin = 'manual' | 'extensao';
+
+/** Como a extensao montou a lista a partir do processo SUAP. */
+export type LcSavedListExtraction = {
+  method: 'script' | 'ia';
+  documents: Array<{ id: string; title: string; kind: 'text' | 'pdf' }>;
+  /** Total de bolsas declarado no documento ("10 (dez) bolsas"), quando houver. */
+  expected?: number;
+  found: number;
+  pendencias: number;
+  warnings: string[];
+  builtAt: string;
+};
+
 export type LcSavedList<Row = unknown> = {
   id: string;
   name: string;
@@ -5,6 +19,10 @@ export type LcSavedList<Row = unknown> = {
   updatedAt: string;
   sourcePdfNames: string[];
   rows: Row[];
+  suapId?: string;
+  processNumber?: string;
+  origin?: LcSavedListOrigin;
+  extraction?: LcSavedListExtraction;
 };
 
 type SaveLcListInput<Row> = {

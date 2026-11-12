@@ -38,6 +38,25 @@ vi.mock('@/services/suapScraperService', () => ({
 }));
 
 import { DEFAULT_PROCESS_MAPPINGS } from '@/data/defaultProcessMapping';
+import { runSuapLcAutoBuild } from '@/services/suapLcAutoBuildService';
+import {
+  SUAP_EXTENSION_LC_DOCUMENTS_REQUEST_TYPE,
+  SUAP_EXTENSION_LC_DOCUMENTS_RESULT_TYPE,
+  SUAP_EXTENSION_LC_REBUILD_TYPE,
+  SUAP_EXTENSION_LC_STATUS_TYPE,
+  type SuapExtensionProcessContextMessage,
+} from '@/lib/suapExtensionDispatch';
+
+vi.mock('@/services/bolsistasPdfService', () => ({ extractBolsistasFromPdfFiles: vi.fn() }));
+vi.mock('@/services/lcImportService', () => ({ loadLatestLCRowsFromDb: vi.fn().mockResolvedValue({ rows: [], sourceFile: '' }) }));
+vi.mock('@/services/lcSavedListsService', () => ({
+  findSharedLcSavedListBySuapId: vi.fn().mockResolvedValue(null),
+  saveSharedLcSavedList: vi.fn(),
+}));
+vi.mock('@/services/suapLcAutoBuildService', async () => {
+  const actual = await vi.importActual<typeof import('@/services/suapLcAutoBuildService')>('@/services/suapLcAutoBuildService');
+  return { ...actual, runSuapLcAutoBuild: vi.fn().mockResolvedValue(null), extractBolsistasWithAi: vi.fn() };
+});
 
 vi.mock('@/services/processMappings', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/services/processMappings')>();
@@ -355,5 +374,53 @@ describe('SuapExtensionProcessInfo', () => {
     });
 
     postMessage.mockRestore();
+  });
+
+  describe('lista de credores automatica', () => {
+    const bolsaContext = {
+      ...processContext,
+      payload: { ...processContext.payload, assunto: 'Bolsa TAL 2026 - Outubro.', tipoProcesso: 'Ensino: Pagamento de Bolsa' },
+    };
+
+    it('nao monta lista em processo que nao e de bolsa', async () => {
+      render(<SuapExtensionProcessInfo />);
+      await sendContext();
+      await waitFor(() => expect(suapProcessosService.getBySuapId).toHaveBeenCalled());
+      expect(runSuapLcAutoBuild).not.toHaveBeenCalled();
+    });
+
+    it('monta em processo de bolsa: pede os documentos ao SUAP e publica o status', async () => {
+      const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
+      render(<SuapExtensionProcessInfo />);
+      await sendContext(bolsaContext);
+
+      await waitFor(() => expect(runSuapLcAutoBuild).toHaveBeenCalledTimes(1));
+      const [info, deps, options] = vi.mocked(runSuapLcAutoBuild).mock.calls[0];
+      expect(info).toEqual({ suapId: '987', processNumber: '23035.000987.2026-11', assunto: 'Bolsa TAL 2026 - Outubro.', tipoProcesso: 'Ensino: Pagamento de Bolsa' });
+      expect(options).toEqual({ force: false });
+
+      const documentsPromise = deps.requestDocuments();
+      expect(postMessage).toHaveBeenCalledWith({ source: 'siages', type: SUAP_EXTENSION_LC_DOCUMENTS_REQUEST_TYPE, version: 1, payload: { suapId: '987' } }, SUAP_EXTENSION_ORIGIN);
+      const documents = [{ id: '1168328', title: 'Ofício Nº 156/2026', type: 'Ofício', kind: 'text', text: 'conteudo' }];
+      // Resposta de outra origem e ignorada; a da extensao resolve o pedido.
+      window.dispatchEvent(new MessageEvent('message', { origin: 'https://origem-invalida.exemplo', source: window.parent, data: { source: 'siages-suap-extension', type: SUAP_EXTENSION_LC_DOCUMENTS_RESULT_TYPE, version: 1, payload: { suapId: '987', documents: [] } } }));
+      window.dispatchEvent(new MessageEvent('message', { origin: SUAP_EXTENSION_ORIGIN, source: window.parent, data: { source: 'siages-suap-extension', type: SUAP_EXTENSION_LC_DOCUMENTS_RESULT_TYPE, version: 1, payload: { suapId: '987', documents } } }));
+      await expect(documentsPromise).resolves.toEqual(documents);
+
+      deps.onStatus({ suapId: '987', stage: 'ready', message: 'ok', listId: 'list-1' });
+      expect(postMessage).toHaveBeenCalledWith({ source: 'siages', type: SUAP_EXTENSION_LC_STATUS_TYPE, version: 1, payload: { suapId: '987', stage: 'ready', message: 'ok', listId: 'list-1' } }, SUAP_EXTENSION_ORIGIN);
+      postMessage.mockRestore();
+    });
+
+    it('remonta com force quando a extensao pede', async () => {
+      render(<SuapExtensionProcessInfo />);
+      await sendContext(bolsaContext);
+      await waitFor(() => expect(runSuapLcAutoBuild).toHaveBeenCalledTimes(1));
+
+      await sendContext({ source: 'siages-suap-extension', type: SUAP_EXTENSION_LC_REBUILD_TYPE, version: 1, payload: { suapId: '987' } } as never);
+
+      await waitFor(() => expect(runSuapLcAutoBuild).toHaveBeenCalledTimes(2));
+      expect(vi.mocked(runSuapLcAutoBuild).mock.calls[1][2]).toEqual({ force: true });
+    });
   });
 });

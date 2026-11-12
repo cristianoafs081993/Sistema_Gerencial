@@ -34,6 +34,8 @@ Este indice organiza a documentacao operacional do repositorio por dominio.
 
 ## Integracoes e operacao
 
+- [Mapeamento da aba Dedução do SIAFI](integrations/SIAFI_DEDUCOES_MAPEAMENTO.md)
+
 - [Comprovantes de preenchimento do SIAFI: PDF e JSON](integrations/SIAFI_EVIDENCE.md)
 
 - [Diagnóstico e recuperação do Supabase](ops/SUPABASE_RECOVERY.md)

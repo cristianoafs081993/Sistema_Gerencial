@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SIAGES",
-  "version": "1.9.90",
+  "version": "1.9.92",
   "description": "Paleta Ctrl+K, resumo de processos, caminho BPMN, dados financeiros, atalhos e documentos com IA no SIAGES, SUAP e Comprasnet.",
   "permissions": [
     "activeTab",
@@ -154,6 +154,7 @@
       ],
       "js": [
         "siafi-predoc-alert.js",
+        "siafi-deducoes-assistidas.js",
         "siafi-evidence-core.js",
         "siafi-evidence-pdf.js",
         "siafi-analysis.js",
