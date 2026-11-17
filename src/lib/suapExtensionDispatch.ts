@@ -19,6 +19,7 @@ export type SuapExtensionProcessContext = {
   extensionSession?: {
     accessToken: string;
     expiresAt?: number;
+    campusUasg?: string;
   };
   route?: SuapProcessRouteSnapshot;
   customMappings?: ProcessMappingRecord[];
@@ -201,7 +202,8 @@ export function isValidSuapExtensionDocumentAnalysisContext(value: unknown): val
       typeof payload.extensionSession.accessToken !== 'string' ||
       !payload.extensionSession.accessToken ||
       payload.extensionSession.accessToken.length > 10000 ||
-      (payload.extensionSession.expiresAt !== undefined && (!Number.isFinite(payload.extensionSession.expiresAt) || payload.extensionSession.expiresAt <= 0))
+      (payload.extensionSession.expiresAt !== undefined && (!Number.isFinite(payload.extensionSession.expiresAt) || payload.extensionSession.expiresAt <= 0)) ||
+      (payload.extensionSession.campusUasg !== undefined && (typeof payload.extensionSession.campusUasg !== 'string' || !/^\d{6}$/.test(payload.extensionSession.campusUasg.trim())))
     ))
   ) return false;
 
@@ -439,7 +441,8 @@ export function isValidSuapExtensionProcessContext(value: unknown): value is Sua
       typeof payload.extensionSession.accessToken !== 'string' ||
       !payload.extensionSession.accessToken ||
       payload.extensionSession.accessToken.length > 10000 ||
-      (payload.extensionSession.expiresAt !== undefined && (!Number.isFinite(payload.extensionSession.expiresAt) || payload.extensionSession.expiresAt <= 0))
+      (payload.extensionSession.expiresAt !== undefined && (!Number.isFinite(payload.extensionSession.expiresAt) || payload.extensionSession.expiresAt <= 0)) ||
+      (payload.extensionSession.campusUasg !== undefined && (typeof payload.extensionSession.campusUasg !== 'string' || !/^\d{6}$/.test(payload.extensionSession.campusUasg.trim())))
     ))
   ) {
     return false;
@@ -473,6 +476,7 @@ export function getSuapExtensionProcessContext(event: MessageEvent, expectedSour
       extensionSession: {
         accessToken: extensionSession.accessToken,
         ...(extensionSession.expiresAt ? { expiresAt: extensionSession.expiresAt } : {}),
+        ...(extensionSession.campusUasg?.trim() ? { campusUasg: extensionSession.campusUasg.trim() } : {}),
       },
     } : {}),
     ...(route ? { route } : {}),

@@ -692,7 +692,7 @@
           ...(state.selectedMappingId ? { selectedMappingId: state.selectedMappingId } : {}),
           ...(state.manualStepNodeId ? { manualCurrentStepNodeId: state.manualStepNodeId } : {}),
         },
-        ...(session ? { extensionSession: { accessToken: session.accessToken, ...(session.expiresAt ? { expiresAt: session.expiresAt } : {}) } } : {}),
+        ...(session ? { extensionSession: { accessToken: session.accessToken, ...(session.expiresAt ? { expiresAt: session.expiresAt } : {}), ...(session.campusUasg ? { campusUasg: session.campusUasg } : (state.campusUasg ? { campusUasg: state.campusUasg } : {})) } } : {}),
       },
     };
   }
@@ -1302,6 +1302,7 @@
     const form = createElement('form', 'suape-form suape-auth-form'); form.noValidate = true; form.style.padding = '11px'; form.dataset.authenticated = 'false';
     form.innerHTML = [
       '<div class="suape-auth-user-box" data-auth-connected-box style="display:none !important;"><span class="suape-auth-user-label">Usuário conectado</span><strong class="suape-auth-user-email"></strong></div>',
+      '<label for="suape-auth-campus" data-auth-campus-box style="display:none !important;"><span>Campus vinculado (UASG)</span><select id="suape-auth-campus" class="suape-input" name="campus_uasg" data-auth-campus aria-label="Campus vinculado (UASG)"><option value="158366">158366 — Currais Novos</option><option value="158155">158155 — Reitoria</option><option value="158371">158371 — Apodi</option><option value="158370">158370 — Caicó</option><option value="154839">154839 — Canguaretama</option><option value="154838">154838 — Ceará-Mirim</option><option value="158367">158367 — Ipanguaçu</option><option value="158373">158373 — João Câmara</option><option value="158887">158887 — Lajes</option><option value="158375">158375 — Macau</option><option value="158365">158365 — Mossoró</option><option value="158369">158369 — Natal - Central</option><option value="152711">152711 — Natal - Cidade Alta</option><option value="158368">158368 — Natal - Zona Norte</option><option value="152757">152757 — Nova Cruz</option><option value="158882">158882 — Parelhas</option><option value="152756">152756 — Parnamirim</option><option value="158374">158374 — Pau dos Ferros</option><option value="158372">158372 — Santa Cruz</option><option value="154582">154582 — São Gonçalo do Amarante</option><option value="158897">158897 — São Miguel</option><option value="154840">154840 — São Paulo do Potengi</option><option value="158896">158896 — Touros</option><option value="158898">158898 — Umarizal</option></select></label>',
       '<label for="suape-auth-email" data-auth-field><span>E-mail cadastrado no SIAGES</span><input id="suape-auth-email" class="suape-input" name="email" type="text" inputmode="email" autocomplete="username" placeholder="nome@dominio.com" required></label>',
       '<label for="suape-auth-password" data-auth-field><span>Senha do SIAGES</span><input id="suape-auth-password" class="suape-input" name="password" type="password" autocomplete="current-password" required></label>',
       '<div class="suape-auth-actions"><button class="suape-button suape-full" type="submit" data-signin>Entrar</button><button class="suape-button suape-button-secondary suape-full" type="button" data-signout style="display:none !important;">Sair</button></div>',
@@ -1310,6 +1311,29 @@
     isolateAuthFormLayout(form);
     form.addEventListener('submit', signIn);
     form.querySelector('[data-signout]').addEventListener('click', signOut);
+    form.querySelector('[data-auth-campus]')?.addEventListener('change', async (event) => {
+      const select = event.currentTarget;
+      const message = form.querySelector('[data-auth-message]');
+      select.disabled = true;
+      try {
+        if (!globalThis.SiagesExtensionAuth?.setCampus) throw new Error('O serviço de autenticação da extensão não está disponível.');
+        const saved = await globalThis.SiagesExtensionAuth.setCampus(select.value);
+        state.campusUasg = saved || select.value;
+        select.value = state.campusUasg;
+        if (message) {
+          message.dataset.state = 'success';
+          message.textContent = `Campus vinculado atualizado (${select.selectedOptions?.[0]?.textContent || state.campusUasg}).`;
+        }
+        restartBridge();
+      } catch (error) {
+        if (message) {
+          message.dataset.state = 'error';
+          message.textContent = formatAuthError(error);
+        }
+      } finally {
+        select.disabled = false;
+      }
+    });
     authSection.appendChild(form);
     container.appendChild(authSection);
     void updateAuthStatus(form);
@@ -1337,6 +1361,21 @@
       if (emailEl) {
         emailEl.textContent = extractEmailFromSession(session) || 'Usuário autenticado';
       }
+    }
+    const campusBox = form.querySelector('[data-auth-campus-box]');
+    const campusSelect = form.querySelector('[data-auth-campus]');
+    if (campusBox) {
+      campusBox.style.setProperty('display', isAuthenticated ? 'grid' : 'none', 'important');
+    }
+    if (campusSelect) {
+      campusSelect.value = session?.campusUasg || state.campusUasg || '158366';
+    }
+    if (isAuthenticated && typeof globalThis.SiagesExtensionAuth?.getCampus === 'function') {
+      void globalThis.SiagesExtensionAuth.getCampus().then((campusUasg) => {
+        if (form.dataset.authStatusRequest !== requestId || !campusUasg) return;
+        state.campusUasg = campusUasg;
+        if (campusSelect) campusSelect.value = campusUasg;
+      }).catch(() => undefined);
     }
     form.querySelectorAll('[data-auth-field]').forEach((field) => {
       field.style.setProperty('display', isAuthenticated ? 'none' : 'grid', 'important');

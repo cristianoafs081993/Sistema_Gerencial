@@ -26,6 +26,8 @@ let rdUnit = null;
 const extensionAuthForm = document.getElementById('extension-auth-form');
 const extensionAuthUser = document.getElementById('extension-auth-user');
 const extensionAuthUserEmail = document.getElementById('extension-auth-user-email');
+const extensionAuthCampusField = document.getElementById('extension-auth-campus-field');
+const extensionUserCampusSelect = document.getElementById('extension-user-campus-select');
 const extensionAuthBadge = document.getElementById('extension-auth-badge');
 const extensionAuthEmailInput = document.getElementById('extension-auth-email');
 const extensionAuthPasswordInput = document.getElementById('extension-auth-password');
@@ -50,19 +52,34 @@ let siafiLists = [];
 let siafiBatchProgress = null;
 let siafiActiveTab = null;
 
-function setExtensionAuthStatus(message, isError = false) {
+function setExtensionAuthStatus(message, isError = false, isNotice = false) {
   extensionAuthStatus.textContent = message;
   extensionAuthStatus.dataset.error = String(isError);
+  if (isNotice) extensionAuthStatus.dataset.notice = 'true';
+  else delete extensionAuthStatus.dataset.notice;
 }
 
 function renderExtensionAccount(session) {
   const connected = Boolean(session?.accessToken);
   extensionAuthForm.hidden = connected;
   extensionAuthUser.hidden = !connected;
+  if (extensionAuthCampusField) extensionAuthCampusField.hidden = !connected;
   extensionAuthBadge.textContent = connected ? 'Conectado' : 'Desconectado';
   extensionAuthBadge.dataset.state = connected ? 'connected' : 'disconnected';
   extensionAuthUserEmail.textContent = connected ? session.user?.email || 'Conta SIAGES conectada' : '';
-  if (connected) extensionAuthPasswordInput.value = '';
+  if (extensionUserCampusSelect) {
+    extensionUserCampusSelect.value = session?.campusUasg || '158366';
+  }
+  if (connected) {
+    extensionAuthPasswordInput.value = '';
+    if (typeof globalThis.SiagesExtensionAuth?.getCampus === 'function') {
+      const request = authStatusRequest;
+      void globalThis.SiagesExtensionAuth.getCampus().then((campusUasg) => {
+        if (request !== authStatusRequest || !extensionUserCampusSelect || !campusUasg) return;
+        extensionUserCampusSelect.value = campusUasg;
+      }).catch(() => undefined);
+    }
+  }
   updateSyncAccess(session);
 }
 
@@ -217,10 +234,29 @@ extensionSignOutButton.addEventListener('click', async () => {
     extensionSignOutButton.disabled = false;
   }
 });
+extensionUserCampusSelect?.addEventListener('change', async () => {
+  const nextCampusUasg = extensionUserCampusSelect.value;
+  extensionUserCampusSelect.disabled = true;
+  try {
+    if (!globalThis.SiagesExtensionAuth?.setCampus) throw new Error('O serviço de autenticação da extensão não está disponível.');
+    const saved = await globalThis.SiagesExtensionAuth.setCampus(nextCampusUasg);
+    extensionUserCampusSelect.value = saved || nextCampusUasg;
+    const selectedLabel = extensionUserCampusSelect.selectedOptions?.[0]?.textContent || saved || nextCampusUasg;
+    setExtensionAuthStatus(`Campus vinculado atualizado: ${selectedLabel}.`, false, true);
+  } catch (error) {
+    setExtensionAuthStatus(formatExtensionAuthError(error), true);
+  } finally {
+    extensionUserCampusSelect.disabled = false;
+  }
+});
 void updateExtensionAuthStatus();
 chrome?.storage?.onChanged?.addListener((changes, areaName) => {
   if (areaName === 'local' && changes['siages-process-box-sync-state']) updateProcessBoxSyncStatus();
   if (areaName === 'local' && changes['siages-extension-session']) void updateExtensionAuthStatus();
+  if (areaName === 'local' && changes['siages-user-campus-uasg'] && extensionUserCampusSelect) {
+    const nextVal = changes['siages-user-campus-uasg'].newValue;
+    if (typeof nextVal === 'string' && nextVal) extensionUserCampusSelect.value = nextVal;
+  }
 });
 
 function log(msg, type = 'info') {

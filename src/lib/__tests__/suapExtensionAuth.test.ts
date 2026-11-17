@@ -238,4 +238,33 @@ describe('autenticação persistente da extensão', () => {
     await expect(background.send({ type: 'get-session' })).resolves.toMatchObject({ ok: true, session: { accessToken: 'renovado' } });
     expect(values[SESSION_KEY]).toMatchObject({ refreshToken: 'novo-refresh' });
   });
+
+  it('consulta e atualiza o campus (UASG) vinculado ao usuário na extensão', async () => {
+    const userId = '2f4513d7-af42-4270-beb4-1f854cdc4b5e';
+    const session = {
+      accessToken: 'token-valido',
+      refreshToken: 'refresh-valido',
+      expiresAt: Date.now() / 1000 + 3600,
+      user: { id: userId, email: 'servidor@ifrn.edu.br' },
+    };
+    const values: StorageValues = { [SESSION_KEY]: session };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => JSON.stringify([{ campus_uasg: '158366' }]) })
+      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => JSON.stringify('158370') });
+    vi.stubGlobal('fetch', fetchMock);
+    const background = loadBackground(values);
+
+    await expect(background.send({ type: 'get-campus' })).resolves.toEqual({
+      ok: true,
+      campusUasg: '158366',
+    });
+    expect(values['siages-user-campus-uasg']).toBe('158366');
+
+    await expect(background.send({ type: 'set-campus', campusUasg: '158370' } as unknown as { type: string })).resolves.toEqual({
+      ok: true,
+      campusUasg: '158370',
+    });
+    expect(values['siages-user-campus-uasg']).toBe('158370');
+    expect(values[SESSION_KEY]).toMatchObject({ campusUasg: '158370' });
+  });
 });

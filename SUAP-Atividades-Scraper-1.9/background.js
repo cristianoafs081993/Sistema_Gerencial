@@ -10,6 +10,14 @@ const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
 const AUTH_MESSAGE_SOURCE = 'siages-extension-auth';
 const EXTENSION_SESSION_STORAGE_KEY = 'siages-extension-session';
+const USER_CAMPUS_STORAGE_KEY = 'siages-user-campus-uasg';
+const DEFAULT_CAMPUS_UASG = '158366';
+const IFRN_CAMPUS_UASGS = new Set([
+  '152711', '152756', '152757', '154582', '154838', '154839', '154840',
+  '158155', '158365', '158366', '158367', '158368', '158369', '158370',
+  '158371', '158372', '158373', '158374', '158375', '158882', '158887',
+  '158896', '158897', '158898',
+]);
 const SESSION_REFRESH_ALARM = 'siages-extension-session-refresh';
 const REFRESH_AHEAD_SECONDS = 20 * 60;
 const PROCESS_BOX_SYNC_SOURCE = 'siages-extension-process-box-sync';
@@ -21,19 +29,55 @@ const PROCESS_BOX_SYNC = globalThis.SuapeScheduledProcessSync;
 let refreshInFlight = null;
 let sessionGeneration = 0;
 
-function buildSession(payload) {
+function isValidCampusUasg(value) {
+  return typeof value === 'string' && IFRN_CAMPUS_UASGS.has(value.trim());
+}
+
+function normalizeCampusUasg(value) {
+  const clean = typeof value === 'string' ? value.trim() : '';
+  return IFRN_CAMPUS_UASGS.has(clean) ? clean : DEFAULT_CAMPUS_UASG;
+}
+
+function extractUserIdFromSession(session) {
+  if (typeof session?.user?.id === 'string' && session.user.id.trim()) return session.user.id.trim();
+  const token = session?.accessToken;
+  if (typeof token !== 'string') return '';
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return '';
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const decoded = JSON.parse(atob(padded));
+    return typeof decoded?.sub === 'string' ? decoded.sub.trim() : '';
+  } catch {
+    return '';
+  }
+}
+
+function buildSession(payload, previousCampusUasg) {
   if (!payload?.access_token || !payload?.refresh_token) return null;
+  const campusUasg = isValidCampusUasg(previousCampusUasg)
+    ? previousCampusUasg.trim()
+    : isValidCampusUasg(payload?.user?.user_metadata?.campus_uasg)
+      ? payload.user.user_metadata.campus_uasg.trim()
+      : undefined;
   return {
     accessToken: payload.access_token,
     refreshToken: payload.refresh_token,
     expiresAt: Math.floor(Date.now() / 1000) + Number(payload.expires_in || 3600),
     user: payload.user || null,
+    ...(campusUasg ? { campusUasg } : {}),
   };
 }
 
 function toPublicSession(session) {
   if (!session?.accessToken) return null;
-  return { accessToken: session.accessToken, expiresAt: session.expiresAt, user: session.user || null };
+  return {
+    accessToken: session.accessToken,
+    expiresAt: session.expiresAt,
+    user: session.user || null,
+    ...(isValidCampusUasg(session.campusUasg) ? { campusUasg: session.campusUasg.trim() } : {}),
+  };
 }
 
 async function readStoredSession() {
@@ -116,7 +160,7 @@ async function refreshSessionIfNeeded() {
         throw new Error(getRefreshErrorMessage(response, payload));
       }
 
-      const nextSession = buildSession(payload);
+      const nextSession = buildSession(payload, session.campusUasg);
       if (!nextSession) throw new Error('O SIAGES não devolveu uma sessão renovada válida.');
       if (generation !== sessionGeneration) return readStoredSession();
 
@@ -145,10 +189,68 @@ async function refreshSessionIfNeeded() {
   return refreshInFlight;
 }
 
+async function resolveUserCampusUasg() {
+  const storedCampus = await chrome.storage.local.get(USER_CAMPUS_STORAGE_KEY).catch(() => ({}));
+  const session = await refreshSessionIfNeeded().catch(() => null);
+  let campusUasg = normalizeCampusUasg(session?.campusUasg || storedCampus?.[USER_CAMPUS_STORAGE_KEY]);
+
+  const userId = extractUserIdFromSession(session);
+  if (session?.accessToken && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+    try {
+      const rows = await fetchSupabaseRest(
+        `user_campus_preferences?select=campus_uasg&user_id=eq.${encodeURIComponent(userId)}&limit=1`,
+        session.accessToken,
+      );
+      const remoteCampus = Array.isArray(rows) ? rows[0]?.campus_uasg : null;
+      if (isValidCampusUasg(remoteCampus)) {
+        campusUasg = remoteCampus.trim();
+      }
+      const latestSession = await readStoredSession();
+      const updates = { [USER_CAMPUS_STORAGE_KEY]: campusUasg };
+      if (latestSession?.accessToken === session.accessToken && latestSession.campusUasg !== campusUasg) {
+        updates[EXTENSION_SESSION_STORAGE_KEY] = { ...latestSession, campusUasg };
+      }
+      await chrome.storage.local.set(updates);
+    } catch {
+      // Mantém a preferência local/padrão quando a consulta remota oscilar.
+    }
+  }
+  return campusUasg;
+}
+
+async function saveUserCampusUasg(targetUasg) {
+  const clean = typeof targetUasg === 'string' ? targetUasg.trim() : '';
+  if (!isValidCampusUasg(clean)) {
+    throw new Error('Campus IFRN inválido.');
+  }
+
+  const session = await refreshSessionIfNeeded().catch(() => null);
+  if (session?.accessToken) {
+    await fetchSupabaseRest('rpc/set_user_campus_uasg', session.accessToken, {
+      method: 'POST',
+      body: JSON.stringify({ target_uasg: clean }),
+    });
+  }
+
+  const latestSession = await readStoredSession();
+  const updates = { [USER_CAMPUS_STORAGE_KEY]: clean };
+  if (latestSession?.accessToken) {
+    updates[EXTENSION_SESSION_STORAGE_KEY] = { ...latestSession, campusUasg: clean };
+  }
+  await chrome.storage.local.set(updates);
+  return clean;
+}
+
 async function handleAuthMessage(message) {
   if (message.type === 'get-session') {
     await ensureSessionRefreshAlarm();
     return { session: toPublicSession(await refreshSessionIfNeeded()) };
+  }
+  if (message.type === 'get-campus') {
+    return { campusUasg: await resolveUserCampusUasg() };
+  }
+  if (message.type === 'set-campus') {
+    return { campusUasg: await saveUserCampusUasg(message.campusUasg) };
   }
   if (message.type === 'sign-in') {
     const email = String(message.email || '').trim();

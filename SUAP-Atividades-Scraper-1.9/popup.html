@@ -41,11 +41,12 @@
 
     /* Conta */
     .account-user { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+    .account-campus { margin: 10px 0 0; }
     #extension-auth-user-email { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
     #btn-extension-sign-out { width: auto; min-height: 28px; margin: 0; padding: 4px 12px; flex-shrink: 0; }
     #extension-auth-form { margin-top: 10px; }
     #extension-auth-status { margin: 8px 0 0; }
-    .account-card:has(#extension-auth-user:not([hidden])) #extension-auth-status:not([data-error="true"]) { display: none; }
+    .account-card:has(#extension-auth-user:not([hidden])) #extension-auth-status:not([data-error="true"]):not([data-notice="true"]) { display: none; }
 
     /* Formulários e botões */
     label { display: block; margin-bottom: 10px; font-size: 12px; font-weight: 600; }
@@ -125,6 +126,35 @@
       <span id="extension-auth-user-email"></span>
       <button id="btn-extension-sign-out" type="button" class="secondary">Sair</button>
     </div>
+    <label id="extension-auth-campus-field" class="account-campus" hidden>
+      Campus vinculado (UASG)
+      <select id="extension-user-campus-select" aria-label="Campus vinculado (UASG)">
+        <option value="158366">158366 — Currais Novos</option>
+        <option value="158155">158155 — Reitoria</option>
+        <option value="158371">158371 — Apodi</option>
+        <option value="158370">158370 — Caicó</option>
+        <option value="154839">154839 — Canguaretama</option>
+        <option value="154838">154838 — Ceará-Mirim</option>
+        <option value="158367">158367 — Ipanguaçu</option>
+        <option value="158373">158373 — João Câmara</option>
+        <option value="158887">158887 — Lajes</option>
+        <option value="158375">158375 — Macau</option>
+        <option value="158365">158365 — Mossoró</option>
+        <option value="158369">158369 — Natal - Central</option>
+        <option value="152711">152711 — Natal - Cidade Alta</option>
+        <option value="158368">158368 — Natal - Zona Norte</option>
+        <option value="152757">152757 — Nova Cruz</option>
+        <option value="158882">158882 — Parelhas</option>
+        <option value="152756">152756 — Parnamirim</option>
+        <option value="158374">158374 — Pau dos Ferros</option>
+        <option value="158372">158372 — Santa Cruz</option>
+        <option value="154582">154582 — São Gonçalo do Amarante</option>
+        <option value="158897">158897 — São Miguel</option>
+        <option value="154840">154840 — São Paulo do Potengi</option>
+        <option value="158896">158896 — Touros</option>
+        <option value="158898">158898 — Umarizal</option>
+      </select>
+    </label>
     <p id="extension-auth-status" class="helper" role="status" aria-live="polite">Verificando sua sessão…</p>
   </section>
   <section id="siafi-favorecidos-card" class="card" hidden aria-labelledby="siafi-favorecidos-title">

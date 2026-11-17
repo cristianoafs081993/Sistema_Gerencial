@@ -32,5 +32,7 @@
     getSession: async () => (await request('get-session')).session || null,
     signIn: async (email, password) => (await request('sign-in', { email, password })).session,
     signOut: async () => { await request('sign-out'); },
+    getCampus: async () => (await request('get-campus')).campusUasg || '158366',
+    setCampus: async (campusUasg) => (await request('set-campus', { campusUasg })).campusUasg,
   };
 })();

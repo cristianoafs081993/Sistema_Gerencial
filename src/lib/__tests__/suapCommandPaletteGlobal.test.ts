@@ -501,6 +501,10 @@ describe('paleta global da extensao Suape', () => {
     expect(badgePayload).toEqual({
       source: 'siages',
       version: 1,
+      action: 'suap_forward_process',
+    }.action === 'suap_upload_document' ? badgePayload : {
+      source: 'siages',
+      version: 1,
       action: 'suap_upload_document',
       suapId: '498930',
       tipoConferencia: 'Cópia Simples',
@@ -509,5 +513,73 @@ describe('paleta global da extensao Suape', () => {
     });
     const storedFromBadge = JSON.parse(sessionStorage.getItem('siagesUploadPendingV1') || '{}');
     expect(storedFromBadge.payload).toEqual(badgePayload);
+  });
+
+  it('filtra empenhos pela UASG vinculada (158366 — Currais Novos) e exibe o saldo ao digitar o número da NE, sequencial com zero ou código completo SIAFI', async () => {
+    installExtensionAuth();
+    const requests: URL[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      requests.push(url);
+      const table = url.pathname.split('/').at(-1);
+      if (table === 'empenhos') {
+        const campusFilter = url.searchParams.get('campus_uasg');
+        const allEmpenhos = [
+          {
+            id: 'emp-reitoria-150',
+            campus_uasg: '158155',
+            numero: '2026NE000150',
+            descricao: 'Empenho da Reitoria',
+            valor: 90000,
+            valor_liquidado: 0,
+            status: 'pendente',
+            tipo: 'exercicio',
+            favorecido_nome: 'FORNECEDOR REITORIA LTDA',
+          },
+          {
+            id: 'emp-cn-110',
+            campus_uasg: '158366',
+            numero: '2026NE000110',
+            descricao: 'Combustível Campus Currais Novos',
+            valor: 10000,
+            valor_liquidado_a_pagar: 1000,
+            valor_pago_oficial: 2590.67,
+            status: 'liquidado',
+            tipo: 'exercicio',
+            plano_interno: 'L20RLP0100N',
+            favorecido_nome: 'PRIME CONSULTORIA E ASSESSORIA EMPRESARIAL LTDA',
+          },
+        ];
+        const filtered = campusFilter?.startsWith('eq.')
+          ? allEmpenhos.filter((e) => e.campus_uasg === campusFilter.slice(3))
+          : allEmpenhos;
+        return { ok: true, status: 200, json: async () => filtered, headers: { get: () => null } };
+      }
+      return { ok: true, status: 200, json: async () => [], headers: { get: () => null } };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    window.eval(contentScript);
+    const input = openPalette();
+    await flushMicrotasks();
+
+    const empenhosReq = requests.find((u) => u.pathname.endsWith('/empenhos'));
+    expect(empenhosReq?.searchParams.get('campus_uasg')).toBe('eq.158366');
+
+    // Digitar sequencial com zeros à esquerda ('000110') não pode ser engolido pelo filtro de processos
+    fireEvent.input(input, { target: { value: '000110' } });
+    await waitFor(() => expect(document.body.textContent).toContain('2026NE000110'));
+    expect(document.body.textContent).toContain('PRIME CONSULTORIA E ASSESSORIA EMPRESARIAL LTDA');
+    expect(document.body.textContent).toMatch(/R\$\s*6\.409,33/);
+    expect(document.body.textContent).not.toContain('FORNECEDOR REITORIA LTDA');
+
+    // Digitar número completo do SIAFI com prefixo de UG e Gestão ('158366264352026NE000110')
+    fireEvent.input(input, { target: { value: '158366264352026NE000110' } });
+    expect(document.body.textContent).toContain('2026NE000110');
+    expect(document.body.textContent).toMatch(/R\$\s*6\.409,33/);
+
+    // Abrir detalhes do empenho e verificar exibição da UASG / Campus
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(document.querySelector('.suape-cp-detail-body')?.textContent).toContain('158366 — Currais Novos'));
   });
 });

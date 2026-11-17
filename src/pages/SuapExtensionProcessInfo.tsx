@@ -344,8 +344,11 @@ export default function SuapExtensionProcessInfo() {
     };
     const publishFinance = async () => {
       postSyncStatus({ stage: 'checking', message: 'Consultando empenhos no SIAGES...' });
+      const campusUasg = context.extensionSession?.campusUasg;
       const summary = await withTimeout(
-        suapProcessFinanceService.getSummaryBySuapId(context.suapId, extensionClient),
+        campusUasg
+          ? suapProcessFinanceService.getSummaryBySuapId(context.suapId, extensionClient, campusUasg)
+          : suapProcessFinanceService.getSummaryBySuapId(context.suapId, extensionClient),
         FINANCE_QUERY_TIMEOUT_MS,
         'A consulta financeira demorou demais. Tente novamente.',
       );

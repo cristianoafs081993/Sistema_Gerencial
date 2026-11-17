@@ -441,6 +441,7 @@ export const suapProcessFinanceService = {
   async getSummaryBySuapId(
     suapId: string,
     client: SupabaseClient = supabase,
+    campusUasg?: string,
   ): Promise<SuapProcessFinanceSummary> {
     const { suapProcessosService } = await import('@/services/suapProcessos');
     const processo = await suapProcessosService.getBySuapId(suapId, client);
@@ -454,10 +455,10 @@ export const suapProcessFinanceService = {
     });
 
     const [empenhos, contratos, contratosEmpenhos, contratosApi] = await Promise.all([
-      empenhosService.getAll(undefined, client),
-      contratosService.getContratos(undefined, client),
-      contratosService.getContratosEmpenhos(undefined, client),
-      contratosApiService.getContratosApi(false, undefined, client),
+      empenhosService.getAll(campusUasg, client),
+      contratosService.getContratos(campusUasg, client),
+      contratosService.getContratosEmpenhos(campusUasg, client),
+      contratosApiService.getContratosApi(false, campusUasg, client),
     ]);
     const contratoNumero = getProcessContratoNumero(processo);
     const beneficiaryDocument = normalizeDigits(processo.cpfCnpj) || undefined;

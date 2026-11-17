@@ -9,9 +9,39 @@
   const IS_SUAP_PAGE = window.location.hostname === 'suap.ifrn.edu.br';
   const IS_SIAFI_PAGE = window.location.protocol === 'https:' && window.location.hostname === 'siafi.tesouro.gov.br';
   const IS_SIAGES_PAGE = window.location.hostname === 'www.siages.com.br';
+  const DEFAULT_CAMPUS_UASG = '158366';
+  const USER_CAMPUS_STORAGE_KEY = 'siages-user-campus-uasg';
+  const IFRN_CAMPUS_NAMES = {
+    '152711': 'Natal - Cidade Alta',
+    '152756': 'Parnamirim',
+    '152757': 'Nova Cruz',
+    '154582': 'São Gonçalo do Amarante',
+    '154838': 'Ceará-Mirim',
+    '154839': 'Canguaretama',
+    '154840': 'São Paulo do Potengi',
+    '158155': 'Reitoria',
+    '158365': 'Mossoró',
+    '158366': 'Currais Novos',
+    '158367': 'Ipanguaçu',
+    '158368': 'Natal - Zona Norte',
+    '158369': 'Natal - Central',
+    '158370': 'Caicó',
+    '158371': 'Apodi',
+    '158372': 'Santa Cruz',
+    '158373': 'João Câmara',
+    '158374': 'Pau dos Ferros',
+    '158375': 'Macau',
+    '158882': 'Parelhas',
+    '158887': 'Lajes',
+    '158896': 'Touros',
+    '158897': 'São Miguel',
+    '158898': 'Umarizal',
+  };
 
   let empenhosCache = null;
   let contratosCache = null;
+  let cachedCampusUasg = DEFAULT_CAMPUS_UASG;
+  let loadedCampusUasg = null;
   let isFetching = false;
   let activeScope = 'all'; // 'all' | 'empenhos' | 'contratos' | 'screens' | 'actions'
   let currentResults = [];
@@ -737,18 +767,24 @@
 
     let score = 0;
 
-    // 1. NE Number
-    if (num === q) score += 20000;
-    else if (num.startsWith(q)) score += 15000;
-    else if (num.includes(q)) score += 10000;
+    // 1. NE Number (incluindo NE completa do SIAFI com prefixo de UG/Gestão ou sem zeros à esquerda)
+    const canonicalQueryNe = (() => {
+      const m = q.match(/(?:^|\D)(\d{4})\s*ne\s*0*(\d{1,6})$/i);
+      if (!m) return '';
+      return `${m[1]}ne${m[2].padStart(6, '0')}`.toLowerCase();
+    })();
+    if (num === q || (canonicalQueryNe && num === canonicalQueryNe)) score += 20000;
+    else if (num.startsWith(q) || (canonicalQueryNe && num.startsWith(canonicalQueryNe))) score += 15000;
+    else if (num.includes(q) || (num && q.includes(num))) score += 10000;
 
     if (digits.length >= 1) {
       const numDigits = num.replace(/\D/g, '');
       const sequentialPart = num.replace(/^.*?ne0*/i, '');
-      if (sequentialPart === digits) score += 18000;
-      else if (sequentialPart.startsWith(digits)) score += 12000;
+      const rawSequentialDigits = digits.replace(/^0+/, '') || '0';
+      if (sequentialPart === digits || sequentialPart === rawSequentialDigits) score += 18000;
+      else if (sequentialPart.startsWith(digits) || sequentialPart.startsWith(rawSequentialDigits)) score += 12000;
       else if (num.endsWith(digits)) score += 9000;
-      else if (digits.length >= 3 && numDigits.includes(digits)) score += 5000;
+      else if (digits.length >= 3 && (numDigits.includes(digits) || (numDigits && digits.includes(numDigits)))) score += 5000;
     }
 
     // 2. PI
@@ -830,15 +866,40 @@
     return score;
   }
 
+  function normalizeCampusUasg(value) {
+    const clean = String(value || '').trim();
+    return Object.prototype.hasOwnProperty.call(IFRN_CAMPUS_NAMES, clean) ? clean : DEFAULT_CAMPUS_UASG;
+  }
+
+  function readStoredCampusUasg() {
+    return new Promise((resolve) => {
+      try {
+        if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+          chrome.storage.local.get([USER_CAMPUS_STORAGE_KEY], (result) => {
+            const raw = result?.[USER_CAMPUS_STORAGE_KEY];
+            if (raw && Object.prototype.hasOwnProperty.call(IFRN_CAMPUS_NAMES, String(raw).trim())) {
+              cachedCampusUasg = String(raw).trim();
+            }
+            resolve(cachedCampusUasg);
+          });
+          return;
+        }
+      } catch (_) {}
+      resolve(cachedCampusUasg);
+    });
+  }
+
   // Supabase Fetch Helper
-  async function fetchFromSupabase(table, queryParams = '') {
-    let token = SUPABASE_ANON_KEY;
-    try {
-      if (globalThis.SiagesExtensionAuth?.getSession) {
-        const session = await globalThis.SiagesExtensionAuth.getSession();
-        if (session?.accessToken) token = session.accessToken;
-      }
-    } catch (_) {}
+  async function fetchFromSupabase(table, queryParams = '', givenToken = '') {
+    let token = givenToken || SUPABASE_ANON_KEY;
+    if (!givenToken) {
+      try {
+        if (globalThis.SiagesExtensionAuth?.getSession) {
+          const session = await globalThis.SiagesExtensionAuth.getSession();
+          if (session?.accessToken) token = session.accessToken;
+        }
+      } catch (_) {}
+    }
 
     const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${queryParams}`, {
       headers: {
@@ -1076,27 +1137,66 @@
   // Load Data
   async function loadData(force = false) {
     if (isFetching) return;
-    if (!force && empenhosCache && contratosCache) return;
+    if (!force && empenhosCache && contratosCache && loadedCampusUasg === cachedCampusUasg) return;
 
     isFetching = true;
     try {
+      let token = SUPABASE_ANON_KEY;
+      let sessionCampus = '';
+      try {
+        if (globalThis.SiagesExtensionAuth?.getSession) {
+          const session = await globalThis.SiagesExtensionAuth.getSession();
+          if (session?.accessToken) token = session.accessToken;
+          if (session?.campusUasg) sessionCampus = session.campusUasg;
+        }
+        if (!sessionCampus && typeof globalThis.SiagesExtensionAuth?.getCampus === 'function') {
+          sessionCampus = await globalThis.SiagesExtensionAuth.getCampus();
+        }
+      } catch (_) {}
+
+      const campusUasg = normalizeCampusUasg(sessionCampus || cachedCampusUasg);
+      cachedCampusUasg = campusUasg;
+
       const [empenhosData, contratosApiData, contratosLocaisData] = await Promise.allSettled([
-        fetchFromSupabase('empenhos', 'select=id,numero,descricao,valor,natureza_despesa,plano_interno,favorecido_nome,favorecido_documento,valor_liquidado,valor_liquidado_oficial,valor_pago_oficial,valor_liquidado_a_pagar,status,tipo,rap_inscrito,rap_a_liquidar,rap_liquidado,rap_pago,saldo_rap_oficial,processo&order=numero.desc&limit=1500'),
-        fetchFromSupabase('contratos_api', 'select=id,api_contrato_id,numero,fornecedor_nome,fornecedor_documento,unidade_codigo,unidade_nome,unidade_origem_codigo,unidade_origem_nome,objeto,processo,vigencia_inicio,vigencia_fim,vigencia_inicio_derivada,vigencia_fim_derivada,valor_global,valor_acumulado,situacao,situacao_derivada,campus_scope_reason,updated_at&situacao_derivada=eq.true&campus_scope_reason=in.(ug_campus,reitoria_com_empenho_campus,reitoria_com_fatura_campus)&order=numero.asc'),
-        fetchFromSupabase('contratos', 'select=id,numero,contratada,valor,data_inicio,data_termino'),
+        fetchFromSupabase(
+          'empenhos',
+          `select=id,campus_uasg,numero,descricao,valor,natureza_despesa,plano_interno,favorecido_nome,favorecido_documento,valor_liquidado,valor_liquidado_oficial,valor_pago_oficial,valor_liquidado_a_pagar,status,tipo,rap_inscrito,rap_a_liquidar,rap_liquidado,rap_pago,saldo_rap_oficial,processo&campus_uasg=eq.${encodeURIComponent(campusUasg)}&order=numero.desc&limit=1500`,
+          token,
+        ),
+        fetchFromSupabase(
+          'contratos_api',
+          'select=id,api_contrato_id,numero,fornecedor_nome,fornecedor_documento,unidade_codigo,unidade_nome,unidade_origem_codigo,unidade_origem_nome,objeto,processo,vigencia_inicio,vigencia_fim,vigencia_inicio_derivada,vigencia_fim_derivada,valor_global,valor_acumulado,situacao,situacao_derivada,campus_scope_reason,updated_at&situacao_derivada=eq.true&campus_scope_reason=in.(ug_campus,reitoria_com_empenho_campus,reitoria_com_fatura_campus)&order=numero.asc',
+          token,
+        ),
+        fetchFromSupabase(
+          'contratos',
+          `select=id,numero,contratada,valor,data_inicio,data_termino&campus_uasg=eq.${encodeURIComponent(campusUasg)}`,
+          token,
+        ),
       ]);
 
       if (empenhosData.status === 'fulfilled') {
-        empenhosCache = empenhosData.value || [];
+        empenhosCache = (empenhosData.value || []).filter(
+          (emp) => !emp?.campus_uasg || String(emp.campus_uasg).trim() === campusUasg,
+        );
       }
 
       const apiContratos = contratosApiData.status === 'fulfilled' ? (contratosApiData.value || []) : [];
       const localContratos = contratosLocaisData.status === 'fulfilled' ? (contratosLocaisData.value || []) : [];
+      loadedCampusUasg = campusUasg;
 
       const contratosMap = new Map();
       for (const api of apiContratos) {
         if (api.situacao_derivada !== true) continue;
         if (api.campus_scope_reason && !['ug_campus', 'reitoria_com_empenho_campus', 'reitoria_com_fatura_campus'].includes(api.campus_scope_reason)) {
+          continue;
+        }
+        if (
+          api.unidade_codigo &&
+          String(api.unidade_codigo).trim() !== campusUasg &&
+          String(api.unidade_origem_codigo || '').trim() !== campusUasg &&
+          String(api.unidade_codigo).trim() !== '158155'
+        ) {
           continue;
         }
 
@@ -1447,8 +1547,8 @@
     const matchIdFirst = text.match(/^#?(\d{4,8})[:\s]+([a-zA-Z]+)$/);
     // Pattern 3: proc <id> / processo <id> / p <id>
     const matchProcId = text.match(/^(?:processos|processo|proc|p)[:\s]+#?(\d{4,8})$/i);
-    // Pattern 4: just <id> or #<id>
-    const matchJustId = text.match(/^#?(\d{4,8})$/);
+    // Pattern 4: just #<id> or bare <id> without leading zero (sequenciais de NE iniciam com 0)
+    const matchJustId = text.match(/^(?:#(\d{4,8})|([1-9]\d{3,7}))$/);
 
     const PROCESS_SHORTCUTS = new Set([
       'up', 'upload', 'doc', 'upld', 'anexar',
@@ -1476,7 +1576,7 @@
     } else if (matchProcId) {
       return { processId: matchProcId[1], actionCommand: 'proc', isExplicitProcessId: true };
     } else if (matchJustId) {
-      return { processId: matchJustId[1], actionCommand: '', isExplicitProcessId: true };
+      return { processId: matchJustId[1] || matchJustId[2], actionCommand: '', isExplicitProcessId: true };
     }
 
     return null;
@@ -1488,7 +1588,11 @@
     let query = rawVal;
     let scope = activeScope;
     const currentProcId = getCurrentProcessId();
-    const explicitProcess = parseExplicitProcessQuery(rawVal);
+    const rawExplicitProcess = parseExplicitProcessQuery(rawVal);
+    const isBareNumericProcess = Boolean(rawExplicitProcess && !rawExplicitProcess.actionCommand && /^\d+$/.test(rawVal));
+    const explicitProcess = (isBareNumericProcess && ['empenhos', 'contratos', 'screens', 'actions'].includes(activeScope))
+      ? null
+      : rawExplicitProcess;
     const targetProcId = explicitProcess ? explicitProcess.processId : currentProcId;
 
     // Detect prefix
@@ -1499,8 +1603,10 @@
     let isExplicitCondhSearch = false;
 
     if (explicitProcess) {
-      scope = 'processo';
-      if (!explicitProcess.actionCommand) {
+      if (!isBareNumericProcess) {
+        scope = 'processo';
+      }
+      if (!explicitProcess.actionCommand && !isBareNumericProcess) {
         isExplicitProcessSearch = true;
       }
     } else if (query.toLowerCase().startsWith('ne ') || query.toLowerCase().startsWith('empenho ') || query.toLowerCase().startsWith('ne:') || query.toLowerCase().startsWith('empenho:')) {
@@ -1912,7 +2018,7 @@
     const hasHighPriorityShortcut = (query && matchingProcessActions.some((p) => {
       const q = query.trim().toLowerCase();
       return p.shortcuts.some((s) => s.toLowerCase() === q || s.toLowerCase().startsWith(q)) || p.title.toLowerCase().startsWith(q);
-    })) || (isExplicitProcessId && matchingProcessActions.length > 0);
+    })) || (isExplicitProcessId && matchingProcessActions.length > 0 && matchingEmpenhos.length === 0);
 
     if (isExplicitCondhSearch) {
       renderCondhResults(query);
@@ -1944,7 +2050,7 @@
     if (hasHighPriorityShortcut) {
       matchingProcessActions.forEach((p) => currentResults.push({ type: 'process_action', data: p, processId: targetProcId }));
     }
-    if (isExplicitProcessId && suapProcessSearchAction) {
+    if (isExplicitProcessId && suapProcessSearchAction && hasHighPriorityShortcut) {
       currentResults.push({ type: 'suap_process_search', data: suapProcessSearchAction });
     }
     matchingEmpenhos.forEach((e) => currentResults.push({ type: 'empenho', data: e }));
@@ -1966,7 +2072,7 @@
     if (!hasHighPriorityShortcut && matchingProcessActions && matchingProcessActions.length > 0) {
       matchingProcessActions.forEach((p) => currentResults.push({ type: 'process_action', data: p, processId: targetProcId }));
     }
-    if (!isExplicitProcessSearch && !isExplicitProcessId && suapProcessSearchAction && ((matchingProcessActions && matchingProcessActions.length > 0) || activeScope === 'processo')) {
+    if (!isExplicitProcessSearch && (!isExplicitProcessId || !hasHighPriorityShortcut) && suapProcessSearchAction && ((matchingProcessActions && matchingProcessActions.length > 0) || activeScope === 'processo')) {
       currentResults.push({ type: 'suap_process_search', data: suapProcessSearchAction });
     }
 
@@ -2557,6 +2663,10 @@
           <span class="suape-cp-info-key">Favorecido:</span>
           <span class="suape-cp-info-val">${escapeHtml(emp.favorecido_nome) || '—'}</span>
         </div>
+        <div class="suape-cp-info-row">
+          <span class="suape-cp-info-key">UASG / Campus:</span>
+          <span class="suape-cp-info-val font-mono">${escapeHtml(emp.campus_uasg || cachedCampusUasg)}${IFRN_CAMPUS_NAMES[emp.campus_uasg || cachedCampusUasg] ? ` — ${escapeHtml(IFRN_CAMPUS_NAMES[emp.campus_uasg || cachedCampusUasg])}` : ''}</span>
+        </div>
         ${emp.favorecido_documento ? `
           <div class="suape-cp-info-row">
             <span class="suape-cp-info-key">CPF / CNPJ:</span>
@@ -3042,6 +3152,30 @@
     const priorCleanup=processBadgesCleanup;
     processBadgesCleanup=()=>{priorCleanup();observer.disconnect();clearTimeout(debounceTimer);};
   }
+
+  void readStoredCampusUasg();
+  try {
+    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged?.addListener) {
+      chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (commandPaletteDisposed || areaName !== 'local') return;
+        const campusChanged = Boolean(changes[USER_CAMPUS_STORAGE_KEY]);
+        const sessionChanged = Boolean(changes['siages-extension-session']);
+        if (!campusChanged && !sessionChanged) return;
+        if (campusChanged) {
+          cachedCampusUasg = normalizeCampusUasg(changes[USER_CAMPUS_STORAGE_KEY].newValue);
+        } else if (sessionChanged) {
+          const nextSessionCampus = changes['siages-extension-session']?.newValue?.campusUasg;
+          if (nextSessionCampus) cachedCampusUasg = normalizeCampusUasg(nextSessionCampus);
+        }
+        empenhosCache = null;
+        contratosCache = null;
+        loadedCampusUasg = null;
+        if (overlayEl?.classList.contains('suape-cp-visible')) {
+          void loadData(true);
+        }
+      });
+    }
+  } catch (_) {}
 
   solrecfinReady = readSolrecfinStorage().then(entries => {
     solrecfinEntries = retainSolrecfinHistory(entries);

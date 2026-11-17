@@ -76,6 +76,24 @@ it('oculta o formulário na sessão ativa e identifica a conta conectada', async
   expect(element('extension-auth-form').hidden).toBe(true);
   expect(element('extension-auth-user-email').textContent).toBe('usuario@example.com');
   expect(element('extension-auth-badge').textContent).toBe('Conectado');
+  expect(element('extension-auth-campus-field').hidden).toBe(false);
+  expect((element('extension-user-campus-select') as HTMLSelectElement).value).toBe('158366');
+});
+
+it('permite vincular e alterar o campus (UASG) do usuário no popup quando autenticado', async () => {
+  const { auth } = setup(connected);
+  const setCampus = vi.fn().mockResolvedValue('158370');
+  const getCampus = vi.fn().mockResolvedValue('158366');
+  Object.assign(auth, { getCampus, setCampus });
+
+  await waitFor(() => expect(element('extension-auth-campus-field').hidden).toBe(false));
+  const select = element('extension-user-campus-select') as HTMLSelectElement;
+  expect(select.value).toBe('158366');
+
+  select.value = '158370';
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+  await waitFor(() => expect(setCampus).toHaveBeenCalledWith('158370'));
+  expect(element('extension-auth-status').textContent).toContain('158370');
 });
 
 it('entra pelo formulário, limpa a senha e volta ao login ao sair', async () => {

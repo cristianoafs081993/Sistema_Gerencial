@@ -483,11 +483,11 @@
     return currentSession;
   }
 
-  async function fetchTableRows(table, select, order, session) {
+  async function fetchTableRows(table, select, order, session, campusUasg = '158366') {
     const rows = [];
     const pageSize = 1000;
     for (let offset = 0; ; offset += pageSize) {
-      const params = new URLSearchParams({ select, order });
+      const params = new URLSearchParams({ select, order, campus_uasg: `eq.${campusUasg}` });
       const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
         headers: {
           apikey: SUPABASE_ANON_KEY,
@@ -509,10 +509,15 @@
 
   async function fetchDirectPlanSummary() {
     const session = await getExtensionSession();
+    let campusUasg = session?.campusUasg || '';
+    if (!campusUasg && typeof globalThis.SiagesExtensionAuth?.getCampus === 'function') {
+      try { campusUasg = await globalThis.SiagesExtensionAuth.getCampus(); } catch { campusUasg = ''; }
+    }
+    const resolvedCampusUasg = /^\d{6}$/.test(String(campusUasg || '').trim()) ? String(campusUasg).trim() : '158366';
     const [atividades, descentralizacoes, empenhos] = await Promise.all([
-      fetchTableRows('atividades', 'id,dimensao,componente_funcional,atividade,descricao,valor_total,origem_recurso,plano_interno', 'created_at.desc', session),
-      fetchTableRows('descentralizacoes', 'id,dimensao,nota_credito,origem_recurso,natureza_despesa,plano_interno,data_emissao,descricao,valor', 'data_emissao.desc.nullslast', session),
-      fetchTableRows('empenhos', 'id,numero,descricao,valor,dimensao,origem_recurso,plano_interno,data_empenho,status,tipo', 'created_at.desc', session),
+      fetchTableRows('atividades', 'id,dimensao,componente_funcional,atividade,descricao,valor_total,origem_recurso,plano_interno', 'created_at.desc', session, resolvedCampusUasg),
+      fetchTableRows('descentralizacoes', 'id,dimensao,nota_credito,origem_recurso,natureza_despesa,plano_interno,data_emissao,descricao,valor', 'data_emissao.desc.nullslast', session, resolvedCampusUasg),
+      fetchTableRows('empenhos', 'id,numero,descricao,valor,dimensao,origem_recurso,plano_interno,data_empenho,status,tipo', 'created_at.desc', session, resolvedCampusUasg),
     ]);
     return buildDirectPlanSummary(atividades, descentralizacoes, empenhos);
   }

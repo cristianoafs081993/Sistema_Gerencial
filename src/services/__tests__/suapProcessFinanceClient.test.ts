@@ -60,4 +60,15 @@ describe('suapProcessFinanceService com sessao da extensao', () => {
     expect(mocks.getContratosApi).toHaveBeenCalledWith(false, undefined, client);
     expect(mocks.getEmpenhosApi).toHaveBeenCalledWith([], undefined, client);
   });
+
+  it('propaga o campusUasg vinculado ao usuario quando informado pela extensao', async () => {
+    const client = { from: vi.fn(), functions: { invoke: vi.fn() } } as unknown as SupabaseClient;
+
+    await expect(suapProcessFinanceService.getSummaryBySuapId('987', client, '158366')).resolves.toMatchObject({ status: 'empty' });
+
+    expect(mocks.getAll).toHaveBeenCalledWith('158366', client);
+    expect(mocks.getContratos).toHaveBeenCalledWith('158366', client);
+    expect(mocks.getContratosEmpenhos).toHaveBeenCalledWith('158366', client);
+    expect(mocks.getContratosApi).toHaveBeenCalledWith(false, '158366', client);
+  });
 });
