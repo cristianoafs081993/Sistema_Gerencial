@@ -26,6 +26,8 @@
   let flatItems = [];
   let selectedIndex = 0;
   let filterQuery = '';
+  let pendingEnterItem = null;
+  let pendingEnterTimer = null;
 
   function cleanText(val) {
     if (val == null) return '';
@@ -834,6 +836,7 @@
 
   function closePicker() {
     if (!overlayEl) return;
+    clearPendingEnter();
     overlayEl.remove();
     overlayEl = null;
     searchInputEl = null;
@@ -855,8 +858,54 @@
     else void openPicker();
   }
 
-  // Listener de teclado com fase de captura para precedência imediata
-  document.addEventListener(
+  function isEnterKey(e) {
+    return e.key === 'Enter' || e.code === 'Enter' || e.code === 'NumpadEnter';
+  }
+
+  function clearPendingEnter() {
+    pendingEnterItem = null;
+    if (pendingEnterTimer) {
+      clearTimeout(pendingEnterTimer);
+      pendingEnterTimer = null;
+    }
+  }
+
+  /**
+   * Cola o item escolhido com Enter só depois que a tecla é solta.
+   * Se a colagem acontecesse no keydown, o foco já iria para o campo de
+   * destino e o keyup do Enter chegaria nele, disparando handlers da página
+   * (autocomplete, máscara, busca) que descartavam o valor colado.
+   */
+  function commitPendingEnter() {
+    const item = pendingEnterItem;
+    clearPendingEnter();
+    if (item) void chooseItem(item);
+  }
+
+  // Listener de teclado com fase de captura (na window) para precedência imediata
+  window.addEventListener(
+    'keyup',
+    (e) => {
+      if (!pendingEnterItem || !isEnterKey(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      commitPendingEnter();
+    },
+    true
+  );
+
+  window.addEventListener(
+    'keypress',
+    (e) => {
+      if (!overlayEl && !pendingEnterItem) return;
+      if (!isEnterKey(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    true
+  );
+
+  window.addEventListener(
     'keydown',
     (e) => {
       // Atalho Alt + V (e não Ctrl/Meta para não conflitar com nada)
@@ -890,11 +939,14 @@
           return;
         }
 
-        if (e.key === 'Enter') {
+        if (isEnterKey(e)) {
           e.preventDefault();
           e.stopPropagation();
+          if (e.isComposing || e.repeat || pendingEnterItem) return;
           if (flatItems[selectedIndex]) {
-            void chooseItem(flatItems[selectedIndex]);
+            pendingEnterItem = flatItems[selectedIndex];
+            // Garantia caso o keyup nunca chegue (ex.: janela perdeu o foco)
+            pendingEnterTimer = setTimeout(commitPendingEnter, 500);
           }
           return;
         }
@@ -903,10 +955,26 @@
     true
   );
 
+  /**
+   * O comando Alt+V do Chrome é enviado a todos os frames da aba. Só o frame
+   * que contém o campo em foco deve abrir o menu; os demais ignoram, para não
+   * empilhar menus (um por iframe) disputando o foco e o Enter.
+   */
+  function shouldHandleCommandInThisFrame() {
+    if (overlayEl) return true;
+    const isTop = window === window.top;
+    const focused = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+    if (!focused) return isTop;
+    const active = document.activeElement;
+    const tag = active?.tagName;
+    return tag !== 'IFRAME' && tag !== 'FRAME';
+  }
+
   // Listener para acionamento via chrome.commands (se registrado no manifest)
   if (globalThis.chrome?.runtime?.onMessage) {
     chrome.runtime.onMessage.addListener((message) => {
       if (message?.action === 'toggle-process-paste' || message?.action === 'open-process-paste') {
+        if (!shouldHandleCommandInThisFrame()) return;
         togglePicker();
       }
     });

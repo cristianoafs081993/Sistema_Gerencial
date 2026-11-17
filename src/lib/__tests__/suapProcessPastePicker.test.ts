@@ -264,14 +264,93 @@ describe('Suape - Menu de Colagem Inteligente Alt+V (suapProcessPastePicker)', (
 
     await api.openPicker();
 
+    // Campo de destino não pode receber nenhum evento do Enter usado no menu
+    const enterSeenByField = vi.fn();
+    input.addEventListener('keydown', enterSeenByField);
+    input.addEventListener('keypress', enterSeenByField);
+    input.addEventListener('keyup', enterSeenByField);
+
     // Simula tecla Enter no primeiro item (Processo: 23035.002581.2026-60)
-    const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
-    document.dispatchEvent(enterEvent);
+    const searchInput = document.querySelector('.suape-paste-search-input') as HTMLInputElement;
+    searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
+    // Enquanto a tecla está pressionada nada é colado e o foco não sai do menu
+    expect(input.value).toBe('Prefixo: ');
+    expect(document.getElementById('suape-paste-overlay')).not.toBeNull();
+
+    const keyup = new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true });
+    (document.activeElement ?? document).dispatchEvent(keyup);
 
     // O valor deve ter sido inserido no input
     expect(input.value).toBe('Prefixo: 23035.002581.2026-60');
     // O modal deve ter sido fechado
     expect(document.getElementById('suape-paste-overlay')).toBeNull();
+    // O keyup foi consumido pelo menu e não chegou ao campo de destino
+    expect(keyup.defaultPrevented).toBe(true);
+    expect(enterSeenByField).not.toHaveBeenCalled();
+  });
+
+  it('cola com Enter mesmo se o keyup não chegar (fallback por tempo)', async () => {
+    vi.useFakeTimers();
+    try {
+      window.eval(pasteScript);
+      const api = (window as unknown as { __suapeProcessPastePicker: { openPicker: () => Promise<void> } }).__suapeProcessPastePicker;
+
+      const input = document.createElement('input');
+      document.body.appendChild(input);
+      input.focus();
+
+      (window as unknown as { chrome: unknown }).chrome = {
+        runtime: {
+          sendMessage: vi.fn((_msg: unknown, cb: (res: unknown) => void) => {
+            cb({ ok: true, processes: [{ suapId: '1', processNumber: '23035.000001.2026-01', process: { numProcesso: '23035.000001.2026-01' } }] });
+          }),
+        },
+      };
+
+      await api.openPicker();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      // Tecla mantida pressionada (auto-repeat) não cola de novo
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true, cancelable: true }));
+      expect(input.value).toBe('');
+
+      vi.advanceTimersByTime(600);
+      expect(input.value).toBe('23035.000001.2026-01');
+      expect(document.getElementById('suape-paste-overlay')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('o comando Alt+V do Chrome não abre o menu em frame que não tem o foco', () => {
+    let onMessage: ((message: unknown) => void) | undefined;
+    (window as unknown as { chrome: unknown }).chrome = {
+      runtime: {
+        onMessage: { addListener: (cb: (message: unknown) => void) => { onMessage = cb; } },
+        sendMessage: vi.fn((_msg: unknown, cb: (res: unknown) => void) => cb({ ok: true, processes: [] })),
+      },
+    };
+    window.eval(pasteScript);
+
+    const iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    iframe.focus();
+    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+    Object.defineProperty(document, 'activeElement', { configurable: true, get: () => iframe });
+    try {
+      onMessage?.({ action: 'open-process-paste' });
+      expect(document.getElementById('suape-paste-overlay')).toBeNull();
+    } finally {
+      delete (document as unknown as { activeElement?: unknown }).activeElement;
+      hasFocus.mockRestore();
+    }
+
+    // Com o foco num campo deste frame, o comando abre o menu normalmente
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+    onMessage?.({ action: 'open-process-paste' });
+    expect(document.getElementById('suape-paste-overlay')).not.toBeNull();
+    (window as unknown as { __suapeProcessPastePicker: { closePicker: () => void } }).__suapeProcessPastePicker.closePicker();
   });
 
   it('filtra itens em tempo real ao digitar na busca', async () => {
