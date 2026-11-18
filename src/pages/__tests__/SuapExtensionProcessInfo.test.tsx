@@ -9,6 +9,7 @@ import SuapExtensionProcessInfo from '@/pages/SuapExtensionProcessInfo';
 import { suapProcessFinanceService } from '@/services/suapProcessFinance';
 import { suapProcessosService } from '@/services/suapProcessos';
 import { suapScraperService } from '@/services/suapScraperService';
+import { transparenciaService } from '@/services/transparencia';
 import { DEFAULT_BOLSA_PROCESS_MAPPING } from '@/data/defaultProcessMapping';
 
 const extensionMocks = vi.hoisted(() => ({ extensionClient: { from: vi.fn(), functions: { invoke: vi.fn() } } }));
@@ -44,8 +45,16 @@ import {
   SUAP_EXTENSION_LC_DOCUMENTS_RESULT_TYPE,
   SUAP_EXTENSION_LC_REBUILD_TYPE,
   SUAP_EXTENSION_LC_STATUS_TYPE,
+  SUAP_EXTENSION_PROCESS_BENEFICIARY_DOCS_MORE_TYPE,
+  SUAP_EXTENSION_PROCESS_BENEFICIARY_DOCS_TYPE,
   type SuapExtensionProcessContextMessage,
 } from '@/lib/suapExtensionDispatch';
+
+vi.mock('@/services/transparencia', () => ({
+  transparenciaService: {
+    getDocumentosPorFavorecido: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+  },
+}));
 
 vi.mock('@/services/bolsistasPdfService', () => ({ extractBolsistasFromPdfFiles: vi.fn() }));
 vi.mock('@/services/lcImportService', () => ({ loadLatestLCRowsFromDb: vi.fn().mockResolvedValue({ rows: [], sourceFile: '' }) }));
@@ -422,5 +431,109 @@ describe('SuapExtensionProcessInfo', () => {
       await waitFor(() => expect(runSuapLcAutoBuild).toHaveBeenCalledTimes(2));
       expect(vi.mocked(runSuapLcAutoBuild).mock.calls[1][2]).toEqual({ force: true });
     });
+  });
+
+  it('consulta RPs/NPs do beneficiario e carrega paginas adicionais sob demanda', async () => {
+    const postMessage = vi.spyOn(window.parent, 'postMessage');
+    vi.mocked(suapProcessosService.getBySuapId).mockResolvedValue({
+      id: 'proc-1',
+      suapId: '987',
+      url: 'https://suap.ifrn.edu.br/processo_eletronico/processo/987/',
+      status: 'success',
+      numProcesso: '23035.000987.2026-11',
+      cpfCnpj: '10.877.412/0011-30',
+      beneficiario: 'Fornecedor Alfa',
+    });
+    vi.mocked(suapProcessFinanceService.getSummaryBySuapId).mockResolvedValue({
+      status: 'empty',
+      escopoContrato: false,
+      totais: { empenhado: 0, saldo: 0 },
+      empenhos: [],
+    });
+    vi.mocked(transparenciaService.getDocumentosPorFavorecido)
+      .mockResolvedValueOnce({
+        total: 52,
+        data: [{
+          id: '2026NP000085',
+          valor_original: 1200,
+          valor_pago: 0,
+          estado: 'PENDENTE DE REALIZAÇÃO',
+          processo: '23035.000987.2026-11',
+          favorecido_nome: 'Fornecedor Alfa',
+          favorecido_documento: '10.877.412/0011-30',
+          data_emissao: '2026-10-15',
+          empenho_numero: '2026NE000010',
+          itens: [],
+          situacoes: [],
+        }],
+      })
+      .mockResolvedValueOnce({
+        total: 52,
+        data: [{
+          id: '2026RP000001',
+          valor_original: 500,
+          valor_pago: 500,
+          estado: 'PAGO',
+          processo: '23035.000100.2026-11',
+          favorecido_nome: 'Fornecedor Alfa',
+          favorecido_documento: '10.877.412/0011-30',
+          data_emissao: '2026-09-10',
+          itens: [],
+          situacoes: [],
+        }],
+      });
+
+    render(<SuapExtensionProcessInfo />);
+    await sendContext();
+
+    await waitFor(() => {
+      expect(transparenciaService.getDocumentosPorFavorecido).toHaveBeenCalledWith(
+        '10.877.412/0011-30',
+        { page: 1, perPage: 50, client: extensionClient },
+      );
+      expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: 'siages',
+          type: SUAP_EXTENSION_PROCESS_BENEFICIARY_DOCS_TYPE,
+          version: 1,
+          payload: expect.objectContaining({
+            suapId: '987',
+            cpfCnpj: '10.877.412/0011-30',
+            total: 52,
+            page: 1,
+            append: false,
+            items: [expect.objectContaining({ id: '2026NP000085', estado: 'PENDENTE DE REALIZAÇÃO', valorOriginal: 1200 })],
+          }),
+        }),
+        SUAP_EXTENSION_ORIGIN,
+      );
+    });
+
+    await sendContext({
+      source: 'siages-suap-extension',
+      type: SUAP_EXTENSION_PROCESS_BENEFICIARY_DOCS_MORE_TYPE,
+      version: 1,
+      payload: { suapId: '987', cpfCnpj: '10.877.412/0011-30', page: 2 },
+    } as never);
+
+    await waitFor(() => {
+      expect(transparenciaService.getDocumentosPorFavorecido).toHaveBeenCalledWith(
+        '10.877.412/0011-30',
+        { page: 2, perPage: 50, client: extensionClient },
+      );
+      expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: SUAP_EXTENSION_PROCESS_BENEFICIARY_DOCS_TYPE,
+          payload: expect.objectContaining({
+            suapId: '987',
+            page: 2,
+            append: true,
+            items: [expect.objectContaining({ id: '2026RP000001', estado: 'PAGO' })],
+          }),
+        }),
+        SUAP_EXTENSION_ORIGIN,
+      );
+    });
+    postMessage.mockRestore();
   });
 });

@@ -57,6 +57,52 @@ export const SUAP_EXTENSION_PROCESS_PDF_REQUEST_TYPE = 'siages:suap-process-pdf-
 export const SUAP_EXTENSION_PROCESS_PDF_RESULT_TYPE = 'siages:suap-process-pdf-result' as const;
 export const SUAP_EXTENSION_PROCESS_RETRY_TYPE = 'siages:suap-process-retry' as const;
 export const SUAP_EXTENSION_PROCESS_FLOW_TYPE = 'siages:suap-process-flow' as const;
+export const SUAP_EXTENSION_PROCESS_BENEFICIARY_DOCS_TYPE = 'siages:suap-process-beneficiary-docs' as const;
+export const SUAP_EXTENSION_PROCESS_BENEFICIARY_DOCS_MORE_TYPE = 'siages:suap-process-beneficiary-docs-more' as const;
+
+export type SuapExtensionBeneficiaryDocItem = {
+  id: string;
+  valorOriginal: number;
+  valorPago: number;
+  estado: string;
+  processo?: string;
+  dataEmissao?: string;
+  empenhoNumero?: string;
+};
+
+export type SuapExtensionProcessBeneficiaryDocsPayload = {
+  suapId: string;
+  cpfCnpj: string;
+  total: number;
+  page: number;
+  perPage: number;
+  append?: boolean;
+  items: SuapExtensionBeneficiaryDocItem[];
+  error?: string;
+};
+
+export function getSuapExtensionBeneficiaryDocsMoreRequest(
+  event: MessageEvent,
+  expectedSource: WindowProxy | null,
+  expectedSuapId: string,
+): { suapId: string; cpfCnpj: string; page: number } | null {
+  if (event.origin !== SUAP_EXTENSION_ORIGIN || event.source !== expectedSource) return null;
+  const message = event.data as { source?: unknown; type?: unknown; version?: unknown; payload?: Record<string, unknown> } | null;
+  if (
+    !message ||
+    message.source !== 'siages-suap-extension' ||
+    message.type !== SUAP_EXTENSION_PROCESS_BENEFICIARY_DOCS_MORE_TYPE ||
+    message.version !== 1 ||
+    !message.payload ||
+    typeof message.payload !== 'object'
+  ) {
+    return null;
+  }
+  const { suapId, cpfCnpj, page } = message.payload;
+  if (suapId !== expectedSuapId || typeof cpfCnpj !== 'string' || !cpfCnpj.trim()) return null;
+  const parsedPage = typeof page === 'number' && Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1;
+  return { suapId, cpfCnpj: cpfCnpj.trim(), page: parsedPage };
+}
 
 export type SuapExtensionProcessFlowPayload = {
   suapId: string;

@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { DocumentoDespesa, DocumentoDespesaAPI, OperacaoEmpenho, DocumentoItem, Retencao, CreditoDisponivel } from '@/types';
 import { formatarDocumento, parseCurrency } from '@/lib/utils';
@@ -505,7 +506,7 @@ export const transparenciaService = {
 
     async getDocumentosPorFavorecido(
         favorecidoDocumentoOuNumero: string,
-        options?: { page?: number; perPage?: number },
+        options?: { page?: number; perPage?: number; client?: SupabaseClient },
     ): Promise<{ data: DocumentoDespesa[]; total: number }> {
         const consulta = favorecidoDocumentoOuNumero.trim();
         const documentoNormalizado = consulta.replace(/\D/g, '');
@@ -522,7 +523,8 @@ export const transparenciaService = {
         const perPage = Math.max(1, Math.floor(options?.perPage || 20));
         const from = (page - 1) * perPage;
         const to = from + perPage - 1;
-        let query = supabase
+        const db = options?.client ?? supabase;
+        let query = db
             .from('documentos_habeis')
             .select(DOCUMENTOS_HABEIS_SELECT, { count: 'exact' });
 

@@ -4,6 +4,7 @@
   const IFRAME_ID = 'siages-suap-dispatch-frame';
   const DOCUMENT_ANALYSIS_MODAL_ID = 'siages-suap-document-analysis-modal';
   const DOCUMENT_ANALYSIS_IFRAME_ID = 'siages-suap-document-analysis-frame';
+  const BENEFICIARY_DOCS_MODAL_ID = 'siages-suap-beneficiary-docs-modal';
   const BRIDGE_FRAME_ID = 'siages-suap-finance-frame';
   const FINANCE_PANEL_ID = 'siages-suap-finance-panel';
   const SIAGES_ORIGIN = 'https://www.siages.com.br';
@@ -35,6 +36,7 @@
     collapsedSections: new Set(),
     authSession: null,
     lcStatus: null,
+    beneficiaryDocs: null,
   };
   const LC_MAX_DOCUMENTS = 15;
   const LC_MAX_TEXT_CHARS = 500000;
@@ -174,6 +176,7 @@
       ...(state.hasFinanceSummary ? { financeSummary: state.financeSummary } : {}),
       ...(state.flow ? { flow: state.flow } : {}),
       ...(state.lcStatus ? { lcStatus: state.lcStatus } : {}),
+      ...(state.beneficiaryDocs ? { beneficiaryDocs: state.beneficiaryDocs } : {}),
     };
     try {
       globalThis.sessionStorage?.setItem(key, JSON.stringify(persisted));
@@ -341,6 +344,7 @@
     }
     if (persisted.flow) { state.flow = persisted.flow; state.mappings = persisted.flow.mappings || []; }
     if (persisted.lcStatus?.stage && persisted.lcStatus?.suapId === getProcessId()) state.lcStatus = persisted.lcStatus;
+    if (persisted.beneficiaryDocs?.suapId === getProcessId()) state.beneficiaryDocs = persisted.beneficiaryDocs;
     const storedCustom = await storageGet('local', 'siages_custom_process_mappings', null);
     if (Array.isArray(storedCustom) && storedCustom.length > 0) {
       state.customMappings = storedCustom;
@@ -933,11 +937,10 @@
   }
   function renderSummary(snapshot = state.snapshot) {
     const container = panel('summary'); if (!container) return;
-    container.innerHTML = ''; renderSyncStatus(container); renderLcCard(container);
+    container.innerHTML = ''; renderSyncStatus(container);
     const process = snapshot?.process; const fallback = snapshot?.fallback || { suapId: getProcessId(), processNumber: getProcessNumber() };
     appendSection(container, 'Processo', (section) => {
       appendCopyRow(section, 'Processo', process?.numProcesso || fallback.processNumber, true);
-      appendCopyRow(section, 'SUAP ID', process?.suapId || fallback.suapId, true);
     });
     if (process) {
       const full = process.dadosCompletos || {}; const bank = full.dados_bancarios || {}; const taxes = full.retencoes_tributarias || {};
@@ -958,6 +961,7 @@
         appendCopyRow(section, 'CPF/CNPJ', process.cpfCnpj, true, true);
         appendCopyRow(section, 'Assunto', process.assunto);
       });
+      renderBeneficiaryDocsCard(container, process.cpfCnpj);
       appendSection(container, 'Documento e pagamento', (section) => {
         appendCopyRow(section, 'Valor', full.val_nf);
         appendCopyRow(section, 'NS', workflow.nsNumero || full.ns_numero, true);
@@ -991,6 +995,7 @@
       });
     }
     renderProcessFlow(container);
+    renderLcCard(container);
   }
 
   function renderProcessFlow(container) {
@@ -1733,6 +1738,209 @@
     container.appendChild(section);
   }
 
+  // --- RPs / NPs do beneficiario (preview curto no card + modal completo) ------------------------
+  const BENEFICIARY_DOCS_PREVIEW_LIMIT = 4;
+  let beneficiaryDocsModalState = { query: '', filter: 'all', loadingMore: false, refresh: null };
+
+  function isBeneficiaryDocPending(item) {
+    const status = String(item?.estado || '').trim().toLowerCase();
+    return Boolean(status) && !/^(pago|paga|realizad[oa]|cancelad[oa]|estornad[oa])/.test(status);
+  }
+  function formatBeneficiaryDocCode(id) {
+    const raw = String(id || '').trim();
+    const match = raw.match(/(\d{4}(?:NP|RP)\d+)$/i);
+    return match ? match[1].toUpperCase() : raw;
+  }
+  function createBeneficiaryDocRow(item, { rowClass = 'suape-bdocs-row', includeDetails = false } = {}) {
+    const row = createElement('div', rowClass);
+    const main = createElement('div', 'suape-bdocs-main');
+    const code = formatBeneficiaryDocCode(item.id);
+    const top = createElement('div', 'suape-bdocs-top');
+    top.appendChild(createElement('span', 'suape-bdocs-code', code));
+    const badge = createElement('span', 'suape-bdocs-badge', item.estado || 'Pendente');
+    badge.dataset.pending = String(isBeneficiaryDocPending(item));
+    top.appendChild(badge);
+    const meta = createElement('div', 'suape-bdocs-meta');
+    const parts = [formatDate(item.dataEmissao), formatCurrency(item.valorOriginal)];
+    if (includeDetails && item.processo) parts.push(`Proc. ${item.processo}`);
+    if (includeDetails && item.empenhoNumero) parts.push(`NE ${item.empenhoNumero}`);
+    meta.textContent = parts.filter(Boolean).join(' · ');
+    main.append(top, meta);
+    const copy = createElement('button', 'suape-copy', '⧉');
+    copy.type = 'button';
+    copy.setAttribute('aria-label', `Copiar ${code}`);
+    copy.addEventListener('click', () => void copyText(code, copy));
+    row.append(main, copy);
+    return row;
+  }
+  function selectBeneficiaryDocsPreview(items) {
+    if (!Array.isArray(items) || !items.length) return [];
+    const pending = items.filter(isBeneficiaryDocPending);
+    const others = items.filter((item) => !isBeneficiaryDocPending(item));
+    return [...pending, ...others].slice(0, BENEFICIARY_DOCS_PREVIEW_LIMIT);
+  }
+  function closeBeneficiaryDocsModal() {
+    document.getElementById(BENEFICIARY_DOCS_MODAL_ID)?.remove();
+    beneficiaryDocsModalState.refresh = null;
+    beneficiaryDocsModalState.loadingMore = false;
+  }
+  function requestMoreBeneficiaryDocs() {
+    const docs = state.beneficiaryDocs;
+    const frame = document.getElementById(BRIDGE_FRAME_ID);
+    const suapId = getProcessId();
+    if (!docs || !frame?.contentWindow || !suapId || beneficiaryDocsModalState.loadingMore) return;
+    beneficiaryDocsModalState.loadingMore = true;
+    beneficiaryDocsModalState.refresh?.();
+    frame.contentWindow.postMessage({
+      source: 'siages-suap-extension',
+      type: 'siages:suap-process-beneficiary-docs-more',
+      version: 1,
+      payload: { suapId, cpfCnpj: docs.cpfCnpj, page: (docs.page || 1) + 1 },
+    }, SIAGES_ORIGIN);
+  }
+  function openBeneficiaryDocsModal() {
+    if (document.getElementById(BENEFICIARY_DOCS_MODAL_ID)) return;
+    const docs = state.beneficiaryDocs;
+    if (!docs) return;
+    beneficiaryDocsModalState = { query: '', filter: 'all', loadingMore: false, refresh: null };
+
+    const overlay = createElement('div', 'suape-bdocs-modal-overlay');
+    overlay.id = BENEFICIARY_DOCS_MODAL_ID;
+    overlay.dataset.theme = state.theme || 'dark';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'RPs e NPs do beneficiário');
+
+    const modal = createElement('div', 'suape-bdocs-modal');
+    const header = createElement('div', 'suape-bdocs-modal-header');
+    const titleBox = document.createElement('div');
+    const beneficiaryName = state.snapshot?.process?.beneficiario || docs.cpfCnpj || 'Beneficiário';
+    titleBox.append(
+      createElement('h3', 'suape-bdocs-modal-title', 'RPs e NPs do beneficiário'),
+      createElement('p', 'suape-bdocs-modal-sub', `${beneficiaryName} · ${docs.total || docs.items.length} documento(s)`),
+    );
+    const closeBtn = createElement('button', 'suape-bdocs-modal-close', '×');
+    closeBtn.type = 'button';
+    closeBtn.setAttribute('aria-label', 'Fechar modal de RPs e NPs');
+    const onKeyDown = (event) => { if (event.key === 'Escape') cleanup(); };
+    const cleanup = () => {
+      document.removeEventListener('keydown', onKeyDown);
+      closeBeneficiaryDocsModal();
+    };
+    closeBtn.addEventListener('click', cleanup);
+    overlay.addEventListener('click', (event) => { if (event.target === overlay) cleanup(); });
+    document.addEventListener('keydown', onKeyDown);
+    header.append(titleBox, closeBtn);
+
+    const toolbar = createElement('div', 'suape-bdocs-modal-toolbar');
+    const search = createElement('input', 'suape-input');
+    search.type = 'search';
+    search.placeholder = 'Buscar por número, processo, empenho ou situação...';
+    const chips = createElement('div', 'suape-bdocs-chips');
+    const chipDefs = [
+      { id: 'all', label: 'Todas' },
+      { id: 'pending', label: 'Pendentes' },
+      { id: 'done', label: 'Pagas/Realizadas' },
+    ];
+    const chipButtons = chipDefs.map(({ id, label }) => {
+      const btn = createElement('button', 'suape-bdocs-chip', label);
+      btn.type = 'button';
+      btn.setAttribute('aria-pressed', String(id === 'all'));
+      btn.addEventListener('click', () => {
+        beneficiaryDocsModalState.filter = id;
+        chipButtons.forEach((other, index) => other.setAttribute('aria-pressed', String(chipDefs[index].id === id)));
+        renderList();
+      });
+      chips.appendChild(btn);
+      return btn;
+    });
+    toolbar.append(search, chips);
+
+    const body = createElement('div', 'suape-bdocs-modal-body');
+    const footer = createElement('div', 'suape-bdocs-modal-footer');
+    const countLabel = document.createElement('span');
+    const loadMoreBtn = createElement('button', 'suape-button suape-button-secondary', 'Carregar mais');
+    loadMoreBtn.type = 'button';
+    loadMoreBtn.addEventListener('click', requestMoreBeneficiaryDocs);
+    footer.append(countLabel, loadMoreBtn);
+
+    const renderList = () => {
+      const currentDocs = state.beneficiaryDocs || docs;
+      const items = Array.isArray(currentDocs.items) ? currentDocs.items : [];
+      const query = normalizeDocumentReviewText(beneficiaryDocsModalState.query);
+      const filtered = items.filter((item) => {
+        const pending = isBeneficiaryDocPending(item);
+        if (beneficiaryDocsModalState.filter === 'pending' && !pending) return false;
+        if (beneficiaryDocsModalState.filter === 'done' && pending) return false;
+        if (!query) return true;
+        const haystack = normalizeDocumentReviewText([
+          item.id,
+          formatBeneficiaryDocCode(item.id),
+          item.processo,
+          item.empenhoNumero,
+          item.estado,
+        ].filter(Boolean).join(' '));
+        return haystack.includes(query);
+      });
+      body.innerHTML = '';
+      if (!filtered.length) {
+        body.appendChild(createElement('div', 'suape-empty', 'Nenhuma RP/NP corresponde ao filtro informado.'));
+      } else {
+        filtered.forEach((item) => body.appendChild(createBeneficiaryDocRow(item, { rowClass: 'suape-bdocs-modal-row', includeDetails: true })));
+      }
+      const total = Math.max(currentDocs.total || 0, items.length);
+      countLabel.textContent = `Exibindo ${filtered.length} de ${total} documento(s)`;
+      const hasMore = items.length < total;
+      loadMoreBtn.hidden = !hasMore;
+      loadMoreBtn.disabled = beneficiaryDocsModalState.loadingMore;
+      loadMoreBtn.textContent = beneficiaryDocsModalState.loadingMore ? 'Carregando...' : 'Carregar mais';
+    };
+
+    search.addEventListener('input', () => {
+      beneficiaryDocsModalState.query = search.value;
+      renderList();
+    });
+    beneficiaryDocsModalState.refresh = renderList;
+    renderList();
+
+    modal.append(header, toolbar, body, footer);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  }
+  function renderBeneficiaryDocsCard(container, cpfCnpj) {
+    const docs = state.beneficiaryDocs;
+    const digits = String(cpfCnpj || docs?.cpfCnpj || '').replace(/\D/g, '');
+    if (digits.length !== 11 && digits.length !== 14) return;
+    if (!docs || (docs.suapId && docs.suapId !== getProcessId())) return;
+
+    const total = Math.max(docs.total || 0, (docs.items || []).length);
+    const title = total > 0 ? `RPs / NPs (${total})` : 'RPs / NPs';
+    appendSection(container, title, (section) => {
+      if (docs.error) {
+        section.appendChild(createElement('div', 'suape-empty', docs.error));
+        return;
+      }
+      const items = Array.isArray(docs.items) ? docs.items : [];
+      if (!items.length) {
+        section.appendChild(createElement('div', 'suape-empty', 'Nenhuma RP/NP encontrada para este beneficiário.'));
+        return;
+      }
+      const preview = selectBeneficiaryDocsPreview(items);
+      const list = createElement('div', 'suape-bdocs-list');
+      preview.forEach((item) => list.appendChild(createBeneficiaryDocRow(item)));
+      section.appendChild(list);
+
+      if (total > preview.length) {
+        const footer = createElement('div', 'suape-bdocs-footer');
+        const openAll = createElement('button', 'suape-button suape-button-secondary suape-full', `Ver todas (${total})`);
+        openAll.type = 'button';
+        openAll.addEventListener('click', openBeneficiaryDocsModal);
+        footer.appendChild(openAll);
+        section.appendChild(footer);
+      }
+    });
+  }
+
   function retrySync() { const frame = document.getElementById(BRIDGE_FRAME_ID); const suapId = getProcessId(); if (frame?.contentWindow && suapId) frame.contentWindow.postMessage({ source: 'siages-suap-extension', type: 'siages:suap-process-retry', version: 1, payload: { suapId } }, SIAGES_ORIGIN); }
   function restartBridge() { document.getElementById(BRIDGE_FRAME_ID)?.remove(); openProcessBridge(); }
   function openProcessBridge() {
@@ -1769,6 +1977,23 @@
           return;
         }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-finance-summary')) { renderFinanceSummary(event.data.payload); return; }
+        if (isSiagesFrameMessage(event, frame, 'siages:suap-process-beneficiary-docs')) {
+          const payload = event.data.payload;
+          if (!payload || payload.suapId !== getProcessId()) return;
+          if (payload.append && state.beneficiaryDocs?.cpfCnpj === payload.cpfCnpj) {
+            const seen = new Set((state.beneficiaryDocs.items || []).map((item) => item.id));
+            const merged = [...(state.beneficiaryDocs.items || [])];
+            (payload.items || []).forEach((item) => { if (!seen.has(item.id)) { seen.add(item.id); merged.push(item); } });
+            state.beneficiaryDocs = { ...payload, items: merged };
+          } else {
+            state.beneficiaryDocs = payload;
+          }
+          beneficiaryDocsModalState.loadingMore = false;
+          persistProcessState();
+          renderSummary();
+          beneficiaryDocsModalState.refresh?.();
+          return;
+        }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-lc-status')) {
           if (event.data.payload?.suapId !== getProcessId()) return;
           state.lcStatus = event.data.payload; persistProcessState(); renderSummary(); return;
@@ -1881,6 +2106,6 @@
     }
     return undefined;
   });
-  window.__siagesSuapProcessDocument = { isScannedDocumentPage, getProcessId, getProcessNumber, buildContext, parseProcessRoute, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, renderAiPanel, openModal, closeModal, openDocumentAnalysisModal, closeDocumentAnalysisModal, scanDocumentCards, installDocumentAnalysis, disposeDocumentAnalysis, classifyDocumentForAnalysis, downloadProcessPdfFromSuap, htmlToBlockText, collectLcDocumentSources, collectLcDocuments, readDefinitionField, renderLcCard, requestLcRebuild, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed, syncProcessToRegistry };
+  window.__siagesSuapProcessDocument = { isScannedDocumentPage, getProcessId, getProcessNumber, buildContext, parseProcessRoute, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, renderAiPanel, openModal, closeModal, openBeneficiaryDocsModal, closeBeneficiaryDocsModal, openDocumentAnalysisModal, closeDocumentAnalysisModal, scanDocumentCards, installDocumentAnalysis, disposeDocumentAnalysis, classifyDocumentForAnalysis, downloadProcessPdfFromSuap, htmlToBlockText, collectLcDocumentSources, collectLcDocuments, readDefinitionField, renderLcCard, requestLcRebuild, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed, syncProcessToRegistry };
   if (!window.__SIAGES_SUAP_PROCESS_TEST__) void installToolkit();
 })();

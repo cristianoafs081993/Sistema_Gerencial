@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 import {
+  getSuapExtensionBeneficiaryDocsMoreRequest,
   getSuapExtensionProcessContext,
   isValidSuapExtensionLcDocumentsResult,
   isValidSuapExtensionLcRebuild,
@@ -10,6 +11,7 @@ import {
   SUAP_EXTENSION_LC_DOCUMENTS_REQUEST_TYPE,
   SUAP_EXTENSION_LC_STATUS_TYPE,
   SUAP_EXTENSION_ORIGIN,
+  SUAP_EXTENSION_PROCESS_BENEFICIARY_DOCS_TYPE,
   SUAP_EXTENSION_PROCESS_FINANCE_SUMMARY_TYPE,
   SUAP_EXTENSION_PROCESS_FLOW_TYPE,
   SUAP_EXTENSION_PROCESS_INFO_READY_MESSAGE,
@@ -18,6 +20,7 @@ import {
   SUAP_EXTENSION_PROCESS_SYNC_STATUS_TYPE,
   type SuapExtensionLcDocument,
   type SuapExtensionLcStatus,
+  type SuapExtensionProcessBeneficiaryDocsPayload,
   type SuapExtensionProcessContext,
   type SuapExtensionProcessSyncStatus,
 } from '@/lib/suapExtensionDispatch';
@@ -30,6 +33,7 @@ import { extractBolsistasWithAi, isBolsaProcess, runSuapLcAutoBuild } from '@/se
 import { suapProcessFinanceService, type SuapProcessFinanceSummary } from '@/services/suapProcessFinance';
 import { suapProcessosService } from '@/services/suapProcessos';
 import { suapScraperService } from '@/services/suapScraperService';
+import { transparenciaService } from '@/services/transparencia';
 import { mergePublishedMappings, processMappingsService } from '@/services/processMappings';
 import { buildSuapProcessFlowSummary, selectSuapProcessMapping } from '@/lib/suapProcessFlow';
 import { authenticateExtensionAccessToken } from '@/lib/extensionSupabase';
@@ -50,6 +54,61 @@ function postMessageToSuapParent(message: unknown) {
     window.parent.postMessage(message, SUAP_EXTENSION_ORIGIN);
   } catch {
     // Em testes ou acesso direto, a janela pai pode nao ser o SUAP.
+  }
+}
+
+const BENEFICIARY_DOCS_PER_PAGE = 50;
+
+function postBeneficiaryDocs(payload: SuapExtensionProcessBeneficiaryDocsPayload) {
+  postMessageToSuapParent({ source: 'siages', type: SUAP_EXTENSION_PROCESS_BENEFICIARY_DOCS_TYPE, version: 1, payload });
+}
+
+async function fetchAndPostBeneficiaryDocs(
+  suapId: string,
+  cpfCnpj: string,
+  client: SupabaseClient | undefined,
+  options: { page?: number; append?: boolean; isActive?: () => boolean } = {},
+) {
+  const page = options.page ?? 1;
+  const append = Boolean(options.append);
+  const digits = cpfCnpj.replace(/\D/g, '');
+  if (digits.length !== 11 && digits.length !== 14) return;
+  try {
+    const result = await transparenciaService.getDocumentosPorFavorecido(cpfCnpj, {
+      page,
+      perPage: BENEFICIARY_DOCS_PER_PAGE,
+      client,
+    });
+    if (options.isActive && !options.isActive()) return;
+    postBeneficiaryDocs({
+      suapId,
+      cpfCnpj,
+      total: result.total,
+      page,
+      perPage: BENEFICIARY_DOCS_PER_PAGE,
+      append,
+      items: result.data.map((doc) => ({
+        id: doc.id,
+        valorOriginal: doc.valor_original,
+        valorPago: doc.valor_pago,
+        estado: doc.estado,
+        processo: doc.processo || undefined,
+        dataEmissao: doc.data_emissao || undefined,
+        empenhoNumero: doc.empenho_numero || undefined,
+      })),
+    });
+  } catch (error) {
+    if (options.isActive && !options.isActive()) return;
+    postBeneficiaryDocs({
+      suapId,
+      cpfCnpj,
+      total: 0,
+      page,
+      perPage: BENEFICIARY_DOCS_PER_PAGE,
+      append,
+      items: [],
+      error: error instanceof Error ? error.message : 'Não foi possível consultar as RPs/NPs do beneficiário.',
+    });
   }
 }
 
@@ -217,6 +276,8 @@ export default function SuapExtensionProcessInfo() {
   const [retryCount, setRetryCount] = useState(0);
   const [lcRebuildCount, setLcRebuildCount] = useState(0);
   const [status, setStatus] = useState('Aguardando o contexto do processo SUAP...');
+  const extensionClientRef = useRef<SupabaseClient | undefined>(undefined);
+  const fetchedBeneficiaryDocsKeyRef = useRef<string>('');
 
   useEffect(() => {
     let readyAttempts = 0;
@@ -334,12 +395,41 @@ export default function SuapExtensionProcessInfo() {
   useEffect(() => {
     if (!context) return;
     let active = true;
+    const receiveDocsMore = (event: MessageEvent) => {
+      const req = getSuapExtensionBeneficiaryDocsMoreRequest(event, window.parent, context.suapId);
+      if (!req) return;
+      void fetchAndPostBeneficiaryDocs(req.suapId, req.cpfCnpj, extensionClientRef.current, {
+        page: req.page,
+        append: true,
+        isActive: () => active,
+      });
+    };
+    window.addEventListener('message', receiveDocsMore);
+    return () => {
+      active = false;
+      window.removeEventListener('message', receiveDocsMore);
+    };
+  }, [context]);
+
+  useEffect(() => {
+    if (!context) return;
+    let active = true;
     let extensionClient: SupabaseClient | undefined;
     const isActive = () => active;
+    const maybePublishBeneficiaryDocs = (process: SuapProcesso | null | undefined) => {
+      const cpfCnpj = (process?.cpfCnpj || context.cpfCnpj || '').trim();
+      const digits = cpfCnpj.replace(/\D/g, '');
+      if (digits.length !== 11 && digits.length !== 14) return;
+      const key = `${context.suapId}:${digits}`;
+      if (fetchedBeneficiaryDocsKeyRef.current === key) return;
+      fetchedBeneficiaryDocsKeyRef.current = key;
+      void fetchAndPostBeneficiaryDocs(context.suapId, cpfCnpj, extensionClient, { page: 1, append: false, isActive });
+    };
     const publishProcess = async () => {
       const process = await suapProcessosService.getBySuapId(context.suapId, extensionClient);
       if (!active) return process;
       postSnapshot(context, process);
+      maybePublishBeneficiaryDocs(process);
       return process;
     };
     const publishFinance = async () => {
@@ -362,6 +452,7 @@ export default function SuapExtensionProcessInfo() {
       postSyncStatus({ stage: 'checking', message: 'Consultando o processo no SIAGES...' });
       const authenticated = await authenticateExtensionAccessToken(extensionSession.accessToken);
       extensionClient = authenticated.client;
+      extensionClientRef.current = extensionClient;
       const tenantId = authenticated.user.id;
 
       let process = await publishProcess();

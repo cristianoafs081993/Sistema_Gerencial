@@ -1203,6 +1203,9 @@ describe('process-document 1.9', () => {
       card = document.querySelector('.suape-lc-card');
       expect(card).toHaveTextContent('10 aluno(s) · 10 declarado(s) · 2 pendência(s)');
       expect(card?.querySelector('a')).toHaveAttribute('href', 'https://www.siages.com.br/lc?lista=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+      const summaryPanel = document.querySelector('[data-panel="summary"]');
+      expect(summaryPanel).not.toHaveTextContent('SUAP ID');
+      expect(summaryPanel?.lastElementChild).toBe(card);
 
       (card?.querySelector('button') as HTMLButtonElement).click();
       expect(window.confirm).toHaveBeenCalled();
@@ -1211,5 +1214,87 @@ describe('process-document 1.9', () => {
         'https://www.siages.com.br',
       );
     });
+  });
+
+  it('exibe card compacto de RPs/NPs apos Beneficiario e abre modal com busca, filtro e paginacao', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+    const framePost = vi.spyOn(frame.contentWindow!, 'postMessage').mockImplementation(() => undefined);
+    const dispatchFromFrame = (type: string, payload: unknown) => window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br',
+      source: frame.contentWindow,
+      data: { source: 'siages', type, version: 1, payload },
+    }));
+
+    const currentSuapId = api.getProcessId() || '321';
+    dispatchFromFrame('siages:suap-process-snapshot', {
+      fallback: { suapId: currentSuapId, processNumber: '23035.000505.2026-11' },
+      process: {
+        suapId: currentSuapId,
+        numProcesso: '23035.000505.2026-11',
+        status: 'success',
+        beneficiario: 'Fornecedor Alfa',
+        cpfCnpj: '10.877.412/0011-30',
+        dadosCompletos: {},
+      },
+    });
+
+    dispatchFromFrame('siages:suap-process-beneficiary-docs', {
+      suapId: currentSuapId,
+      cpfCnpj: '10.877.412/0011-30',
+      total: 6,
+      page: 1,
+      perPage: 50,
+      items: [
+        { id: '158366264352026NP000010', valorOriginal: 100, valorPago: 100, estado: 'PAGO', dataEmissao: '2026-10-10' },
+        { id: '158366264352026NP000011', valorOriginal: 200, valorPago: 200, estado: 'PAGO', dataEmissao: '2026-10-11' },
+        { id: '158366264352026NP000012', valorOriginal: 300, valorPago: 300, estado: 'PAGO', dataEmissao: '2026-10-12' },
+        { id: '158366264352026NP000013', valorOriginal: 400, valorPago: 400, estado: 'PAGO', dataEmissao: '2026-10-13' },
+        { id: '158366264352026RP000099', valorOriginal: 500, valorPago: 0, estado: 'PENDENTE DE REALIZAÇÃO', dataEmissao: '2026-10-14' },
+      ],
+    });
+
+    const summaryPanel = document.querySelector('[data-panel="summary"]');
+    const sectionTitles = [...(summaryPanel?.querySelectorAll('.suape-section-title') ?? [])].map((el) => el.textContent);
+    const beneficiaryIdx = sectionTitles.indexOf('Beneficiário');
+    const rpsIdx = sectionTitles.indexOf('RPs / NPs (6)');
+    expect(beneficiaryIdx).toBeGreaterThan(-1);
+    expect(rpsIdx).toBe(beneficiaryIdx + 1);
+
+    const rpsSection = summaryPanel?.querySelectorAll('.suape-section')[rpsIdx];
+    const previewCodes = [...(rpsSection?.querySelectorAll('.suape-bdocs-code') ?? [])].map((el) => el.textContent);
+    expect(previewCodes).toHaveLength(4);
+    expect(previewCodes[0]).toBe('2026RP000099');
+
+    const openAllBtn = [...(rpsSection?.querySelectorAll('button') ?? [])].find((btn) => btn.textContent?.includes('Ver todas (6)'));
+    expect(openAllBtn).toBeTruthy();
+    (openAllBtn as HTMLButtonElement).click();
+
+    const modal = document.getElementById('siages-suap-beneficiary-docs-modal');
+    expect(modal).toBeTruthy();
+    expect(modal?.querySelectorAll('.suape-bdocs-modal-row')).toHaveLength(5);
+
+    const pendingChip = [...(modal?.querySelectorAll('.suape-bdocs-chip') ?? [])].find((btn) => btn.textContent === 'Pendentes');
+    (pendingChip as HTMLButtonElement).click();
+    expect(modal?.querySelectorAll('.suape-bdocs-modal-row')).toHaveLength(1);
+    expect(modal).toHaveTextContent('2026RP000099');
+
+    const loadMoreBtn = [...(modal?.querySelectorAll('button') ?? [])].find((btn) => btn.textContent === 'Carregar mais');
+    expect(loadMoreBtn).toBeTruthy();
+    (loadMoreBtn as HTMLButtonElement).click();
+    expect(framePost).toHaveBeenCalledWith(
+      {
+        source: 'siages-suap-extension',
+        type: 'siages:suap-process-beneficiary-docs-more',
+        version: 1,
+        payload: { suapId: currentSuapId, cpfCnpj: '10.877.412/0011-30', page: 2 },
+      },
+      'https://www.siages.com.br',
+    );
+
+    api.closeBeneficiaryDocsModal();
+    expect(document.getElementById('siages-suap-beneficiary-docs-modal')).toBeNull();
   });
 });
