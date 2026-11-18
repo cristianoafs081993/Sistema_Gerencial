@@ -112,7 +112,9 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  document.documentElement.classList.remove('dark');
   document.body.innerHTML = '';
+  try { localStorage.removeItem('siages-palette-theme'); } catch { /* noop */ }
   delete (window as typeof window & Record<string, unknown>).__suapeCommandPaletteLoaded;
   if (originalLocationDescriptor) Object.defineProperty(window, 'location', originalLocationDescriptor);
 });
@@ -768,6 +770,8 @@ describe('paleta global da extensao Suape', () => {
     const childIframe = document.createElement('iframe');
     childIframe.src = 'https://ogs.google.com/widget/app';
     document.body.appendChild(childIframe);
+    document.documentElement.classList.add('dark');
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true, media: '(prefers-color-scheme: dark)', addEventListener: vi.fn(), removeEventListener: vi.fn() })));
 
     vi.stubGlobal('trustedTypes', {
       createPolicy: vi.fn(() => {
@@ -793,7 +797,19 @@ describe('paleta global da extensao Suape', () => {
       fireEvent.keyDown(document.body, { key: 'k', code: 'KeyK', ctrlKey: true });
 
       const overlay = document.getElementById('suape-cp-overlay');
+      const detailOverlay = document.getElementById('suape-cp-detail-overlay');
       expect(overlay).toHaveClass('suape-cp-visible');
+      expect(overlay?.dataset.theme).toBe('light');
+      expect(detailOverlay?.dataset.theme).toBe('light');
+
+      const themeToggle = overlay?.querySelector<HTMLButtonElement>('#suape-cp-theme-toggle');
+      expect(themeToggle).toBeTruthy();
+      fireEvent.click(themeToggle!);
+      expect(overlay?.dataset.theme).toBe('dark');
+      expect(detailOverlay?.dataset.theme).toBe('dark');
+      fireEvent.click(themeToggle!);
+      expect(overlay?.dataset.theme).toBe('light');
+      expect(detailOverlay?.dataset.theme).toBe('light');
 
       const input = document.querySelector<HTMLInputElement>('.suape-cp-input');
       expect(input).toBeTruthy();

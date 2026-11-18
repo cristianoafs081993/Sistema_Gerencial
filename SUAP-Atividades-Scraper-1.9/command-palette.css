@@ -52,44 +52,7 @@
   line-height: 1.5 !important;
 }
 
-/* Dark mode auto-detection for SUAP */
-@media (prefers-color-scheme: dark) {
-  #suape-cp-overlay {
-    --suape-cp-bg: #0f172a;
-    --suape-cp-dialog-bg: #0f172a;
-    --suape-cp-header-bg: #0f172a;
-    --suape-cp-border: #334155;
-    --suape-cp-border-subtle: #1e293b;
-    --suape-cp-text: #f8fafc;
-    --suape-cp-text-muted: #94a3b8;
-    --suape-cp-text-dim: #64748b;
-    --suape-cp-primary: #2dd4bf;
-    --suape-cp-primary-soft: rgba(45, 212, 191, 0.15);
-    --suape-cp-primary-border: rgba(45, 212, 191, 0.3);
-    --suape-cp-chip-bg: #1e293b;
-    --suape-cp-chip-border: #334155;
-    --suape-cp-chip-text: #cbd5e1;
-    --suape-cp-chip-hover-bg: #334155;
-    --suape-cp-chip-active-bg: #0A7F70;
-    --suape-cp-chip-active-text: #ffffff;
-    --suape-cp-screen-icon-bg: #1e293b;
-    --suape-cp-screen-icon-color: #94a3b8;
-    --suape-cp-kbd-bg: #1e293b;
-    --suape-cp-kbd-border: #334155;
-    --suape-cp-kbd-text: #94a3b8;
-    --suape-cp-footer-bg: rgba(15, 23, 42, 0.95);
-    --suape-cp-item-hover: rgba(45, 212, 191, 0.1);
-    --suape-cp-item-selected: rgba(45, 212, 191, 0.12);
-    --suape-cp-item-selected-border: rgba(45, 212, 191, 0.3);
-    --suape-cp-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
-  }
-}
-
-body.theme-luna #suape-cp-overlay:not([data-theme="light"]),
-html.dark #suape-cp-overlay:not([data-theme="light"]),
-body.dark #suape-cp-overlay:not([data-theme="light"]),
-[data-theme="dark"] #suape-cp-overlay:not([data-theme="light"]),
-[data-darkreader-scheme="dark"] #suape-cp-overlay:not([data-theme="light"]),
+/* Tema escuro (aplicado apenas quando selecionado pelo usuário na paleta) */
 #suape-cp-overlay[data-theme="dark"],
 #suape-cp-detail-overlay[data-theme="dark"] {
   --suape-cp-bg: #0f172a;

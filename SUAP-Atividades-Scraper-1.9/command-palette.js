@@ -1701,7 +1701,7 @@
   }
 
   const THEME_STORAGE_KEY = 'siages-palette-theme';
-  let currentPaletteTheme = 'auto'; // 'auto' | 'light' | 'dark'
+  let currentPaletteTheme = 'light'; // 'light' | 'dark'
 
   try {
     const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
@@ -1711,19 +1711,7 @@
   } catch (_) {}
 
   function getEffectiveTheme() {
-    if (currentPaletteTheme === 'light' || currentPaletteTheme === 'dark') {
-      return currentPaletteTheme;
-    }
-    if (
-      document.body?.classList?.contains('theme-luna') ||
-      document.documentElement?.classList?.contains('dark') ||
-      document.body?.classList?.contains('dark') ||
-      document.body?.getAttribute?.('data-theme') === 'dark' ||
-      window.matchMedia?.('(prefers-color-scheme: dark)').matches
-    ) {
-      return 'dark';
-    }
-    return 'light';
+    return currentPaletteTheme === 'dark' ? 'dark' : 'light';
   }
 
   function applyPaletteTheme(theme) {
