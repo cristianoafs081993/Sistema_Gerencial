@@ -10,7 +10,24 @@ import type { Empenho, Contrato, Atividade, DocumentoDespesa } from '@/types';
 import { contratosApiService } from '@/services/contratosApi';
 import { extensionFixturePath } from '@/test/extensionFixtures';
 
-vi.mock('@/services/contratosApi', () => ({ contratosApiService: { getContratosApi: vi.fn().mockResolvedValue([]) } }));
+vi.mock('@/services/contratosApi', () => ({
+  contratosApiService: {
+    getContratosApi: vi.fn().mockResolvedValue([]),
+    getEmpenhosApi: vi.fn().mockResolvedValue([]),
+    getHistoricosApi: vi.fn().mockResolvedValue([]),
+    getFaturasApi: vi.fn().mockResolvedValue([]),
+    getLastSyncRun: vi.fn().mockResolvedValue(null),
+    getContratoApiByNumeroOrId: vi.fn().mockResolvedValue(null),
+    getContratoApiDetails: vi.fn().mockResolvedValue({
+      historico: [],
+      empenhos: [],
+      itens: [],
+      faturas: [],
+      faturaItens: [],
+      faturaEmpenhos: [],
+    }),
+  },
+}));
 
 it('abre solrecfin pela paleta nativa SIAGES sem duplicar Ctrl+K nem depender do SIAFI',async()=>{
   const location=Object.getOwnPropertyDescriptor(window,'location');
@@ -656,7 +673,131 @@ describe('CommandPalette — Entity Search & Navigation', () => {
     expect(screen.queryByText('2025NE000280')).not.toBeInTheDocument();
     expect(screen.queryByText(/ROBERIO BATISTA DE AZEVEDO JUNIOR/i)).not.toBeInTheDocument();
   });
+
+  it('exibe indicadores executivos de contratos (CNPJ, Origem Reitoria, faturas pendentes, saldo a liquidar) e abre o dossiê completo com abas e NE clicável', async () => {
+    const apiContrato = {
+      id: 'api-777',
+      api_contrato_id: 777,
+      numero: '00045/2025',
+      unidade_codigo: '158155',
+      unidade_nome: 'REITORIA IFRN',
+      fornecedor_nome: 'SOLUCOES DIGITAIS LTDA',
+      fornecedor_documento: '11.222.333/0001-44',
+      objeto: 'Licenciamento corporativo de software',
+      processo: '23000.000777/2025-99',
+      situacao: 'Ativo',
+      situacao_derivada: true,
+      campus_scope_reason: 'reitoria_com_empenho_campus',
+      vigencia_inicio: '2025-01-01',
+      vigencia_fim: '2026-12-31',
+      vigencia_inicio_derivada: '2025-01-01',
+      vigencia_fim_derivada: '2027-06-30',
+      valor_global: 120000,
+      valor_acumulado: 180000,
+    };
+    const apiEmpenho = {
+      id: 'emp-api-901',
+      contrato_api_id: 'api-777',
+      numero: '2026NE000123',
+      unidade_gestora: '158366',
+      valor_empenhado: 100000,
+      valor_a_liquidar: 50000,
+      valor_liquidado: 20000,
+      valor_pago: 30000,
+    };
+
+    vi.mocked(contratosApiService.getContratosApi).mockResolvedValue([apiContrato as never]);
+    vi.mocked(contratosApiService.getEmpenhosApi).mockResolvedValue([apiEmpenho as never]);
+    vi.mocked(contratosApiService.getHistoricosApi).mockResolvedValue([
+      {
+        id: 'hist-1',
+        contrato_api_id: 'api-777',
+        receita_despesa: 'Despesa',
+        valor_inicial: 200000,
+        novo_valor_global: 200000,
+        vigencia_fim: '2027-06-30',
+      } as never,
+    ]);
+    vi.mocked(contratosApiService.getFaturasApi).mockResolvedValue([
+      {
+        id: 'fat-501',
+        contrato_api_id: 'api-777',
+        numero_instrumento_cobranca: 'FAT-10',
+        situacao: 'Ateste Pendente',
+        valor_liquido: 8500,
+      } as never,
+    ]);
+    vi.mocked(contratosApiService.getLastSyncRun).mockResolvedValue({
+      id: 'sync-1',
+      unidade_codigo: '158366',
+      finished_at: '2026-11-18T06:02:00Z',
+    } as never);
+    vi.mocked(contratosApiService.getContratoApiDetails).mockResolvedValue({
+      historico: [
+        {
+          id: 'hist-1',
+          contrato_api_id: 'api-777',
+          tipo: 'Termo Aditivo',
+          numero: '01/2026',
+          observacao: 'Prorrogação',
+          valor_inicial: 200000,
+          novo_valor_global: 200000,
+        } as never,
+      ],
+      empenhos: [apiEmpenho as never],
+      itens: [],
+      faturas: [
+        {
+          id: 'fat-501',
+          contrato_api_id: 'api-777',
+          numero_instrumento_cobranca: 'FAT-10',
+          situacao: 'Ateste Pendente',
+          valor_liquido: 8500,
+        } as never,
+      ],
+      faturaItens: [],
+      faturaEmpenhos: [],
+    });
+
+    renderWithProviders(
+      <CommandPalette
+        open={true}
+        onOpenChange={vi.fn()}
+        empenhosList={mockEmpenhos}
+        contratosList={[]}
+      />,
+    );
+
+    const searchInput = screen.getByPlaceholderText(/digite um comando, ne, contrato/i);
+    // Busca por CNPJ do fornecedor no escopo de contratos
+    fireEvent.change(searchInput, { target: { value: 'contrato 11.222.333/0001-44' } });
+
+    expect(await screen.findByText('Contrato 00045/2025')).toBeInTheDocument();
+    expect(screen.getByText('Origem Reitoria')).toBeInTheDocument();
+    expect(screen.getByText('1 fatura pendente')).toBeInTheDocument();
+    expect(screen.getByText('1 NE')).toBeInTheDocument();
+    expect(screen.getByText(/A liquidar:\s*R\$\s*50\.000,00/i)).toBeInTheDocument();
+    // Subfiltros de contratos aparecem no escopo
+    expect(screen.getByRole('button', { name: /Faturas pendentes/i })).toBeInTheDocument();
+
+    // Seleciona o contrato para abrir o dossiê completo com 5 abas
+    fireEvent.click(screen.getByText('Contrato 00045/2025'));
+
+    expect(await screen.findByRole('tab', { name: /Empenhos/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Faturas/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Termos/i })).toBeInTheDocument();
+
+    // Navega até a aba Empenhos e clica na NE para abrir o EmpenhoDialog
+    const empenhosTab = screen.getByRole('tab', { name: /Empenhos/i });
+    fireEvent.mouseDown(empenhosTab, { button: 0, ctrlKey: false });
+    fireEvent.click(empenhosTab);
+    const neCell = await screen.findByText('2026NE000123');
+    fireEvent.click(neCell);
+
+    expect(await screen.findByText(/LIMPEZA TOTAL LTDA/i)).toBeInTheDocument();
+  });
 });
+
 
 
 

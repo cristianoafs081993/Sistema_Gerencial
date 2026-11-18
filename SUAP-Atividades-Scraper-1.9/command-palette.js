@@ -825,6 +825,7 @@
 
     const num = (cont.numero || '').toLowerCase();
     const forn = (cont.fornecedorNome || '').toLowerCase();
+    const doc = String(cont.fornecedorDocumento || '').replace(/\D/g, '');
     const obj = (cont.objeto || '').toLowerCase();
     const proc = (cont.processo || '').toLowerCase();
 
@@ -852,6 +853,11 @@
       if (forn.startsWith(q)) score += 5000;
       else if (forn.includes(q)) score += 3000;
       else if (words.length > 1 && words.every((w) => forn.includes(w))) score += 4000;
+    }
+
+    // 3b. CPF/CNPJ do Fornecedor
+    if (doc && digits.length >= 4 && doc.includes(digits)) {
+      score += digits.length >= 11 && doc === digits ? 9000 : 3500;
     }
 
     // 4. Objeto
@@ -2393,6 +2399,21 @@
 
       matchingContratos.forEach((cont) => {
         const isSel = globalIndex === selectedIndex;
+        const hasVigencia = Boolean(cont.vigenciaInicio || cont.vigenciaFim);
+        const isReitoria = cont.apiContrato && (cont.apiContrato.unidade_origem_codigo === '158155' || cont.apiContrato.unidade_codigo === '158155');
+        let deadlineBadge = '<span class="suape-cp-badge badge-pago">Ativo</span>';
+        if (cont.vigenciaFim) {
+          const endStr = String(cont.vigenciaFim).slice(0, 10);
+          const endDate = new Date(`${endStr}T00:00:00`);
+          const nowDate = new Date();
+          nowDate.setHours(0, 0, 0, 0);
+          const diffDays = Math.round((endDate.getTime() - nowDate.getTime()) / 86400000);
+          if (Number.isFinite(diffDays)) {
+            const label = diffDays < 0 ? `Vencido há ${Math.abs(diffDays)}d` : diffDays === 0 ? 'Vence hoje' : `${diffDays}d restantes`;
+            const badgeCls = diffDays <= 90 ? 'badge-rap' : 'badge-pago';
+            deadlineBadge = `<span class="suape-cp-badge ${badgeCls}">${escapeHtml(label)}</span>`;
+          }
+        }
         html += `
           <div class="suape-cp-item ${isSel ? 'suape-cp-item-selected item-selected-blue' : ''}" data-index="${globalIndex}">
             <div class="suape-cp-item-icon contrato-icon">
@@ -2401,12 +2422,20 @@
             <div class="suape-cp-item-body">
               <div class="suape-cp-item-title-row">
                 <span class="suape-cp-item-title-text">Contrato ${highlightMatch(cont.numero, query)}</span>
-                <span class="suape-cp-badge badge-pago">Ativo</span>
+                ${deadlineBadge}
+                ${isReitoria ? '<span class="suape-cp-badge">Origem Reitoria</span>' : ''}
               </div>
               <p class="suape-cp-item-subtitle">
                 <span class="suape-cp-subtitle-main">${highlightMatch(cont.fornecedorNome || 'Fornecedor não informado', query)}</span>
+                ${cont.fornecedorDocumento ? `<span class="suape-cp-subtitle-extra">(${escapeHtml(cont.fornecedorDocumento)})</span>` : ''}
                 ${cont.objeto ? `<span class="suape-cp-subtitle-extra">• ${highlightMatch(cont.objeto, query)}</span>` : ''}
               </p>
+              ${hasVigencia || cont.processo ? `
+                <p class="suape-cp-item-subtitle" style="margin-top:2px;font-size:11px;opacity:0.85;">
+                  ${hasVigencia ? `<span>Vigência: ${formatDate(cont.vigenciaInicio)} a ${formatDate(cont.vigenciaFim)}</span>` : ''}
+                  ${cont.processo ? `<span class="suape-cp-subtitle-extra">${hasVigencia ? '• ' : ''}Proc. <span class="suape-cp-code">${escapeHtml(cont.processo)}</span></span>` : ''}
+                </p>
+              ` : ''}
             </div>
             <div class="suape-cp-item-meta">
               <span class="suape-cp-item-meta-label">Valor Global</span>
@@ -2806,7 +2835,7 @@
       <div class="suape-cp-empty">
         <div class="suape-cp-spinner"></div>
         <p class="suape-cp-empty-title">Carregando detalhes do contrato...</p>
-        <p class="suape-cp-empty-desc">Buscando faturas, empenhos e itens contratados.</p>
+        <p class="suape-cp-empty-desc">Buscando empenhos, faturas, itens e histórico contratual.</p>
       </div>
     `;
 
@@ -2814,45 +2843,93 @@
 
     let faturas = [];
     let itens = [];
+    let empenhosApi = [];
+    let historicos = [];
 
     if (cont.isApi && cont.id) {
       try {
-        const [faturasRes, itensRes] = await Promise.allSettled([
+        const [faturasRes, itensRes, empenhosRes, historicosRes] = await Promise.allSettled([
           fetchFromSupabase('contratos_api_faturas', `contrato_api_id=eq.${cont.id}&order=data_emissao.desc`),
-          fetchFromSupabase('contratos_api_itens', `contrato_api_id=eq.${cont.id}&order=numero_item.asc`),
+          fetchFromSupabase('contratos_api_itens', `contrato_api_id=eq.${cont.id}&order=numero_item_compra.asc`),
+          fetchFromSupabase('contratos_api_empenhos', `contrato_api_id=eq.${cont.id}&order=data_emissao.desc`),
+          fetchFromSupabase('contratos_api_historico', `contrato_api_id=eq.${cont.id}&order=data_assinatura.asc`),
         ]);
 
         if (faturasRes.status === 'fulfilled') faturas = faturasRes.value || [];
         if (itensRes.status === 'fulfilled') itens = itensRes.value || [];
+        if (empenhosRes.status === 'fulfilled') empenhosApi = empenhosRes.value || [];
+        if (historicosRes.status === 'fulfilled') historicos = historicosRes.value || [];
       } catch (err) {
         console.warn('Erro ao carregar detalhes extras do contrato', err);
       }
     }
 
-    const valorTotal = Number(cont.valor || 0);
-    const valorExecutado = faturas.reduce((acc, f) => acc + (Number(f.valor_liquidado || f.valor_bruto || 0)), 0);
-    const saldo = Math.max(0, valorTotal - valorExecutado);
+    const campusUasg = cachedCampusUasg || DEFAULT_CAMPUS_UASG;
+    const campusEmpenhosApi = empenhosApi.filter(
+      (emp) => !emp.unidade_gestora || String(emp.unidade_gestora).trim() === campusUasg,
+    );
+
+    const localByShortNe = new Map();
+    for (const localEmp of empenhosCache || []) {
+      const m = String(localEmp.numero || '').toUpperCase().match(/\d{4}NE\d+/);
+      if (m) localByShortNe.set(m[0], localEmp);
+    }
+
+    const empenhoRows = campusEmpenhosApi.map((empApi) => {
+      const shortKey = String(empApi.numero || '').toUpperCase().match(/\d{4}NE\d+/)?.[0] || String(empApi.numero || '');
+      const localMatch = localByShortNe.get(shortKey);
+      const isRap = localMatch
+        ? localMatch.tipo === 'rap'
+        : Number(empApi.rp_inscrito || 0) > 0 || Number(empApi.rp_a_pagar || 0) > 0;
+      const valorBase = localMatch
+        ? Number(isRap ? (localMatch.rap_inscrito || localMatch.valor || 0) : (localMatch.valor || 0))
+        : Number(isRap ? (empApi.rp_inscrito || empApi.valor_empenhado || 0) : (empApi.valor_empenhado || 0));
+      const saldo = localMatch
+        ? calculateEmpenhoSaldo(localMatch)
+        : Number(isRap ? (empApi.rp_a_pagar ?? 0) : (empApi.valor_a_liquidar ?? 0));
+      return {
+        numero: empApi.numero || shortKey,
+        tipo: isRap ? 'RAP' : 'Exercício',
+        fonte: localMatch ? 'SIAFI local + Comprasnet' : 'API Comprasnet',
+        valor: valorBase,
+        saldo: Math.max(0, saldo),
+        localEmp: localMatch || null,
+      };
+    });
+
+    const valorHistorico = historicos.reduce((sum, h) => sum + (Number(h.valor_inicial) || 0), 0);
+    const valorTotal = valorHistorico > 0 ? valorHistorico : Number(cont.valor || 0);
+    const valorEmpenhadoCampus = campusEmpenhosApi.reduce((sum, e) => sum + (Number(e.valor_empenhado) || 0), 0);
+    const saldoALiquidarCampus = empenhoRows.reduce((sum, e) => sum + e.saldo, 0);
+    const faturasPendentes = faturas.filter((f) => {
+      const sit = String(f.situacao || '').trim().toLowerCase();
+      return sit !== 'pago' && sit !== 'siafi apropriado';
+    }).length;
 
     body.innerHTML = `
       <div class="suape-cp-metric-grid">
         <div class="suape-cp-metric-card">
-          <p class="suape-cp-metric-label">Valor Global / Acumulado</p>
+          <p class="suape-cp-metric-label">Valor Global</p>
           <p class="suape-cp-metric-value">${formatCurrency(valorTotal)}</p>
         </div>
         <div class="suape-cp-metric-card">
-          <p class="suape-cp-metric-label">Valor Executado (Faturas)</p>
-          <p class="suape-cp-metric-value">${formatCurrency(valorExecutado)}</p>
+          <p class="suape-cp-metric-label">Empenhado Campus</p>
+          <p class="suape-cp-metric-value">${formatCurrency(valorEmpenhadoCampus)}</p>
         </div>
         <div class="suape-cp-metric-card metric-highlight">
-          <p class="suape-cp-metric-label">Saldo Contratual</p>
-          <p class="suape-cp-metric-value">${formatCurrency(saldo)}</p>
+          <p class="suape-cp-metric-label">A Liquidar / Saldo RAP</p>
+          <p class="suape-cp-metric-value">${formatCurrency(saldoALiquidarCampus)}</p>
+        </div>
+        <div class="suape-cp-metric-card">
+          <p class="suape-cp-metric-label">Faturas Pendentes</p>
+          <p class="suape-cp-metric-value">${faturasPendentes} de ${faturas.length}</p>
         </div>
       </div>
 
       <div class="suape-cp-info-card">
         <div class="suape-cp-info-row">
           <span class="suape-cp-info-key">Fornecedor:</span>
-          <span class="suape-cp-info-val">${escapeHtml(cont.fornecedorNome) || '—'}</span>
+          <span class="suape-cp-info-val">${escapeHtml(cont.fornecedorNome) || '—'}${cont.fornecedorDocumento ? ` (${escapeHtml(cont.fornecedorDocumento)})` : ''}</span>
         </div>
         <div class="suape-cp-info-row">
           <span class="suape-cp-info-key">Vigência:</span>
@@ -2872,62 +2949,107 @@
         ` : ''}
       </div>
 
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px; margin-bottom: 6px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
         <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Detalhamento</span>
         <div class="suape-cp-tabs">
-          <button type="button" class="suape-cp-tab-btn suape-cp-tab-active" data-tab="faturas">Faturas (${faturas.length})</button>
+          <button type="button" class="suape-cp-tab-btn suape-cp-tab-active" data-tab="empenhos">Empenhos (${empenhoRows.length})</button>
+          <button type="button" class="suape-cp-tab-btn" data-tab="faturas">Faturas (${faturas.length})</button>
           <button type="button" class="suape-cp-tab-btn" data-tab="itens">Itens (${itens.length})</button>
+          <button type="button" class="suape-cp-tab-btn" data-tab="termos">Termos (${historicos.length})</button>
         </div>
       </div>
 
-      <div id="suape-cp-tab-faturas-content" style="display: flex; flex-direction: column; gap: 8px;">
-        ${faturas.length > 0 ? faturas.map((f) => `
-          <div class="suape-cp-entry-card">
+      <div id="suape-cp-tab-empenhos-content" style="display: flex; flex-direction: column; gap: 8px;">
+        ${empenhoRows.length > 0 ? empenhoRows.map((emp, idx) => `
+          <div class="suape-cp-entry-card" data-emp-index="${idx}" style="${emp.localEmp ? 'cursor:pointer;' : ''}">
             <div class="suape-cp-entry-top">
-              <span class="suape-cp-entry-title">Fatura ${escapeHtml(f.numero_fatura || f.id)}</span>
-              <span class="suape-cp-entry-value">${formatCurrency(f.valor_bruto || f.valor_liquidado || 0)}</span>
+              <span class="suape-cp-entry-title font-mono">${escapeHtml(emp.numero)} <span class="suape-cp-badge">${escapeHtml(emp.tipo)}</span></span>
+              <span class="suape-cp-entry-value">${formatCurrency(emp.saldo)}</span>
             </div>
             <p class="suape-cp-entry-desc">
-              Emissão: ${formatDate(f.data_emissao)} • Situação: ${escapeHtml(f.situacao || 'Apropriado')}
-              ${f.periodo_inicio ? ` • Período: ${formatDate(f.periodo_inicio)} a ${formatDate(f.periodo_fim)}` : ''}
+              Empenhado/Base: ${formatCurrency(emp.valor)} • Fonte: ${escapeHtml(emp.fonte)}
             </p>
           </div>
-        `).join('') : '<p class="suape-cp-empty-desc" style="text-align: center; padding: 12px;">Nenhuma fatura associada na API.</p>'}
+        `).join('') : '<p class="suape-cp-empty-desc" style="text-align: center; padding: 12px;">Nenhum empenho vinculado ao campus.</p>'}
+      </div>
+
+      <div id="suape-cp-tab-faturas-content" style="display: none; flex-direction: column; gap: 8px;">
+        ${faturas.length > 0 ? faturas.map((f) => {
+          const numFatura = f.numero_instrumento_cobranca || f.numero_fatura || f.api_fatura_id || f.id;
+          const valFatura = f.valor_liquido ?? f.valor_bruto ?? f.valor_liquidado ?? 0;
+          const refLabel = f.mes_referencia && f.ano_referencia ? `${String(f.mes_referencia).padStart(2, '0')}/${f.ano_referencia}` : '';
+          return `
+            <div class="suape-cp-entry-card">
+              <div class="suape-cp-entry-top">
+                <span class="suape-cp-entry-title">Fatura ${escapeHtml(numFatura)}</span>
+                <span class="suape-cp-entry-value">${formatCurrency(valFatura)}</span>
+              </div>
+              <p class="suape-cp-entry-desc">
+                Emissão: ${formatDate(f.data_emissao)} • Situação: ${escapeHtml(f.situacao || 'Apropriado')}
+                ${refLabel ? ` • Ref.: ${escapeHtml(refLabel)}` : ''}
+                ${f.data_pagamento ? ` • Pago em: ${formatDate(f.data_pagamento)}` : ''}
+              </p>
+            </div>
+          `;
+        }).join('') : '<p class="suape-cp-empty-desc" style="text-align: center; padding: 12px;">Nenhuma fatura associada na API.</p>'}
       </div>
 
       <div id="suape-cp-tab-itens-content" style="display: none; flex-direction: column; gap: 8px;">
-        ${itens.length > 0 ? itens.map((it) => `
+        ${itens.length > 0 ? itens.map((it) => {
+          const numItem = it.numero_item_compra || it.numero_item || it.api_item_id || '';
+          const descItem = [it.catmatseritem_id, it.descricao_complementar, it.descricao].filter(Boolean).join(' - ') || 'Item do Contrato';
+          return `
+            <div class="suape-cp-entry-card">
+              <div class="suape-cp-entry-top">
+                <span class="suape-cp-entry-title">Item ${escapeHtml(numItem)} • ${escapeHtml(descItem)}</span>
+                <span class="suape-cp-entry-value">${formatCurrency(it.valor_total || (Number(it.quantidade || 0) * Number(it.valor_unitario || 0)))}</span>
+              </div>
+              <p class="suape-cp-entry-desc">
+                Qtd. ${formatNumber(it.quantidade)} | Unitário ${formatCurrency(it.valor_unitario || 0)}
+              </p>
+            </div>
+          `;
+        }).join('') : '<p class="suape-cp-empty-desc" style="text-align: center; padding: 12px;">Nenhum item discriminado na API.</p>'}
+      </div>
+
+      <div id="suape-cp-tab-termos-content" style="display: none; flex-direction: column; gap: 8px;">
+        ${historicos.length > 0 ? historicos.map((h) => `
           <div class="suape-cp-entry-card">
             <div class="suape-cp-entry-top">
-              <span class="suape-cp-entry-title">Item ${escapeHtml(it.numero_item || '')} • ${escapeHtml(it.descricao || 'Item do Contrato')}</span>
-              <span class="suape-cp-entry-value">${formatCurrency(it.valor_total || (Number(it.quantidade || 0) * Number(it.valor_unitario || 0)))}</span>
+              <span class="suape-cp-entry-title">${escapeHtml(h.tipo || 'Termo')}${h.numero ? ` — ${escapeHtml(h.numero)}` : ''}</span>
+              <span class="suape-cp-entry-value">${formatCurrency(h.novo_valor_global || h.valor_inicial || h.valor_global || 0)}</span>
             </div>
             <p class="suape-cp-entry-desc">
-              Qtd. ${formatNumber(it.quantidade)} | Unitário ${formatCurrency(it.valor_unitario || 0)}
+              Assinatura: ${formatDate(h.data_assinatura)} • Vigência: ${formatDate(h.vigencia_inicio)} a ${formatDate(h.vigencia_fim)}
+              ${h.observacao ? ` • ${escapeHtml(h.observacao)}` : ''}
             </p>
           </div>
-        `).join('') : '<p class="suape-cp-empty-desc" style="text-align: center; padding: 12px;">Nenhum item discriminado na API.</p>'}
+        `).join('') : '<p class="suape-cp-empty-desc" style="text-align: center; padding: 12px;">Nenhum termo de histórico sincronizado.</p>'}
       </div>
     `;
 
     // Tab switcher events
-    const tabFaturasBtn = body.querySelector('[data-tab="faturas"]');
-    const tabItensBtn = body.querySelector('[data-tab="itens"]');
-    const tabFaturasContent = body.querySelector('#suape-cp-tab-faturas-content');
-    const tabItensContent = body.querySelector('#suape-cp-tab-itens-content');
-
-    tabFaturasBtn?.addEventListener('click', () => {
-      tabFaturasBtn.classList.add('suape-cp-tab-active');
-      tabItensBtn?.classList.remove('suape-cp-tab-active');
-      tabFaturasContent.style.display = 'flex';
-      tabItensContent.style.display = 'none';
+    const tabs = ['empenhos', 'faturas', 'itens', 'termos'];
+    tabs.forEach((tabId) => {
+      const btn = body.querySelector(`[data-tab="${tabId}"]`);
+      btn?.addEventListener('click', () => {
+        tabs.forEach((otherId) => {
+          const otherBtn = body.querySelector(`[data-tab="${otherId}"]`);
+          const otherContent = body.querySelector(`#suape-cp-tab-${otherId}-content`);
+          if (otherBtn) otherBtn.classList.toggle('suape-cp-tab-active', otherId === tabId);
+          if (otherContent) otherContent.style.display = otherId === tabId ? 'flex' : 'none';
+        });
+      });
     });
 
-    tabItensBtn?.addEventListener('click', () => {
-      tabItensBtn.classList.add('suape-cp-tab-active');
-      tabFaturasBtn?.classList.remove('suape-cp-tab-active');
-      tabItensContent.style.display = 'flex';
-      tabFaturasContent.style.display = 'none';
+    body.querySelectorAll('[data-emp-index]').forEach((card) => {
+      card.addEventListener('click', () => {
+        const idx = Number(card.getAttribute('data-emp-index'));
+        const row = empenhoRows[idx];
+        if (row?.localEmp) {
+          openEmpenhoDetail(row.localEmp);
+        }
+      });
     });
   }
 

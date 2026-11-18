@@ -797,9 +797,21 @@ export default function Contratos() {
     <PageHeader compact />
     <div className="space-y-6 pb-10">
       <HeaderActions>
-        {lastSyncLabel ? (
+        {lastSyncLabel || isSuperAdmin ? (
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="text-xs text-text-secondary">{lastSyncLabel}</span>
+            {lastSyncLabel ? <span className="text-xs text-text-secondary">{lastSyncLabel}</span> : null}
+            {isSuperAdmin ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => setIsSyncDialogOpen(true)}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span>Atualizar Comprasnet</span>
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </HeaderActions>
@@ -1041,7 +1053,7 @@ export default function Contratos() {
       </DataTablePanel>
 
       </div>
-      {isSuperAdmin ? <ContratosSyncDialog open={isSyncDialogOpen} onOpenChange={setIsSyncDialogOpen} onSyncComplete={handleSyncComplete} /> : null}
+      {isSuperAdmin ? <ContratosSyncDialog open={isSyncDialogOpen} onOpenChange={setIsSyncDialogOpen} onSyncComplete={handleSyncComplete} campusUasg={campusUasg} /> : null}
       <div hidden={!!inspectedEmpenho}>
       <ContratoApiDetailsSheet presentation="page" campusUasg={campusUasg} error={detailsError} onRetry={() => selectedApiContrato && void openApiDetails(selectedApiContrato)} execution={selectedExecution} onOpenEmpenho={setInspectedEmpenho} open={isDetailsOpen} onOpenChange={open => { if (!open) detailRequest.current++; setIsDetailsOpen(open); }} contrato={selectedPageContrato} details={selectedApiDetails} lastSyncRun={lastApiSyncRun} loading={isDetailsLoading} />
       </div>

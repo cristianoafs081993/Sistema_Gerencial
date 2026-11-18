@@ -53,12 +53,27 @@ import { formatCurrency, formatarDocumento, formatDocumentoId } from '@/lib/util
 import { getEmpenhoAvailableBalance } from '@/utils/empenhoBalance';
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
 import { ContratoApiDetailsSheet } from '@/components/contratos/ContratoApiDetailsSheet';
-import { contratosApiService, type ContratoApiDetails, type ContratoApiRow } from '@/services/contratosApi';
+import {
+  contratosApiService,
+  type ContratoApiDetails,
+  type ContratoApiEmpenhoRow,
+  type ContratoApiFaturaRow,
+  type ContratoApiHistoricoRow,
+  type ContratoApiRow,
+  type ContratoApiSyncRun,
+} from '@/services/contratosApi';
 import { isContratoApiCampusEmpenho } from '@/utils/contratosApiStatus';
+import { contractDaysRemaining, contractDeadlineLabel, formatContractDate } from '@/utils/contractPresentation';
+import {
+  buildContractExecutionSummary,
+  buildLocalEmpenhoLookupMap,
+  type ContractExecutionRow,
+} from '@/utils/contractExecutionSummary';
 import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 import { normalizeContratoNumero, shouldIgnoreContratoNumero } from '@/utils/contratosSync';
 import { transparenciaService } from '@/services/transparencia';
-import type { Empenho, Contrato, Atividade, DocumentoDespesa } from '@/types';
+import { getRapReferenceYear } from '@/utils/rapMetrics';
+import type { Empenho, Contrato, ContratoEmpenho, Atividade, DocumentoDespesa } from '@/types';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -68,6 +83,7 @@ interface CommandPaletteProps {
   onSignOut?: () => void;
   empenhosList?: Empenho[];
   contratosList?: Contrato[];
+  contratosEmpenhosList?: ContratoEmpenho[];
   disableContractSearch?: boolean;
   atividadesList?: Atividade[];
   onSaveEmpenho?: (id: string, data: Partial<Empenho>) => void;
@@ -75,6 +91,7 @@ interface CommandPaletteProps {
 }
 
 type SearchScope = 'all' | 'empenhos' | 'contratos' | 'screens' | 'actions' | 'suap-processos' | 'suap-alunos' | 'suap-documentos' | 'documentos-habeis';
+type ContractViewFilter = 'all' | 'expiring90' | 'pending' | 'expired120';
 type SuapQueryKind = 'processos' | 'alunos' | 'documentos' | 'contratos';
 
 const SUAP_BASE_URL = 'https://suap.ifrn.edu.br';
@@ -287,6 +304,7 @@ function scoreContrato(
   cont: {
     numero: string;
     fornecedorNome: string;
+    fornecedorDocumento?: string | null;
     objeto: string;
     processo: string;
   },
@@ -299,6 +317,7 @@ function scoreContrato(
 
   const num = (cont.numero || '').toLowerCase();
   const forn = (cont.fornecedorNome || '').toLowerCase();
+  const doc = (cont.fornecedorDocumento || '').replace(/\D/g, '');
   const obj = (cont.objeto || '').toLowerCase();
   const proc = (cont.processo || '').toLowerCase();
 
@@ -336,13 +355,18 @@ function scoreContrato(
     else if (words.length > 1 && words.every((w) => forn.includes(w))) score += 4000;
   }
 
-  // 4. Objeto
+  // 4. CPF/CNPJ do Fornecedor
+  if (doc && digits.length >= 4 && doc.includes(digits)) {
+    score += digits.length >= 11 && doc === digits ? 9000 : 3500;
+  }
+
+  // 5. Objeto
   if (obj) {
     if (obj.includes(q)) score += 2000;
     else if (words.length > 1 && words.every((w) => obj.includes(w))) score += 2500;
   }
 
-  // 5. Processo
+  // 6. Processo
   if (proc && q.length >= 3 && proc.includes(q)) {
     score += 1500;
   }
@@ -358,6 +382,7 @@ export function CommandPalette({
   onSignOut,
   empenhosList = [],
   contratosList = [],
+  contratosEmpenhosList = [],
   disableContractSearch = false,
   atividadesList = [],
   onSaveEmpenho,
@@ -367,21 +392,33 @@ export function CommandPalette({
   const { canAccessScreen, session } = useAuth();
   const [searchValue, setSearchValue] = useState('');
   const [activeScope, setActiveScope] = useState<SearchScope>('all');
+  const [contractViewFilter, setContractViewFilter] = useState<ContractViewFilter>('all');
   const [selectedEmpenhoForDialog, setSelectedEmpenhoForDialog] = useState<Empenho | null>(null);
   const [isEmpenhoDialogOpen, setIsEmpenhoDialogOpen] = useState(false);
   const [apiContratos, setApiContratos] = useState<ContratoApiRow[]>([]);
+  const [apiEmpenhos, setApiEmpenhos] = useState<ContratoApiEmpenhoRow[]>([]);
+  const [apiHistoricos, setApiHistoricos] = useState<ContratoApiHistoricoRow[]>([]);
+  const [apiFaturas, setApiFaturas] = useState<ContratoApiFaturaRow[]>([]);
+  const [lastApiSyncRun, setLastApiSyncRun] = useState<ContratoApiSyncRun | null>(null);
   const [selectedContratoForDialog, setSelectedContratoForDialog] = useState<ContratoApiRow | null>(null);
+  const [selectedContratoLocalId, setSelectedContratoLocalId] = useState<string | null>(null);
+  const [selectedContratoFallbackValor, setSelectedContratoFallbackValor] = useState<number>(0);
   const [selectedContratoDetails, setSelectedContratoDetails] = useState<ContratoApiDetails | null>(null);
+  const [contratoDetailsError, setContratoDetailsError] = useState<string | null>(null);
   const [isContratoDetailsOpen, setIsContratoDetailsOpen] = useState(false);
   const [isContratoDetailsLoading, setIsContratoDetailsLoading] = useState(false);
   const [documentosPage, setDocumentosPage] = useState(1);
   const [selectedDocumentoForDialog, setSelectedDocumentoForDialog] = useState<DocumentoDespesa | null>(null);
   const [isDocumentoDetailsOpen, setIsDocumentoDetailsOpen] = useState(false);
 
-  // Carrega apenas contratos ativos da API para enriquecer busca e detalhes com precisão
+  // Carrega contratos e resumos financeiros da API ao abrir a paleta
   useEffect(() => {
     if (disableContractSearch) {
       setApiContratos([]);
+      setApiEmpenhos([]);
+      setApiHistoricos([]);
+      setApiFaturas([]);
+      setLastApiSyncRun(null);
       return;
     }
     if (!open) return;
@@ -389,8 +426,23 @@ export function CommandPalette({
     let isMounted = true;
     contratosApiService
       .getContratosApi(true, campusUasg)
-      .then((res) => {
-        if (isMounted && Array.isArray(res)) setApiContratos(res);
+      .then(async (res) => {
+        if (!isMounted || !Array.isArray(res)) return;
+        setApiContratos(res);
+        const ids = res.map((contrato) => contrato.id);
+        const [empenhosRes, historicosRes, faturasRes, syncRunRes] = await Promise.all([
+          contratosApiService.getEmpenhosApi ? contratosApiService.getEmpenhosApi(ids, campusUasg).catch(() => []) : Promise.resolve([]),
+          contratosApiService.getHistoricosApi ? contratosApiService.getHistoricosApi(ids).catch(() => []) : Promise.resolve([]),
+          contratosApiService.getFaturasApi ? contratosApiService.getFaturasApi(ids, undefined, campusUasg).catch(() => []) : Promise.resolve([]),
+          contratosApiService.getLastSyncRun ? contratosApiService.getLastSyncRun(campusUasg).catch(() => null) : Promise.resolve(null),
+        ]);
+        if (!isMounted) return;
+        if (Array.isArray(empenhosRes)) {
+          setApiEmpenhos(empenhosRes.filter((emp) => isContratoApiCampusEmpenho(emp, campusUasg)));
+        }
+        if (Array.isArray(historicosRes)) setApiHistoricos(historicosRes);
+        if (Array.isArray(faturasRes)) setApiFaturas(faturasRes);
+        setLastApiSyncRun(syncRunRes ?? null);
       })
       .catch((err) => {
         console.warn('CommandPalette: aviso ao carregar contratos da API', err);
@@ -417,6 +469,7 @@ export function CommandPalette({
     if (!open) {
       setSearchValue('');
       setActiveScope('all');
+      setContractViewFilter('all');
     }
   }, [open]);
 
@@ -545,44 +598,132 @@ export function CommandPalette({
     onOpenChange(false);
   };
 
-  // Lista unificada de contratos EXCLUSIVAMENTE ATIVOS (mesclando API e dados locais)
+  const rapReferenceYear = useMemo(() => getRapReferenceYear(empenhosList), [empenhosList]);
+  const localEmpenhoByLookupKey = useMemo(() => buildLocalEmpenhoLookupMap(empenhosList), [empenhosList]);
+
+  const apiEmpenhosByContratoApiId = useMemo(() => {
+    const map = new Map<string, ContratoApiEmpenhoRow[]>();
+    for (const empenho of apiEmpenhos) {
+      const current = map.get(empenho.contrato_api_id) ?? [];
+      current.push(empenho);
+      map.set(empenho.contrato_api_id, current);
+    }
+    return map;
+  }, [apiEmpenhos]);
+
+  const apiHistoricosByContratoApiId = useMemo(() => {
+    const map = new Map<string, ContratoApiHistoricoRow[]>();
+    for (const historico of apiHistoricos) {
+      const current = map.get(historico.contrato_api_id) ?? [];
+      current.push(historico);
+      map.set(historico.contrato_api_id, current);
+    }
+    return map;
+  }, [apiHistoricos]);
+
+  const apiFaturasByContratoApiId = useMemo(() => {
+    const map = new Map<string, ContratoApiFaturaRow[]>();
+    for (const fatura of apiFaturas) {
+      const current = map.get(fatura.contrato_api_id) ?? [];
+      current.push(fatura);
+      map.set(fatura.contrato_api_id, current);
+    }
+    return map;
+  }, [apiFaturas]);
+
+  // Lista unificada e enriquecida de contratos (mesclando API, histórico, empenhos do campus, faturas e dados locais)
   const combinedContratos = useMemo(() => {
     if (disableContractSearch) return [];
 
-    const map = new Map<
-      string,
-      {
-        id: string;
-        numero: string;
-        fornecedorNome: string;
-        objeto: string;
-        processo: string;
-        valor: number;
-        status?: string;
-        apiContrato?: ContratoApiRow;
-        localContrato?: Contrato;
-      }
-    >();
+    type EnrichedPaletteContrato = {
+      id: string;
+      localId: string | null;
+      numero: string;
+      fornecedorNome: string;
+      fornecedorDocumento: string | null;
+      objeto: string;
+      processo: string;
+      vigenciaInicio: string | null;
+      vigenciaFim: string | null;
+      daysRemaining: number | null;
+      deadlineLabel: string;
+      valor: number;
+      empenhado: number;
+      aLiquidar: number;
+      empenhosCount: number;
+      openFaturasCount: number;
+      hasReitoriaOrigin: boolean;
+      situacaoDerivada: boolean;
+      status?: string;
+      apiContrato?: ContratoApiRow;
+      localContrato?: Contrato;
+      executionRows: ContractExecutionRow[];
+    };
 
-    // 1. Contratos da API ativos
+    const localByNorm = new Map<string, Contrato>();
+    for (const loc of contratosList) {
+      if (shouldIgnoreContratoNumero(loc.numero)) continue;
+      const norm = normalizeContratoNumero(loc.numero) || loc.numero;
+      localByNorm.set(norm, loc);
+    }
+
+    const map = new Map<string, EnrichedPaletteContrato>();
+
+    // 1. Contratos da API (ativos + vencidos nos últimos 120 dias retornados por getContratosApi)
     for (const api of apiContratos) {
+      if (shouldIgnoreContratoNumero(api.numero)) continue;
+      const vigenciaInicio = api.vigencia_inicio_derivada ?? api.vigencia_inicio ?? null;
+      const vigenciaFim = api.vigencia_fim_derivada ?? api.vigencia_fim ?? null;
+      const daysRemaining = contractDaysRemaining(vigenciaFim);
       const isAtivo = api.situacao_derivada === true;
-      if (!isAtivo) continue;
+      const isExpired120 = daysRemaining !== null && daysRemaining < 0 && daysRemaining >= -120;
+      if (!isAtivo && !isExpired120) continue;
 
       const norm = normalizeContratoNumero(api.numero) || api.numero;
+      const loc = localByNorm.get(norm);
+      const localId = loc?.id ?? null;
+      const fallbackValor = loc?.valorTotal ?? loc?.valor ?? api.valor_acumulado ?? api.valor_global ?? 0;
+
+      const summary = buildContractExecutionSummary({
+        localContratoId: localId,
+        fallbackValor,
+        apiContrato: api,
+        empenhos: empenhosList,
+        contratosEmpenhos: contratosEmpenhosList,
+        localEmpenhoByLookupKey,
+        apiEmpenhos: apiEmpenhosByContratoApiId.get(api.id) ?? [],
+        historico: apiHistoricosByContratoApiId.get(api.id) ?? [],
+        faturas: apiFaturasByContratoApiId.get(api.id) ?? [],
+        rapReferenceYear,
+      });
+
       map.set(norm, {
         id: api.id,
-        numero: api.numero,
-        fornecedorNome: api.fornecedor_nome || '',
-        objeto: api.objeto || '',
-        processo: api.processo || '',
-        valor: api.valor_acumulado || api.valor_global || 0,
-        status: 'Ativo',
+        localId,
+        numero: loc?.numero ?? api.numero,
+        fornecedorNome: api.fornecedor_nome || loc?.fornecedorNome || loc?.contratada || '',
+        fornecedorDocumento: api.fornecedor_documento || loc?.cnpj || null,
+        objeto: api.objeto || loc?.objeto || '',
+        processo: api.processo || loc?.processo || '',
+        vigenciaInicio,
+        vigenciaFim,
+        daysRemaining,
+        deadlineLabel: contractDeadlineLabel(vigenciaFim),
+        valor: summary.valorGlobal,
+        empenhado: summary.empenhado,
+        aLiquidar: summary.aLiquidar,
+        empenhosCount: summary.empenhosCount,
+        openFaturasCount: summary.openFaturas.length,
+        hasReitoriaOrigin: summary.hasReitoriaOrigin,
+        situacaoDerivada: isAtivo,
+        status: isAtivo ? 'Ativo' : 'Encerrado',
         apiContrato: api,
+        localContrato: loc,
+        executionRows: summary.rows,
       });
     }
 
-    // 2. Mescla contratos locais que estejam ativos
+    // 2. Mescla contratos locais ativos que não constam na API
     for (const loc of contratosList) {
       if (shouldIgnoreContratoNumero(loc.numero)) continue;
       const statusNorm = (loc.status || '').trim().toLowerCase();
@@ -590,44 +731,113 @@ export function CommandPalette({
       if (isLocalInativo) continue;
 
       const norm = normalizeContratoNumero(loc.numero) || loc.numero;
-      if (map.has(norm)) {
-        const existing = map.get(norm)!;
-        existing.localContrato = loc;
-        if (!existing.fornecedorNome && (loc.fornecedorNome || loc.contratada)) {
-          existing.fornecedorNome = loc.fornecedorNome || loc.contratada || '';
-        }
-        if (!existing.objeto && loc.objeto) existing.objeto = loc.objeto;
-      } else {
-        map.set(norm, {
-          id: loc.id,
-          numero: loc.numero,
-          fornecedorNome: loc.fornecedorNome || loc.contratada || '',
-          objeto: loc.objeto || '',
-          processo: loc.processo || '',
-          valor: loc.valorTotal || loc.valor || 0,
-          status: loc.status || 'Ativo',
-          localContrato: loc,
-        });
-      }
+      if (map.has(norm)) continue;
+
+      const rawInicio = loc.dataInicio ?? loc.data_inicio ?? null;
+      const rawFim = loc.dataFim ?? loc.data_termino ?? null;
+      const vigenciaInicio = rawInicio ? String(rawInicio).slice(0, 10) : null;
+      const vigenciaFim = rawFim ? String(rawFim).slice(0, 10) : null;
+      const daysRemaining = contractDaysRemaining(vigenciaFim);
+      const fallbackValor = loc.valorTotal || loc.valor || 0;
+
+      const summary = buildContractExecutionSummary({
+        localContratoId: loc.id,
+        fallbackValor,
+        apiContrato: null,
+        empenhos: empenhosList,
+        contratosEmpenhos: contratosEmpenhosList,
+        localEmpenhoByLookupKey,
+        rapReferenceYear,
+      });
+
+      map.set(norm, {
+        id: loc.id,
+        localId: loc.id,
+        numero: loc.numero,
+        fornecedorNome: loc.fornecedorNome || loc.contratada || '',
+        fornecedorDocumento: loc.cnpj || null,
+        objeto: loc.objeto || '',
+        processo: loc.processo || '',
+        vigenciaInicio,
+        vigenciaFim,
+        daysRemaining,
+        deadlineLabel: contractDeadlineLabel(vigenciaFim),
+        valor: summary.valorGlobal || fallbackValor,
+        empenhado: summary.empenhado,
+        aLiquidar: summary.aLiquidar,
+        empenhosCount: summary.empenhosCount,
+        openFaturasCount: 0,
+        hasReitoriaOrigin: false,
+        situacaoDerivada: true,
+        status: loc.status || 'Ativo',
+        localContrato: loc,
+        executionRows: summary.rows,
+      });
     }
 
     return Array.from(map.values());
-  }, [apiContratos, contratosList, disableContractSearch]);
+  }, [
+    apiContratos,
+    apiEmpenhosByContratoApiId,
+    apiFaturasByContratoApiId,
+    apiHistoricosByContratoApiId,
+    contratosEmpenhosList,
+    contratosList,
+    disableContractSearch,
+    empenhosList,
+    localEmpenhoByLookupKey,
+    rapReferenceYear,
+  ]);
+
+  const matchesContractFilter = (cont: (typeof combinedContratos)[number], view: ContractViewFilter) => {
+    if (view === 'all') return cont.situacaoDerivada;
+    if (view === 'expiring90') {
+      return cont.situacaoDerivada && cont.daysRemaining !== null && cont.daysRemaining >= 0 && cont.daysRemaining <= 90;
+    }
+    if (view === 'pending') {
+      return cont.openFaturasCount > 0;
+    }
+    return cont.daysRemaining !== null && cont.daysRemaining < 0 && cont.daysRemaining >= -120;
+  };
+
+  const contractFilterCounts = useMemo(() => {
+    const counts: Record<ContractViewFilter, number> = {
+      all: 0,
+      expiring90: 0,
+      pending: 0,
+      expired120: 0,
+    };
+    for (const c of combinedContratos) {
+      if (matchesContractFilter(c, 'all')) counts.all += 1;
+      if (matchesContractFilter(c, 'expiring90')) counts.expiring90 += 1;
+      if (matchesContractFilter(c, 'pending')) counts.pending += 1;
+      if (matchesContractFilter(c, 'expired120')) counts.expired120 += 1;
+    }
+    return counts;
+  }, [combinedContratos]);
 
   const handleSelectContrato = async (cont: (typeof combinedContratos)[number]) => {
     setIsContratoDetailsOpen(true);
     setIsContratoDetailsLoading(true);
+    setContratoDetailsError(null);
+    setSelectedContratoLocalId(cont.localId);
+    setSelectedContratoFallbackValor(cont.valor || 0);
     onOpenChange(false);
 
     try {
       let apiContrato = cont.apiContrato;
 
-      if (!apiContrato) {
+      if (!apiContrato && typeof contratosApiService.getContratoApiByNumeroOrId === 'function') {
         apiContrato = (await contratosApiService.getContratoApiByNumeroOrId(cont.numero || cont.id, campusUasg)) ?? undefined;
       }
 
       if (apiContrato) {
-        setSelectedContratoForDialog(apiContrato);
+        const normalizedContrato: ContratoApiRow = {
+          ...apiContrato,
+          vigencia_inicio: apiContrato.vigencia_inicio_derivada ?? apiContrato.vigencia_inicio,
+          vigencia_fim: apiContrato.vigencia_fim_derivada ?? apiContrato.vigencia_fim,
+        };
+        setSelectedContratoForDialog(normalizedContrato);
         const details = await contratosApiService.getContratoApiDetails(apiContrato.id, campusUasg);
         const campusEmpenhos = details.empenhos.filter((empenho) => isContratoApiCampusEmpenho(empenho, campusUasg));
         const campusEmpenhoIds = new Set(campusEmpenhos.map((empenho) => empenho.id));
@@ -655,11 +865,12 @@ export function CommandPalette({
           unidade_origem_nome: null,
           objeto: cont.objeto || 'Contrato cadastrado localmente',
           processo: cont.processo || null,
-          vigencia_inicio: loc?.dataInicio ? String(loc.dataInicio).slice(0, 10) : loc?.data_inicio ? String(loc.data_inicio).slice(0, 10) : null,
-          vigencia_fim: loc?.dataFim ? String(loc.dataFim).slice(0, 10) : loc?.data_termino ? String(loc.data_termino).slice(0, 10) : null,
+          vigencia_inicio: cont.vigenciaInicio,
+          vigencia_fim: cont.vigenciaFim,
           valor_global: cont.valor || null,
           valor_acumulado: cont.valor || null,
           situacao: cont.status === 'Ativo',
+          situacao_derivada: cont.situacaoDerivada,
           updated_at: new Date().toISOString(),
         };
         setSelectedContratoForDialog(fallbackContrato);
@@ -674,6 +885,7 @@ export function CommandPalette({
       }
     } catch (error) {
       console.error('CommandPalette: erro ao carregar detalhes do contrato', error);
+      setContratoDetailsError('Não foi possível carregar os detalhes do contrato. Tente novamente.');
       setSelectedContratoDetails({
         historico: [],
         empenhos: [],
@@ -686,6 +898,45 @@ export function CommandPalette({
       setIsContratoDetailsLoading(false);
     }
   };
+
+  const selectedContratoExecution = useMemo(() => {
+    if (!selectedContratoForDialog) return undefined;
+    const historico =
+      selectedContratoDetails?.historico?.length
+        ? selectedContratoDetails.historico
+        : apiHistoricosByContratoApiId.get(selectedContratoForDialog.id) ?? [];
+    const detailEmpenhos =
+      selectedContratoDetails?.empenhos?.length
+        ? selectedContratoDetails.empenhos
+        : apiEmpenhosByContratoApiId.get(selectedContratoForDialog.id) ?? [];
+    const summary = buildContractExecutionSummary({
+      localContratoId: selectedContratoLocalId,
+      fallbackValor: selectedContratoFallbackValor,
+      apiContrato: selectedContratoForDialog,
+      empenhos: empenhosList,
+      contratosEmpenhos: contratosEmpenhosList,
+      localEmpenhoByLookupKey,
+      apiEmpenhos: detailEmpenhos,
+      historico,
+      rapReferenceYear,
+    });
+    return {
+      valorGlobal: summary.valorGlobal,
+      empenhado: summary.empenhado,
+      rows: summary.rows,
+    };
+  }, [
+    apiEmpenhosByContratoApiId,
+    apiHistoricosByContratoApiId,
+    contratosEmpenhosList,
+    empenhosList,
+    localEmpenhoByLookupKey,
+    rapReferenceYear,
+    selectedContratoDetails,
+    selectedContratoFallbackValor,
+    selectedContratoForDialog,
+    selectedContratoLocalId,
+  ]);
 
   // High-precision scored Empenhos (ranked by relevance) - omite empenhos com saldo zero
   const matchingEmpenhos = useMemo(() => {
@@ -715,14 +966,17 @@ export function CommandPalette({
   const matchingContratos = useMemo(() => {
     if (currentScope !== 'all' && currentScope !== 'contratos') return [];
 
+    const activeFilter = currentScope === 'contratos' ? contractViewFilter : 'all';
+    const basePool = combinedContratos.filter((cont) => matchesContractFilter(cont, activeFilter));
+
     if (!effectiveQuery) {
       if (currentScope === 'contratos') {
-        return combinedContratos.slice(0, 15);
+        return basePool.slice(0, 15);
       }
       return [];
     }
 
-    const scored = combinedContratos
+    const scored = basePool
       .map((cont) => ({
         cont,
         score: scoreContrato(cont, effectiveQuery),
@@ -732,7 +986,7 @@ export function CommandPalette({
       .map((item) => item.cont);
 
     return scored.slice(0, 8);
-  }, [combinedContratos, effectiveQuery, currentScope]);
+  }, [combinedContratos, contractViewFilter, effectiveQuery, currentScope]);
 
   // Build grouped screens
   const availableGroups = useMemo(() => {
@@ -886,6 +1140,45 @@ export function CommandPalette({
               Ações Rápidas
             </button>
           </div>
+
+          {currentScope === 'contratos' && !disableContractSearch ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-1.5 bg-muted/10 border-t border-border/40 text-[11px]">
+              <div className="flex items-center gap-1 overflow-x-auto">
+                {(
+                  [
+                    { id: 'all', label: 'Vigentes', count: contractFilterCounts.all },
+                    { id: 'expiring90', label: 'A vencer (90d)', count: contractFilterCounts.expiring90 },
+                    { id: 'pending', label: 'Faturas pendentes', count: contractFilterCounts.pending },
+                    { id: 'expired120', label: 'Vencidos (120d)', count: contractFilterCounts.expired120 },
+                  ] as const
+                ).map((filterOption) => {
+                  const selected = contractViewFilter === filterOption.id;
+                  return (
+                    <button
+                      key={filterOption.id}
+                      type="button"
+                      onClick={() => setContractViewFilter(filterOption.id)}
+                      className={`px-2.5 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 border text-[11px] ${
+                        selected
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-card text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      <span>{filterOption.label}</span>
+                      <span className={`text-[10px] px-1 rounded font-bold ${selected ? 'bg-white/20 text-white' : 'bg-muted text-foreground/80'}`}>
+                        {filterOption.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {lastApiSyncRun?.finished_at ? (
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                  Sincronizado: {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(lastApiSyncRun.finished_at))}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <CommandList className="max-h-[min(540px,78vh)] p-2 scrollbar-thin bg-card text-card-foreground">
@@ -977,57 +1270,115 @@ export function CommandPalette({
                   <div className="flex items-center justify-between font-bold text-xs uppercase tracking-wider text-muted-foreground mb-1">
                     <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
                       <FileStack className="h-3.5 w-3.5" />
-                      Contratos Ativos
+                      {currentScope === 'contratos' && contractViewFilter === 'expired120'
+                        ? 'Contratos Vencidos (120d)'
+                        : currentScope === 'contratos' && contractViewFilter === 'expiring90'
+                          ? 'Contratos a Vencer (90d)'
+                          : currentScope === 'contratos' && contractViewFilter === 'pending'
+                            ? 'Contratos com Faturas Pendentes'
+                            : 'Contratos Ativos'}
                     </span>
                     <span className="text-[11px] font-medium text-muted-foreground">{matchingContratos.length} resultado(s)</span>
                   </div>
                 }
               >
-                {matchingContratos.map((contrato) => (
-                  <CommandItem
-                    key={contrato.id}
-                    value={`contrato ${contrato.numero} ${contrato.fornecedorNome || ''} ${contrato.objeto || ''} ${contrato.id}`}
-                    onSelect={() => handleSelectContrato(contrato)}
-                    className="group flex items-center justify-between gap-3.5 py-3 px-3.5 mb-1.5 rounded-xl border border-transparent transition-all cursor-pointer data-[selected=true]:bg-blue-500/8 data-[selected=true]:border-blue-500/25 hover:bg-muted/50"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold shadow-2xs">
-                      <FileStack className="h-4 w-4" />
-                    </div>
+                {matchingContratos.map((contrato) => {
+                  const isExpired = !contrato.situacaoDerivada || (contrato.daysRemaining !== null && contrato.daysRemaining < 0);
+                  const isExpiringSoon = !isExpired && contrato.daysRemaining !== null && contrato.daysRemaining <= 90;
+                  const statusBadgeClass = isExpired
+                    ? 'border-rose-500/30 bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'
+                    : isExpiringSoon
+                      ? 'border-amber-500/40 bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
+                      : 'border-emerald-500/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300';
+                  const hasVigencia = Boolean(contrato.vigenciaInicio || contrato.vigenciaFim);
+                  const badgeText = contrato.vigenciaFim ? contrato.deadlineLabel : (contrato.status || 'Ativo');
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-foreground text-sm">
-                          Contrato {contrato.numero}
-                        </span>
-                        <Badge variant="outline" className="text-[10px] px-2 py-0 border-emerald-500/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 font-bold uppercase tracking-wider rounded-md">
-                          {contrato.status || 'Ativo'}
-                        </Badge>
+                  return (
+                    <CommandItem
+                      key={contrato.id}
+                      value={`contrato ${contrato.numero} ${contrato.fornecedorNome || ''} ${contrato.fornecedorDocumento || ''} ${contrato.objeto || ''} ${contrato.processo || ''} ${contrato.id}`}
+                      onSelect={() => handleSelectContrato(contrato)}
+                      className="group flex items-center justify-between gap-3.5 py-3 px-3.5 mb-1.5 rounded-xl border border-transparent transition-all cursor-pointer data-[selected=true]:bg-blue-500/8 data-[selected=true]:border-blue-500/25 hover:bg-muted/50"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold shadow-2xs">
+                        <FileStack className="h-4 w-4" />
                       </div>
 
-                      <p className="text-xs text-muted-foreground font-medium truncate mt-1">
-                        <span className="text-foreground/90 font-semibold">
-                          <HighlightMatch text={contrato.fornecedorNome || 'Fornecedor não informado'} query={effectiveQuery} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-foreground text-sm">
+                            Contrato {contrato.numero}
+                          </span>
+                          <Badge variant="outline" className={`text-[10px] px-2 py-0 font-bold uppercase tracking-wider rounded-md ${statusBadgeClass}`}>
+                            {badgeText}
+                          </Badge>
+                          {contrato.hasReitoriaOrigin ? (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 rounded-md">
+                              Origem Reitoria
+                            </Badge>
+                          ) : null}
+                          {contrato.openFaturasCount > 0 ? (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 font-semibold rounded-md">
+                              {contrato.openFaturasCount} {contrato.openFaturasCount === 1 ? 'fatura pendente' : 'faturas pendentes'}
+                            </Badge>
+                          ) : null}
+                          {contrato.empenhosCount > 0 ? (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-border text-muted-foreground font-mono rounded-md">
+                              {contrato.empenhosCount} {contrato.empenhosCount === 1 ? 'NE' : 'NEs'}
+                            </Badge>
+                          ) : null}
+                        </div>
+
+                        <p className="text-xs text-muted-foreground font-medium truncate mt-1">
+                          <span className="text-foreground/90 font-semibold">
+                            <HighlightMatch text={contrato.fornecedorNome || 'Fornecedor não informado'} query={effectiveQuery} />
+                          </span>
+                          {contrato.fornecedorDocumento ? (
+                            <span className="ml-1.5 font-mono text-[11px] text-muted-foreground">
+                              ({formatarDocumento(contrato.fornecedorDocumento)})
+                            </span>
+                          ) : null}
+                          {contrato.objeto ? (
+                            <span className="ml-1.5 text-muted-foreground">
+                              • <HighlightMatch text={contrato.objeto} query={effectiveQuery} />
+                            </span>
+                          ) : null}
+                        </p>
+
+                        {hasVigencia || contrato.processo ? (
+                          <p className="text-[11px] text-muted-foreground/90 truncate mt-0.5">
+                            {hasVigencia ? (
+                              <span>
+                                Vigência: {formatContractDate(contrato.vigenciaInicio)} a {formatContractDate(contrato.vigenciaFim)}
+                              </span>
+                            ) : null}
+                            {contrato.processo ? (
+                              <span className={hasVigencia ? 'ml-2' : ''}>
+                                {hasVigencia ? '• ' : ''}Proc. <span className="font-mono">{contrato.processo}</span>
+                              </span>
+                            ) : null}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">Valor Global</span>
+                        <span className="font-mono font-extrabold text-sm text-foreground tabular-nums block">
+                          {formatCurrency(contrato.valor || 0)}
                         </span>
-                        {contrato.objeto ? (
-                          <span className="ml-1.5 text-muted-foreground">
-                            • <HighlightMatch text={contrato.objeto} query={effectiveQuery} />
+                        {contrato.empenhado > 0 || contrato.aLiquidar > 0 || contrato.empenhosCount > 0 ? (
+                          <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold block mt-0.5 tabular-nums">
+                            A liquidar: {formatCurrency(contrato.aLiquidar)}
                           </span>
                         ) : null}
-                      </p>
-                    </div>
+                      </div>
 
-                    <div className="text-right shrink-0">
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">Valor Global</span>
-                      <span className="font-mono font-extrabold text-sm text-foreground tabular-nums">
-                        {formatCurrency(contrato.valor || 0)}
-                      </span>
-                    </div>
-
-                    <CommandShortcut className="hidden sm:inline-flex opacity-0 group-data-[selected=true]:opacity-100 transition-opacity text-xs font-semibold text-blue-600">
-                      Ver ↵
-                    </CommandShortcut>
-                  </CommandItem>
-                ))}
+                      <CommandShortcut className="hidden sm:inline-flex opacity-0 group-data-[selected=true]:opacity-100 transition-opacity text-xs font-semibold text-blue-600">
+                        Ver ↵
+                      </CommandShortcut>
+                    </CommandItem>
+                  );
+                })}
               </CommandGroup>
             </>
           )}
@@ -1387,8 +1738,14 @@ export function CommandPalette({
           onOpenChange={setIsContratoDetailsOpen}
           contrato={selectedContratoForDialog}
           details={selectedContratoDetails}
-          lastSyncRun={null}
+          lastSyncRun={lastApiSyncRun}
           loading={isContratoDetailsLoading}
+          error={contratoDetailsError}
+          execution={selectedContratoExecution}
+          onOpenEmpenho={(empenho) => {
+            setSelectedEmpenhoForDialog(empenho);
+            setIsEmpenhoDialogOpen(true);
+          }}
           campusUasg={campusUasg}
         />
       )}

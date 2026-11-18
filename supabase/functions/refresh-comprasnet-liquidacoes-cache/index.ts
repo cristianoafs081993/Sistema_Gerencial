@@ -135,12 +135,27 @@ function assertOptionalSharedSecret(request: Request) {
   }
 }
 
-async function fetchJson<T = unknown>(url: string): Promise<T> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`API ${response.status} em ${url}`);
+async function fetchJson<T = unknown>(url: string, retries = 3): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(25000) });
+      if (!response.ok) {
+        if ((response.status === 429 || response.status >= 500) && attempt < retries) {
+          await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+          continue;
+        }
+        throw new Error(`API ${response.status} em ${url}`);
+      }
+      return (await response.json()) as T;
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+      }
+    }
   }
-  return response.json() as Promise<T>;
+  throw lastError instanceof Error ? lastError : new Error(`Falha ao consultar ${url}`);
 }
 
 async function mapWithConcurrency<T, R>(

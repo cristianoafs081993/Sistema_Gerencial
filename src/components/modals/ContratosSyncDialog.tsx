@@ -22,6 +22,7 @@ interface ContratosSyncDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSyncComplete: () => void;
+  campusUasg?: string;
 }
 
 const getSummary = (payload: unknown): SyncSummary => {
@@ -49,6 +50,7 @@ export function ContratosSyncDialog({
   open,
   onOpenChange,
   onSyncComplete,
+  campusUasg,
 }: ContratosSyncDialogProps) {
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
@@ -62,7 +64,10 @@ export function ContratosSyncDialog({
     setSummary(null);
 
     try {
-      const result = await contratosApiService.runSync();
+      const targetUasgs = campusUasg
+        ? Array.from(new Set([campusUasg, '158155']))
+        : undefined;
+      const result = await contratosApiService.runSync(targetUasgs);
       setSummary(getSummary(result));
       setDone(true);
       onSyncComplete();

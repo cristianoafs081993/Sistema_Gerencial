@@ -836,6 +836,7 @@ export function Layout({ children }: LayoutProps) {
           onSignOut={() => void handleSignOut()}
           empenhosList={dataContext?.empenhos}
           contratosList={isTerceirizado ? [] : dataContext?.contratos}
+          contratosEmpenhosList={isTerceirizado ? [] : dataContext?.contratosEmpenhos}
           disableContractSearch={isTerceirizado}
           atividadesList={dataContext?.atividades}
           onSaveEmpenho={dataContext?.updateEmpenho}

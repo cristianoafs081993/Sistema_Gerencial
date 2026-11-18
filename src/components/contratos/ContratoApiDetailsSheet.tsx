@@ -519,6 +519,7 @@ export function ContratoApiDetailsSheet({
 }: ContratoApiDetailsSheetProps) {
   const [detailTab, setDetailTab] = useState('resumo');
   const pageMode = presentation === 'page';
+  const tabbedMode = pageMode || Boolean(execution);
   const Header = pageMode ? 'div' : DialogHeader;
   const Title = pageMode ? 'h1' : DialogTitle;
   const Description = pageMode ? 'p' : DialogDescription;
@@ -706,7 +707,7 @@ export function ContratoApiDetailsSheet({
               <FileText className="h-5 w-5" />
             </span>
             <span className="text-lg font-bold text-foreground">Contrato {contrato?.numero ?? '-'}</span>
-            {pageMode ? (
+            {tabbedMode ? (
               <Badge variant="outline" className={cn('rounded-full text-xs font-bold', vigenciaBadge.className)}>{vigenciaBadge.label}</Badge>
             ) : null}
             {hasReitoriaOrigin ? <Badge variant="secondary" className="rounded-md">Origem Reitoria</Badge> : null}
@@ -724,7 +725,7 @@ export function ContratoApiDetailsSheet({
             ) : null}
           </Title>
           <Description className={cn('text-xs text-muted-foreground', pageMode ? 'order-1 min-w-0 border-l border-border pl-3' : 'mt-1')}>
-            {contrato?.fornecedor_nome || 'Fornecedor não informado'} | Vigência {(pageMode ? formatContractDate : formatDate)(contrato?.vigencia_inicio)} a {(pageMode ? formatContractDate : formatDate)(contrato?.vigencia_fim)}
+            {contrato?.fornecedor_nome || 'Fornecedor não informado'} | Vigência {(tabbedMode ? formatContractDate : formatDate)(contrato?.vigencia_inicio)} a {(tabbedMode ? formatContractDate : formatDate)(contrato?.vigencia_fim)}
           </Description>
         </Header>
 
@@ -734,20 +735,20 @@ export function ContratoApiDetailsSheet({
               <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               Carregando itens, faturas e histórico do contrato...
             </div>
-          ) : pageMode && error ? (
+          ) : tabbedMode && error ? (
             <div role="alert" className="rounded-lg border border-destructive/30 p-6 space-y-3"><p>{error}</p><Button variant="outline" onClick={onRetry}>Tentar novamente</Button></div>
           ) : !details ? (
             <div className="py-16 text-center text-sm font-medium text-muted-foreground">Nenhum detalhe da API carregado.</div>
           ) : (
             <Tabs value={detailTab} onValueChange={setDetailTab} className="space-y-5">
-            {pageMode && <TabsList aria-label="Detalhes do contrato" className="h-auto w-full flex-wrap justify-start gap-1">
+            {tabbedMode && <TabsList aria-label="Detalhes do contrato" className="h-auto w-full flex-wrap justify-start gap-1">
               <TabsTrigger value="resumo">Resumo</TabsTrigger>
               <TabsTrigger value="empenhos">Empenhos{execution ? <TabCount value={execution.rows.length} /> : null}</TabsTrigger>
               <TabsTrigger value="faturas">Faturas<TabCount value={faturas.length} /></TabsTrigger>
               <TabsTrigger value="termos">Termos<TabCount value={historico.length} /></TabsTrigger>
               <TabsTrigger value="documentos">Documentos e ocorrências</TabsTrigger>
             </TabsList>}
-            {(!pageMode || detailTab === 'resumo') && <div className="space-y-5">
+            {(!tabbedMode || detailTab === 'resumo') && <div className="space-y-5">
               <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
                 <div className="flex flex-col gap-4">
 
@@ -770,28 +771,28 @@ export function ContratoApiDetailsSheet({
               </div>
             </div>
 
-            <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${pageMode ? '2xl:grid-cols-4' : 'xl:grid-cols-4'}`}>
-              <SummaryMetric fullValue={pageMode}
+            <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${tabbedMode ? '2xl:grid-cols-4' : 'xl:grid-cols-4'}`}>
+              <SummaryMetric fullValue={tabbedMode}
                 icon={<CircleDollarSign className="h-4 w-4" />}
-                label={pageMode ? 'Valor global do contrato' : valorTotalLabel}
-                value={formatCurrency(pageMode && execution ? execution.valorGlobal : valorTotalApi)}
+                label={tabbedMode ? 'Valor global do contrato' : valorTotalLabel}
+                value={formatCurrency(tabbedMode && execution && execution.valorGlobal > 0 ? execution.valorGlobal : valorTotalApi)}
               />
-              <SummaryMetric fullValue={pageMode}
+              <SummaryMetric fullValue={tabbedMode}
                 icon={<Package className="h-4 w-4" />}
-                label={pageMode ? 'Empenhado campus' : 'Itens'}
-                value={pageMode && execution ? formatCurrency(execution.empenhado) : details.itens.length}
-                helper={pageMode ? 'Empenhos vinculados à unidade' : `${formatCurrency(valorExecutadoItens)} executado`}
+                label={tabbedMode ? 'Empenhado campus' : 'Itens'}
+                value={tabbedMode && execution ? formatCurrency(execution.empenhado) : details.itens.length}
+                helper={tabbedMode ? 'Empenhos vinculados à unidade' : `${formatCurrency(valorExecutadoItens)} executado`}
               />
-              <SummaryMetric fullValue={pageMode}
+              <SummaryMetric fullValue={tabbedMode}
                 icon={<ReceiptText className="h-4 w-4" />}
-                label={pageMode ? 'A liquidar campus / saldo RAP' : 'Faturas'}
-                value={pageMode && execution ? formatCurrency(execution.rows.reduce((sum, row) => sum + row.saldo, 0)) : faturas.length}
-                helper={pageMode ? 'Saldos atuais dos empenhos vinculados' : `${faturasExecutadas} executadas`}
+                label={tabbedMode ? 'A liquidar campus / saldo RAP' : 'Faturas'}
+                value={tabbedMode && execution ? formatCurrency(execution.rows.reduce((sum, row) => sum + row.saldo, 0)) : faturas.length}
+                helper={tabbedMode ? 'Saldos atuais dos empenhos vinculados' : `${faturasExecutadas} executadas`}
               />
-              <SummaryMetric fullValue={pageMode}
+              <SummaryMetric fullValue={tabbedMode}
                 icon={<CalendarClock className="h-4 w-4" />}
-                label={pageMode ? 'Faturas pendentes' : 'Última sincronização'}
-                value={pageMode ? faturas.length - faturasExecutadas : lastSyncLabel}
+                label={tabbedMode ? 'Faturas pendentes' : 'Última sincronização'}
+                value={tabbedMode ? faturas.length - faturasExecutadas : lastSyncLabel}
               />
             </div>
 
@@ -809,7 +810,7 @@ export function ContratoApiDetailsSheet({
               </div>
             ) : null}
 
-            {pageMode && execution ? (
+            {tabbedMode && execution ? (
               <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <p className="text-sm font-bold text-foreground">Execução financeira (campus)</p>
@@ -826,18 +827,18 @@ export function ContratoApiDetailsSheet({
               </div>
             ) : null}
 
-            {pageMode && <p className="text-xs text-muted-foreground">Última sincronização: {lastSyncLabel}</p>}
+            {tabbedMode && <p className="text-xs text-muted-foreground">Última sincronização: {lastSyncLabel}</p>}
             </div>}
             <TabsContent value={detailTab} forceMount className="space-y-4">
-            {pageMode && detailTab === 'empenhos' && execution && <DataTablePanel title="Empenhos vinculados ao campus">
+            {tabbedMode && detailTab === 'empenhos' && execution && <DataTablePanel title="Empenhos vinculados ao campus">
               <Table aria-label="Empenhos vinculados ao campus"><TableHeader><TableRow><TableHead>Empenho</TableHead><TableHead>Tipo</TableHead><TableHead className="text-right">Empenhado / base RAP</TableHead><TableHead className="text-right">Liquidado / liquidado-pago RAP</TableHead><TableHead className="text-right">A liquidar / saldo RAP</TableHead></TableRow></TableHeader>
               <TableBody>{execution.rows.length ? execution.rows.map(row => <TableRow key={row.id}>
                 <TableCell>{row.local && onOpenEmpenho ? <button type="button" className="font-data text-primary hover:underline" onClick={() => onOpenEmpenho(row.local!)}>{row.numero}</button> : <span className="font-data">{row.numero}</span>}</TableCell>
                 <TableCell><p>{row.tipo}</p><p className="mt-1 text-xs text-muted-foreground">{row.fonte}</p></TableCell><TableCell className="font-data text-right whitespace-nowrap">{formatCurrency(row.valor)}</TableCell><TableCell className="font-data text-right whitespace-nowrap">{formatCurrency(row.liquidado)}</TableCell><TableCell className="font-data text-right whitespace-nowrap">{formatCurrency(row.saldo)}</TableCell>
               </TableRow>) : <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Nenhum empenho vinculado ao campus.</TableCell></TableRow>}</TableBody></Table>
             </DataTablePanel>}
-            <Accordion defaultValue={pageMode ? ['historico', 'itens', 'faturas', 'gestao-contratual', 'documentos', 'nfe-rastreabilidade'] : undefined} key={contrato?.id ?? 'sem-contrato'} type="multiple" className="space-y-3">
-              <AccordionItem hidden={pageMode && detailTab !== 'termos'} value="historico" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+            <Accordion defaultValue={tabbedMode ? ['historico', 'itens', 'faturas', 'gestao-contratual', 'documentos', 'nfe-rastreabilidade'] : undefined} key={contrato?.id ?? 'sem-contrato'} type="multiple" className="space-y-3">
+              <AccordionItem hidden={tabbedMode && detailTab !== 'termos'} value="historico" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<History className="h-4 w-4" />}
@@ -897,7 +898,7 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem hidden={pageMode && detailTab !== 'resumo'} value="gestao-fiscalizacao" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+              <AccordionItem hidden={tabbedMode && detailTab !== 'resumo'} value="gestao-fiscalizacao" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<CalendarClock className="h-4 w-4" />}
@@ -911,7 +912,7 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem hidden={pageMode && detailTab !== 'resumo'} value="itens" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+              <AccordionItem hidden={tabbedMode && detailTab !== 'resumo'} value="itens" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<Package className="h-4 w-4" />}
@@ -994,7 +995,7 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem hidden={pageMode && detailTab !== 'faturas'} value="faturas" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+              <AccordionItem hidden={tabbedMode && detailTab !== 'faturas'} value="faturas" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<ReceiptText className="h-4 w-4" />}
@@ -1109,7 +1110,7 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem hidden={pageMode && detailTab !== 'documentos'} value="gestao-contratual" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+              <AccordionItem hidden={tabbedMode && detailTab !== 'documentos'} value="gestao-contratual" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<CalendarClock className="h-4 w-4" />}
@@ -1123,7 +1124,7 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem hidden={pageMode && detailTab !== 'documentos'} value="documentos" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+              <AccordionItem hidden={tabbedMode && detailTab !== 'documentos'} value="documentos" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<FileDown className="h-4 w-4" />}
@@ -1289,7 +1290,7 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem hidden={pageMode && detailTab !== 'faturas'} value="nfe-rastreabilidade" className="border border-border/80 rounded-xl px-4 py-1 bg-card shadow-xs">
+              <AccordionItem hidden={tabbedMode && detailTab !== 'faturas'} value="nfe-rastreabilidade" className="border border-border/80 rounded-xl px-4 py-1 bg-card shadow-xs">
                 <AccordionTrigger className="hover:no-underline py-3">
                   <div className="flex items-center gap-2 text-left">
                     <Receipt className="h-4 w-4 text-action-primary shrink-0" />

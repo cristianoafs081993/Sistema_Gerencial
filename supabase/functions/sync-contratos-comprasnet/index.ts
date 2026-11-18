@@ -18,6 +18,8 @@ import {
 } from '../../../src/services/contratosApiMappers.ts';
 import {
   buildContratoApiDerivedFields,
+  deriveContratoApiCampusScope,
+  deriveContratoApiStatus,
   isContratoApiCampusEmpenho,
   isContratoApiCampusFatura,
   isContratoApiDisplayFatura,
@@ -168,12 +170,27 @@ function assertOptionalSharedSecret(request: Request) {
   }
 }
 
-async function fetchJson<T = unknown>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`API ${res.status} em ${url}`);
+async function fetchJson<T = unknown>(url: string, retries = 3): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(25000) });
+      if (!res.ok) {
+        if ((res.status === 429 || res.status >= 500) && attempt < retries) {
+          await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+          continue;
+        }
+        throw new Error(`API ${res.status} em ${url}`);
+      }
+      return (await res.json()) as T;
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+      }
+    }
   }
-  return res.json() as Promise<T>;
+  throw lastError instanceof Error ? lastError : new Error(`Falha ao consultar ${url}`);
 }
 
 async function mapWithConcurrency<T, R>(
@@ -242,7 +259,7 @@ async function insertInChunks(
 }
 
 async function deleteChildrenForContracts(supabase: SupabaseClient, contratoApiIds: string[]) {
-  for (const idChunk of chunk(contratoApiIds, 200)) {
+  for (const idChunk of chunk(contratoApiIds, 40)) {
     const { error: delEmpError } = await supabase
       .from('contratos_api_empenhos')
       .delete()
@@ -460,6 +477,16 @@ async function completeSyncRun(
 }
 
 async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: string) {
+  await supabase
+    .from('contratos_api_sync_runs')
+    .update({
+      status: 'error',
+      finished_at: new Date().toISOString(),
+      error_message: 'Execucao anterior interrompida por limite de tempo da Edge Function.',
+    })
+    .eq('status', 'running')
+    .lt('started_at', new Date(Date.now() - 10 * 60 * 1000).toISOString());
+
   const { data: runInsert, error: runInsertError } = await supabase
     .from('contratos_api_sync_runs')
     .insert({
@@ -490,6 +517,36 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
     }
     const contratosPayload = Array.from(mergedMap.values());
 
+    const existingByApiId = new Map<
+      number,
+      {
+        id: string;
+        situacao_derivada: boolean | null;
+        vigencia_inicio_derivada: string | null;
+        vigencia_fim_derivada: string | null;
+        situacao_derivada_motivo: string | null;
+        campus_scope_reason: string | null;
+      }
+    >();
+    for (const apiIdChunk of chunk(contratosPayload.map((c) => c.api_contrato_id), 300)) {
+      if (apiIdChunk.length === 0) continue;
+      const { data: existingRows } = await supabase
+        .from('contratos_api')
+        .select('id, api_contrato_id, situacao_derivada, vigencia_inicio_derivada, vigencia_fim_derivada, situacao_derivada_motivo, campus_scope_reason')
+        .in('api_contrato_id', apiIdChunk);
+      for (const row of (existingRows ?? []) as Array<{
+        id: string;
+        api_contrato_id: number;
+        situacao_derivada: boolean | null;
+        vigencia_inicio_derivada: string | null;
+        vigencia_fim_derivada: string | null;
+        situacao_derivada_motivo: string | null;
+        campus_scope_reason: string | null;
+      }>) {
+        existingByApiId.set(Number(row.api_contrato_id), row);
+      }
+    }
+
     const { data: upserted, error: upsertError } = await supabase
       .from('contratos_api')
       .upsert(contratosPayload, { onConflict: 'api_contrato_id' })
@@ -499,15 +556,20 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
     const mappedContratos = (upserted ?? []) as { id: string; api_contrato_id: number }[];
     const remoteByApiId = new Map(contratosPayload.map((contrato) => [contrato.api_contrato_id, contrato]));
     const contractWork = mappedContratos.filter((contrato) => remoteByApiId.has(contrato.api_contrato_id));
+    const now = new Date();
+    const hundredTwentyDaysAgoIso = new Date(now.getTime() - 120 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const hundredEightyDaysAgoIso = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const contractData = await mapWithConcurrency(
       contractWork,
       async (contractDb) => {
         const contrato = remoteByApiId.get(contractDb.api_contrato_id);
+        const existing = existingByApiId.get(contractDb.api_contrato_id);
         if (!contrato) {
           return {
             contratoApiId: contractDb.id,
             apiContratoId: contractDb.api_contrato_id,
+            replaceChildren: false,
             rawFaturas: [],
             empenhos: [],
             faturas: [],
@@ -516,15 +578,25 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
             arquivos: undefined,
             recursos: [],
             resourceErrors: [],
-            derived: buildContratoApiDerivedFields({}, [], [], [], new Date(), unidadeCodigo),
+            extraCampusScopes: [] as Array<{ campus_uasg: string; scope_reason: string }>,
+            derived: buildContratoApiDerivedFields({}, [], [], [], now, unidadeCodigo),
           };
         }
 
-        if (unidadeCodigo === '158155') {
-          if (!contrato.situacao) {
+        const effectiveEnd = existing?.vigencia_fim_derivada ?? contrato.vigencia_fim ?? null;
+        const alreadyKnownLongInactive =
+          existing?.situacao_derivada === false &&
+          Boolean(effectiveEnd && effectiveEnd < hundredEightyDaysAgoIso) &&
+          (!contrato.vigencia_fim || contrato.vigencia_fim < hundredEightyDaysAgoIso);
+
+        if (!contrato.situacao || alreadyKnownLongInactive) {
+          const fallbackEnd = existing?.vigencia_fim_derivada ?? contrato.vigencia_fim ?? null;
+          const isRecentExpired = Boolean(fallbackEnd && fallbackEnd >= hundredTwentyDaysAgoIso);
+          if (!isRecentExpired && (existing?.situacao_derivada === false || !contrato.situacao)) {
             return {
               contratoApiId: contractDb.id,
               apiContratoId: contractDb.api_contrato_id,
+              replaceChildren: false,
               rawFaturas: [],
               empenhos: [],
               faturas: [],
@@ -533,143 +605,95 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
               arquivos: undefined,
               recursos: [],
               resourceErrors: [],
+              extraCampusScopes: [] as Array<{ campus_uasg: string; scope_reason: string }>,
               derived: {
                 situacao_derivada: false,
-                vigencia_inicio_derivada: contrato.vigencia_inicio ?? null,
-                vigencia_fim_derivada: contrato.vigencia_fim ?? null,
-                situacao_derivada_motivo: 'inativo_no_comprasnet',
-                campus_scope_reason: 'reitoria_inativo',
+                vigencia_inicio_derivada: existing?.vigencia_inicio_derivada ?? contrato.vigencia_inicio ?? null,
+                vigencia_fim_derivada: fallbackEnd,
+                situacao_derivada_motivo: existing?.situacao_derivada_motivo || (!contrato.situacao ? 'inativo_no_comprasnet' : 'historico_vencido_sem_renovacao'),
+                campus_scope_reason: existing?.campus_scope_reason || (unidadeCodigo === '158155' ? 'reitoria_inativo' : 'ug_campus'),
               },
             };
           }
-
-          // Nunca trate indisponibilidade da origem como uma lista vazia. A lista
-          // vazia é um resultado válido e remove os filhos; já uma falha precisa
-          // interromper a execução antes que dados previamente sincronizados sejam
-          // apagados na etapa de substituição abaixo.
-          const apiEmpenhos = await fetchJson<ApiEmpenho[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/empenhos`);
-
-          const empenhos = (apiEmpenhos ?? [])
-            .map((empenho) => mapEmpenho(contractDb.id, empenho))
-            .filter((empenho) => empenho.api_empenho_id);
-          const campusEmpenhos = empenhos.filter((empenho) => isContratoApiCampusEmpenho(empenho, unidadeCodigo));
-          const directCampusScope = contrato.unidade_codigo === unidadeCodigo || contrato.unidade_origem_codigo === unidadeCodigo;
-          if (campusEmpenhos.length === 0 && !directCampusScope) {
-            return {
-              contratoApiId: contractDb.id,
-              apiContratoId: contractDb.api_contrato_id,
-              rawFaturas: [],
-              empenhos: [],
-              faturas: [],
-              itens: [],
-              historico: [],
-              arquivos: undefined,
-              recursos: [],
-              resourceErrors: [],
-              derived: buildContratoApiDerivedFields(contrato, [], campusEmpenhos, [], new Date(), unidadeCodigo),
-            };
-          }
-
-          const apiHistorico = await fetchJson<ApiContratoHistorico[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/historico`);
-          const historico = (apiHistorico ?? [])
-            .map((item) => mapHistorico(contractDb.id, item))
-            .filter((item) => item.api_historico_id);
-
-          let rawFaturas: ApiFatura[] = [];
-          let faturas: ReturnType<typeof mapFatura>[] = [];
-          let derived = buildContratoApiDerivedFields(contrato, historico, empenhos, faturas, new Date(), unidadeCodigo);
-          const activeByVigencia =
-            derived.situacao_derivada_motivo === 'historico_vigente' ||
-            derived.situacao_derivada_motivo === 'fallback_sem_historico_vigente';
-
-          if (campusEmpenhos.length === 0 && !derived.situacao_derivada && activeByVigencia && derived.campus_scope_reason === 'reitoria_sem_evidencia_operacional_campus') {
-            rawFaturas = await fetchJson<ApiFatura[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/faturas`);
-            faturas = rawFaturas
-              .map((fatura) => mapFatura(contractDb.id, fatura))
-              .filter((fatura) => fatura.api_fatura_id);
-            derived = buildContratoApiDerivedFields(contrato, historico, empenhos, faturas, new Date(), unidadeCodigo);
-          }
-
-          let apiItens: ApiContratoItem[] = [];
-          if (derived.situacao_derivada) {
-            if (rawFaturas.length === 0) {
-              rawFaturas = await fetchJson<ApiFatura[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/faturas`);
-              faturas = rawFaturas
-                .map((fatura) => mapFatura(contractDb.id, fatura))
-                .filter((fatura) => fatura.api_fatura_id);
-            }
-            apiItens = await fetchJson<ApiContratoItem[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/itens`);
-          }
-          const campusEmpenhoNumeros = new Set(campusEmpenhos.map((e) => String(e.numero || '').trim()));
-          const campusEmpenhoIds = new Set(campusEmpenhos.map((e) => Number(e.api_empenho_id)));
-
-          const isCampusFatura = (fatura: ApiFatura) => {
-            if (isContratoApiCampusFatura(fatura, unidadeCodigo)) return true;
-            const emps = Array.isArray(fatura.dados_empenho) ? fatura.dados_empenho : [];
-            return emps.some((emp: Record<string, unknown>) => {
-              const num = String(emp.numero_empenho || '').trim();
-              const id = Number(emp.id_empenho);
-              return campusEmpenhoNumeros.has(num) || campusEmpenhoIds.has(id);
-            });
-          };
-
-          const campusRawFaturas = rawFaturas.filter(isCampusFatura);
-          const campusFaturas = faturas.filter((f) => {
-            const raw = rawFaturas.find((r) => Number(r.id) === Number(f.api_fatura_id));
-            return raw ? isCampusFatura(raw) : isContratoApiCampusFatura(f, unidadeCodigo);
-          });
-
-          const extras = derived.situacao_derivada
-            ? await fetchContractExtras(contractDb.api_contrato_id, contractDb.id)
-            : { arquivos: undefined, recursos: [], errors: [] };
-
-          return {
-            contratoApiId: contractDb.id,
-            apiContratoId: contractDb.api_contrato_id,
-            rawFaturas: derived.situacao_derivada ? campusRawFaturas : [],
-            empenhos: empenhos,
-            faturas: derived.situacao_derivada ? campusFaturas : [],
-            itens: derived.situacao_derivada
-              ? apiItens.map((item) => mapItem(contractDb.id, item)).filter((item) => item.api_item_id)
-              : [],
-            historico,
-            arquivos: extras.arquivos,
-            recursos: extras.recursos,
-            resourceErrors: extras.errors,
-            derived,
-          };
         }
 
-        const [apiEmpenhos, apiFaturas, apiItens, apiHistorico] = await Promise.all([
+        const [apiEmpenhos, apiHistorico] = await Promise.all([
           fetchJson<ApiEmpenho[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/empenhos`),
-          fetchJson<ApiFatura[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/faturas`),
-          fetchJson<ApiContratoItem[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/itens`),
           fetchJson<ApiContratoHistorico[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/historico`),
         ]);
 
-        const empenhos = (apiEmpenhos ?? []).map((empenho) => mapEmpenho(contractDb.id, empenho)).filter((empenho) => empenho.api_empenho_id);
-        const faturas = (apiFaturas ?? []).map((fatura) => mapFatura(contractDb.id, fatura)).filter((fatura) => fatura.api_fatura_id);
-        const historico = (apiHistorico ?? []).map((item) => mapHistorico(contractDb.id, item)).filter((item) => item.api_historico_id);
-        const derived = buildContratoApiDerivedFields(contrato, historico, empenhos, faturas, new Date(), unidadeCodigo);
-        const extras = derived.situacao_derivada
+        const empenhos = (apiEmpenhos ?? [])
+          .map((empenho) => mapEmpenho(contractDb.id, empenho))
+          .filter((empenho) => empenho.api_empenho_id);
+        const historico = (apiHistorico ?? [])
+          .map((item) => mapHistorico(contractDb.id, item))
+          .filter((item) => item.api_historico_id);
+
+        const prelimStatus = deriveContratoApiStatus(contrato, historico, now);
+        const isVigenteOrRecent =
+          prelimStatus.situacao_derivada ||
+          Boolean(prelimStatus.vigencia_fim_derivada && prelimStatus.vigencia_fim_derivada >= hundredEightyDaysAgoIso);
+
+        let rawFaturas: ApiFatura[] = [];
+        let faturas: ReturnType<typeof mapFatura>[] = [];
+        let apiItens: ApiContratoItem[] = [];
+
+        if (isVigenteOrRecent) {
+          const [fetchedFaturas, fetchedItens] = await Promise.all([
+            fetchJson<ApiFatura[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/faturas`),
+            fetchJson<ApiContratoItem[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/itens`),
+          ]);
+          rawFaturas = fetchedFaturas ?? [];
+          faturas = rawFaturas
+            .map((fatura) => mapFatura(contractDb.id, fatura))
+            .filter((fatura) => fatura.api_fatura_id);
+          apiItens = fetchedItens ?? [];
+        }
+
+        const derived = buildContratoApiDerivedFields(contrato, historico, empenhos, faturas, now, unidadeCodigo);
+        const extraCampusScopes: Array<{ campus_uasg: string; scope_reason: string }> = [];
+
+        if (unidadeCodigo === '158155') {
+          for (const targetUasg of DEFAULT_SYNC_UASGS) {
+            if (targetUasg === '158155') continue;
+            const campusScope = deriveContratoApiCampusScope(contrato, empenhos, faturas, targetUasg, '158155');
+            if (campusScope.inScope) {
+              extraCampusScopes.push({
+                campus_uasg: targetUasg,
+                scope_reason: campusScope.campus_scope_reason,
+              });
+              if (targetUasg === DEFAULT_UASG) {
+                derived.campus_scope_reason = campusScope.campus_scope_reason;
+              }
+            }
+          }
+        }
+
+        const shouldFetchExtras =
+          derived.situacao_derivada &&
+          (unidadeCodigo !== '158155' || extraCampusScopes.length > 0);
+
+        const extras = shouldFetchExtras
           ? await fetchContractExtras(contractDb.api_contrato_id, contractDb.id)
           : { arquivos: undefined, recursos: [], errors: [] };
 
         return {
           contratoApiId: contractDb.id,
           apiContratoId: contractDb.api_contrato_id,
-          rawFaturas: apiFaturas ?? [],
+          replaceChildren: true,
+          rawFaturas,
           empenhos,
           faturas,
-          itens: (apiItens ?? []).map((item) => mapItem(contractDb.id, item)).filter((item) => item.api_item_id),
+          itens: apiItens.map((item) => mapItem(contractDb.id, item)).filter((item) => item.api_item_id),
           historico,
           arquivos: extras.arquivos,
           recursos: extras.recursos,
           resourceErrors: extras.errors,
+          extraCampusScopes,
           derived,
         };
       },
-      unidadeCodigo === '158155' ? 3 : 6,
+      8,
     );
 
     const contractDataByApiId = new Map(contractData.map((item) => [item.apiContratoId, item]));
@@ -680,7 +704,7 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
         data?.historico ?? [],
         data?.empenhos ?? [],
         data?.faturas ?? [],
-        new Date(),
+        now,
         unidadeCodigo,
       );
       const derivedFields = data?.derived ?? derived;
@@ -697,34 +721,58 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
     if (derivedUpsertError) throw derivedUpsertError;
 
     const contratoApiIds = contractWork.map((contrato) => contrato.id);
-    const campusScopePayload = contractData
-      .filter((item) => ['ug_campus', 'reitoria_com_empenho_campus', 'reitoria_com_fatura_campus'].includes(item.derived.campus_scope_reason))
-      .map((item) => ({
-        contrato_api_id: item.contratoApiId,
-        campus_uasg: unidadeCodigo,
-        scope_reason: item.derived.campus_scope_reason,
-        updated_at: new Date().toISOString(),
-      }));
+    const updatedAtIso = new Date().toISOString();
+    const campusScopeMap = new Map<string, { contrato_api_id: string; campus_uasg: string; scope_reason: string; updated_at: string }>();
+
+    for (const item of contractData) {
+      if (['ug_campus', 'reitoria_com_empenho_campus', 'reitoria_com_fatura_campus'].includes(item.derived.campus_scope_reason)) {
+        campusScopeMap.set(`${item.contratoApiId}:${unidadeCodigo}`, {
+          contrato_api_id: item.contratoApiId,
+          campus_uasg: unidadeCodigo,
+          scope_reason: item.derived.campus_scope_reason,
+          updated_at: updatedAtIso,
+        });
+      }
+      for (const extra of item.extraCampusScopes) {
+        campusScopeMap.set(`${item.contratoApiId}:${extra.campus_uasg}`, {
+          contrato_api_id: item.contratoApiId,
+          campus_uasg: extra.campus_uasg,
+          scope_reason: extra.scope_reason,
+          updated_at: updatedAtIso,
+        });
+      }
+    }
+    const campusScopePayload = Array.from(campusScopeMap.values());
+
     if (contratoApiIds.length > 0) {
-      const { error: scopeDeleteError } = await supabase
-        .from('contratos_api_campus_scope')
-        .delete()
-        .eq('campus_uasg', unidadeCodigo)
-        .in('contrato_api_id', contratoApiIds);
-      if (scopeDeleteError) throw scopeDeleteError;
+      for (const idChunk of chunk(contratoApiIds, 100)) {
+        const { error: scopeDeleteError } = await supabase
+          .from('contratos_api_campus_scope')
+          .delete()
+          .eq('campus_uasg', unidadeCodigo)
+          .in('contrato_api_id', idChunk);
+        if (scopeDeleteError) throw scopeDeleteError;
+      }
     }
     if (campusScopePayload.length > 0) {
-      const { error: scopeUpsertError } = await supabase
-        .from('contratos_api_campus_scope')
-        .upsert(campusScopePayload, { onConflict: 'contrato_api_id,campus_uasg' });
-      if (scopeUpsertError) throw scopeUpsertError;
+      for (const scopeChunk of chunk(campusScopePayload, 200)) {
+        const { error: scopeUpsertError } = await supabase
+          .from('contratos_api_campus_scope')
+          .upsert(scopeChunk, { onConflict: 'contrato_api_id,campus_uasg' });
+        if (scopeUpsertError) throw scopeUpsertError;
+      }
     }
-    await deleteChildrenForContracts(supabase, contratoApiIds);
 
-    const empenhosPayload = contractData.flatMap((item) => item.empenhos);
-    const faturasPayload = contractData.flatMap((item) => item.faturas);
-    const itensPayload = contractData.flatMap((item) => item.itens);
-    const historicoPayload = contractData.flatMap((item) => item.historico);
+    const replacedContractData = contractData.filter((item) => item.replaceChildren);
+    const replacedContratoApiIds = replacedContractData.map((item) => item.contratoApiId);
+    if (replacedContratoApiIds.length > 0) {
+      await deleteChildrenForContracts(supabase, replacedContratoApiIds);
+    }
+
+    const empenhosPayload = replacedContractData.flatMap((item) => item.empenhos);
+    const faturasPayload = replacedContractData.flatMap((item) => item.faturas);
+    const itensPayload = replacedContractData.flatMap((item) => item.itens);
+    const historicoPayload = replacedContractData.flatMap((item) => item.historico);
 
     const insertedEmpenhos = await insertInChunks(
       supabase,

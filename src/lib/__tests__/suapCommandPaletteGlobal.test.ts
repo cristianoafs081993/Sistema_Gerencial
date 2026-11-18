@@ -582,4 +582,163 @@ describe('paleta global da extensao Suape', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(() => expect(document.querySelector('.suape-cp-detail-body')?.textContent).toContain('158366 — Currais Novos'));
   });
+
+  it('exibe contratos com busca por CNPJ, badge de vigência e dossiê com 4 abas (Empenhos, Faturas, Itens, Termos) usando as colunas reais do PostgREST', async () => {
+    installExtensionAuth();
+    const requests: URL[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      requests.push(url);
+      const table = url.pathname.split('/').at(-1);
+      if (table === 'contratos_api') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              id: 'api-777',
+              api_contrato_id: 777,
+              numero: '00045/2025',
+              unidade_codigo: '158155',
+              unidade_nome: 'REITORIA IFRN',
+              fornecedor_nome: 'SOLUCOES DIGITAIS LTDA',
+              fornecedor_documento: '11.222.333/0001-44',
+              objeto: 'Licenciamento corporativo de software',
+              processo: '23000.000777/2025-99',
+              situacao: 'Ativo',
+              situacao_derivada: true,
+              campus_scope_reason: 'reitoria_com_empenho_campus',
+              vigencia_inicio: '2025-01-01',
+              vigencia_fim: '2026-12-31',
+              vigencia_inicio_derivada: '2025-01-01',
+              vigencia_fim_derivada: '2026-12-31',
+              valor_global: 120000,
+              valor_acumulado: 180000,
+            },
+          ],
+          headers: { get: () => null },
+        };
+      }
+      if (table === 'contratos_api_empenhos') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              id: 'emp-api-901',
+              contrato_api_id: 'api-777',
+              numero: '2026NE000555',
+              unidade_gestora: '158366',
+              valor_empenhado: 90000,
+              valor_a_liquidar: 40000,
+              valor_liquidado: 20000,
+              valor_pago: 30000,
+            },
+          ],
+          headers: { get: () => null },
+        };
+      }
+      if (table === 'contratos_api_faturas') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              id: 'fat-501',
+              contrato_api_id: 'api-777',
+              numero_instrumento_cobranca: 'FAT-10',
+              data_emissao: '2026-03-10',
+              processo: '23000.000777/2025-99',
+              valor_liquido: 8500,
+              situacao: 'Ateste Pendente',
+            },
+          ],
+          headers: { get: () => null },
+        };
+      }
+      if (table === 'contratos_api_itens') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              id: 'item-301',
+              contrato_api_id: 'api-777',
+              numero_item_compra: '1',
+              tipo_material: 'Serviço',
+              descricao_complementar: 'Subscrição anual de licenças',
+              quantidade: 12,
+              valor_unitario: 10000,
+              valor_total: 120000,
+            },
+          ],
+          headers: { get: () => null },
+        };
+      }
+      if (table === 'contratos_api_historico') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              id: 'hist-201',
+              contrato_api_id: 'api-777',
+              receita_despesa: 'Despesa',
+              tipo: 'Termo Aditivo',
+              numero: '01/2026',
+              data_assinatura: '2026-01-10',
+              vigencia_inicio: '2026-01-10',
+              vigencia_fim: '2027-01-10',
+              valor_inicial: 200000,
+              novo_valor_global: 200000,
+              observacao: 'Prorrogação contratual de 12 meses',
+            },
+          ],
+          headers: { get: () => null },
+        };
+      }
+      return { ok: true, status: 200, json: async () => [], headers: { get: () => null } };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    window.eval(contentScript);
+    const input = openPalette();
+    await flushMicrotasks();
+
+    // Busca pelo CNPJ do fornecedor
+    fireEvent.input(input, { target: { value: '11.222.333/0001-44' } });
+    await waitFor(() => expect(document.body.textContent).toContain('Contrato 00045/2025'));
+    expect(document.body.textContent).toContain('SOLUCOES DIGITAIS LTDA');
+    expect(document.body.textContent).toContain('Origem Reitoria');
+
+    // Seleciona o item do contrato (não a linha de consulta SUAP)
+    const contractItem = Array.from(document.querySelectorAll<HTMLElement>('.suape-cp-item'))
+      .find((el) => el.textContent?.includes('Contrato 00045/2025'));
+    expect(contractItem).toBeTruthy();
+    fireEvent.click(contractItem!);
+
+    await waitFor(() => expect(document.querySelector('.suape-cp-detail-body')?.textContent).toContain('2026NE000555'));
+
+    // Verifica que a query de itens usou numero_item_compra.asc
+    const itensReq = requests.find((u) => u.pathname.endsWith('/contratos_api_itens'));
+    expect(itensReq?.searchParams.get('order')).toBe('numero_item_compra.asc');
+
+    // Verifica as 4 abas e alternância para Faturas, Itens e Termos
+    const detailBody = document.querySelector('.suape-cp-detail-body')!;
+    expect(detailBody.textContent).toContain('Empenhos (1)');
+    expect(detailBody.textContent).toContain('Faturas (1)');
+    expect(detailBody.textContent).toContain('Itens (1)');
+    expect(detailBody.textContent).toContain('Termos (1)');
+
+    fireEvent.click(detailBody.querySelector<HTMLElement>('[data-tab="faturas"]')!);
+    expect(detailBody.textContent).toContain('FAT-10');
+    expect(detailBody.textContent).toContain('Ateste Pendente');
+
+    fireEvent.click(detailBody.querySelector<HTMLElement>('[data-tab="itens"]')!);
+    expect(detailBody.textContent).toContain('Subscrição anual de licenças');
+
+    fireEvent.click(detailBody.querySelector<HTMLElement>('[data-tab="termos"]')!);
+    expect(detailBody.textContent).toContain('Termo Aditivo');
+    expect(detailBody.textContent).toContain('Prorrogação contratual de 12 meses');
+  });
 });
