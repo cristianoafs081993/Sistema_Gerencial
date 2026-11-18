@@ -741,4 +741,301 @@ describe('paleta global da extensao Suape', () => {
     expect(detailBody.textContent).toContain('Termo Aditivo');
     expect(detailBody.textContent).toContain('Prorrogação contratual de 12 meses');
   });
+
+  it('abre a paleta com Ctrl+K no Google mesmo quando TrustedHTML bloqueia innerHTML e createPolicy é restrito', async () => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        protocol: 'https:',
+        hostname: 'www.google.com',
+        pathname: '/search',
+        search: '?q=ifrn',
+        hash: '',
+        href: 'https://www.google.com/search?q=ifrn',
+      },
+    });
+    installExtensionAuth();
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => [], headers: { get: () => null } })));
+
+    const originalInnerHtmlDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+    const googleDocKeydownStopper = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener('keydown', googleDocKeydownStopper, false);
+
+    const childIframe = document.createElement('iframe');
+    childIframe.src = 'https://ogs.google.com/widget/app';
+    document.body.appendChild(childIframe);
+
+    vi.stubGlobal('trustedTypes', {
+      createPolicy: vi.fn(() => {
+        throw new TypeError("Failed to execute 'createPolicy' on 'TrustedTypePolicyFactory': Policy disallowed.");
+      }),
+    });
+
+    Object.defineProperty(Element.prototype, 'innerHTML', {
+      configurable: true,
+      get() {
+        return originalInnerHtmlDesc?.get?.call(this) ?? '';
+      },
+      set(value: unknown) {
+        if (typeof value === 'string') {
+          throw new TypeError("Failed to set the 'innerHTML' property on 'Element': This document requires 'TrustedHTML' assignment.");
+        }
+        originalInnerHtmlDesc?.set?.call(this, value);
+      },
+    });
+
+    try {
+      window.eval(contentScript);
+      fireEvent.keyDown(document.body, { key: 'k', code: 'KeyK', ctrlKey: true });
+
+      const overlay = document.getElementById('suape-cp-overlay');
+      expect(overlay).toHaveClass('suape-cp-visible');
+
+      const input = document.querySelector<HTMLInputElement>('.suape-cp-input');
+      expect(input).toBeTruthy();
+      expect(document.activeElement).toBe(input);
+      expect(overlay?.querySelectorAll('svg').length).toBeGreaterThan(0);
+
+      await flushMicrotasks();
+      fireEvent.input(input!, { target: { value: 'dashboard' } });
+      await waitFor(() => expect(document.querySelector('.suape-cp-list')).toHaveTextContent('Dashboard'));
+    } finally {
+      document.removeEventListener('keydown', googleDocKeydownStopper, false);
+      if (originalInnerHtmlDesc) {
+        Object.defineProperty(Element.prototype, 'innerHTML', originalInnerHtmlDesc);
+      }
+    }
+  });
+
+  it('recupera o foco preso em PDF embutido no SUAP e abre Ctrl+K sem precisar clicar fora do PDF', async () => {
+    vi.useFakeTimers();
+    const windowFocusSpy = vi.spyOn(window, 'focus').mockImplementation(() => undefined);
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        protocol: 'https:',
+        hostname: 'suap.ifrn.edu.br',
+        pathname: '/documento_eletronico/visualizar_documento_digitalizado/2693291/',
+        search: '',
+        hash: '',
+        href: 'https://suap.ifrn.edu.br/documento_eletronico/visualizar_documento_digitalizado/2693291/',
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => [], headers: { get: () => null } })));
+
+    const embed = document.createElement('embed');
+    embed.setAttribute('type', 'application/pdf');
+    embed.setAttribute('src', '/documento_eletronico/visualizar_documento_digitalizado/2693291/?original=sim');
+    embed.tabIndex = 0;
+    document.body.appendChild(embed);
+    embed.focus();
+    expect(document.activeElement).toBe(embed);
+
+    window.eval(contentScript);
+    // Na carga inicial já retira o foco do <embed> sem precisar clicar fora
+    expect(document.activeElement).not.toBe(embed);
+    expect(document.activeElement).toBe(document.body);
+
+    // Simula clique posterior no PDF (<embed> captura o foco e dispara blur na window)
+    embed.focus();
+    expect(document.activeElement).toBe(embed);
+    window.dispatchEvent(new Event('blur'));
+    await vi.advanceTimersByTimeAsync(250);
+    expect(document.activeElement).toBe(document.body);
+
+    // Simula Ctrl+K enquanto um <object> ou <iframe> de PDF ainda detém document.activeElement
+    const pdfObject = document.createElement('object');
+    pdfObject.setAttribute('type', 'application/pdf');
+    pdfObject.setAttribute('data', '/documento_eletronico/visualizar_documento_digitalizado/2693291/?original=sim');
+    pdfObject.tabIndex = 0;
+    document.body.appendChild(pdfObject);
+
+    const pdfIframe = document.createElement('iframe');
+    pdfIframe.setAttribute('src', '/documento_eletronico/visualizar_documento_digitalizado/2693291/?original=sim');
+    document.body.appendChild(pdfIframe);
+
+    const activeElementSpy = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(pdfIframe);
+    const iframeBlurSpy = vi.spyOn(pdfIframe, 'blur');
+    fireEvent.keyDown(document, { key: 'k', code: 'KeyK', ctrlKey: true });
+    activeElementSpy.mockRestore();
+
+    expect(iframeBlurSpy).toHaveBeenCalled();
+    expect(windowFocusSpy).toHaveBeenCalled();
+    expect(document.getElementById('suape-cp-overlay')).toHaveClass('suape-cp-visible');
+
+    // Fechar com Escape não devolve o foco ao plugin de PDF
+    const input = document.querySelector<HTMLInputElement>('.suape-cp-input')!;
+    fireEvent.keyDown(input, { key: 'Escape', code: 'Escape' });
+    expect(document.getElementById('suape-cp-overlay')).not.toHaveClass('suape-cp-visible');
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('encaminha Ctrl+K de iframes filhos para o topo e evita alternância duplicada entre evento e mensagem', async () => {
+    vi.useFakeTimers();
+
+    // 1. Comportamento no frame filho (window !== window.top)
+    const originalTopDescriptor = Object.getOwnPropertyDescriptor(window, 'top');
+    const topPostMessage = vi.fn();
+    const childSendMessage = vi.fn((_msg: unknown, cb?: () => void) => cb?.());
+    Object.defineProperty(window, 'top', {
+      configurable: true,
+      value: { postMessage: topPostMessage },
+    });
+    vi.stubGlobal('chrome', {
+      runtime: { sendMessage: childSendMessage, lastError: undefined },
+    });
+
+    try {
+      window.eval(contentScript);
+      expect((window as unknown as { __suapeCommandPaletteFrameForwarderLoaded?: boolean }).__suapeCommandPaletteFrameForwarderLoaded).toBe(true);
+      expect(document.getElementById('suape-cp-overlay')).toBeNull();
+
+      fireEvent.keyDown(document, { key: 'k', code: 'KeyK', ctrlKey: true });
+      expect(topPostMessage).toHaveBeenCalledTimes(1);
+      expect(topPostMessage).toHaveBeenCalledWith(
+        { source: 'siages-command-palette', action: 'toggle-command-palette' },
+        '*',
+      );
+      expect(childSendMessage).toHaveBeenCalledTimes(1);
+      expect(childSendMessage.mock.calls[0][0]).toEqual({
+        source: 'siages-command-palette',
+        type: 'toggle-in-top-frame',
+      });
+
+      fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' });
+      expect(topPostMessage).toHaveBeenLastCalledWith(
+        { source: 'siages-command-palette', action: 'close-command-palette' },
+        '*',
+      );
+    } finally {
+      (window as typeof window & { __suapeSolrecfin?: { destroy: () => void } }).__suapeSolrecfin?.destroy();
+      delete (window as typeof window & Record<string, unknown>).__suapeCommandPaletteLoaded;
+      if (originalTopDescriptor) {
+        Object.defineProperty(window, 'top', originalTopDescriptor);
+      }
+    }
+
+    // 2. Comportamento no frame principal recebendo evento + postMessage + runtime.onMessage
+    let onMessageListener: ((message: unknown, sender: unknown, sendResponse: (res: unknown) => void) => void) | undefined;
+    vi.stubGlobal('chrome', {
+      runtime: {
+        onMessage: {
+          addListener: (cb: typeof onMessageListener) => { onMessageListener = cb; },
+          removeListener: vi.fn(),
+        },
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => [], headers: { get: () => null } })));
+
+    window.eval(contentScript);
+
+    const sendResponse = vi.fn();
+    onMessageListener?.({ source: 'siages-command-palette', action: 'toggle-command-palette' }, {}, sendResponse);
+    expect(sendResponse).toHaveBeenCalledWith({ ok: true });
+    expect(document.getElementById('suape-cp-overlay')).toHaveClass('suape-cp-visible');
+
+    // Deduplicação imediata impede que postMessage/onMessage simultâneos fechem a paleta recém-aberta
+    window.dispatchEvent(new MessageEvent('message', {
+      data: { source: 'siages-command-palette', action: 'toggle-command-palette' },
+    }));
+    expect(document.getElementById('suape-cp-overlay')).toHaveClass('suape-cp-visible');
+
+    // Após fechar, keydown + mensagem simultânea mantém aberta
+    onMessageListener?.({ source: 'siages-command-palette', action: 'close-command-palette' }, {}, sendResponse);
+    expect(document.getElementById('suape-cp-overlay')).not.toHaveClass('suape-cp-visible');
+
+    await vi.advanceTimersByTimeAsync(250);
+    fireEvent.keyDown(document, { key: 'k', code: 'KeyK', ctrlKey: true });
+    window.dispatchEvent(new MessageEvent('message', {
+      data: { source: 'siages-command-palette', action: 'toggle-command-palette' },
+    }));
+    onMessageListener?.({ source: 'siages-command-palette', action: 'toggle-command-palette' }, {}, sendResponse);
+    expect(document.getElementById('suape-cp-overlay')).toHaveClass('suape-cp-visible');
+  });
+
+  it('abre a paleta automaticamente via #siagesOpenPalette=1 e roteia open-command-palette no background.js', async () => {
+    const replaceState = vi.fn();
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        protocol: 'https:',
+        hostname: 'www.google.com',
+        pathname: '/',
+        search: '',
+        hash: '#siagesOpenPalette=1',
+        href: 'https://www.google.com/#siagesOpenPalette=1',
+      },
+    });
+    vi.spyOn(window.history, 'replaceState').mockImplementation(replaceState);
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => [], headers: { get: () => null } })));
+
+    window.eval(contentScript);
+    expect(replaceState).toHaveBeenCalledWith(null, expect.any(String), '/');
+    expect(document.getElementById('suape-cp-overlay')).toHaveClass('suape-cp-visible');
+
+    // Testa o background.js para comando open-command-palette e nova guia
+    const commandListeners: Array<(command: string, tab?: { id: number; url?: string }) => Promise<void> | void> = [];
+    const messageListeners: Array<(message: unknown, sender: unknown, sendResponse: (res: unknown) => void) => unknown> = [];
+    const tabsSendMessage = vi.fn((_tabId: number, _msg: unknown, cb?: (res: unknown) => void) => cb?.(undefined));
+    const tabsUpdate = vi.fn(async () => ({}));
+    const scriptingInsertCss = vi.fn(async () => undefined);
+    const scriptingExecuteScript = vi.fn(async () => []);
+
+    const chromeBg = {
+      storage: { local: { get: vi.fn(async () => ({})), set: vi.fn(async () => undefined), remove: vi.fn(async () => undefined) } },
+      runtime: {
+        onMessage: { addListener: (cb: typeof messageListeners[number]) => messageListeners.push(cb) },
+        onInstalled: { addListener: vi.fn() },
+        onStartup: { addListener: vi.fn() },
+      },
+      alarms: { create: vi.fn(), get: vi.fn().mockResolvedValue(undefined), onAlarm: { addListener: vi.fn() } },
+      tabs: {
+        query: vi.fn(async () => [{ id: 10, url: 'chrome://newtab/' }]),
+        sendMessage: tabsSendMessage,
+        update: tabsUpdate,
+      },
+      scripting: {
+        insertCSS: scriptingInsertCss,
+        executeScript: scriptingExecuteScript,
+      },
+      commands: {
+        onCommand: { addListener: (cb: typeof commandListeners[number]) => commandListeners.push(cb) },
+      },
+    };
+
+    const bgScope: Record<string, unknown> = {};
+    new Function('chrome', 'fetch', 'globalThis', readFileSync(extensionFixturePath('background.js'), 'utf8'))(chromeBg, globalThis.fetch, bgScope);
+
+    // Nova guia redireciona para Google com hash de abertura automática
+    await commandListeners[0]('open-command-palette', { id: 10, url: 'chrome://newtab/' });
+    expect(tabsUpdate).toHaveBeenCalledWith(10, { url: 'https://www.google.com/#siagesOpenPalette=1' });
+
+    // Aba HTTP sem content script recebe injeção sob demanda e reenvio da mensagem
+    let injected = false;
+    scriptingExecuteScript.mockImplementation(async () => {
+      injected = true;
+      return [];
+    });
+    tabsSendMessage.mockImplementation((_tabId: number, _msg: unknown, cb?: (res: unknown) => void) => {
+      cb?.(injected ? { ok: true } : undefined);
+    });
+    await commandListeners[0]('open-command-palette', { id: 20, url: 'https://www.google.com/' });
+    expect(scriptingInsertCss).toHaveBeenCalledWith({
+      target: { tabId: 20, allFrames: true },
+      files: ['command-palette.css'],
+    });
+    expect(scriptingExecuteScript).toHaveBeenCalledWith({
+      target: { tabId: 20, allFrames: true },
+      files: ['extension-auth-client.js', 'command-palette.js'],
+    });
+    expect(tabsSendMessage).toHaveBeenCalledWith(
+      20,
+      { source: 'siages-command-palette', action: 'toggle-command-palette' },
+      expect.any(Function),
+    );
+  });
 });

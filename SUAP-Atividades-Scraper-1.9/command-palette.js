@@ -2,6 +2,446 @@
   if (window.__suapeCommandPaletteLoaded) return;
   window.__suapeCommandPaletteLoaded = true;
 
+  const COMMAND_PALETTE_SOURCE = 'siages-command-palette';
+  let commandPaletteDisposed = false;
+  let overlayEl = null;
+  let detailOverlayEl = null;
+
+  let isTopFrame = true;
+  try {
+    isTopFrame = window === window.top;
+  } catch (_) {
+    isTopFrame = false;
+  }
+
+  function isPaletteVisible() {
+    return Boolean(
+      overlayEl?.classList?.contains('suape-cp-visible')
+      || detailOverlayEl?.classList?.contains('suape-cp-visible'),
+    );
+  }
+
+  function isEmbeddedPdfElement(el) {
+    if (!el || el.nodeType !== 1) return false;
+    const id = String(el.id || '');
+    if (/^(?:siages-|suape-)/i.test(id)) return false;
+
+    const tag = String(el.tagName || '').toUpperCase();
+    if (tag === 'EMBED' || tag === 'OBJECT') {
+      const type = String(el.getAttribute?.('type') || el.type || '').toLowerCase();
+      const src = String(el.getAttribute?.('src') || el.getAttribute?.('data') || el.src || el.data || '').toLowerCase();
+      if (type.includes('pdf')) return true;
+      if (/(?:\.pdf\b|original=sim|visualizar_documento_digitalizado|blob:|about:blank)/i.test(src)) return true;
+      if (!type && !src) return true;
+      return false;
+    }
+
+    if (tag === 'IFRAME') {
+      const src = String(el.getAttribute?.('src') || el.src || '').toLowerCase();
+      let contentType = '';
+      let hasFrameForwarder = false;
+      let hasUnprotectedPdfPlugin = false;
+      try {
+        const cw = el.contentWindow;
+        const cd = el.contentDocument;
+        contentType = String(cd?.contentType || '').toLowerCase();
+        hasFrameForwarder = Boolean(cw?.__suapeCommandPaletteFrameForwarderLoaded || cw?.__suapeCommandPaletteLoaded);
+        if (cd && hasFrameForwarder) {
+          const plugins = cd.querySelectorAll?.('embed, object') || [];
+          hasUnprotectedPdfPlugin = Array.from(plugins).some(
+            (plugin) => isEmbeddedPdfElement(plugin) && (!cw.__suapePdfGuardActive || cd.activeElement === plugin),
+          );
+        }
+      } catch (_) {
+        // Iframe cross-origin
+      }
+      if (hasFrameForwarder && !hasUnprotectedPdfPlugin && !contentType.includes('pdf')) {
+        return false;
+      }
+      if (contentType.includes('pdf')) return true;
+      if (/(?:\.pdf\b|original=sim|visualizar_documento_digitalizado)/i.test(src)) return true;
+      if (/\/visualizar_documento_digitalizado\//i.test(window.location?.pathname || '')) return true;
+      return false;
+    }
+
+    return false;
+  }
+
+  function focusHostBodyWithoutScroll() {
+    const host = document.body || document.documentElement;
+    if (!host) return false;
+    if (!host.hasAttribute('tabindex')) {
+      host.setAttribute('tabindex', '-1');
+      if (host.style && !host.style.outline) {
+        host.style.outline = 'none';
+      }
+    }
+    try {
+      host.focus({ preventScroll: true });
+    } catch (_) {
+      try { host.focus(); } catch (_) {}
+    }
+    try { window.focus?.(); } catch (_) {}
+    return true;
+  }
+
+  function reclaimFocusFromEmbeddedPdf() {
+    if (commandPaletteDisposed || isPaletteVisible()) return false;
+    const active = document.activeElement;
+    if (!isEmbeddedPdfElement(active)) return false;
+    try { active.blur?.(); } catch (_) {}
+    return focusHostBodyWithoutScroll();
+  }
+
+  function installEmbeddedPdfFocusGuard() {
+    let disposed = false;
+    const timers = new Set();
+    let observer = null;
+
+    const scheduleTimer = (delayMs) => {
+      const id = setTimeout(() => {
+        timers.delete(id);
+        if (!disposed) reclaimFocusFromEmbeddedPdf();
+      }, delayMs);
+      timers.add(id);
+    };
+
+    const scheduleReclaim = () => {
+      if (disposed || commandPaletteDisposed) return;
+      scheduleTimer(80);
+      scheduleTimer(220);
+    };
+
+    const onFocusIn = (event) => {
+      if (disposed || commandPaletteDisposed) return;
+      if (isEmbeddedPdfElement(event?.target) || isEmbeddedPdfElement(document.activeElement)) {
+        scheduleReclaim();
+      }
+    };
+
+    const onWindowBlur = () => {
+      if (disposed || commandPaletteDisposed) return;
+      if (document.visibilityState === 'hidden') return;
+      scheduleReclaim();
+    };
+
+    const onCaptureLoad = (event) => {
+      if (disposed || commandPaletteDisposed) return;
+      if (isEmbeddedPdfElement(event?.target)) {
+        reclaimFocusFromEmbeddedPdf();
+        scheduleReclaim();
+      }
+    };
+
+    document.addEventListener('focusin', onFocusIn, true);
+    window.addEventListener('blur', onWindowBlur);
+    document.addEventListener('load', onCaptureLoad, true);
+
+    const startObserver = () => {
+      const target = document.body || document.documentElement;
+      if (!target || typeof MutationObserver === 'undefined' || observer) return;
+      observer = new MutationObserver(() => {
+        if (disposed || commandPaletteDisposed) return;
+        if (isEmbeddedPdfElement(document.activeElement)) {
+          reclaimFocusFromEmbeddedPdf();
+          scheduleReclaim();
+        }
+      });
+      observer.observe(target, { childList: true, subtree: true });
+    };
+
+    const onDomReady = () => {
+      if (disposed || commandPaletteDisposed) return;
+      startObserver();
+      reclaimFocusFromEmbeddedPdf();
+    };
+
+    startObserver();
+    reclaimFocusFromEmbeddedPdf();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', onDomReady);
+    }
+
+    try { window.__suapePdfGuardActive = true; } catch (_) {}
+
+    return () => {
+      disposed = true;
+      for (const id of timers) clearTimeout(id);
+      timers.clear();
+      document.removeEventListener('focusin', onFocusIn, true);
+      window.removeEventListener('blur', onWindowBlur);
+      document.removeEventListener('load', onCaptureLoad, true);
+      document.removeEventListener('DOMContentLoaded', onDomReady);
+      observer?.disconnect();
+      observer = null;
+      try { delete window.__suapePdfGuardActive; } catch (_) {}
+    };
+  }
+
+  if (!isTopFrame) {
+    window.__suapeCommandPaletteFrameForwarderLoaded = true;
+    const cleanupChildPdfGuard = installEmbeddedPdfFocusGuard();
+    let lastForwardedKeydownEvent = null;
+
+    const frameKeydownHandler = (e) => {
+      if (commandPaletteDisposed) return;
+      if (e === lastForwardedKeydownEvent) return;
+      lastForwardedKeydownEvent = e;
+
+      const isCtrlOrMetaK = (e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK');
+      if (isCtrlOrMetaK) {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+          window.top?.postMessage({ source: COMMAND_PALETTE_SOURCE, action: 'toggle-command-palette' }, '*');
+        } catch (_) {}
+        try {
+          if (globalThis.chrome?.runtime?.sendMessage) {
+            chrome.runtime.sendMessage({ source: COMMAND_PALETTE_SOURCE, type: 'toggle-in-top-frame' }, () => {
+              void chrome.runtime?.lastError;
+            });
+          }
+        } catch (_) {}
+      } else if (e.key === 'Escape') {
+        try {
+          window.top?.postMessage({ source: COMMAND_PALETTE_SOURCE, action: 'close-command-palette' }, '*');
+        } catch (_) {}
+        try {
+          if (globalThis.chrome?.runtime?.sendMessage) {
+            chrome.runtime.sendMessage({ source: COMMAND_PALETTE_SOURCE, type: 'close-in-top-frame' }, () => {
+              void chrome.runtime?.lastError;
+            });
+          }
+        } catch (_) {}
+      }
+    };
+
+    window.addEventListener('keydown', frameKeydownHandler, true);
+    document.addEventListener('keydown', frameKeydownHandler, true);
+
+    window.__suapeSolrecfin = {
+      destroy: () => {
+        commandPaletteDisposed = true;
+        cleanupChildPdfGuard();
+        window.removeEventListener('keydown', frameKeydownHandler, true);
+        document.removeEventListener('keydown', frameKeydownHandler, true);
+        delete window.__suapeCommandPaletteFrameForwarderLoaded;
+      },
+    };
+    return;
+  }
+
+  const VOID_HTML_TAGS = new Set([
+    'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+    'link', 'meta', 'param', 'source', 'track', 'wbr',
+  ]);
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function decodeHtmlEntities(str) {
+    return String(str).replace(/&(#x[\da-f]+|#\d+|amp|lt|gt|quot|#0?39|apos|nbsp);/gi, (match, entity) => {
+      const lower = entity.toLowerCase();
+      if (lower === 'amp') return '&';
+      if (lower === 'lt') return '<';
+      if (lower === 'gt') return '>';
+      if (lower === 'quot') return '"';
+      if (lower === 'apos' || lower === '#39' || lower === '#039') return "'";
+      if (lower === 'nbsp') return '\u00a0';
+      if (lower.startsWith('#x')) {
+        const code = Number.parseInt(lower.slice(2), 16);
+        return Number.isFinite(code) ? String.fromCodePoint(code) : match;
+      }
+      if (lower.startsWith('#')) {
+        const code = Number.parseInt(lower.slice(1), 10);
+        return Number.isFinite(code) ? String.fromCodePoint(code) : match;
+      }
+      return match;
+    });
+  }
+
+  function parseSafeHtmlFragment(html) {
+    const raw = String(html ?? '');
+    const fragment = document.createDocumentFragment();
+    const stack = [{ node: fragment, inSvg: false, tag: '' }];
+    let pos = 0;
+
+    while (pos < raw.length) {
+      if (raw[pos] !== '<') {
+        const nextLt = raw.indexOf('<', pos);
+        const textEnd = nextLt === -1 ? raw.length : nextLt;
+        const text = decodeHtmlEntities(raw.slice(pos, textEnd));
+        if (text) stack[stack.length - 1].node.appendChild(document.createTextNode(text));
+        pos = textEnd;
+        continue;
+      }
+
+      if (raw.startsWith('<!--', pos)) {
+        const commentEnd = raw.indexOf('-->', pos + 4);
+        pos = commentEnd === -1 ? raw.length : commentEnd + 3;
+        continue;
+      }
+
+      if (raw.startsWith('</', pos)) {
+        const closeEnd = raw.indexOf('>', pos + 2);
+        if (closeEnd === -1) break;
+        const closeTag = raw.slice(pos + 2, closeEnd).trim().toLowerCase();
+        for (let i = stack.length - 1; i > 0; i--) {
+          if (stack[i].tag === closeTag) {
+            stack.length = i;
+            break;
+          }
+        }
+        pos = closeEnd + 1;
+        continue;
+      }
+
+      let cursor = pos + 1;
+      const tagMatch = raw.slice(cursor).match(/^[a-zA-Z0-9:-]+/);
+      if (!tagMatch) {
+        stack[stack.length - 1].node.appendChild(document.createTextNode('<'));
+        pos += 1;
+        continue;
+      }
+      const rawTagName = tagMatch[0];
+      const tagLower = rawTagName.toLowerCase();
+      cursor += rawTagName.length;
+
+      const attrs = [];
+      let selfClosing = false;
+      while (cursor < raw.length) {
+        while (cursor < raw.length && /\s/.test(raw[cursor])) cursor += 1;
+        if (cursor >= raw.length) break;
+        if (raw[cursor] === '>') {
+          cursor += 1;
+          break;
+        }
+        if (raw[cursor] === '/' && raw[cursor + 1] === '>') {
+          selfClosing = true;
+          cursor += 2;
+          break;
+        }
+        const nameMatch = raw.slice(cursor).match(/^[^\s=/>]+/);
+        if (!nameMatch) {
+          cursor += 1;
+          continue;
+        }
+        const attrName = nameMatch[0];
+        cursor += attrName.length;
+        while (cursor < raw.length && /\s/.test(raw[cursor])) cursor += 1;
+        let attrValue = '';
+        if (raw[cursor] === '=') {
+          cursor += 1;
+          while (cursor < raw.length && /\s/.test(raw[cursor])) cursor += 1;
+          const quote = raw[cursor];
+          if (quote === '"' || quote === "'") {
+            cursor += 1;
+            const valueStart = cursor;
+            const valueEnd = raw.indexOf(quote, cursor);
+            if (valueEnd === -1) {
+              attrValue = raw.slice(valueStart);
+              cursor = raw.length;
+            } else {
+              attrValue = raw.slice(valueStart, valueEnd);
+              cursor = valueEnd + 1;
+            }
+          } else {
+            const unquotedMatch = raw.slice(cursor).match(/^[^\s>]+/);
+            if (unquotedMatch) {
+              attrValue = unquotedMatch[0];
+              cursor += attrValue.length;
+            }
+          }
+        }
+        attrs.push([attrName, decodeHtmlEntities(attrValue)]);
+      }
+
+      const parentCtx = stack[stack.length - 1];
+      const isSvg = tagLower === 'svg' || (parentCtx.inSvg && tagLower !== 'foreignobject');
+      const el = isSvg
+        ? document.createElementNS(SVG_NS, rawTagName)
+        : document.createElement(tagLower);
+
+      for (const [attrName, attrValue] of attrs) {
+        if (isSvg && attrName === 'xmlns') continue;
+        el.setAttribute(attrName, attrValue);
+      }
+
+      parentCtx.node.appendChild(el);
+      if (!selfClosing && !VOID_HTML_TAGS.has(tagLower)) {
+        stack.push({ node: el, inSvg: isSvg, tag: tagLower });
+      }
+      pos = cursor;
+    }
+
+    return fragment;
+  }
+
+  function replaceElementChildren(element, content) {
+    if (!element) return;
+    if (typeof element.replaceChildren === 'function') {
+      if (content) element.replaceChildren(content);
+      else element.replaceChildren();
+      return;
+    }
+    while (element.firstChild) element.removeChild(element.firstChild);
+    if (content) element.appendChild(content);
+  }
+
+  let cachedTrustedHtmlPolicy;
+  let bypassInnerHtmlSink = false;
+
+  function getTrustedHtmlPolicy() {
+    if (cachedTrustedHtmlPolicy !== undefined) return cachedTrustedHtmlPolicy;
+    cachedTrustedHtmlPolicy = null;
+    try {
+      const tt = globalThis.trustedTypes;
+      if (tt?.defaultPolicy?.createHTML) {
+        cachedTrustedHtmlPolicy = tt.defaultPolicy;
+        return cachedTrustedHtmlPolicy;
+      }
+      if (typeof tt?.createPolicy === 'function') {
+        for (const name of ['siages-command-palette', 'default']) {
+          try {
+            cachedTrustedHtmlPolicy = tt.createPolicy(name, { createHTML: (value) => String(value) });
+            return cachedTrustedHtmlPolicy;
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+    return cachedTrustedHtmlPolicy;
+  }
+
+  function setElementHtml(element, html) {
+    if (!element) return;
+    const raw = String(html ?? '');
+    if (!raw) {
+      replaceElementChildren(element, null);
+      return;
+    }
+
+    if (!bypassInnerHtmlSink) {
+      try {
+        const policy = getTrustedHtmlPolicy();
+        element.innerHTML = policy ? policy.createHTML(raw) : raw;
+        return;
+      } catch (_) {
+        bypassInnerHtmlSink = true;
+      }
+    }
+
+    try {
+      const parserDoc = document.implementation?.createHTMLDocument?.('');
+      if (parserDoc) {
+        const template = parserDoc.createElement('template');
+        template.innerHTML = raw;
+        const fragment = document.importNode(template.content, true);
+        replaceElementChildren(element, fragment);
+        return;
+      }
+    } catch (_) {}
+
+    replaceElementChildren(element, parseSafeHtmlFragment(raw));
+  }
+
   const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
   const SIAGES_APP_URL = 'https://www.siages.com.br';
@@ -59,15 +499,13 @@
   let solrecfinNativeTimer = null;
 
   // DOM Elements
-  let overlayEl = null;
   let dialogEl = null;
   let inputEl = null;
   let listEl = null;
-  let detailOverlayEl = null;
   let detailDialogEl = null;
   let paletteReturnFocus = null;
-  let commandPaletteDisposed = false;
   let processBadgesCleanup = () => {};
+  let pdfFocusGuardCleanup = () => {};
 
   function normalizeSolrecfinText(value) {
     return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -273,7 +711,7 @@
     const groups = aggregateSolrecfinEntries(dailyEntries);
     const pending = dailyEntries.filter(entry => entry.warning);
     detailDialogEl.querySelector('.suape-cp-detail-title').textContent = 'Solicitação financeira (solrecfin)';
-    body.innerHTML = `<div class="suape-cp-info-card">
+    setElementHtml(body, `<div class="suape-cp-info-card">
       <label class="suape-cp-info-row"><span class="suape-cp-info-key">Dia:</span><select data-solrecfin-day aria-label="Dia da solicitação financeira">${days.map(item => `<option value="${item}" ${item === solrecfinSelectedDay ? 'selected' : ''}>${item.split('-').reverse().join('/')}${item === days[0] ? ' (hoje)' : ''}</option>`).join('')}</select></label>
       <p class="suape-cp-empty-desc">O acumulado reinicia à meia-noite de Brasília. Histórico de 7 dias, incluindo hoje.</p>
       <div class="suape-cp-info-row"><span class="suape-cp-info-key">Capturas do dia:</span><span class="suape-cp-info-val" data-solrecfin-count>${dailyEntries.length}</span></div>
@@ -281,7 +719,7 @@
       ${pending.length ? `<p class="suape-cp-empty-desc">Pendências não somadas: ${pending.map(entry => escapeHtml(entry.warning)).join('; ')}.</p>` : ''}
       ${solrecfinSelectedDay === days[0] ? '<div style="display:flex;justify-content:flex-end;margin-top:14px"><button type="button" data-solrecfin-clear class="suape-cp-detail-close-action">Limpar acumulado de hoje</button></div>' : ''}
       <p data-solrecfin-status role="status"></p>
-    </div>`;
+    </div>`);
     body.querySelector('[data-solrecfin-day]').addEventListener('change', event => openSolrecfinDetail(event.target.value));
     body.querySelectorAll('[data-solrecfin-toggle]').forEach(button => button.addEventListener('click', () => {
       const expanded = button.getAttribute('aria-expanded') !== 'true';
@@ -1277,10 +1715,10 @@
       return currentPaletteTheme;
     }
     if (
-      document.body.classList.contains('theme-luna') ||
-      document.documentElement.classList.contains('dark') ||
-      document.body.classList.contains('dark') ||
-      document.body.getAttribute('data-theme') === 'dark' ||
+      document.body?.classList?.contains('theme-luna') ||
+      document.documentElement?.classList?.contains('dark') ||
+      document.body?.classList?.contains('dark') ||
+      document.body?.getAttribute?.('data-theme') === 'dark' ||
       window.matchMedia?.('(prefers-color-scheme: dark)').matches
     ) {
       return 'dark';
@@ -1307,13 +1745,13 @@
 
     const mainBtn = overlayEl?.querySelector('#suape-cp-theme-toggle');
     if (mainBtn) {
-      mainBtn.innerHTML = iconHtml;
+      setElementHtml(mainBtn, iconHtml);
       mainBtn.title = titleText;
       mainBtn.setAttribute('aria-label', titleText);
     }
     const detailBtn = detailOverlayEl?.querySelector('#suape-cp-detail-theme-toggle');
     if (detailBtn) {
-      detailBtn.innerHTML = iconHtml;
+      setElementHtml(detailBtn, iconHtml);
       detailBtn.title = titleText;
       detailBtn.setAttribute('aria-label', titleText);
     }
@@ -1327,135 +1765,162 @@
 
   // Create Palette DOM (Exact match with SIAGES UI)
   function createPaletteDOM() {
-    if (overlayEl) return;
+    if (overlayEl && overlayEl.isConnected && inputEl && listEl && detailOverlayEl?.isConnected) return;
+    if (overlayEl && !overlayEl.isConnected) overlayEl = null;
+    if (detailOverlayEl && !detailOverlayEl.isConnected) detailOverlayEl = null;
 
-    overlayEl = document.createElement('div');
-    overlayEl.id = 'suape-cp-overlay';
-    overlayEl.innerHTML = `
-      <div id="suape-cp-dialog">
-        <div class="suape-cp-header">
-          <div class="suape-cp-search-box">
-            <div class="suape-cp-search-icon-box">
-              ${ICONS.search}
+    const mountTarget = document.body || document.documentElement;
+    if (!mountTarget) return;
+
+    const nextOverlayEl = document.createElement('div');
+    const nextDetailOverlayEl = document.createElement('div');
+    try {
+      nextOverlayEl.id = 'suape-cp-overlay';
+      setElementHtml(nextOverlayEl, `
+        <div id="suape-cp-dialog">
+          <div class="suape-cp-header">
+            <div class="suape-cp-search-box">
+              <div class="suape-cp-search-icon-box">
+                ${ICONS.search}
+              </div>
+              <input type="text" class="suape-cp-input" placeholder="Digite um comando, NE, contrato, fornecedor ou módulo..." autocomplete="off" spellcheck="false" autofocus />
+              <button type="button" class="suape-cp-theme-btn" id="suape-cp-theme-toggle" title="Alternar tema claro/escuro" aria-label="Alternar tema claro/escuro"></button>
+              <span class="suape-cp-kbd">ESC</span>
             </div>
-            <input type="text" class="suape-cp-input" placeholder="Digite um comando, NE, contrato, fornecedor ou módulo..." autocomplete="off" spellcheck="false" autofocus />
-            <button type="button" class="suape-cp-theme-btn" id="suape-cp-theme-toggle" title="Alternar tema claro/escuro" aria-label="Alternar tema claro/escuro"></button>
-            <span class="suape-cp-kbd">ESC</span>
+            <div class="suape-cp-chips">
+              <button type="button" class="suape-cp-chip suape-cp-chip-active" data-scope="all">
+                Todos
+                <span class="suape-cp-chip-count" id="suape-cp-count-all" style="display:none;">0</span>
+              </button>
+              <button type="button" class="suape-cp-chip" data-scope="empenhos">
+                ${ICONS.receipt}
+                Empenhos
+                <span class="suape-cp-chip-count count-emerald" id="suape-cp-count-empenhos" style="display:none;">0</span>
+              </button>
+              <button type="button" class="suape-cp-chip" data-scope="contratos">
+                ${ICONS.fileStack}
+                Contratos
+                <span class="suape-cp-chip-count count-blue" id="suape-cp-count-contratos" style="display:none;">0</span>
+              </button>
+              <button type="button" class="suape-cp-chip" data-scope="screens">
+                ${ICONS.layoutDashboard}
+                Módulos
+              </button>
+              <button type="button" class="suape-cp-chip" data-scope="actions">
+                ${ICONS.sparkles}
+                Ações Rápidas
+              </button>
+              <button type="button" class="suape-cp-chip suape-cp-chip-processo" data-scope="processo" id="suape-cp-chip-processo" style="display:none;">
+                ${ICONS.folder}
+                Processo
+                <span class="suape-cp-chip-count count-teal" id="suape-cp-count-processo" style="display:none;">0</span>
+              </button>
+            </div>
           </div>
-          <div class="suape-cp-chips">
-            <button type="button" class="suape-cp-chip suape-cp-chip-active" data-scope="all">
-              Todos
-              <span class="suape-cp-chip-count" id="suape-cp-count-all" style="display:none;">0</span>
-            </button>
-            <button type="button" class="suape-cp-chip" data-scope="empenhos">
-              ${ICONS.receipt}
-              Empenhos
-              <span class="suape-cp-chip-count count-emerald" id="suape-cp-count-empenhos" style="display:none;">0</span>
-            </button>
-            <button type="button" class="suape-cp-chip" data-scope="contratos">
-              ${ICONS.fileStack}
-              Contratos
-              <span class="suape-cp-chip-count count-blue" id="suape-cp-count-contratos" style="display:none;">0</span>
-            </button>
-            <button type="button" class="suape-cp-chip" data-scope="screens">
-              ${ICONS.layoutDashboard}
-              Módulos
-            </button>
-            <button type="button" class="suape-cp-chip" data-scope="actions">
-              ${ICONS.sparkles}
-              Ações Rápidas
-            </button>
-            <button type="button" class="suape-cp-chip suape-cp-chip-processo" data-scope="processo" id="suape-cp-chip-processo" style="display:none;">
-              ${ICONS.folder}
-              Processo
-              <span class="suape-cp-chip-count count-teal" id="suape-cp-count-processo" style="display:none;">0</span>
-            </button>
-          </div>
-        </div>
-        <div class="suape-cp-list"></div>
-        <div class="suape-cp-footer">
-          <div class="suape-cp-footer-left">
-            <span><kbd class="suape-cp-key">↑</kbd> <kbd class="suape-cp-key">↓</kbd> Navegar</span>
-            <span><kbd class="suape-cp-key">↵</kbd> Selecionar</span>
-          </div>
-          <div class="suape-cp-footer-right">
-            <span>Sistema Gerencial</span>
-            <span class="suape-cp-footer-dot">•</span>
-            <kbd class="suape-cp-key suape-cp-key-accent">Ctrl + K</kbd>
+          <div class="suape-cp-list"></div>
+          <div class="suape-cp-footer">
+            <div class="suape-cp-footer-left">
+              <span><kbd class="suape-cp-key">↑</kbd> <kbd class="suape-cp-key">↓</kbd> Navegar</span>
+              <span><kbd class="suape-cp-key">↵</kbd> Selecionar</span>
+            </div>
+            <div class="suape-cp-footer-right">
+              <span>Sistema Gerencial</span>
+              <span class="suape-cp-footer-dot">•</span>
+              <kbd class="suape-cp-key suape-cp-key-accent">Ctrl + K</kbd>
+            </div>
           </div>
         </div>
-      </div>
-    `;
+      `);
 
-    document.body.appendChild(overlayEl);
+      mountTarget.appendChild(nextOverlayEl);
 
-    dialogEl = overlayEl.querySelector('#suape-cp-dialog');
-    inputEl = overlayEl.querySelector('.suape-cp-input');
-    listEl = overlayEl.querySelector('.suape-cp-list');
+      const nextDialogEl = nextOverlayEl.querySelector('#suape-cp-dialog');
+      const nextInputEl = nextOverlayEl.querySelector('.suape-cp-input');
+      const nextListEl = nextOverlayEl.querySelector('.suape-cp-list');
+      if (!nextDialogEl || !nextInputEl || !nextListEl) {
+        throw new Error('Falha ao montar estrutura da paleta.');
+      }
 
-    // Scope chip events
-    overlayEl.querySelectorAll('.suape-cp-chip').forEach((chip) => {
-      chip.addEventListener('click', () => {
-        overlayEl.querySelectorAll('.suape-cp-chip').forEach((c) => c.classList.remove('suape-cp-chip-active'));
-        chip.classList.add('suape-cp-chip-active');
-        activeScope = chip.dataset.scope || 'all';
-        inputEl.focus();
-        if (IS_SIAFI_PAGE && ['empenhos', 'contratos'].includes(activeScope)) loadData(false);
+      // Scope chip events
+      nextOverlayEl.querySelectorAll('.suape-cp-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          nextOverlayEl.querySelectorAll('.suape-cp-chip').forEach((c) => c.classList.remove('suape-cp-chip-active'));
+          chip.classList.add('suape-cp-chip-active');
+          activeScope = chip.dataset.scope || 'all';
+          nextInputEl.focus();
+          if (IS_SIAFI_PAGE && ['empenhos', 'contratos'].includes(activeScope)) loadData(false);
+          renderResults();
+        });
+      });
+
+      // Theme toggle events
+      nextOverlayEl.querySelector('#suape-cp-theme-toggle')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePaletteTheme();
+        nextInputEl.focus();
+      });
+
+      // Input events
+      nextInputEl.addEventListener('input', () => {
+        selectedIndex = 0;
+        if (IS_SIAFI_PAGE && !['print','printup','solrecfin'].some(command=>command.startsWith(nextInputEl.value.trim().toLowerCase()))) loadData(false);
         renderResults();
       });
-    });
 
-    // Theme toggle events
-    overlayEl.querySelector('#suape-cp-theme-toggle')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      togglePaletteTheme();
-      inputEl?.focus();
-    });
+      nextInputEl.addEventListener('keydown', handleKeyNavigation);
 
-    // Input events
-    inputEl.addEventListener('input', () => {
-      selectedIndex = 0;
-      if (IS_SIAFI_PAGE && !['print','printup','solrecfin'].some(command=>command.startsWith(inputEl.value.trim().toLowerCase()))) loadData(false);
-      renderResults();
-    });
+      // Overlay click to close
+      nextOverlayEl.addEventListener('click', (e) => {
+        if (e.target === nextOverlayEl) closePalette();
+      });
 
-    inputEl.addEventListener('keydown', handleKeyNavigation);
-
-    // Overlay click to close
-    overlayEl.addEventListener('click', (e) => {
-      if (e.target === overlayEl) closePalette();
-    });
-
-    // Create Details Modal DOM
-    detailOverlayEl = document.createElement('div');
-    detailOverlayEl.id = 'suape-cp-detail-overlay';
-    detailOverlayEl.innerHTML = `
-      <div id="suape-cp-detail-dialog">
-        <div class="suape-cp-detail-header">
-          <div class="suape-cp-detail-title-group">
-            <h3 class="suape-cp-detail-title">Detalhes</h3>
+      // Create Details Modal DOM
+      nextDetailOverlayEl.id = 'suape-cp-detail-overlay';
+      setElementHtml(nextDetailOverlayEl, `
+        <div id="suape-cp-detail-dialog">
+          <div class="suape-cp-detail-header">
+            <div class="suape-cp-detail-title-group">
+              <h3 class="suape-cp-detail-title">Detalhes</h3>
+            </div>
+            <div class="suape-cp-detail-header-actions">
+              <button type="button" class="suape-cp-theme-btn" id="suape-cp-detail-theme-toggle" title="Alternar tema claro/escuro" aria-label="Alternar tema claro/escuro"></button>
+              <button type="button" class="suape-cp-detail-close" title="Fechar (Esc)">✕</button>
+            </div>
           </div>
-          <div class="suape-cp-detail-header-actions">
-            <button type="button" class="suape-cp-theme-btn" id="suape-cp-detail-theme-toggle" title="Alternar tema claro/escuro" aria-label="Alternar tema claro/escuro"></button>
-            <button type="button" class="suape-cp-detail-close" title="Fechar (Esc)">✕</button>
-          </div>
+          <div class="suape-cp-detail-body"></div>
         </div>
-        <div class="suape-cp-detail-body"></div>
-      </div>
-    `;
-    document.body.appendChild(detailOverlayEl);
+      `);
+      mountTarget.appendChild(nextDetailOverlayEl);
 
-    detailDialogEl = detailOverlayEl.querySelector('#suape-cp-detail-dialog');
-    detailOverlayEl.querySelector('.suape-cp-detail-close').addEventListener('click', closeDetailModal);
-    detailOverlayEl.querySelector('#suape-cp-detail-theme-toggle')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      togglePaletteTheme();
-    });
-    detailOverlayEl.addEventListener('click', (e) => {
-      if (e.target === detailOverlayEl) closeDetailModal();
-    });
+      const nextDetailDialogEl = nextDetailOverlayEl.querySelector('#suape-cp-detail-dialog');
+      nextDetailOverlayEl.querySelector('.suape-cp-detail-close')?.addEventListener('click', closeDetailModal);
+      nextDetailOverlayEl.querySelector('#suape-cp-detail-theme-toggle')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePaletteTheme();
+      });
+      nextDetailOverlayEl.addEventListener('click', (e) => {
+        if (e.target === nextDetailOverlayEl) closeDetailModal();
+      });
 
-    applyPaletteTheme(currentPaletteTheme);
+      overlayEl = nextOverlayEl;
+      dialogEl = nextDialogEl;
+      inputEl = nextInputEl;
+      listEl = nextListEl;
+      detailOverlayEl = nextDetailOverlayEl;
+      detailDialogEl = nextDetailDialogEl;
+
+      applyPaletteTheme(currentPaletteTheme);
+    } catch (error) {
+      nextOverlayEl.remove?.();
+      nextDetailOverlayEl.remove?.();
+      overlayEl = null;
+      dialogEl = null;
+      inputEl = null;
+      listEl = null;
+      detailOverlayEl = null;
+      detailDialogEl = null;
+      throw error;
+    }
   }
 
   function updateProcessChip() {
@@ -1463,11 +1928,11 @@
     const chipProcesso = overlayEl?.querySelector('#suape-cp-chip-processo');
     if (chipProcesso) {
       chipProcesso.style.display = 'inline-flex';
-      chipProcesso.innerHTML = `
+      setElementHtml(chipProcesso, `
         ${ICONS.folder}
         ${procId ? `Processo #${procId}` : 'Processos'}
         <span class="suape-cp-chip-count count-teal" id="suape-cp-count-processo" style="display:none;">0</span>
-      `;
+      `);
     }
   }
 
@@ -1881,13 +2346,13 @@
 
   function renderCondhMessage(title, description, showSpinner = false) {
     currentResults = [];
-    listEl.innerHTML = `
+    setElementHtml(listEl, `
       <div class="suape-cp-empty">
         ${showSpinner ? '<div class="suape-cp-spinner"></div>' : `<div class="suape-cp-empty-icon">${ICONS.search}</div>`}
         <p class="suape-cp-empty-title">${escapeHtml(title)}</p>
         <p class="suape-cp-empty-desc">${escapeHtml(description)}</p>
       </div>
-    `;
+    `);
   }
 
   function renderCondhResults(queryText) {
@@ -1975,7 +2440,7 @@
         <button type="button" class="suape-cp-condh-page-btn" data-page="${state.page + 1}" ${state.page >= totalPages ? 'disabled' : ''}>Próxima</button>
       </div>
     `;
-    listEl.innerHTML = html;
+    setElementHtml(listEl, html);
 
     listEl.querySelectorAll('.suape-cp-item').forEach((item) => {
       item.addEventListener('click', () => {
@@ -2032,13 +2497,13 @@
     }
 
     if (isFetching && !empenhosCache && !contratosCache && !matchingActions.some(action => action.siafiOnly || action.localOnly)) {
-      listEl.innerHTML = `
+      setElementHtml(listEl, `
         <div class="suape-cp-empty">
           <div class="suape-cp-spinner"></div>
           <p class="suape-cp-empty-title">Carregando dados...</p>
           <p class="suape-cp-empty-desc">Sincronizando dados com o SIAGES.</p>
         </div>
-      `;
+      `);
       currentResults = [];
       return;
     }
@@ -2116,7 +2581,7 @@
     }
 
     if (currentResults.length === 0) {
-      listEl.innerHTML = `
+      setElementHtml(listEl, `
         <div class="suape-cp-empty">
           <div class="suape-cp-empty-icon">
             ${ICONS.search}
@@ -2124,7 +2589,7 @@
           <p class="suape-cp-empty-title">Nenhum resultado encontrado</p>
           <p class="suape-cp-empty-desc">Não encontramos correspondências para "<strong>${escapeHtml(query)}</strong>". Tente matrícula do aluno (ex: "alu 2009..."), documento (ex: "doc texto"), processo ou contrato.</p>
         </div>
-      `;
+      `);
       return;
     }
 
@@ -2557,7 +3022,7 @@
       html += renderDocumentBlock();
     }
 
-    listEl.innerHTML = html;
+    setElementHtml(listEl, html);
 
     // Attach click and hover events
     listEl.querySelectorAll('.suape-cp-item').forEach((item) => {
@@ -2667,7 +3132,7 @@
     const body = detailDialogEl.querySelector('.suape-cp-detail-body');
     detailDialogEl.querySelector('.suape-cp-detail-title').textContent = `Nota de Empenho: ${emp.numero}`;
 
-    body.innerHTML = `
+    setElementHtml(body, `
       <div class="suape-cp-metric-grid">
         <div class="suape-cp-metric-card">
           <p class="suape-cp-metric-label">Valor Empenhado</p>
@@ -2731,7 +3196,7 @@
           </div>
         ` : ''}
       </div>
-    `;
+    `);
 
     detailOverlayEl.classList.add('suape-cp-visible');
   }
@@ -2740,12 +3205,12 @@
     const body = detailDialogEl.querySelector('.suape-cp-detail-body');
     const displayId = getCondhDisplayNumber(documento.id);
     detailDialogEl.querySelector('.suape-cp-detail-title').textContent = `Documento hábil: ${displayId}`;
-    body.innerHTML = `
+    setElementHtml(body, `
       <div class="suape-cp-empty">
         <div class="suape-cp-spinner"></div>
         <p class="suape-cp-empty-title">Carregando detalhes de ${escapeHtml(displayId)}...</p>
       </div>
-    `;
+    `);
     detailOverlayEl.classList.add('suape-cp-visible');
 
     try {
@@ -2767,7 +3232,7 @@
       const original = documento.valor_original ?? 0;
       const paid = documento.valor_pago ?? 0;
 
-      body.innerHTML = `
+      setElementHtml(body, `
         <div class="suape-cp-metric-grid">
           <div class="suape-cp-metric-card">
             <p class="suape-cp-metric-label">Valor original</p>
@@ -2815,14 +3280,14 @@
             </div>
           `).join('') : '<p class="suape-cp-empty-desc">Nenhum documento relacionado registrado.</p>'}
         </div>
-      `;
+      `);
     } catch (error) {
-      body.innerHTML = `
+      setElementHtml(body, `
         <div class="suape-cp-empty">
           <p class="suape-cp-empty-title">Não foi possível carregar os detalhes</p>
           <p class="suape-cp-empty-desc">${escapeHtml(error?.message || 'Verifique sua sessão e tente novamente.')}</p>
         </div>
-      `;
+      `);
     }
   }
 
@@ -2831,13 +3296,13 @@
     const body = detailDialogEl.querySelector('.suape-cp-detail-body');
     detailDialogEl.querySelector('.suape-cp-detail-title').textContent = `Contrato ${cont.numero}`;
 
-    body.innerHTML = `
+    setElementHtml(body, `
       <div class="suape-cp-empty">
         <div class="suape-cp-spinner"></div>
         <p class="suape-cp-empty-title">Carregando detalhes do contrato...</p>
         <p class="suape-cp-empty-desc">Buscando empenhos, faturas, itens e histórico contratual.</p>
       </div>
-    `;
+    `);
 
     detailOverlayEl.classList.add('suape-cp-visible');
 
@@ -2906,7 +3371,7 @@
       return sit !== 'pago' && sit !== 'siafi apropriado';
     }).length;
 
-    body.innerHTML = `
+    setElementHtml(body, `
       <div class="suape-cp-metric-grid">
         <div class="suape-cp-metric-card">
           <p class="suape-cp-metric-label">Valor Global</p>
@@ -3026,7 +3491,7 @@
           </div>
         `).join('') : '<p class="suape-cp-empty-desc" style="text-align: center; padding: 12px;">Nenhum termo de histórico sincronizado.</p>'}
       </div>
-    `;
+    `);
 
     // Tab switcher events
     const tabs = ['empenhos', 'faturas', 'itens', 'termos'];
@@ -3065,7 +3530,12 @@
       return;
     }
     paletteReturnFocus = document.activeElement;
+    if (paletteReturnFocus && /^(?:IFRAME|EMBED|OBJECT)$/i.test(String(paletteReturnFocus.tagName || ''))) {
+      try { paletteReturnFocus.blur?.(); } catch (_) {}
+      try { window.focus?.(); } catch (_) {}
+    }
     createPaletteDOM();
+    if (!overlayEl || !inputEl) return;
     if (IS_SIAFI_PAGE || localCommand) {
       activeScope = 'all';
       overlayEl.querySelectorAll('.suape-cp-chip').forEach(chip => chip.classList.toggle('suape-cp-chip-active', chip.dataset.scope === 'all'));
@@ -3108,7 +3578,15 @@
     const wasVisible = overlayEl?.classList.contains('suape-cp-visible');
     if (overlayEl) overlayEl.classList.remove('suape-cp-visible');
     closeDetailModal();
-    if (wasVisible && paletteReturnFocus?.isConnected) paletteReturnFocus.focus();
+    if (wasVisible) {
+      const returnTarget = paletteReturnFocus;
+      paletteReturnFocus = null;
+      if (isEmbeddedPdfElement(returnTarget)) {
+        focusHostBodyWithoutScroll();
+      } else if (returnTarget?.isConnected) {
+        try { returnTarget.focus(); } catch (_) {}
+      }
+    }
   }
 
   function togglePalette() {
@@ -3119,31 +3597,113 @@
     }
   }
 
-  // Global keydown listener com fase de captura para precedência imediata
-  const commandPaletteKeydown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
-        // SIAGES owns the normal palette. The extension takes over only the
-        // local solrecfin command, after the native dialog has closed.
-        if (IS_SIAGES_PAGE) {
-          if (overlayEl?.classList.contains('suape-cp-visible') || detailOverlayEl?.classList.contains('suape-cp-visible')) {
-            e.preventDefault(); e.stopPropagation(); closePalette();
-          }
-          return;
-        }
-        e.preventDefault();
-        e.stopPropagation();
-        togglePalette();
-      } else if (e.key === 'Escape') {
-        if (detailOverlayEl?.classList.contains('suape-cp-visible')) {
-          e.preventDefault();
-          closeDetailModal();
-        } else if (overlayEl?.classList.contains('suape-cp-visible')) {
-          e.preventDefault();
-          closePalette();
-        }
+  let lastHandledKeydownEvent = null;
+  let lastShortcutHandledAt = 0;
+  let dispatchingNativeShortcut = false;
+
+  function handleExternalPaletteToggle(action = 'toggle-command-palette') {
+    if (commandPaletteDisposed) return false;
+    if (action === 'close-command-palette') {
+      if (detailOverlayEl?.classList.contains('suape-cp-visible')) {
+        closeDetailModal();
+      } else if (overlayEl?.classList.contains('suape-cp-visible')) {
+        closePalette();
       }
-    };
+      return true;
+    }
+
+    const now = Date.now();
+    if (now - lastShortcutHandledAt < 180) {
+      return true;
+    }
+    lastShortcutHandledAt = now;
+
+    if (IS_SIAGES_PAGE) {
+      if (overlayEl?.classList.contains('suape-cp-visible') || detailOverlayEl?.classList.contains('suape-cp-visible')) {
+        closePalette();
+        return true;
+      }
+      dispatchingNativeShortcut = true;
+      try {
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'k',
+          code: 'KeyK',
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        }));
+      } finally {
+        dispatchingNativeShortcut = false;
+      }
+      return true;
+    }
+
+    togglePalette();
+    return true;
+  }
+
+  // Global keydown listener com fase de captura na window e no document para precedência imediata
+  const commandPaletteKeydown = (e) => {
+    if (commandPaletteDisposed || dispatchingNativeShortcut) return;
+    if (e === lastHandledKeydownEvent) return;
+    lastHandledKeydownEvent = e;
+
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
+      // SIAGES owns the normal palette. The extension takes over only the
+      // local solrecfin command, after the native dialog has closed.
+      if (IS_SIAGES_PAGE) {
+        if (overlayEl?.classList.contains('suape-cp-visible') || detailOverlayEl?.classList.contains('suape-cp-visible')) {
+          e.preventDefault(); e.stopPropagation(); closePalette();
+        }
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      lastShortcutHandledAt = Date.now();
+      togglePalette();
+    } else if (e.key === 'Escape') {
+      if (detailOverlayEl?.classList.contains('suape-cp-visible')) {
+        e.preventDefault();
+        closeDetailModal();
+      } else if (overlayEl?.classList.contains('suape-cp-visible')) {
+        e.preventDefault();
+        closePalette();
+      }
+    }
+  };
+  window.addEventListener('keydown', commandPaletteKeydown, true);
   document.addEventListener('keydown', commandPaletteKeydown, true);
+
+  const windowMessageListener = (event) => {
+    if (commandPaletteDisposed) return;
+    const data = event?.data;
+    if (!data || data.source !== COMMAND_PALETTE_SOURCE) return;
+    if (data.action === 'toggle-command-palette' || data.action === 'close-command-palette') {
+      handleExternalPaletteToggle(data.action);
+    }
+  };
+  window.addEventListener('message', windowMessageListener);
+
+  const runtimeMessageListener = (message, _sender, sendResponse) => {
+    if (commandPaletteDisposed) return undefined;
+    const isPaletteMsg =
+      (message?.source === COMMAND_PALETTE_SOURCE && ['toggle-command-palette', 'open-command-palette', 'close-command-palette'].includes(message.action))
+      || message?.action === 'toggle-command-palette'
+      || message?.action === 'open-command-palette';
+    if (!isPaletteMsg) return undefined;
+    const normalizedAction = message.action === 'close-command-palette'
+      ? 'close-command-palette'
+      : 'toggle-command-palette';
+    const ok = handleExternalPaletteToggle(normalizedAction);
+    if (typeof sendResponse === 'function') sendResponse({ ok });
+    return undefined;
+  };
+  try {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage?.addListener) {
+      chrome.runtime.onMessage.addListener(runtimeMessageListener);
+    }
+  } catch (_) {}
+
   const nativeSolrecfinInput = event => {
     if (!IS_SIAGES_PAGE || !event.target.matches?.('[cmdk-input]') || !event.target.closest('[role="dialog"]') || event.target.value.trim().toLowerCase() !== 'solrecfin') return;
     event.target.dispatchEvent(new KeyboardEvent('keydown', { key:'Escape', code:'Escape', bubbles:true, cancelable:true }));
@@ -3178,7 +3738,7 @@
         badge.setAttribute('role', 'button');
         badge.setAttribute('tabindex', '0');
         badge.title = `ID SUAP: ${processId}\n• Clique para copiar\n• Alt+Clique para Upload com automação\n• Use "up ${processId}" ou "enc ${processId}" no Ctrl+K`;
-        badge.innerHTML = `<span class="suape-badge-hash">#</span><span class="suape-badge-num">${processId}</span>`;
+        setElementHtml(badge, `<span class="suape-badge-hash">#</span><span class="suape-badge-num">${processId}</span>`);
 
         badge.addEventListener('click', async (e) => {
           e.preventDefault();
@@ -3220,10 +3780,10 @@
           }
 
           const prevHtml = badge.innerHTML;
-          badge.innerHTML = `<span class="suape-badge-copied-icon">✓</span> Copiado!`;
+          setElementHtml(badge, `<span class="suape-badge-copied-icon">✓</span> Copiado!`);
           badge.classList.add('suape-badge-copied');
           setTimeout(() => {
-            badge.innerHTML = prevHtml;
+            setElementHtml(badge, prevHtml);
             badge.classList.remove('suape-badge-copied');
           }, 1400);
         });
@@ -3276,26 +3836,27 @@
   }
 
   void readStoredCampusUasg();
+  const storageChangeListener = (changes, areaName) => {
+    if (commandPaletteDisposed || areaName !== 'local') return;
+    const campusChanged = Boolean(changes[USER_CAMPUS_STORAGE_KEY]);
+    const sessionChanged = Boolean(changes['siages-extension-session']);
+    if (!campusChanged && !sessionChanged) return;
+    if (campusChanged) {
+      cachedCampusUasg = normalizeCampusUasg(changes[USER_CAMPUS_STORAGE_KEY].newValue);
+    } else if (sessionChanged) {
+      const nextSessionCampus = changes['siages-extension-session']?.newValue?.campusUasg;
+      if (nextSessionCampus) cachedCampusUasg = normalizeCampusUasg(nextSessionCampus);
+    }
+    empenhosCache = null;
+    contratosCache = null;
+    loadedCampusUasg = null;
+    if (overlayEl?.classList.contains('suape-cp-visible')) {
+      void loadData(true);
+    }
+  };
   try {
     if (typeof chrome !== 'undefined' && chrome.storage?.onChanged?.addListener) {
-      chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (commandPaletteDisposed || areaName !== 'local') return;
-        const campusChanged = Boolean(changes[USER_CAMPUS_STORAGE_KEY]);
-        const sessionChanged = Boolean(changes['siages-extension-session']);
-        if (!campusChanged && !sessionChanged) return;
-        if (campusChanged) {
-          cachedCampusUasg = normalizeCampusUasg(changes[USER_CAMPUS_STORAGE_KEY].newValue);
-        } else if (sessionChanged) {
-          const nextSessionCampus = changes['siages-extension-session']?.newValue?.campusUasg;
-          if (nextSessionCampus) cachedCampusUasg = normalizeCampusUasg(nextSessionCampus);
-        }
-        empenhosCache = null;
-        contratosCache = null;
-        loadedCampusUasg = null;
-        if (overlayEl?.classList.contains('suape-cp-visible')) {
-          void loadData(true);
-        }
-      });
+      chrome.storage.onChanged.addListener(storageChangeListener);
     }
   } catch (_) {}
 
@@ -3310,6 +3871,8 @@
     });
   };
   window.addEventListener('siages-siafi-capture-complete', solrecfinCaptureListener);
+
+  pdfFocusGuardCleanup = installEmbeddedPdfFocusGuard();
 
   // No SUAP a consulta antecipada preserva a resposta imediata da paleta atual.
   // Em sites comuns, os dados do SIAGES so sao carregados quando o usuario abre a paleta.
@@ -3332,6 +3895,32 @@
     }
   }
 
+  function consumeOpenPaletteHash() {
+    try {
+      const hash = String(window.location.hash || '');
+      if (!/(?:^|[#&])siagesOpenPalette=1(?:&|$)/.test(hash)) return false;
+      const cleanedParams = new URLSearchParams(hash.replace(/^#/, ''));
+      cleanedParams.delete('siagesOpenPalette');
+      const nextHash = cleanedParams.toString();
+      const nextUrl = `${window.location.pathname || '/'}${window.location.search || ''}${nextHash ? `#${nextHash}` : ''}`;
+      window.history?.replaceState?.(null, document.title || '', nextUrl);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  const openFromHash = () => {
+    if (!commandPaletteDisposed) openPalette();
+  };
+  if (consumeOpenPaletteHash()) {
+    if (document.readyState === 'loading' && !document.body && !document.documentElement) {
+      document.addEventListener('DOMContentLoaded', openFromHash, { once: true });
+    } else {
+      openFromHash();
+    }
+  }
+
   // Expor utilitários para testes unitários
   if (typeof window !== 'undefined') {
     window.__suapeInitProcessBoxIdBadges = initProcessBoxIdBadges;
@@ -3341,10 +3930,23 @@
     window.__suapeSolrecfin = { buildEntry: buildSolrecfinEntry, aggregate: aggregateSolrecfinEntries, parseCents: solrecfinMoneyToCents,
       getEntries: () => solrecfinEntries, day: solrecfinDay, days: solrecfinDays, retain: retainSolrecfinHistory,
       remember: rememberSolrecfinCapture, show: () => { createPaletteDOM(); openSolrecfinDetail(); },
-      destroy: () => { commandPaletteDisposed=true;processBadgesCleanup();closePalette();
-        clearInterval(solrecfinDayTimer); clearTimeout(solrecfinNativeTimer);
-        document.removeEventListener('keydown',commandPaletteKeydown,true); document.removeEventListener('input',nativeSolrecfinInput);
-        window.removeEventListener('siages-siafi-capture-complete', solrecfinCaptureListener); } };
+      destroy: () => {
+        commandPaletteDisposed = true;
+        processBadgesCleanup();
+        pdfFocusGuardCleanup();
+        closePalette();
+        clearInterval(solrecfinDayTimer);
+        clearTimeout(solrecfinNativeTimer);
+        window.removeEventListener('keydown', commandPaletteKeydown, true);
+        document.removeEventListener('keydown', commandPaletteKeydown, true);
+        window.removeEventListener('message', windowMessageListener);
+        document.removeEventListener('input', nativeSolrecfinInput);
+        document.removeEventListener('DOMContentLoaded', initProcessBoxIdBadges);
+        document.removeEventListener('DOMContentLoaded', openFromHash);
+        window.removeEventListener('siages-siafi-capture-complete', solrecfinCaptureListener);
+        try { chrome?.runtime?.onMessage?.removeListener?.(runtimeMessageListener); } catch (_) {}
+        try { chrome?.storage?.onChanged?.removeListener?.(storageChangeListener); } catch (_) {}
+      } };
   }
 
   function showProcessSyncNotice(message) {

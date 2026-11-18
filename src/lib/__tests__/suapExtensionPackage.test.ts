@@ -80,6 +80,7 @@ describe('pacote da extensao Suape 1.9', () => {
       css: ['command-palette.css'],
       js: ['extension-auth-client.js', 'command-palette.js'],
       run_at: 'document_idle',
+      all_frames: true,
     });
     expect(siafi).toMatchObject({
       matches: ['https://siafi.tesouro.gov.br/*'],
@@ -110,6 +111,14 @@ describe('pacote da extensao Suape 1.9', () => {
       css: ['command-palette.css'],
       js: ['extension-auth-client.js', 'command-palette.js'],
       run_at: 'document_idle',
+      all_frames: true,
+    });
+    expect(manifest.commands?.['open-command-palette']).toEqual({
+      suggested_key: {
+        default: 'Ctrl+K',
+        mac: 'Command+K',
+      },
+      description: expect.stringContaining('Ctrl+K'),
     });
     expect(clickHints).toMatchObject({
       matches: ['<all_urls>'],

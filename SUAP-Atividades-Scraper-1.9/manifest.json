@@ -30,6 +30,13 @@
     "128": "logo-transparent.png"
   },
   "commands": {
+    "open-command-palette": {
+      "suggested_key": {
+        "default": "Ctrl+K",
+        "mac": "Command+K"
+      },
+      "description": "Abrir paleta de comandos (Ctrl+K)"
+    },
     "open-process-paste": {
       "suggested_key": {
         "default": "Alt+V"
@@ -65,7 +72,8 @@
         "extension-auth-client.js",
         "command-palette.js"
       ],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     },
     {
       "matches": [
@@ -84,7 +92,8 @@
         "extension-auth-client.js",
         "command-palette.js"
       ],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     },
     {
       "matches": [

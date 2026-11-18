@@ -22,6 +22,7 @@ const SESSION_REFRESH_ALARM = 'siages-extension-session-refresh';
 const REFRESH_AHEAD_SECONDS = 20 * 60;
 const PROCESS_BOX_SYNC_SOURCE = 'siages-extension-process-box-sync';
 const CLICK_HINTS_SOURCE = 'suape-click-hints';
+const COMMAND_PALETTE_SOURCE = 'siages-command-palette';
 const PROCESS_BOX_SYNC_ALARM = 'siages-extension-process-box-sync';
 const PROCESS_BOX_SYNC_STORAGE_KEY = 'siages-process-box-sync-state';
 const PROCESS_BOX_SYNC = globalThis.SuapeScheduledProcessSync;
@@ -654,7 +655,117 @@ async function handleSiafiUploadPageMessage(message, sender) {
   throw new Error('Operação de captura SIAFI desconhecida.');
 }
 
+function isRestrictedCommandPaletteUrl(rawUrl) {
+  try {
+    const url = new URL(String(rawUrl || ''));
+    const host = url.hostname.toLowerCase();
+    return host === 'acesso.gov.br' || host.endsWith('.acesso.gov.br');
+  } catch {
+    return false;
+  }
+}
+
+function isBrowserNewTabUrl(rawUrl) {
+  const raw = String(rawUrl || '').trim().toLowerCase();
+  if (!raw) return true;
+  return raw.startsWith('chrome://newtab')
+    || raw.startsWith('chrome://new-tab-page')
+    || raw.startsWith('edge://newtab')
+    || raw.startsWith('about:newtab')
+    || raw === 'about:blank';
+}
+
+async function sendCommandPaletteMessageToTab(tabId, action = 'toggle-command-palette') {
+  if (typeof tabId !== 'number' || !chrome?.tabs?.sendMessage) return false;
+  return new Promise((resolve) => {
+    try {
+      const maybePromise = chrome.tabs.sendMessage(
+        tabId,
+        { source: COMMAND_PALETTE_SOURCE, action },
+        (response) => {
+          void chrome.runtime?.lastError;
+          resolve(Boolean(response?.ok));
+        },
+      );
+      if (maybePromise && typeof maybePromise.then === 'function') {
+        maybePromise.then((response) => resolve(Boolean(response?.ok))).catch(() => resolve(false));
+      }
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+async function triggerCommandPaletteInTab(targetTab, action = 'toggle-command-palette') {
+  let tab = targetTab;
+  if (!tab?.id) {
+    const [activeTab] = await queryTabs({ active: true, currentWindow: true });
+    tab = activeTab;
+  }
+  if (typeof tab?.id !== 'number') return { ok: false };
+
+  if (await sendCommandPaletteMessageToTab(tab.id, action)) {
+    return { ok: true };
+  }
+
+  const tabUrl = String(tab.url || tab.pendingUrl || '');
+  let isHttpPage = false;
+  try {
+    isHttpPage = ['http:', 'https:'].includes(new URL(tabUrl).protocol);
+  } catch {
+    isHttpPage = false;
+  }
+
+  if (
+    action === 'toggle-command-palette'
+    && isHttpPage
+    && !isRestrictedCommandPaletteUrl(tabUrl)
+    && chrome?.scripting?.executeScript
+  ) {
+    const injectIntoTarget = async (target) => {
+      if (chrome?.scripting?.insertCSS) {
+        await chrome.scripting.insertCSS({ target, files: ['command-palette.css'] }).catch(() => undefined);
+      }
+      await chrome.scripting.executeScript({
+        target,
+        files: ['extension-auth-client.js', 'command-palette.js'],
+      });
+    };
+
+    try {
+      try {
+        await injectIntoTarget({ tabId: tab.id, allFrames: true });
+      } catch {
+        await injectIntoTarget({ tabId: tab.id });
+      }
+      if (await sendCommandPaletteMessageToTab(tab.id, action)) {
+        return { ok: true, injected: true };
+      }
+    } catch {
+      // A aba pode bloquear scripting (ex.: páginas internas ou Chrome Web Store).
+    }
+  }
+
+  if (action === 'toggle-command-palette' && isBrowserNewTabUrl(tabUrl) && chrome?.tabs?.update) {
+    try {
+      await chrome.tabs.update(tab.id, { url: 'https://www.google.com/#siagesOpenPalette=1' });
+      return { ok: true, navigated: true };
+    } catch {
+      return { ok: false };
+    }
+  }
+
+  return { ok: false };
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.source === COMMAND_PALETTE_SOURCE && ['toggle-in-top-frame', 'close-in-top-frame'].includes(message.type)) {
+    const action = message.type === 'close-in-top-frame' ? 'close-command-palette' : 'toggle-command-palette';
+    void triggerCommandPaletteInTab(sender?.tab, action)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Falha ao acionar a paleta.' }));
+    return true;
+  }
   if (message?.source === 'siages-siafi-analysis') {
     void globalThis.SiagesSiafiAnalysisBackground.handle(message,sender,postSiafiAnalysis,options=>chrome.tabs.create(options))
       .then(result=>sendResponse({ok:true,...result}))
@@ -892,12 +1003,20 @@ if (chrome?.tabs?.onRemoved) {
 }
 
 if (chrome?.commands?.onCommand) {
-  chrome.commands.onCommand.addListener(async (command) => {
+  chrome.commands.onCommand.addListener(async (command, tab) => {
+    if (command === 'open-command-palette' || command === 'toggle-command-palette') {
+      try {
+        await triggerCommandPaletteInTab(tab);
+      } catch {
+        // Ignora erro
+      }
+      return;
+    }
     if (command === 'open-process-paste') {
       try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (tab?.id) {
-          chrome.tabs.sendMessage(tab.id, { action: 'open-process-paste' });
+        const [activeTab] = tab?.id ? [tab] : await chrome.tabs.query({ active: true, currentWindow: true });
+        if (activeTab?.id) {
+          chrome.tabs.sendMessage(activeTab.id, { action: 'open-process-paste' });
         }
       } catch {
         // Ignora erro

@@ -1,5 +1,9 @@
 # Testes
 
+Acionamento global de `Ctrl+K` no Google (Trusted Types CSP) e em páginas com PDF embutido no SUAP:
+- `suapCommandPaletteGlobal.test.ts`: cobre abertura e busca no Google mesmo com `Element.prototype.innerHTML` bloqueado por `TrustedHTML`, `trustedTypes.createPolicy` restrito e listener de página na `document`; cobre recuperação automática de foco preso em `<embed>`, `<object>` e `<iframe>` de PDF em `/documento_eletronico/visualizar_documento_digitalizado/*` sem exigir clique fora e sem devolver o foco ao fechar com `Esc`; cobre encaminhamento de `Ctrl+K`/`Esc` em `window !== window.top`, deduplicação entre `keydown` e mensagens `postMessage`/`chrome.runtime.onMessage`, abertura via `#siagesOpenPalette=1` e roteamento de `open-command-palette` no `background.js`;
+- `suapExtensionPackage.test.ts`: protege o comando `open-command-palette` (`Ctrl+K` / `Command+K`) e `all_frames: true` nas injeções de `command-palette.js` no SUAP e em `<all_urls>`.
+
 Vínculo de usuário à UASG na extensão e saldo de empenhos por campus (`158366` — Currais Novos):
 - `suapCommandPaletteGlobal.test.ts`: verifica que a paleta `Ctrl+K` filtra `empenhos` e `contratos` por `campus_uasg=eq.158366` (ou pela UASG vinculada ao usuário), exibe o saldo disponível das NEs do Campus Currais Novos sem truncamento por outras UASGs e encontra a NE ao digitar número resumido, sequencial com zeros à esquerda (`000110`) ou código completo do SIAFI (`158366264352026NE000110`);
 - `suapPopupAccount.test.ts`: cobre a exibição e alteração do seletor **Campus vinculado (UASG)** na conta autenticada do popup;
