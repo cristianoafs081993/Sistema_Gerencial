@@ -26,6 +26,7 @@
   let flatItems = [];
   let selectedIndex = 0;
   let filterQuery = '';
+  let isLoadingRemote = false;
   let pendingEnterItem = null;
   let pendingEnterTimer = null;
 
@@ -270,22 +271,29 @@
 
   // Acrescenta, sem bloquear a abertura, os processos publicados por outros perfis do Chrome no SIAGES.
   function loadRemoteProcesses() {
-    if (!globalThis.chrome?.runtime?.sendMessage) return;
+    if (!globalThis.chrome?.runtime?.sendMessage) {
+      isLoadingRemote = false;
+      return;
+    }
     const picker = overlayEl;
+    isLoadingRemote = true;
     setRemoteNote('Consultando outros perfis…');
     try {
       chrome.runtime.sendMessage({ source: 'suape-process-registry', type: 'get-remote-processes' }, (result) => {
         void chrome.runtime?.lastError;
         if (!overlayEl || overlayEl !== picker) return;
+        isLoadingRemote = false;
         const incoming = result?.ok && Array.isArray(result.processes) ? result.processes : [];
         const additions = incoming.filter((item) => !currentProcesses.some((existing) => isSameProcess(existing, item)));
         if (additions.length) {
           currentProcesses = [...currentProcesses, ...additions].sort((a, b) => processRecency(b) - processRecency(a));
-          renderList();
         }
+        renderList();
         setRemoteNote(describeRemoteResult(result, additions.length));
       });
     } catch {
+      isLoadingRemote = false;
+      renderList();
       setRemoteNote('');
     }
   }
@@ -562,6 +570,39 @@
       .replace(/"/g, '&quot;');
   }
 
+  function renderRemoteSkeleton() {
+    const skeletonEl = document.createElement('div');
+    skeletonEl.className = 'suape-paste-skeleton';
+    skeletonEl.setAttribute('aria-busy', 'true');
+    skeletonEl.setAttribute('aria-label', 'Carregando processos');
+    skeletonEl.innerHTML = `
+      <div class="suape-paste-skeleton-header">
+        <div class="suape-paste-skeleton-header-left">
+          <span class="suape-paste-skeleton-bar suape-paste-skeleton-badge"></span>
+          <span class="suape-paste-skeleton-bar suape-paste-skeleton-title"></span>
+        </div>
+        <button type="button" class="suape-paste-skip-remote-btn">Mostrar apenas este perfil</button>
+      </div>
+      ${Array.from({ length: 4 }, () => `
+        <div class="suape-paste-skeleton-item">
+          <div class="suape-paste-skeleton-label">
+            <span class="suape-paste-skeleton-bar suape-paste-skeleton-line-sm"></span>
+            <span class="suape-paste-skeleton-bar suape-paste-skeleton-line-xs"></span>
+          </div>
+          <span class="suape-paste-skeleton-bar suape-paste-skeleton-line-lg"></span>
+        </div>
+      `).join('')}
+    `;
+    skeletonEl.querySelector('.suape-paste-skip-remote-btn')?.addEventListener('click', () => {
+      isLoadingRemote = false;
+      renderList();
+      searchInputEl?.focus();
+    });
+    listContainerEl.appendChild(skeletonEl);
+    const countEl = overlayEl?.querySelector('.suape-paste-footer-count');
+    if (countEl) countEl.textContent = 'Carregando processos...';
+  }
+
   /**
    * Renderiza a lista de grupos e itens de processos
    */
@@ -571,6 +612,10 @@
     flatItems = [];
 
     const query = filterQuery.toLowerCase().trim();
+    if (isLoadingRemote && !query) {
+      renderRemoteSkeleton();
+      return;
+    }
 
     // Filtra processos e seus campos
     const processGroups = [];
@@ -825,8 +870,8 @@
     currentProcesses = await fetchActiveProcesses();
     selectedIndex = 0;
     filterQuery = '';
-    renderList();
     loadRemoteProcesses();
+    renderList();
 
     // Foco imediato no campo de busca
     setTimeout(() => {
@@ -836,6 +881,7 @@
 
   function closePicker() {
     if (!overlayEl) return;
+    isLoadingRemote = false;
     clearPendingEnter();
     overlayEl.remove();
     overlayEl = null;

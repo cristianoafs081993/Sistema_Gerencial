@@ -497,6 +497,51 @@ describe('Suape - Menu de Colagem Inteligente Alt+V (suapProcessPastePicker)', (
       await api.openPicker();
       expect(groups()).toHaveLength(1);
     });
+
+    it('exibe skeleton enquanto consulta outros perfis para não trocar o processo exibido', async () => {
+      let resolveRemote: ((res: unknown) => void) | null = null;
+      const sendMessage = vi.fn((message: { type: string }, callback: (res: unknown) => void) => {
+        if (message.type === 'get-remote-processes') {
+          resolveRemote = callback;
+        } else {
+          callback({ ok: true, processes: [{ ...localProc, openedAt: 1000 }] });
+        }
+      });
+      (window as unknown as { chrome: unknown }).chrome = { runtime: { sendMessage } };
+      window.eval(pasteScript);
+      const api = (window as unknown as { __suapeProcessPastePicker: { openPicker: () => Promise<void> } }).__suapeProcessPastePicker;
+
+      await api.openPicker();
+
+      expect(document.querySelector('.suape-paste-skeleton')).not.toBeNull();
+      expect(groups()).toHaveLength(0);
+
+      resolveRemote!({ ok: true, processes: [{ ...remoteProc, openedAt: 2000 }], remote: { status: 'ok' } });
+
+      expect(document.querySelector('.suape-paste-skeleton')).toBeNull();
+      expect(groups()).toHaveLength(2);
+      expect(groups()[0].textContent).toContain('23035.002581.2026-60');
+    });
+
+    it('permite mostrar apenas os processos deste perfil enquanto a consulta remota ainda carrega', async () => {
+      const sendMessage = vi.fn((message: { type: string }, callback: (res: unknown) => void) => {
+        if (message.type !== 'get-remote-processes') {
+          callback({ ok: true, processes: [{ ...localProc, openedAt: 1000 }] });
+        }
+      });
+      (window as unknown as { chrome: unknown }).chrome = { runtime: { sendMessage } };
+      window.eval(pasteScript);
+      const api = (window as unknown as { __suapeProcessPastePicker: { openPicker: () => Promise<void> } }).__suapeProcessPastePicker;
+
+      await api.openPicker();
+      expect(document.querySelector('.suape-paste-skeleton')).not.toBeNull();
+
+      (document.querySelector('.suape-paste-skip-remote-btn') as HTMLButtonElement).click();
+
+      expect(document.querySelector('.suape-paste-skeleton')).toBeNull();
+      expect(groups()).toHaveLength(1);
+      expect(groups()[0].textContent).toContain('23035.000001.2026-11');
+    });
   });
 
   it('fecha o menu com a tecla Escape sem alterar o campo de texto', async () => {
