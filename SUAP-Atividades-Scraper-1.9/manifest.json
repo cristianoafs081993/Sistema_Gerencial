@@ -47,6 +47,12 @@
   "background": {
     "service_worker": "background.js"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["siafi-inventario-deducoes.json"],
+      "matches": ["https://*.siages.com.br/*", "https://suap.ifrn.edu.br/*", "https://siafi.tesouro.gov.br/*"]
+    }
+  ],
   "content_scripts": [
     {
       "matches": [

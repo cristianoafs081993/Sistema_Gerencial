@@ -842,6 +842,13 @@
   // Quick actions
   const systemActions = [
     {
+      id: 'action-siafi-codigos-historicos',
+      title: 'Consultar códigos históricos de dedução',
+      subtitle: 'Buscar situações, DARF e natureza por CNPJ',
+      keywords: 'siafi deducao códigos historicos fornecedor cnpj darf natureza ddf050 ddf055 dob001 dob035 dgr001',
+      icon: 'search', color: '#1976d2', siafiOnly: true,
+    },
+    {
       id: 'action-siafi-deducao',
       title: 'Preencher dedução DOB035',
       subtitle: 'Informar dados conferidos para o item aberto',
@@ -3027,6 +3034,36 @@
 
   // Open Results Detail or Navigate
   async function openResultDetail(result, e) {
+    if (result.type === 'action' && result.data.id === 'action-siafi-codigos-historicos') {
+      closePalette();
+      const cnpj = globalThis.prompt('Informe o CNPJ do fornecedor para consultar o histórico:');
+      if (!cnpj) return;
+      const digits = String(cnpj).replace(/\D/g, '');
+      if (digits.length !== 14) { globalThis.alert('Informe um CNPJ com 14 dígitos.'); return; }
+      try {
+        const response = await fetch(chrome.runtime.getURL('siafi-inventario-deducoes.json'));
+        if (!response.ok) throw new Error('Não foi possível carregar o inventário da extensão.');
+        const inventory = await response.json();
+        const supplier = (inventory.credores || []).find(item => String(item.credor || '').replace(/\D/g, '') === digits);
+        if (!supplier) { globalThis.alert(`CNPJ ${digits}: sem ocorrência no inventário histórico.`); return; }
+        const observed = [];
+        const missing = [];
+        const situations = new Set(['DDF050', 'DDF055', 'DOB001', 'DOB035', 'DGR001']);
+        for (const np of supplier.nps || []) {
+          for (const deduction of np.deducoes_observadas || []) {
+            if (situations.has(deduction.situacao)) observed.push(`${deduction.situacao} | DARF ${deduction.codigo_receita || '—'} | Natureza ${deduction.natureza || '—'} | NP ${np.np}`);
+          }
+          for (const situation of np.situacoes_importadas || []) {
+            if (situations.has(situation) && !(np.deducoes_observadas || []).some(item => item.situacao === situation)) missing.push(`${situation} | NP ${np.np} (sem detalhe de código)`);
+          }
+        }
+        const unique = [...new Set([...observed, ...missing])];
+        const contracts = (supplier.contratos_candidatos || []).map(item => item.numero).filter(Boolean);
+        const message = [`${supplier.nomes?.[0] || digits}`, `CNPJ ${digits}`, contracts.length ? `Contratos candidatos: ${contracts.join(', ')}` : 'Sem contrato candidato no recorte.', '', ...(unique.length ? unique : ['Nenhuma situação das cinco mapeadas encontrada.']), '', 'Histórico para conferência; não determina incidência vigente.'].join('\n');
+        globalThis.alert(message);
+      } catch (error) { globalThis.alert(error?.message || 'Falha ao consultar o inventário histórico.'); }
+      return;
+    }
     if (result.type === 'action' && result.data.id === 'action-siafi-deducao') {
       if (!globalThis.SiagesDeducoesAssistidas) return;
       closePalette();

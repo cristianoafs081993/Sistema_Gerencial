@@ -4,6 +4,8 @@
 
 Execute `node scripts/siafi-sugestoes-deducoes.cjs 03126525000166` para consultar as cinco situações mapeadas pelo CNPJ. O resultado relaciona códigos e natureza à NP observada, distingue situações sem detalhe e apresenta contratos apenas como candidatos. É possível informar outro inventário JSON como segundo argumento. A consulta não preenche o SIAFI, não determina a tributação vigente e não interpreta ausência de histórico como isenção. Itens históricos de valor zero também aparecem para revisão.
 
+Na extensão SIAGES, `Ctrl+K → Consultar códigos históricos de dedução` pede o CNPJ e mostra situações, códigos DARF e natureza encontrados, suas NPs de origem e contratos candidatos. A extensão consulta a cópia `siafi-inventario-deducoes.json` empacotada no diretório da extensão; para refletir novas capturas, atualize essa cópia. Resultado histórico requer conferência pelo usuário.
+
 ## Primeiro preenchimento assistido — extensão 1.9.91
 
 Na aba Dedução do SIAFI, com um item **DOB035 já aberto**, `Ctrl+K → Preencher dedução DOB035` abre o formulário local. O usuário informa processo completo, UG, datas, valor e fonte; opcionalmente cola o trecho do termo e usa **Ler valor do trecho**. O extrator aceita somente um valor explícito depois de `Valor calculado para recolhimento na conta vinculada nesta medição:`; não confunde o valor global da nota com o da conta vinculada e recusa valores divergentes. Não há cálculo automático por fornecedor ou preenchimento das demais situações.

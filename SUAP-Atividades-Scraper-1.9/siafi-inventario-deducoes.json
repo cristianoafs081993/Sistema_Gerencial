@@ -1,0 +1,4260 @@
+{
+  "escopo": "Listagem CONDH 29/10/2026, UG 158366; base de importação do órgão IFRN Currais Novos consultada em 04/11/2026.",
+  "alertas": [
+    "Situações importadas são indícios por número da NP e UG; dados de lotes podem ser incompletos e repetidos.",
+    "Contratos são candidatos por CNPJ; não estão vinculados à NP por este cruzamento.",
+    "Códigos e valores observados são históricos, não instrução de retenção atual.",
+    "A ausência de situação não comprova isenção.",
+    "Percentual efetivo observado é valor da receita dividido pela base exibida, arredondado a quatro casas; não prova a alíquota legal nem é um parâmetro de preenchimento."
+  ],
+  "credor_count": 69,
+  "np_count": 308,
+  "detalhes_salvos": 70,
+  "credores": [
+    {
+      "credor": "00000000000191",
+      "nomes": [
+        "BANCO DO BRASIL SA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000221",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "00907155000106",
+      "nomes": [
+        "ASSOCIACAO DOS PRODUTORES RURAIS DO TRANGOLA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00246/2026",
+          "fornecedor": "ASSOCIACAO DOS PRODUTORES RURAIS DO TRANGOLA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-09-14"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000294",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "01259682000114",
+      "nomes": [
+        "FA LIMA INFORMATICA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000168",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "02745281000137",
+      "nomes": [
+        "F M B BRINDES & SERVICOS LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000243",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "02852277000178",
+      "nomes": [
+        "FUNDACAO DE APOIO A EDUCACAO E AO DESENVOLVIMENTO TECNOLOGICO DO RN",
+        "FUNDACAO DE APOIO A EDUCACAO E AO DESENVOLVIM"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00449/2025",
+          "fornecedor": "FUNDACAO DE APOIO A EDUCACAO E AO DESENVOLVIMENTO TECNOLOGICO DO RN",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2026-12-31"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000006",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "03126525000166",
+      "nomes": [
+        "M M ALIMENTOS E TRANSPORTES LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000034",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000084",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000273",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6147",
+              "natureza": "17001",
+              "valor": "53,15",
+              "recolhedores": [
+                {
+                  "documento": "03126525000166",
+                  "base": "908,47",
+                  "receita": "53,15",
+                  "percentual_efetivo_observado": 5.8505
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        }
+      ]
+    },
+    {
+      "credor": "03655629000168",
+      "nomes": [
+        "S & K INFORMATICA LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000090",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "03746938001549",
+      "nomes": [
+        "BRS SUPRIMENTOS CORPORATIVOS S/A"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00436/2025",
+          "fornecedor": "BRS SUPRIMENTOS CORPORATIVOS S/A",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-12-29"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000128",
+          "estado_29out": "Cancelado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000136",
+          "estado_29out": "Cancelado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000137",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6147",
+              "natureza": "17003",
+              "valor": "1.935,26",
+              "recolhedores": [
+                {
+                  "documento": "03746938001549",
+                  "base": "33.081,47",
+                  "receita": "1.935,26",
+                  "percentual_efetivo_observado": 5.85
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000167",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "04567265000127",
+      "nomes": [
+        "SCORPION INFORMATICA LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000030",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "04987374000101",
+      "nomes": [
+        "VAREJAO L B LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000256",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000282",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6147",
+              "natureza": "17001",
+              "valor": "305,61",
+              "recolhedores": [
+                {
+                  "documento": "04987374000101",
+                  "base": "5.224,02",
+                  "receita": "305,61",
+                  "percentual_efetivo_observado": 5.8501
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000284",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "05340639000130",
+      "nomes": [
+        "PRIME CONSULTORIA E ASSESSORIA EMPRESARIAL LTDA",
+        "PRIME CONSULTORIA E ASSESSORIA EMPRESARIAL LT"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00092/2022",
+          "fornecedor": "PRIME CONSULTORIA E ASSESSORIA EMPRESARIAL LTDA",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2023-04-14"
+        },
+        {
+          "numero": "00155/2022",
+          "fornecedor": "PRIME CONSULTORIA E ASSESSORIA EMPRESARIAL LTDA",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2023-06-23"
+        },
+        {
+          "numero": "00280/2024",
+          "fornecedor": "PRIME CONSULTORIA E ASSESSORIA EMPRESARIAL LTDA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2028-10-31"
+        },
+        {
+          "numero": "00329/2025",
+          "fornecedor": "PRIME CONSULTORIA E ASSESSORIA EMPRESARIAL LTDA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-12-01"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000001",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000041",
+          "estado_29out": "Cancelado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000042",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000048",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000059",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000098",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000146",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6190",
+              "natureza": "17099",
+              "valor": "0,00",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6190",
+              "natureza": "17099",
+              "valor": "64,19",
+              "recolhedores": [
+                {
+                  "documento": "29044514000120",
+                  "base": "679,25",
+                  "receita": "64,19",
+                  "percentual_efetivo_observado": 9.4501
+                }
+              ]
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6190",
+              "natureza": "17099",
+              "valor": "0,00",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6147",
+              "natureza": "17009",
+              "valor": "463,45",
+              "recolhedores": [
+                {
+                  "documento": "29044514000120",
+                  "base": "7.922,20",
+                  "receita": "463,45",
+                  "percentual_efetivo_observado": 5.85
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000147",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000160",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000177",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000219",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000224",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000244",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000260",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000261",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000263",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000283",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000290",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "05427994000140",
+      "nomes": [
+        "LG. ADMINISTRADORA DE SERVICOS LTDA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00174/2026",
+          "fornecedor": "LG. ADMINISTRADORA DE SERVICOS LTDA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2028-07-01"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000252",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055",
+            "DOB035"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF050",
+              "codigo_receita": "1162",
+              "natureza": null,
+              "valor": "385,00",
+              "recolhedores": [
+                {
+                  "documento": "05427994000140",
+                  "base": "3.500,00",
+                  "receita": "385,00",
+                  "percentual_efetivo_observado": 11
+                }
+              ]
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6190",
+              "natureza": "17099",
+              "valor": "330,75",
+              "recolhedores": [
+                {
+                  "documento": "05427994000140",
+                  "base": "3.500,00",
+                  "receita": "330,75",
+                  "percentual_efetivo_observado": 9.45
+                }
+              ]
+            },
+            {
+              "situacao": "DOB035",
+              "codigo_receita": null,
+              "natureza": null,
+              "valor": "520,60",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DOB001",
+              "codigo_receita": null,
+              "natureza": null,
+              "valor": "175,00",
+              "recolhedores": []
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000266",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000286",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "07805649000129",
+      "nomes": [
+        "LM SERVGRAFICA E COPIADORA LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000085",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000207",
+          "estado_29out": "Cancelado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6190",
+              "natureza": "17099",
+              "valor": "0,00",
+              "recolhedores": []
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000208",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "07940946000187",
+      "nomes": [
+        "COPY INFO - COMERCIO DE MAQUINAS E SUPRIMENTO"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000088",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "08109126000100",
+      "nomes": [
+        "MUNICIPIO DE CURRAIS NOVOS"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000202",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "08324196000181",
+      "nomes": [
+        "COMPANHIA ENERGETICA DO RIO GRANDE DO NORTE COSERN",
+        "COMPANHIA ENERGETICA DO RIO GRANDE DO NORTE C"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00082/2021",
+          "fornecedor": "COMPANHIA ENERGETICA DO RIO GRANDE DO NORTE COSERN",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2026-07-15"
+        },
+        {
+          "numero": "00094/2016",
+          "fornecedor": "COMPANHIA ENERGETICA DO RIO GRANDE DO NORTE COSERN",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2021-07-14"
+        },
+        {
+          "numero": "00188/2026",
+          "fornecedor": "COMPANHIA ENERGETICA DO RIO GRANDE DO NORTE COSERN",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2031-07-16"
+        },
+        {
+          "numero": "00198/2026",
+          "fornecedor": "COMPANHIA ENERGETICA DO RIO GRANDE DO NORTE COSERN",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": null
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000002",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000024",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000026",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000027",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000055",
+          "estado_29out": "Cancelado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000056",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000066",
+          "estado_29out": "Cancelado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000070",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000071",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000072",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000073",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000124",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF025",
+              "codigo_receita": "6147",
+              "natureza": "17002",
+              "valor": "0,00",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6190",
+              "natureza": "17099",
+              "valor": "964,59",
+              "recolhedores": [
+                {
+                  "documento": "08324196000181",
+                  "base": "10.207,30",
+                  "receita": "964,59",
+                  "percentual_efetivo_observado": 9.45
+                }
+              ]
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6147",
+              "natureza": "17002",
+              "valor": "8,47",
+              "recolhedores": [
+                {
+                  "documento": "08324196000181",
+                  "base": "144,78",
+                  "receita": "8,47",
+                  "percentual_efetivo_observado": 5.8503
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000142",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000143",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000148",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000195",
+          "estado_29out": "Cancelado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000203",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000209",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000232",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000234",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000250",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000255",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000276",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000277",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000296",
+          "estado_29out": "Cancelado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000297",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "08334385000135",
+      "nomes": [
+        "COMPANHIA DE AGUAS E ESGOTOS DO RIO GRANDE DO NORTE",
+        "COMPANHIA DE AGUAS E ESGOTOS DO RIO GRANDE DO"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00089/2016",
+          "fornecedor": "COMPANHIA DE AGUAS E ESGOTOS DO RIO GRANDE DO NORTE",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2070-12-31"
+        },
+        {
+          "numero": "00374/2024",
+          "fornecedor": "COMPANHIA DE AGUAS E ESGOTOS DO RIO GRANDE DO NORTE",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": null
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000031",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000046",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000075",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000101",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000159",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6243",
+              "natureza": "17028",
+              "valor": "1,71",
+              "recolhedores": [
+                {
+                  "documento": "08334385000135",
+                  "base": "56,96",
+                  "receita": "1,71",
+                  "percentual_efetivo_observado": 3.0021
+                }
+              ]
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6228",
+              "natureza": "17028",
+              "valor": "0,57",
+              "recolhedores": [
+                {
+                  "documento": "08334385000135",
+                  "base": "56,96",
+                  "receita": "0,57",
+                  "percentual_efetivo_observado": 1.0007
+                }
+              ]
+            },
+            {
+              "situacao": "DDF025",
+              "codigo_receita": "6230",
+              "natureza": "17028",
+              "valor": "0,00",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6230",
+              "natureza": "17028",
+              "valor": "0,37",
+              "recolhedores": [
+                {
+                  "documento": "08334385000135",
+                  "base": "56,96",
+                  "receita": "0,37",
+                  "percentual_efetivo_observado": 0.6496
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000196",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000238",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000249",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000270",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "08378641000196",
+      "nomes": [
+        "CINTE TELECOM COMERCIO E SERVICOS LTDA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00073/2022",
+          "fornecedor": "CINTE TELECOM COMERCIO E SERVICOS LTDA",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2026-04-01"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000092",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000096",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000097",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000169",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6190",
+              "natureza": "17099",
+              "valor": "120,26",
+              "recolhedores": [
+                {
+                  "documento": "08378641000196",
+                  "base": "1.272,64",
+                  "receita": "120,26",
+                  "percentual_efetivo_observado": 9.4496
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        }
+      ]
+    },
+    {
+      "credor": "09228128000181",
+      "nomes": [
+        "CAFE SILVA LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000298",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6147",
+              "natureza": "17001",
+              "valor": "83,58",
+              "recolhedores": [
+                {
+                  "documento": "09228128000181",
+                  "base": "1.428,70",
+                  "receita": "83,58",
+                  "percentual_efetivo_observado": 5.8501
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        }
+      ]
+    },
+    {
+      "credor": "09319988000120",
+      "nomes": [
+        "WILTON DA COSTA SANTOS"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000291",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "09676631485",
+      "nomes": [
+        "ISMAEL ASSIS DO NASCIMENTO"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000281",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "10685202000178",
+      "nomes": [
+        "UNIAO COMERCIO E SERVICOS LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000122",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "11205406000127",
+      "nomes": [
+        "J DE MOURA VALE"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00015/2020",
+          "fornecedor": "J DE MOURA VALE",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2021-03-01"
+        },
+        {
+          "numero": "00184/2024",
+          "fornecedor": "J DE MOURA VALE",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-08-28"
+        },
+        {
+          "numero": "00229/2024",
+          "fornecedor": "J DE MOURA VALE",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-09-27"
+        },
+        {
+          "numero": "00233/2025",
+          "fornecedor": "J DE MOURA VALE",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-08-22"
+        },
+        {
+          "numero": "00270/2024",
+          "fornecedor": "J DE MOURA VALE",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2026-10-25"
+        },
+        {
+          "numero": "00349/2024",
+          "fornecedor": "J DE MOURA VALE",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2026-12-19"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000020",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000040",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000044",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000069",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000091",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000104",
+          "estado_29out": "Cancelado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000115",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000118",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000133",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000156",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000157",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000164",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000165",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000170",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000171",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000193",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000213",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000215",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000229",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000240",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000267",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000274",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000299",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000304",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "11621320000185",
+      "nomes": [
+        "M2 PLACAS E REVESTIMENTOS LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000287",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6190",
+              "natureza": "17099",
+              "valor": "0,00",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6147",
+              "natureza": "17009",
+              "valor": "105,30",
+              "recolhedores": [
+                {
+                  "documento": "11621320000185",
+                  "base": "1.799,97",
+                  "receita": "105,30",
+                  "percentual_efetivo_observado": 5.8501
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        }
+      ]
+    },
+    {
+      "credor": "11933627000111",
+      "nomes": [
+        "ASSOCIACAO DAS MULHERES PRODUTORAS RURAIS DA COMUNIDADE DO QUANDU E ADJACENCIAS ",
+        "ASSOCIACAO DAS MULHERES PRODUTORAS RURAIS DA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00022/2025",
+          "fornecedor": "ASSOCIACAO DAS MULHERES PRODUTORAS RURAIS DA COMUNIDADE DO QUANDU E ADJACENCIAS ",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2026-01-17"
+        },
+        {
+          "numero": "00023/2025",
+          "fornecedor": "ASSOCIACAO DAS MULHERES PRODUTORAS RURAIS DA COMUNIDADE DO QUANDU E ADJACENCIAS ",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2026-01-17"
+        },
+        {
+          "numero": "00030/2026",
+          "fornecedor": "ASSOCIACAO DAS MULHERES PRODUTORAS RURAIS DA COMUNIDADE DO QUANDU E ADJACENCIAS ",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-02-04"
+        },
+        {
+          "numero": "00041/2021",
+          "fornecedor": "ASSOCIACAO DAS MULHERES PRODUTORAS RURAIS DA COMUNIDADE DO QUANDU E ADJACENCIAS ",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2022-03-29"
+        },
+        {
+          "numero": "00077/2022",
+          "fornecedor": "ASSOCIACAO DAS MULHERES PRODUTORAS RURAIS DA COMUNIDADE DO QUANDU E ADJACENCIAS ",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2023-03-30"
+        },
+        {
+          "numero": "00247/2026",
+          "fornecedor": "ASSOCIACAO DAS MULHERES PRODUTORAS RURAIS DA COMUNIDADE DO QUANDU E ADJACENCIAS ",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-08-26"
+        },
+        {
+          "numero": "00276/2022",
+          "fornecedor": "ASSOCIACAO DAS MULHERES PRODUTORAS RURAIS DA COMUNIDADE DO QUANDU E ADJACENCIAS ",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2024-01-23"
+        },
+        {
+          "numero": "00279/2019",
+          "fornecedor": "ASSOCIACAO DAS MULHERES PRODUTORAS RURAIS DA COMUNIDADE DO QUANDU E ADJACENCIAS ",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2020-12-19"
+        },
+        {
+          "numero": "00280/2019",
+          "fornecedor": "ASSOCIACAO DAS MULHERES PRODUTORAS RURAIS DA COMUNIDADE DO QUANDU E ADJACENCIAS ",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2020-12-19"
+        },
+        {
+          "numero": "00294/2023",
+          "fornecedor": "ASSOCIACAO DAS MULHERES PRODUTORAS RURAIS DA COMUNIDADE DO QUANDU E ADJACENCIAS ",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2024-12-04"
+        },
+        {
+          "numero": "00301/2023",
+          "fornecedor": "ASSOCIACAO DAS MULHERES PRODUTORAS RURAIS DA COMUNIDADE DO QUANDU E ADJACENCIAS ",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2024-12-06"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000039",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        },
+        {
+          "np": "2026NP000094",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000107",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000119",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000138",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000184",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000231",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000289",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "13119632000110",
+      "nomes": [
+        "MAXIMUS GESTAO DE MANUTENCAO INDUSTRIAL LTDA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00028/2023",
+          "fornecedor": "MAXIMUS GESTAO DE MANUTENCAO INDUSTRIAL LTDA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-02-07"
+        },
+        {
+          "numero": "00135/2016",
+          "fornecedor": "MAXIMUS GESTAO DE MANUTENCAO INDUSTRIAL LTDA",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2021-11-09"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000011",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000033",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000067",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DOB001",
+              "codigo_receita": null,
+              "natureza": null,
+              "valor": "51,83",
+              "recolhedores": []
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000123",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000144",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000206",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000217",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000242",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000265",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000293",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "14426441000164",
+      "nomes": [
+        "COOPERATIVA MISTA DOS AGRICULTORES FAMILIARES DO SERIDO",
+        "COOPERATIVA MISTA DOS AGRICULTORES FAMILIARES"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00036/2021",
+          "fornecedor": "COOPERATIVA MISTA DOS AGRICULTORES FAMILIARES DO SERIDO",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2022-03-29"
+        },
+        {
+          "numero": "00040/2026",
+          "fornecedor": "COOPERATIVA MISTA DOS AGRICULTORES FAMILIARES DO SERIDO",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-02-12"
+        },
+        {
+          "numero": "00078/2022",
+          "fornecedor": "COOPERATIVA MISTA DOS AGRICULTORES FAMILIARES DO SERIDO",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2023-03-28"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000087",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "14717523000168",
+      "nomes": [
+        "L & M COMERCIO DE GAS LTDA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00220/2024",
+          "fornecedor": "L & M COMERCIO DE GAS LTDA",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2026-09-24"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000100",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        },
+        {
+          "np": "2026NP000130",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000140",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000162",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "14723927000164",
+      "nomes": [
+        "ASSOCIACAO COMUNITARIA DO POCO DA FORQUILHA E COMUNIDADES CIRCUNVIZINHAS",
+        "ASSOCIACAO COMUNITARIA DO POCO DA FORQUILHA E"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00328/2025",
+          "fornecedor": "ASSOCIACAO COMUNITARIA DO POCO DA FORQUILHA E COMUNIDADES CIRCUNVIZINHAS",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2026-12-03"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000151",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        },
+        {
+          "np": "2026NP000189",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000235",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "17360773000181",
+      "nomes": [
+        "A C P MEDEIROS - RN CORPORATIVO DA COMPUTACAO"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000012",
+          "estado_29out": "Cancelado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000016",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "17747591000168",
+      "nomes": [
+        "START UP - SISTEMAS DE FORCA LTDA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00160/2019",
+          "fornecedor": "START UP - SISTEMAS DE FORCA LTDA",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2024-11-05"
+        },
+        {
+          "numero": "00181/2025",
+          "fornecedor": "START UP - SISTEMAS DE FORCA LTDA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-06-23"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000179",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        },
+        {
+          "np": "2026NP000180",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000181",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000182",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000185",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000186",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000187",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000188",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "18199200000180",
+      "nomes": [
+        "CINECON DISTRIBUIDORA LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000017",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "18273227000176",
+      "nomes": [
+        "INSTITUTO DE DIGNIDADE E DESENVOLVIMENTO SOCI",
+        "INSTITUTO DE DIGNIDADE E DESENVOLVIMENTO SOCIAL"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00153/2024",
+          "fornecedor": "INSTITUTO DE DIGNIDADE E DESENVOLVIMENTO SOCIAL",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2026-09-03"
+        },
+        {
+          "numero": "00154/2024",
+          "fornecedor": "INSTITUTO DE DIGNIDADE E DESENVOLVIMENTO SOCIAL",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2026-09-03"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000050",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000061",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000086",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000089",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000109",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000127",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000135",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000145",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000210",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000214",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000218",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000247",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000307",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DGR001"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DGR001",
+              "codigo_receita": "28802-0",
+              "natureza": null,
+              "valor": "4.000,00",
+              "recolhedores": []
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        }
+      ]
+    },
+    {
+      "credor": "18891594000133",
+      "nomes": [
+        "ELITE EMPRESA DE LIMPEZA EM PREDIOS E EM DOMICILIOS LTDA",
+        "ELITE EMPRESA DE LIMPEZA EM PREDIOS E EM DOMI"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00232/2025",
+          "fornecedor": "ELITE EMPRESA DE LIMPEZA EM PREDIOS E EM DOMICILIOS LTDA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2026-08-18"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000009",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000052",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000060",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000102",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000125",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DOB035",
+              "codigo_receita": null,
+              "natureza": null,
+              "valor": "957,10",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DOB001",
+              "codigo_receita": null,
+              "natureza": null,
+              "valor": "359,71",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DDF021",
+              "codigo_receita": "1162",
+              "natureza": null,
+              "valor": "791,35",
+              "recolhedores": [
+                {
+                  "documento": "18891594000133",
+                  "base": "7.194,10",
+                  "receita": "791,35",
+                  "percentual_efetivo_observado": 11
+                }
+              ]
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6190",
+              "natureza": "17099",
+              "valor": "679,84",
+              "recolhedores": [
+                {
+                  "documento": "18891594000133",
+                  "base": "7.194,10",
+                  "receita": "679,84",
+                  "percentual_efetivo_observado": 9.45
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000158",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000200",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000245",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000258",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000269",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000292",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "19357004000150",
+      "nomes": [
+        "R. N. DA CUNHA JUNIOR"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00059/2024",
+          "fornecedor": "R. N. DA CUNHA JUNIOR",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2026-03-25"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000131",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        },
+        {
+          "np": "2026NP000132",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "21308637000110",
+      "nomes": [
+        "WHALE ELECTRONICS INDUSTRIA E COMERCIO LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000005",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF025",
+              "codigo_receita": "6147",
+              "natureza": "17009",
+              "valor": "0,00",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DDF025",
+              "codigo_receita": "6147",
+              "natureza": "17009",
+              "valor": "216,45",
+              "recolhedores": [
+                {
+                  "documento": "21308637000110",
+                  "base": "3.700,00",
+                  "receita": "216,45",
+                  "percentual_efetivo_observado": 5.85
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        }
+      ]
+    },
+    {
+      "credor": "21588655000100",
+      "nomes": [
+        "AFN COMERCIO E DISTRIBUICAO DE AGUA MINERAL LTDA",
+        "AFN COMERCIO E DISTRIBUICAO DE AGUA MINERAL L"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00221/2024",
+          "fornecedor": "AFN COMERCIO E DISTRIBUICAO DE AGUA MINERAL LTDA",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2026-09-26"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000021",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000043",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000099",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000175",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "8767",
+              "natureza": "17022",
+              "valor": "31,90",
+              "recolhedores": [
+                {
+                  "documento": "21588655000100",
+                  "base": "1.450,00",
+                  "receita": "31,90",
+                  "percentual_efetivo_observado": 2.2
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        }
+      ]
+    },
+    {
+      "credor": "26391097000102",
+      "nomes": [
+        "ANGRA PRODUCOES LTDA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00178/2026",
+          "fornecedor": "ANGRA PRODUCOES LTDA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-06-30"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000080",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DOB001",
+              "codigo_receita": null,
+              "natureza": null,
+              "valor": "922,25",
+              "recolhedores": []
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000216",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000241",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000278",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "27829511000177",
+      "nomes": [
+        "BILACORP VIAGENS E TURISMO LTDA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00114/2024",
+          "fornecedor": "BILACORP VIAGENS E TURISMO LTDA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-06-20"
+        },
+        {
+          "numero": "00252/2023",
+          "fornecedor": "BILACORP VIAGENS E TURISMO LTDA",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2024-12-01"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000081",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000227",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000233",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000279",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000302",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6175",
+              "natureza": "17023",
+              "valor": "163,07",
+              "recolhedores": [
+                {
+                  "documento": "52636412011584",
+                  "base": "50,42",
+                  "receita": "3,55",
+                  "percentual_efetivo_observado": 7.0409
+                },
+                {
+                  "documento": "07575651000159",
+                  "base": "2.262,70",
+                  "receita": "159,52",
+                  "percentual_efetivo_observado": 7.05
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000303",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6175",
+              "natureza": "17023",
+              "valor": "74,03",
+              "recolhedores": [
+                {
+                  "documento": "51337979000129",
+                  "base": "48,26",
+                  "receita": "3,40",
+                  "percentual_efetivo_observado": 7.0452
+                },
+                {
+                  "documento": "07575651000159",
+                  "base": "1.001,80",
+                  "receita": "70,63",
+                  "percentual_efetivo_observado": 7.0503
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        }
+      ]
+    },
+    {
+      "credor": "29466142000120",
+      "nomes": [
+        "WENDELL PABLLO SOARES CAMPELO"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00185/2024",
+          "fornecedor": "WENDELL PABLLO SOARES CAMPELO",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2026-08-28"
+        },
+        {
+          "numero": "00346/2024",
+          "fornecedor": "WENDELL PABLLO SOARES CAMPELO",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2026-12-17"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000172",
+          "estado_29out": "Cancelado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000173",
+          "estado_29out": "Cancelado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000174",
+          "estado_29out": "Cancelado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000192",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        },
+        {
+          "np": "2026NP000194",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000205",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "30479645000110",
+      "nomes": [
+        "AMR SOLUCOES LABORATORIAIS LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000064",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "31080614000154",
+      "nomes": [
+        "H2A COMERCIO E SERVICOS LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000045",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "31259075000115",
+      "nomes": [
+        "ASSOCIACAO DA COMUNIDADE DA MARCACAO E ADJACENCIAS DO M",
+        "ASSOCIACAO DA COMUNIDADE DA MARCACAO E ADJACE"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00021/2025",
+          "fornecedor": "ASSOCIACAO DA COMUNIDADE DA MARCACAO E ADJACENCIAS DO M",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2026-01-17"
+        },
+        {
+          "numero": "00038/2021",
+          "fornecedor": "ASSOCIACAO DA COMUNIDADE DA MARCACAO E ADJACENCIAS DO M",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2022-03-29"
+        },
+        {
+          "numero": "00039/2026",
+          "fornecedor": "ASSOCIACAO DA COMUNIDADE DA MARCACAO E ADJACENCIAS DO M",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-03-05"
+        },
+        {
+          "numero": "00040/2021",
+          "fornecedor": "ASSOCIACAO DA COMUNIDADE DA MARCACAO E ADJACENCIAS DO M",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2022-03-29"
+        },
+        {
+          "numero": "00076/2022",
+          "fornecedor": "ASSOCIACAO DA COMUNIDADE DA MARCACAO E ADJACENCIAS DO M",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2023-05-09"
+        },
+        {
+          "numero": "00080/2022",
+          "fornecedor": "ASSOCIACAO DA COMUNIDADE DA MARCACAO E ADJACENCIAS DO M",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2023-05-09"
+        },
+        {
+          "numero": "00277/2022",
+          "fornecedor": "ASSOCIACAO DA COMUNIDADE DA MARCACAO E ADJACENCIAS DO M",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2024-01-17"
+        },
+        {
+          "numero": "00281/2019",
+          "fornecedor": "ASSOCIACAO DA COMUNIDADE DA MARCACAO E ADJACENCIAS DO M",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2020-12-19"
+        },
+        {
+          "numero": "00286/2023",
+          "fornecedor": "ASSOCIACAO DA COMUNIDADE DA MARCACAO E ADJACENCIAS DO M",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2024-12-04"
+        },
+        {
+          "numero": "00293/2023",
+          "fornecedor": "ASSOCIACAO DA COMUNIDADE DA MARCACAO E ADJACENCIAS DO M",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2024-12-04"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000023",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        },
+        {
+          "np": "2026NP000025",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000035",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000076",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000106",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000121",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000141",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000178",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000204",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000226",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000228",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "31461288000125",
+      "nomes": [
+        "MAGAZINE TUFICK LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000036",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "33083309000141",
+      "nomes": [
+        "VITA SERVICOS DE CERIMONIAL E EVENTOS LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000212",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DOB001",
+              "codigo_receita": null,
+              "natureza": null,
+              "valor": "71,40",
+              "recolhedores": []
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        }
+      ]
+    },
+    {
+      "credor": "33279320000181",
+      "nomes": [
+        "G.I COMERCIO E SOLUCOES TECNOLOGICAS LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000093",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "34027041000193",
+      "nomes": [
+        "SALUTEM SERVICOS DE AGRONOMIA, ENGENHARIA E SOLUCOES AMBIENTAIS LTDA",
+        "SALUTEM SERVICOS DE AGRONOMIA, ENGENHARIA E S"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00052/2024",
+          "fornecedor": "SALUTEM SERVICOS DE AGRONOMIA, ENGENHARIA E SOLUCOES AMBIENTAIS LTDA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-03-11"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000083",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000201",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF050",
+              "codigo_receita": "1162",
+              "natureza": null,
+              "valor": "92,03",
+              "recolhedores": [
+                {
+                  "documento": "34027041000193",
+                  "base": "836,64",
+                  "receita": "92,03",
+                  "percentual_efetivo_observado": 11
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000280",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "34028316002580",
+      "nomes": [
+        "EMPRESA BRASILEIRA DE CORREIOS E TELEGRAFOS"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00164/2025",
+          "fornecedor": "EMPRESA BRASILEIRA DE CORREIOS E TELEGRAFOS",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2030-05-16"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000007",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000149",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6230",
+              "natureza": "17030",
+              "valor": "0,19",
+              "recolhedores": [
+                {
+                  "documento": "34028316002580",
+                  "base": "28,90",
+                  "receita": "0,19",
+                  "percentual_efetivo_observado": 0.6574
+                }
+              ]
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6228",
+              "natureza": "1730",
+              "valor": "0,00",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6243",
+              "natureza": "17030",
+              "valor": "0,87",
+              "recolhedores": [
+                {
+                  "documento": "34028316002580",
+                  "base": "28,90",
+                  "receita": "0,87",
+                  "percentual_efetivo_observado": 3.0104
+                }
+              ]
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6228",
+              "natureza": "17030",
+              "valor": "0,29",
+              "recolhedores": [
+                {
+                  "documento": "34028316002580",
+                  "base": "28,90",
+                  "receita": "0,29",
+                  "percentual_efetivo_observado": 1.0035
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        }
+      ]
+    },
+    {
+      "credor": "34270890000173",
+      "nomes": [
+        "J & J COMERCIO DE ALIMENTOS LTDA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00261/2024",
+          "fornecedor": "J & J COMERCIO DE ALIMENTOS LTDA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2026-10-21"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000049",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DGR001"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DGR001",
+              "codigo_receita": "28802-0",
+              "natureza": null,
+              "valor": "1.458,52",
+              "recolhedores": []
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000114",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DGR001"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000150",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DGR001"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000190",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DGR001"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000222",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DGR001"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000248",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DGR001"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000271",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DGR001"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "34652187000120",
+      "nomes": [
+        "RKV ALIMENTOS LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000062",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DOB001",
+              "codigo_receita": null,
+              "natureza": null,
+              "valor": "360,00",
+              "recolhedores": []
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        }
+      ]
+    },
+    {
+      "credor": "35290931000156",
+      "nomes": [
+        "EMPRESA DE VIGILANCIA POTIGUAR LTDA - EM RECUPERACAO JUDICIAL",
+        "EMPRESA DE VIGILANCIA POTIGUAR LTDA - EM RECU"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00060/2019",
+          "fornecedor": "EMPRESA DE VIGILANCIA POTIGUAR LTDA - EM RECUPERACAO JUDICIAL",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2022-06-19"
+        },
+        {
+          "numero": "00111/2025",
+          "fornecedor": "EMPRESA DE VIGILANCIA POTIGUAR LTDA - EM RECUPERACAO JUDICIAL",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-04-13"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000015",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000051",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000082",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000110",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000152",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DOB035",
+              "codigo_receita": null,
+              "natureza": null,
+              "valor": "1.818,81",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DDF021",
+              "codigo_receita": "1162",
+              "natureza": null,
+              "valor": "0,00",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DOB001",
+              "codigo_receita": null,
+              "natureza": null,
+              "valor": "881,77",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6190",
+              "natureza": "17031",
+              "valor": "1.666,54",
+              "recolhedores": [
+                {
+                  "documento": "35290931000156",
+                  "base": "17.635,47",
+                  "receita": "1.666,54",
+                  "percentual_efetivo_observado": 9.4499
+                }
+              ]
+            },
+            {
+              "situacao": "DDF050",
+              "codigo_receita": "1162",
+              "natureza": null,
+              "valor": "1.939,90",
+              "recolhedores": [
+                {
+                  "documento": "35290931000156",
+                  "base": "17.635,47",
+                  "receita": "1.939,90",
+                  "percentual_efetivo_observado": 11
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000199",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000236",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000239",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000262",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055",
+            "DOB035"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000264",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000295",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "35391519000122",
+      "nomes": [
+        "35.391.519 JOSELIA MARIA GOMES DA COSTA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000004",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "36346017000142",
+      "nomes": [
+        "RIP CROSS - COMERCIO ATACADO DE BOLSAS E MOCH"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000057",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "37028928000194",
+      "nomes": [
+        "MERCATTO COMERCIALIZADORA DE ENERGIA LTDA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00285/2025",
+          "fornecedor": "MERCATTO COMERCIALIZADORA DE ENERGIA LTDA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2031-02-17"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000008",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000047",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000074",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000105",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000139",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6147",
+              "natureza": "17003",
+              "valor": "386,51",
+              "recolhedores": [
+                {
+                  "documento": "37028928000194",
+                  "base": "6.607,08",
+                  "receita": "386,51",
+                  "percentual_efetivo_observado": 5.8499
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000176",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000225",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000259",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000272",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000300",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "37400911000116",
+      "nomes": [
+        "CONSULTSIDE COMERCIO SERVICOS E SOLUCOES INTE"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000108",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "37763946000110",
+      "nomes": [
+        "GRUPO RL SOLUCOES E APOIO LTDA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00010/2024",
+          "fornecedor": "GRUPO RL SOLUCOES E APOIO LTDA",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2024-07-10"
+        },
+        {
+          "numero": "00129/2024",
+          "fornecedor": "GRUPO RL SOLUCOES E APOIO LTDA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2028-07-11"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000022",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000053",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000058",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000078",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000126",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000166",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000197",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000223",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000251",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000275",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000308",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF050",
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DOB001",
+              "codigo_receita": null,
+              "natureza": null,
+              "valor": "2.237,21",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DOB035",
+              "codigo_receita": null,
+              "natureza": null,
+              "valor": "5.890,05",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DDF050",
+              "codigo_receita": "1162",
+              "natureza": null,
+              "valor": "0,00",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6190",
+              "natureza": "17099",
+              "valor": "0,00",
+              "recolhedores": []
+            },
+            {
+              "situacao": "DDF050",
+              "codigo_receita": "1162",
+              "natureza": null,
+              "valor": "3.965,88",
+              "recolhedores": [
+                {
+                  "documento": "37763946000110",
+                  "base": "44.744,24",
+                  "receita": "3.965,88",
+                  "percentual_efetivo_observado": 8.8634
+                }
+              ]
+            },
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6147",
+              "natureza": "17003",
+              "valor": "2.617,54",
+              "recolhedores": [
+                {
+                  "documento": "37763946000110",
+                  "base": "44.744,24",
+                  "receita": "2.617,54",
+                  "percentual_efetivo_observado": 5.85
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        }
+      ]
+    },
+    {
+      "credor": "39415071000190",
+      "nomes": [
+        "MD TELECOM SERVICOS DE TELECOMUNICACOES LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000013",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "39678810000137",
+      "nomes": [
+        "TI COMPONENTES ELETRONICOS LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000063",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "40938508000150",
+      "nomes": [
+        "MAQ-LAREM MAQUINAS MOVEIS E EQUIPAMENTOS LTDA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00045/2015",
+          "fornecedor": "MAQ-LAREM MAQUINAS MOVEIS E EQUIPAMENTOS LTDA",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2021-06-11"
+        },
+        {
+          "numero": "00158/2021",
+          "fornecedor": "MAQ-LAREM MAQUINAS MOVEIS E EQUIPAMENTOS LTDA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2026-12-10"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000010",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000054",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000079",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000113",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000161",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000198",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000220",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000246",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000268",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000306",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6190",
+              "natureza": "17035",
+              "valor": "213,55",
+              "recolhedores": [
+                {
+                  "documento": "40938508000150",
+                  "base": "2.259,78",
+                  "receita": "213,55",
+                  "percentual_efetivo_observado": 9.45
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        }
+      ]
+    },
+    {
+      "credor": "42810782000174",
+      "nomes": [
+        "MAX QUALITY COMERCIO LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000018",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "45699339000166",
+      "nomes": [
+        "ASSOCIACAO DOS PRODUTORES RURAIS DE ANGICOS -",
+        "ASSOCIACAO DOS PRODUTORES RURAIS DE ANGICOS - ASPRA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00282/2026",
+          "fornecedor": "ASSOCIACAO DOS PRODUTORES RURAIS DE ANGICOS - ASPRA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-09-15"
+        },
+        {
+          "numero": "00337/2025",
+          "fornecedor": "ASSOCIACAO DOS PRODUTORES RURAIS DE ANGICOS - ASPRA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2026-11-17"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000019",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000028",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000038",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000077",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000095",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000103",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000116",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000120",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000153",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000154",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000155",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000183",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000191",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000237",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000305",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "49572307000156",
+      "nomes": [
+        "SILVA RIBEIRO COMERCIO E SERVICOS LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000111",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF025",
+              "codigo_receita": "6147",
+              "natureza": "17001",
+              "valor": "21,76",
+              "recolhedores": [
+                {
+                  "documento": "49572307000156",
+                  "base": "372,05",
+                  "receita": "21,76",
+                  "percentual_efetivo_observado": 5.8487
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000112",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    },
+    {
+      "credor": "50478977000197",
+      "nomes": [
+        "ESTHER G. SUEZ C. LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000068",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "54826788000119",
+      "nomes": [
+        "VIP IMPORTACAO E COMERCIO DE PRODUTOS LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000014",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "54884755000125",
+      "nomes": [
+        "META PAPER COMERCIO DE PAPEIS E INSUMOS LTDA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00169/2024",
+          "fornecedor": "META PAPER COMERCIO DE PAPEIS E INSUMOS LTDA",
+          "situacao_derivada": false,
+          "vigencia_fim_derivada": "2026-08-28"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000134",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "55593835000194",
+      "nomes": [
+        "55.593.835 NATALIA DE FATIMA SIQUEIRA MELO"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000029",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "55806684000105",
+      "nomes": [
+        "ZONA OESTE COMERCIO LTDA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00177/2026",
+          "fornecedor": "ZONA OESTE COMERCIO LTDA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-07-09"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000230",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000257",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000288",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000301",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "71511349000136",
+      "nomes": [
+        "AMILTON GUIMARAES E CIA LTDA"
+      ],
+      "contratos_candidatos": [],
+      "nps": [
+        {
+          "np": "2026NP000037",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [],
+          "estado_consulta_deducao": "aba_ausente"
+        }
+      ]
+    },
+    {
+      "credor": "87883807000106",
+      "nomes": [
+        "MBM SEGURADORA SA"
+      ],
+      "contratos_candidatos": [
+        {
+          "numero": "00213/2022",
+          "fornecedor": "MBM SEGURADORA SA",
+          "situacao_derivada": true,
+          "vigencia_fim_derivada": "2027-10-27"
+        }
+      ],
+      "nps": [
+        {
+          "np": "2026NP000003",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000032",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000065",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000117",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000129",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": true,
+          "deducoes_observadas": [
+            {
+              "situacao": "DDF055",
+              "codigo_receita": "6188",
+              "natureza": "17026",
+              "valor": "14,76",
+              "recolhedores": [
+                {
+                  "documento": "87883807000106",
+                  "base": "209,40",
+                  "receita": "14,76",
+                  "percentual_efetivo_observado": 7.0487
+                }
+              ]
+            }
+          ],
+          "estado_consulta_deducao": "consultada"
+        },
+        {
+          "np": "2026NP000163",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000211",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000253",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000254",
+          "estado_29out": "Realizado",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        },
+        {
+          "np": "2026NP000285",
+          "estado_29out": "Pendente de Realização",
+          "situacoes_importadas": [
+            "DDF055"
+          ],
+          "detalhe_consultado": false,
+          "deducoes_observadas": []
+        }
+      ]
+    }
+  ]
+}
