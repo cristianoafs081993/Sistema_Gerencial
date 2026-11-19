@@ -1732,6 +1732,15 @@
       const rebuild = createElement('button', 'suape-button suape-button-secondary', status.listId ? 'Remontar' : 'Tentar novamente');
       rebuild.type = 'button'; rebuild.addEventListener('click', requestLcRebuild);
       actions.appendChild(rebuild);
+
+      const manual = createElement('a', 'suape-button suape-button-secondary', 'Montar manualmente');
+      const manualUrl = new URL(`${SIAGES_ORIGIN}/lc`);
+      manualUrl.searchParams.set('manual', '1');
+      const processNumber = getProcessNumber();
+      if (processNumber) manualUrl.searchParams.set('nome', `Lista manual — ${processNumber}`);
+      manual.href = manualUrl.toString();
+      manual.target = '_blank'; manual.rel = 'noopener noreferrer';
+      actions.appendChild(manual);
     }
     if (actions.childNodes.length) body.appendChild(actions);
     section.appendChild(body);

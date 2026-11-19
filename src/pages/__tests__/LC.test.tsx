@@ -448,5 +448,17 @@ describe('LCPage', () => {
       expect(within(dialog).getByText('12345678901')).toBeInTheDocument();
       expect(within(dialog).getByRole('textbox', { name: 'Nome da lista de trabalho' })).toHaveValue('Cópia de Lista Abril');
     });
+
+    it('abre a montagem manual direto via ?manual=1&nome=... e limpa os parametros da URL', async () => {
+      window.history.replaceState(null, '', '/lc?manual=1&nome=Lista+manual+%E2%80%94+23035.003293.2026-22');
+      render(<LCPage />);
+
+      const dialog = await screen.findByRole('dialog', { name: 'Preenchimento SIAFI & Lista de Credores' });
+      expect(within(dialog).getByRole('textbox', { name: 'Nome da lista de trabalho' })).toHaveValue(
+        'Lista manual — 23035.003293.2026-22',
+      );
+      expect(within(dialog).getByRole('textbox', { name: 'CPF do aluno' })).toBeInTheDocument();
+      expect(window.location.search).toBe('');
+    });
   });
 });

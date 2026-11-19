@@ -124,7 +124,7 @@ Ao abrir no SUAP um processo cujo **Tipo** ou **Assunto** contenha `bolsa`/`bols
    - `suap_id`, `process_number`, `origin = 'extensao'` e `extraction`;
    - o nome "<assunto> — <NUP>".
    Existe uma lista por processo e órgão. Reabrir o processo não duplica nem sobrescreve uma lista já editada; o botão **Remontar** do painel substitui as linhas, após confirmação.
-6. O painel do SUAP mostra o card **Lista de credores**: etapa, alunos, total declarado, pendências e avisos. O botão **Abrir no SIAGES** leva a `/lc?lista=<id>`, que abre direto a grade da lista. Se a lista não existir mais, a tela avisa.
+6. O painel do SUAP mostra o card **Lista de credores**: etapa, alunos, total declarado, pendências e avisos. O botão **Abrir no SIAGES** leva a `/lc?lista=<id>`, que abre direto a grade da lista. Se a lista não existir mais, a tela avisa. Quando não está em processamento, o card também exibe **Montar manualmente** (`/lc?manual=1&nome=...`) para abrir direto a montagem manual no SIAGES.
 
 Validação real: no processo 505643 (Bolsa TAL, Ofício 156/2026), o script leu 10 de 10 alunos, com R$ 400,00 por aluno. Os bancos vieram pelo nome (Nubank, Banco do Brasil, Caixa, Inter, Mercado Pago).
 

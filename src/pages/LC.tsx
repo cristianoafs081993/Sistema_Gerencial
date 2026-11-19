@@ -126,6 +126,14 @@ export default function LCPage() {
   const requestedListIdRef = useRef<string | null>(
     typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('lista') : null,
   );
+  const requestedManualRef = useRef<{ active: boolean; nome: string | null }>(
+    typeof window !== 'undefined'
+      ? {
+          active: new URLSearchParams(window.location.search).get('manual') === '1',
+          nome: new URLSearchParams(window.location.search).get('nome'),
+        }
+      : { active: false, nome: null },
+  );
   const queryLCDeferred = useDeferredValue(queryLC);
   const queryPendenciasDeferred = useDeferredValue(queryPendencias);
 
@@ -204,6 +212,25 @@ export default function LCPage() {
     // handleOpenSavedWorkList so usa setters de estado.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedWorkLists, sharedListsLoaded]);
+
+  // `/lc?manual=1&nome=...`: link "Montar manualmente" da extensao no SUAP abre direto a grade manual.
+  useEffect(() => {
+    if (!requestedManualRef.current.active) return;
+    const customName = requestedManualRef.current.nome?.trim();
+    requestedManualRef.current = { active: false, nome: null };
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('manual');
+      url.searchParams.delete('nome');
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // Sem acesso ao historico, o parametro apenas permanece na URL.
+    }
+    handleOpenManualWorkList();
+    if (customName) setWorkListName(customName.slice(0, 160));
+    // handleOpenManualWorkList so usa setters de estado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const consolidatedRows = useMemo(() => {
     const byCpf = new Map<string, LCRegistro[]>();

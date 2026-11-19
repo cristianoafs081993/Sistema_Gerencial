@@ -1203,6 +1203,11 @@ describe('process-document 1.9', () => {
       card = document.querySelector('.suape-lc-card');
       expect(card).toHaveTextContent('10 aluno(s) · 10 declarado(s) · 2 pendência(s)');
       expect(card?.querySelector('a')).toHaveAttribute('href', 'https://www.siages.com.br/lc?lista=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+      const manualLink = Array.from(card?.querySelectorAll('a') || []).find((link) => link.textContent === 'Montar manualmente');
+      expect(manualLink).toHaveAttribute(
+        'href',
+        'https://www.siages.com.br/lc?manual=1&nome=Lista+manual+%E2%80%94+23035.003293.2026-22',
+      );
       const summaryPanel = document.querySelector('[data-panel="summary"]');
       expect(summaryPanel).not.toHaveTextContent('SUAP ID');
       expect(summaryPanel?.lastElementChild).toBe(card);
