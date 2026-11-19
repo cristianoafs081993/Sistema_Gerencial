@@ -4,6 +4,8 @@
   const IFRAME_ID = 'siages-suap-dispatch-frame';
   const DOCUMENT_ANALYSIS_MODAL_ID = 'siages-suap-document-analysis-modal';
   const DOCUMENT_ANALYSIS_IFRAME_ID = 'siages-suap-document-analysis-frame';
+  const LC_MODAL_ID = 'siages-suap-lc-modal';
+  const LC_IFRAME_ID = 'siages-suap-lc-frame';
   const BENEFICIARY_DOCS_MODAL_ID = 'siages-suap-beneficiary-docs-modal';
   const BRIDGE_FRAME_ID = 'siages-suap-finance-frame';
   const FINANCE_PANEL_ID = 'siages-suap-finance-panel';
@@ -1703,6 +1705,75 @@
     renderSummary();
     frame.contentWindow.postMessage({ source: 'siages-suap-extension', type: 'siages:suap-lc-rebuild', version: 1, payload: { suapId } }, SIAGES_ORIGIN);
   }
+  function closeLcModal() {
+    document.getElementById(LC_MODAL_ID)?.remove();
+  }
+  async function openLcModal({ mode, listId, nome }) {
+    if (document.getElementById(LC_MODAL_ID)) return;
+    const suapId = getProcessId();
+    if (!suapId) return;
+    const session = state.authSession || (globalThis.SiagesExtensionAuth?.getSession ? await globalThis.SiagesExtensionAuth.getSession().catch(() => null) : null);
+    if (document.getElementById(LC_MODAL_ID)) return;
+    const payload = {
+      suapId,
+      processNumber: getProcessNumber() || '',
+      mode,
+      ...(listId ? { listId } : {}),
+      ...(nome ? { nome } : {}),
+      extensionSession: session?.accessToken ? { accessToken: session.accessToken } : null,
+    };
+    const initMessage = {
+      source: 'siages-suap-extension',
+      type: 'siages:suap-lc-modal-init',
+      version: 1,
+      payload,
+    };
+    const overlay = document.createElement('div');
+    overlay.id = LC_MODAL_ID;
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    Object.assign(overlay.style, { position: 'fixed', inset: '0', zIndex: '2147483647', background: 'rgba(15,23,42,.62)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' });
+    const modalPanel = document.createElement('div');
+    Object.assign(modalPanel.style, { position: 'relative', width: 'min(960px,96vw)', height: 'min(860px,94vh)', overflow: 'hidden', borderRadius: '12px', background: '#fff', boxShadow: '0 25px 50px -12px rgba(0,0,0,.55)' });
+    const frame = document.createElement('iframe');
+    frame.id = LC_IFRAME_ID;
+    frame.src = `${SIAGES_ORIGIN}/suap-extensao/lc`;
+    frame.title = 'Lista de Credores do SIAGES';
+    frame.allow = 'clipboard-read; clipboard-write';
+    Object.assign(frame.style, { width: '100%', height: '100%', border: '0' });
+    const cleanup = () => {
+      window.removeEventListener('message', receive);
+      window.removeEventListener('keydown', onKeyDown);
+      closeLcModal();
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') cleanup();
+    };
+    const receive = (event) => {
+      if (isSiagesFrameMessage(event, frame, 'siages:suap-lc-modal-ready')) {
+        frame.contentWindow?.postMessage(initMessage, SIAGES_ORIGIN);
+      } else if (isSiagesFrameMessage(event, frame, 'siages:suap-lc-modal-saved')) {
+        const saved = event.data?.payload || {};
+        if (saved.listId && state.lcStatus?.listId === saved.listId) {
+          state.lcStatus = {
+            ...state.lcStatus,
+            found: saved.found ?? state.lcStatus.found,
+            pendencias: saved.pendencias ?? state.lcStatus.pendencias,
+          };
+          renderSummary();
+        }
+      } else if (isSiagesFrameMessage(event, frame, 'siages:suap-lc-modal-close')) {
+        cleanup();
+      }
+    };
+    frame.addEventListener('load', () => frame.contentWindow?.postMessage(initMessage, SIAGES_ORIGIN));
+    window.addEventListener('message', receive);
+    window.addEventListener('keydown', onKeyDown);
+    overlay.addEventListener('click', (event) => { if (event.target === overlay) cleanup(); });
+    modalPanel.append(frame);
+    overlay.appendChild(modalPanel);
+    document.body.appendChild(overlay);
+  }
   function renderLcCard(container) {
     const status = state.lcStatus;
     if (!status || status.suapId !== getProcessId()) return;
@@ -1722,9 +1793,9 @@
     (status.warnings || []).slice(0, 3).forEach((warning) => body.appendChild(createElement('p', 'suape-lc-warning', warning)));
     const actions = createElement('div', 'suape-lc-actions');
     if (status.listId) {
-      const open = createElement('a', 'suape-button', 'Abrir no SIAGES');
-      open.href = `${SIAGES_ORIGIN}/lc?lista=${encodeURIComponent(status.listId)}`;
-      open.target = '_blank'; open.rel = 'noopener noreferrer';
+      const open = createElement('button', 'suape-button', 'Abrir no SIAGES');
+      open.type = 'button';
+      open.addEventListener('click', () => { void openLcModal({ mode: 'open', listId: status.listId }); });
       actions.appendChild(open);
     }
     const busy = ['collecting', 'reading', 'ai', 'saving'].includes(status.stage);
@@ -1733,13 +1804,11 @@
       rebuild.type = 'button'; rebuild.addEventListener('click', requestLcRebuild);
       actions.appendChild(rebuild);
 
-      const manual = createElement('a', 'suape-button suape-button-secondary', 'Montar manualmente');
-      const manualUrl = new URL(`${SIAGES_ORIGIN}/lc`);
-      manualUrl.searchParams.set('manual', '1');
+      const manual = createElement('button', 'suape-button suape-button-secondary', 'Montar manualmente');
+      manual.type = 'button';
       const processNumber = getProcessNumber();
-      if (processNumber) manualUrl.searchParams.set('nome', `Lista manual — ${processNumber}`);
-      manual.href = manualUrl.toString();
-      manual.target = '_blank'; manual.rel = 'noopener noreferrer';
+      const manualName = processNumber ? `Lista manual — ${processNumber}` : 'Lista manual';
+      manual.addEventListener('click', () => { void openLcModal({ mode: 'manual', nome: manualName }); });
       actions.appendChild(manual);
     }
     if (actions.childNodes.length) body.appendChild(actions);

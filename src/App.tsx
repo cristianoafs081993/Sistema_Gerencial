@@ -46,6 +46,7 @@ const SuapExtensionDispatch = lazy(() => import('./pages/SuapExtensionDispatch')
 const SuapExtensionProcessInfo = lazy(() => import('./pages/SuapExtensionProcessInfo'));
 const SuapProcessMapping = lazy(() => import('./pages/SuapProcessMapping'));
 const SuapExtensionDocumentAnalysis = lazy(() => import('./pages/SuapExtensionDocumentAnalysis'));
+const SuapExtensionLc = lazy(() => import('./pages/SuapExtensionLc'));
 const SuapExtensionPlanSummary = lazy(() => import('./pages/SuapExtensionPlanSummary'));
 const ComprasnetEtpExtension = lazy(() => import('./pages/ComprasnetEtpExtension'));
 const EconomiaTempo = lazy(() => import('./pages/EconomiaTempo'));
@@ -145,6 +146,7 @@ const App = () => {
               <Route element={<SuapExtensionFrameShell />}>
                 <Route path="/suap-extensao/processo-info" element={<SuapExtensionProcessInfo />} />
                 <Route path="/suap-extensao/documento-analise" element={<SuapExtensionDocumentAnalysis />} />
+                <Route path="/suap-extensao/lc" element={<SuapExtensionLc />} />
                 <Route path="/comprasnet-extensao/etp" element={<ComprasnetEtpExtension />} />
               </Route>
               <Route element={<AppShell />}>

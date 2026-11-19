@@ -1202,17 +1202,38 @@ describe('process-document 1.9', () => {
       });
       card = document.querySelector('.suape-lc-card');
       expect(card).toHaveTextContent('10 aluno(s) · 10 declarado(s) · 2 pendência(s)');
-      expect(card?.querySelector('a')).toHaveAttribute('href', 'https://www.siages.com.br/lc?lista=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-      const manualLink = Array.from(card?.querySelectorAll('a') || []).find((link) => link.textContent === 'Montar manualmente');
-      expect(manualLink).toHaveAttribute(
-        'href',
-        'https://www.siages.com.br/lc?manual=1&nome=Lista+manual+%E2%80%94+23035.003293.2026-22',
-      );
+      const buttons = Array.from(card?.querySelectorAll('button') || []);
+      const openButton = buttons.find((btn) => btn.textContent === 'Abrir no SIAGES');
+      const rebuildButton = buttons.find((btn) => btn.textContent === 'Remontar');
+      const manualButton = buttons.find((btn) => btn.textContent === 'Montar manualmente');
+      expect(openButton).toBeTruthy();
+      expect(rebuildButton).toBeTruthy();
+      expect(manualButton).toBeTruthy();
+
       const summaryPanel = document.querySelector('[data-panel="summary"]');
       expect(summaryPanel).not.toHaveTextContent('SUAP ID');
       expect(summaryPanel?.lastElementChild).toBe(card);
 
-      (card?.querySelector('button') as HTMLButtonElement).click();
+      // Abrir no SIAGES abre o modal /suap-extensao/lc dentro do proprio SUAP
+      openButton!.click();
+      await waitFor(() => expect(document.getElementById('siages-suap-lc-frame')).toBeTruthy());
+      const lcFrame = document.getElementById('siages-suap-lc-frame') as HTMLIFrameElement;
+      expect(lcFrame.src).toBe('https://www.siages.com.br/suap-extensao/lc');
+      const lcFramePost = vi.spyOn(lcFrame.contentWindow!, 'postMessage').mockImplementation(() => undefined);
+      frameMessage(lcFrame, 'siages:suap-lc-modal-ready', undefined);
+      expect(lcFramePost).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: 'siages-suap-extension',
+          type: 'siages:suap-lc-modal-init',
+          payload: expect.objectContaining({ suapId: '505643', mode: 'open', listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }),
+        }),
+        'https://www.siages.com.br',
+      );
+      frameMessage(lcFrame, 'siages:suap-lc-modal-close', undefined);
+      expect(document.getElementById('siages-suap-lc-modal')).toBeNull();
+
+      // Remontar confirma e envia pedido ao iframe bridge
+      rebuildButton!.click();
       expect(window.confirm).toHaveBeenCalled();
       expect(framePost).toHaveBeenCalledWith(
         { source: 'siages-suap-extension', type: 'siages:suap-lc-rebuild', version: 1, payload: { suapId: '505643' } },

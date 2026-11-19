@@ -101,8 +101,7 @@ O fluxo de comparação gera pendências de cruzamento e permite ao usuário:
 - Salvar uma lista de trabalho nomeada, incluindo as contas escolhidas na grade, para reabri-la ou excluí-la depois. As listas são persistidas na tabela `lc_saved_lists`, com isolamento por `org_id`, e não alteram a base oficial `lc_credores`. O salvamento (e a reabertura) não depende de pendências: mesmo que todos os credores estejam com status `aluno_nao_encontrado` e nenhuma linha seja apta para a macro, o diálogo abre na aba de grade, a lista pode ser salva e apenas o download do `.mac` fica desabilitado.
 - **Montagem manual e cópia de listas anteriores**: o botão **Montar lista manualmente** abre a grade para inclusão direta de alunos (por busca na LC carregada ou preenchimento manual de CPF, nome, banco, agência, conta e valor), edição de valor e remoção de linhas. Também é possível copiar listas salvas anteriormente (tanto pelo botão **Copiar** em **Listas salvas**, que cria uma nova lista `Cópia de ...` sem sobrescrever a original nem herdar `suap_id`, quanto pelo seletor **Copiar de lista anterior** dentro da grade).
 - Usuários autenticados do mesmo órgão conseguem listar, abrir, atualizar e excluir as listas dos colegas; o navegador mantém apenas um espelho local para contingência quando o Supabase estiver indisponível.
-- Copiar blocos formatados de 7 alunos (com destaque em amarelo na 7ª linha) no mesmo padrão de leiaute da macro `.mac` para colagem direta (via Shift+Insert). Os campos são concatenados continuamente sem nenhum espaçador ou tabulador (CPF com 14, Banco com 3, Agência com 4, Operação/Resto com 24, Conta preenchida com 20 caracteres com zeros à esquerda, e Valor em centavos como última coluna). Isso garante o preenchimento exato de cada coluna limite do emulador, ativando o recurso de "auto-tab" nativo do SIAFI em cada transição de campo sem risco de pulos ou desalinhamentos.
-- Gerar e baixar arquivo de macro `.mac` para preenchimento automatizado no SIAFI.
+- Copiar blocos formatados de 7 alunos (com destaque em amarelo na 7ª linha) para colagem direta no SIAFI (via Shift+Insert). A tela da grade não exibe mais o seletor de geração de arquivo `.mac` nem o bloco de instruções de cópia.
 
 ## Montagem automática pela extensão (processos de bolsa, 1.9.92)
 
@@ -124,7 +123,7 @@ Ao abrir no SUAP um processo cujo **Tipo** ou **Assunto** contenha `bolsa`/`bols
    - `suap_id`, `process_number`, `origin = 'extensao'` e `extraction`;
    - o nome "<assunto> — <NUP>".
    Existe uma lista por processo e órgão. Reabrir o processo não duplica nem sobrescreve uma lista já editada; o botão **Remontar** do painel substitui as linhas, após confirmação.
-6. O painel do SUAP mostra o card **Lista de credores**: etapa, alunos, total declarado, pendências e avisos. O botão **Abrir no SIAGES** leva a `/lc?lista=<id>`, que abre direto a grade da lista. Se a lista não existir mais, a tela avisa. Quando não está em processamento, o card também exibe **Montar manualmente** (`/lc?manual=1&nome=...`) para abrir direto a montagem manual no SIAGES.
+6. O painel do SUAP mostra o card **Lista de credores**: etapa, alunos, total declarado, pendências e avisos. Os botões **Abrir no SIAGES** e **Montar manualmente** (quando não está em processamento) abrem a grade diretamente em um modal dentro do próprio SUAP (`/suap-extensao/lc`), usando a sessão autenticada da extensão.
 
 Validação real: no processo 505643 (Bolsa TAL, Ofício 156/2026), o script leu 10 de 10 alunos, com R$ 400,00 por aluno. Os bancos vieram pelo nome (Nubank, Banco do Brasil, Caixa, Inter, Mercado Pago).
 
