@@ -692,16 +692,6 @@ export default function LCPage() {
 
       <Dialog open={macroDialogOpen} onOpenChange={setMacroDialogOpen}>
         <DialogContent className="max-w-3xl w-full max-h-[90vh] flex flex-col p-6 overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2">
-              <TableIcon className="h-5 w-5 text-indigo-500" />
-              Preenchimento SIAFI & Lista de Credores
-            </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
-              Monte, edite e copie os blocos da Lista de Credores para preenchimento no SIAFI.
-            </DialogDescription>
-          </DialogHeader>
-
           <LcWorkListEditor
             key={editorSessionKey}
             lcRows={rows}
@@ -715,6 +705,22 @@ export default function LCPage() {
             onClose={() => setMacroDialogOpen(false)}
             initialShowManualAdd={showManualAddPanel}
             contaPagadora={env.siafiContaPagadora || ''}
+            renderHeader={(copyControl) => (
+              <DialogHeader className="pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex flex-wrap items-center justify-between gap-3 pr-8">
+                  <div>
+                    <DialogTitle className="text-lg font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2">
+                      <TableIcon className="h-5 w-5 text-indigo-500" />
+                      Preenchimento SIAFI & Lista de Credores
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
+                      Monte, edite e copie os blocos da Lista de Credores para preenchimento no SIAFI.
+                    </DialogDescription>
+                  </div>
+                  {copyControl}
+                </div>
+              </DialogHeader>
+            )}
           />
         </DialogContent>
       </Dialog>

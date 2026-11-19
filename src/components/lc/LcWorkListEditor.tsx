@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Copy, Check, Plus, Save, Search, Trash2, UserPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Plus, Save, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -86,6 +86,7 @@ export type LcWorkListEditorProps = {
   onClose: () => void;
   initialShowManualAdd?: boolean;
   contaPagadora?: string;
+  renderHeader?: (copyControl: React.ReactNode) => React.ReactNode;
 };
 
 export function LcWorkListEditor({
@@ -98,13 +99,12 @@ export function LcWorkListEditor({
   isSavingWorkList,
   onSave,
   onClose,
-  initialShowManualAdd = false,
   contaPagadora = '',
+  renderHeader,
 }: LcWorkListEditorProps) {
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
   const [chunkIndex, setChunkIndex] = useState(0);
   const [isCopied, setIsCopied] = useState(false);
-  const [showManualAddPanel, setShowManualAddPanel] = useState(initialShowManualAdd);
   const [manualSearchQuery, setManualSearchQuery] = useState('');
   const [manualCpf, setManualCpf] = useState('');
   const [manualNome, setManualNome] = useState('');
@@ -230,52 +230,43 @@ export function LcWorkListEditor({
   const endIdx = Math.min(startIdx + 7, totalStudents);
   const currentChunk = gridRows.slice(startIdx, endIdx);
 
+  const copyControl = savedWorkLists.length > 0 ? (
+    <div className="flex items-center gap-1.5">
+      <select
+        aria-label="Copiar de lista anterior"
+        value={copySourceListId}
+        onChange={(e) => setCopySourceListId(e.target.value)}
+        className="h-8 max-w-[220px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 text-xs text-slate-700 dark:text-slate-200"
+      >
+        <option value="">Copiar de lista anterior...</option>
+        {savedWorkLists.map((list) => (
+          <option key={list.id} value={list.id}>
+            {list.name} ({list.rows.length})
+          </option>
+        ))}
+      </select>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={!copySourceListId}
+        onClick={() => handleImportFromSavedList(copySourceListId)}
+        className="h-8 gap-1 px-2.5 text-xs"
+      >
+        <Copy className="h-3.5 w-3.5" />
+        Copiar
+      </Button>
+    </div>
+  ) : null;
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      {renderHeader ? renderHeader(copyControl) : null}
       <div className="flex-1 overflow-y-auto pr-1 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={showManualAddPanel ? 'secondary' : 'outline'}
-            onClick={() => setShowManualAddPanel((prev) => !prev)}
-            className="h-8 gap-1.5 text-xs"
-          >
-            <UserPlus className="h-3.5 w-3.5" />
-            {showManualAddPanel ? 'Ocultar inclusão manual' : 'Adicionar aluno'}
-          </Button>
+        {!renderHeader && copyControl ? (
+          <div className="flex items-center justify-end">{copyControl}</div>
+        ) : null}
 
-          {savedWorkLists.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              <select
-                aria-label="Copiar de lista anterior"
-                value={copySourceListId}
-                onChange={(e) => setCopySourceListId(e.target.value)}
-                className="h-8 max-w-[220px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 text-xs text-slate-700 dark:text-slate-200"
-              >
-                <option value="">Copiar de lista anterior...</option>
-                {savedWorkLists.map((list) => (
-                  <option key={list.id} value={list.id}>
-                    {list.name} ({list.rows.length})
-                  </option>
-                ))}
-              </select>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={!copySourceListId}
-                onClick={() => handleImportFromSavedList(copySourceListId)}
-                className="h-8 gap-1 px-2.5 text-xs"
-              >
-                <Copy className="h-3.5 w-3.5" />
-                Copiar
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {showManualAddPanel && (
           <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 p-3 space-y-3">
             <div className="space-y-1.5">
               <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block">
@@ -397,7 +388,6 @@ export function LcWorkListEditor({
               </div>
             </div>
           </div>
-        )}
 
         {gridRows.length === 0 ? (
           <div className="rounded-md border border-dashed border-slate-300 dark:border-slate-700 p-6 text-center text-xs text-slate-500 dark:text-slate-400">

@@ -154,20 +154,21 @@ export default function SuapExtensionLc() {
     }
   };
 
-  return (
-    <div className="h-screen w-screen flex flex-col bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 p-5 overflow-hidden">
-      <header className="pb-3 mb-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
-        <div>
-          <h1 className="text-lg font-bold flex items-center gap-2">
-            <TableIcon className="h-5 w-5 text-indigo-500" />
-            Lista de Credores
-          </h1>
-          {initContext?.processNumber && (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Processo {initContext.processNumber}
-            </p>
-          )}
-        </div>
+  const renderExtensionHeader = (copyControl?: React.ReactNode) => (
+    <header className="pb-3 mb-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+      <div>
+        <h1 className="text-lg font-bold flex items-center gap-2">
+          <TableIcon className="h-5 w-5 text-indigo-500" />
+          Lista de Credores
+        </h1>
+        {initContext?.processNumber && (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Processo {initContext.processNumber}
+          </p>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        {copyControl}
         <Button
           type="button"
           size="icon"
@@ -178,20 +179,30 @@ export default function SuapExtensionLc() {
         >
           <X className="h-4 w-4" />
         </Button>
-      </header>
+      </div>
+    </header>
+  );
 
+  return (
+    <div className="h-screen w-screen flex flex-col bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 p-5 overflow-hidden">
       {isLoading ? (
-        <div className="flex-1 flex items-center justify-center gap-2 text-sm text-slate-500">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Carregando Lista de Credores...
-        </div>
+        <>
+          {renderExtensionHeader()}
+          <div className="flex-1 flex items-center justify-center gap-2 text-sm text-slate-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Carregando Lista de Credores...
+          </div>
+        </>
       ) : errorMessage ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
-          <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>
-          <Button type="button" variant="outline" size="sm" onClick={handleClose}>
-            Fechar
-          </Button>
-        </div>
+        <>
+          {renderExtensionHeader()}
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
+            <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>
+            <Button type="button" variant="outline" size="sm" onClick={handleClose}>
+              Fechar
+            </Button>
+          </div>
+        </>
       ) : (
         <LcWorkListEditor
           key={`${initContext?.mode || 'open'}-${initContext?.listId || 'manual'}`}
@@ -206,6 +217,7 @@ export default function SuapExtensionLc() {
           onClose={handleClose}
           initialShowManualAdd={initContext?.mode === 'manual'}
           contaPagadora={env.siafiContaPagadora || ''}
+          renderHeader={renderExtensionHeader}
         />
       )}
     </div>
