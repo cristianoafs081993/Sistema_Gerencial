@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { BolsistaPdfRecord } from '../bolsistasPdfService';
 import type { LCRegistro } from '../lcImportService';
-import { buildLcGridRows, buildMacroRows, countLcGridPendencias } from '../lcWorkListBuilder';
+import {
+  buildLcGridRows,
+  buildMacroRows,
+  buildManualLcGridRow,
+  cloneLcGridRowsForCopy,
+  countLcGridPendencias,
+} from '../lcWorkListBuilder';
 
 const lcRow = (overrides: Partial<LCRegistro>): LCRegistro => ({
   obListaCredores: '2026LC000001',
@@ -60,5 +66,42 @@ describe('buildLcGridRows', () => {
     expect(buildMacroRows(rows)).toEqual([
       { cpf: '52998224725', bancoCodigo: '1', agenciaCodigo: '1234', contaPagadora: '00001', contaFavorecido: '123456789', valor: 400 },
     ]);
+  });
+
+  it('monta linha manual aproveitando nome e primeira conta da LC quando nao informados', () => {
+    const namedLcRows = [
+      lcRow({
+        favorecidoDocumento: '529.982.247-25',
+        favorecidoNome: 'MARIA ALUNA',
+        bancoCodigo: '001',
+        agenciaCodigo: '1234',
+        contaBancaria: '12345678-9',
+      }),
+    ];
+
+    const row = buildManualLcGridRow({ cpf: '529.982.247-25', valor: 350 }, namedLcRows, '00001');
+    expect(row).toMatchObject({
+      cpf: '52998224725',
+      nome: 'MARIA ALUNA',
+      selectedBanco: '001',
+      selectedAgencia: '1234',
+      selectedConta: '123456789',
+      status: 'ok',
+      valor: 350,
+    });
+    expect(row.id).toMatch(/^manual-52998224725-/);
+  });
+
+  it('clona linhas com novos ids sem compartilhar arrays de contas', () => {
+    const original = buildLcGridRows([
+      bolsista({ cpf: '529.982.247-25', nome: 'Um', agencia: '1234', conta: '12345678-9' }),
+    ], lcRows, '00001');
+
+    const cloned = cloneLcGridRowsForCopy(original);
+    expect(cloned).toHaveLength(1);
+    expect(cloned[0].id).not.toBe(original[0].id);
+    expect(cloned[0].cpf).toBe(original[0].cpf);
+    cloned[0].lcAccounts.push({ bancoCodigo: '104', agenciaCodigo: '0001', contaBancaria: '999' });
+    expect(original[0].lcAccounts).toHaveLength(1);
   });
 });

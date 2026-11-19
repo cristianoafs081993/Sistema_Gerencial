@@ -123,3 +123,65 @@ export function buildMacroRows(workRows: LcGridRow[]): SiafiMacroInputRow[] {
 export function countLcGridPendencias(rows: LcGridRow[]): number {
   return rows.filter((row) => row.status !== 'ok').length;
 }
+
+export type ManualLcRowInput = {
+  cpf: string;
+  nome?: string;
+  banco?: string;
+  agencia?: string;
+  conta?: string;
+  valor?: number;
+};
+
+let manualRowCounter = 0;
+
+/**
+ * Monta uma linha da grade da LC para inclusao manual, cruzando o CPF com a LC carregada.
+ * Quando a conta nao e informada e o favorecido possui conta na LC, seleciona a primeira conta da LC.
+ */
+export function buildManualLcGridRow(
+  input: ManualLcRowInput,
+  lcRows: LCRegistro[],
+  contaPagadora: string,
+): LcGridRow {
+  const doc = onlyDigits(input.cpf);
+  const lcMatches = lcRows.filter((r) => onlyDigits(r.favorecidoDocumento) === doc);
+  const lcName = lcMatches.find((r) => r.favorecidoNome?.trim())?.favorecidoNome?.trim() || '';
+  const contaInformada = normalizeLcAccount(input.conta);
+  const firstLcMatch = lcMatches.find((r) => normalizeLcAccount(r.contaBancaria));
+
+  const base = buildLcGridRows(
+    [
+      {
+        cpf: doc,
+        nome: input.nome?.trim() || lcName || doc,
+        banco: input.banco?.trim() || (!contaInformada && firstLcMatch?.bancoCodigo) || '',
+        agencia: input.agencia?.trim() || (!contaInformada && firstLcMatch?.agenciaCodigo) || '',
+        conta: contaInformada || (!contaInformada && firstLcMatch ? normalizeLcAccount(firstLcMatch.contaBancaria) : ''),
+        valor: input.valor,
+        sourceFile: 'manual',
+      },
+    ],
+    lcRows,
+    contaPagadora,
+  )[0];
+
+  manualRowCounter += 1;
+  return {
+    ...base,
+    id: `manual-${doc}-${Date.now()}-${manualRowCounter}`,
+  };
+}
+
+/**
+ * Clona as linhas de uma lista salva para criar uma nova lista independente (copia).
+ */
+export function cloneLcGridRowsForCopy(rows: LcGridRow[]): LcGridRow[] {
+  const stamp = Date.now();
+  return rows.map((row, index) => ({
+    ...row,
+    id: `copy-${row.cpf || 'row'}-${stamp}-${index}`,
+    lcAccounts: row.lcAccounts.map((acc) => ({ ...acc })),
+    originalLcAccounts: row.originalLcAccounts.map((acc) => ({ ...acc })),
+  }));
+}

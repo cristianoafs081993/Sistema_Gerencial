@@ -333,5 +333,120 @@ describe('LCPage', () => {
       const savedListsDialog = await screen.findByRole('dialog', { name: 'Listas de trabalho salvas' });
       expect(within(savedListsDialog).getByText(/Montada pela extensão · processo 23035.003293.2026-22 · via IA, conferir/)).toBeInTheDocument();
     });
+
+    it('permite copiar uma lista salva anteriormente sem sobrescrever a original', async () => {
+      mockedLoadSharedLcSavedLists.mockResolvedValueOnce([extensionList]);
+      render(<LCPage />);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Listas salvas (1)' }));
+      const savedListsDialog = await screen.findByRole('dialog', { name: 'Listas de trabalho salvas' });
+      fireEvent.click(within(savedListsDialog).getByRole('button', { name: `Copiar lista ${extensionList.name}` }));
+
+      const dialog = await screen.findByRole('dialog', { name: 'Preenchimento SIAFI & Lista de Credores' });
+      expect(within(dialog).getByRole('textbox', { name: 'Nome da lista de trabalho' })).toHaveValue(
+        `Cópia de ${extensionList.name}`,
+      );
+      expect(within(dialog).getByText('52998224725')).toBeInTheDocument();
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar lista' }));
+
+      await waitFor(() => expect(mockedSaveSharedLcSavedList).toHaveBeenCalledWith(expect.objectContaining({
+        id: null,
+        name: `Cópia de ${extensionList.name}`,
+        sourcePdfNames: [],
+        rows: [expect.objectContaining({ cpf: '52998224725', selectedConta: '123456789' })],
+      })));
+    });
+  });
+
+  describe('montagem manual e copia na grade', () => {
+    it('permite montar uma lista manualmente buscando na LC e informando aluno', async () => {
+      render(<LCPage />);
+      await screen.findByText('Bolsista sem divergência');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Montar lista manualmente' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Preenchimento SIAFI & Lista de Credores' });
+
+      // Busca na LC carregada e adiciona com 1 clique
+      fireEvent.change(within(dialog).getByRole('textbox', { name: 'Buscar credor na LC para adicionar' }), {
+        target: { value: 'Bolsista sem divergência' },
+      });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
+
+      expect(within(dialog).getByText('12345678901')).toBeInTheDocument();
+
+      // Adiciona outro aluno manualmente pelo formulario
+      fireEvent.change(within(dialog).getByRole('textbox', { name: 'CPF do aluno' }), {
+        target: { value: '529.982.247-25' },
+      });
+      fireEvent.change(within(dialog).getByRole('textbox', { name: 'Nome do aluno' }), {
+        target: { value: 'Aluno Manual Dois' },
+      });
+      fireEvent.change(within(dialog).getByRole('textbox', { name: 'Valor da bolsa em reais' }), {
+        target: { value: '450,00' },
+      });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Adicionar à lista' }));
+
+      expect(within(dialog).getByText('52998224725')).toBeInTheDocument();
+      expect(within(dialog).getByText('45000')).toBeInTheDocument();
+
+      fireEvent.change(within(dialog).getByRole('textbox', { name: 'Nome da lista de trabalho' }), {
+        target: { value: 'Bolsa Manual Maio' },
+      });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar lista' }));
+
+      await waitFor(() => expect(mockedSaveSharedLcSavedList).toHaveBeenCalledWith(expect.objectContaining({
+        id: null,
+        name: 'Bolsa Manual Maio',
+        rows: [
+          expect.objectContaining({ cpf: '12345678901', status: 'ok', valor: 300 }),
+          expect.objectContaining({ cpf: '52998224725', nome: 'Aluno Manual Dois', status: 'aluno_nao_encontrado', valor: 450 }),
+        ],
+      })));
+    });
+
+    it('permite copiar linhas de uma lista anterior dentro da montagem manual', async () => {
+      mockedLoadSharedLcSavedLists.mockResolvedValueOnce([
+        {
+          id: '00000000-0000-4000-8000-000000000099',
+          name: 'Lista Abril',
+          createdAt: '2026-04-01T10:00:00.000Z',
+          updatedAt: '2026-04-01T10:00:00.000Z',
+          sourcePdfNames: [],
+          rows: [
+            {
+              id: 'row-abril-1',
+              cpf: '12345678901',
+              nome: 'Bolsista sem divergência',
+              bancoPdf: '033',
+              agenciaPdf: '2979',
+              contaPdf: '020846728',
+              selectedBanco: '033',
+              selectedAgencia: '2979',
+              selectedConta: '020846728',
+              contaPagadora: '00001',
+              status: 'ok',
+              lcAccounts: [],
+              originalLcAccounts: [],
+              valor: 300,
+            },
+          ],
+        },
+      ]);
+
+      render(<LCPage />);
+      await screen.findByRole('button', { name: 'Listas salvas (1)' });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Montar lista manualmente' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Preenchimento SIAFI & Lista de Credores' });
+
+      fireEvent.change(within(dialog).getByRole('combobox', { name: 'Copiar de lista anterior' }), {
+        target: { value: '00000000-0000-4000-8000-000000000099' },
+      });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Copiar' }));
+
+      expect(within(dialog).getByText('12345678901')).toBeInTheDocument();
+      expect(within(dialog).getByRole('textbox', { name: 'Nome da lista de trabalho' })).toHaveValue('Cópia de Lista Abril');
+    });
   });
 });

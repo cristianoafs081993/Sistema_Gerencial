@@ -13,7 +13,7 @@ Vínculo de usuário à UASG na extensão e saldo de empenhos por campus (`15836
 Lista de credores automática 1.9.92: as regressões ficam em:
 - `bolsistasPdfService.test.ts`: ofício eletrônico fictício com nome em linha própria, banco pelo nome, conta `12.345-X` e total declarado;
 - `bancoCodigo.test.ts`;
-- `lcWorkListBuilder.test.ts`: status e macro;
+- `lcWorkListBuilder.test.ts`: status, macro, inclusão manual (`buildManualLcGridRow`) e clonagem de lista (`cloneLcGridRowsForCopy`);
 - `suapLcAutoBuildService.test.ts`:
   - processo que não é de bolsa;
   - script sem IA;
@@ -26,7 +26,7 @@ Lista de credores automática 1.9.92: as regressões ficam em:
   - PDF que nunca termina, coberto pelo prazo, e PDF escaneado enviado à IA;
 - `SuapExtensionProcessInfo.test.tsx`: pedido de documentos, validação de origem, status e remontar;
 - `suapProcessDocumentExtension.test.ts`: `dt`/`dd`, `htmlToBlockText`, coleta priorizada, resposta com PDF transferido e card com link e remontar;
-- `LC.test.tsx`: `?lista=`, lista inexistente e origem;
+- `LC.test.tsx`: `?lista=`, lista inexistente, origem, montagem manual (busca na LC e inclusão direta) e cópia de listas anteriores;
 - Deno `_shared/bolsistas_extraction_test.ts`.
 
 O parser foi validado no ofício real do processo 505643 (10/10 alunos). O caminho de IA tem só testes com mocks e o smoke test 401 da função publicada; ainda não houve chamada real com documento.

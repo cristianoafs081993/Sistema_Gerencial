@@ -1,5 +1,5 @@
 import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Upload, Search, ChevronLeft, ChevronRight, Copy, Check, Download, AlertCircle, Save, FolderOpen, Trash2, Table as TableIcon } from 'lucide-react';
+import { Upload, Search, ChevronLeft, ChevronRight, Copy, Check, Download, AlertCircle, Save, FolderOpen, Trash2, Table as TableIcon, Plus, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,7 @@ import {
   type SiafiMacroInputRow,
 } from '@/services/siafiMacroService';
 import { env } from '@/lib/env';
-import { buildLcGridRows, buildMacroRows, type LcGridRow } from '@/services/lcWorkListBuilder';
+import { buildLcGridRows, buildMacroRows, buildManualLcGridRow, cloneLcGridRowsForCopy, type LcGridRow } from '@/services/lcWorkListBuilder';
 import { deleteLcSavedList, loadLcSavedLists, saveLcSavedList, type LcSavedList } from '@/lib/lcSavedLists';
 import { normalizeLcAccount, padLeftLcAccount } from '@/utils/lcAccount';
 
@@ -97,11 +97,7 @@ export default function LCPage() {
   const [pdfFileNames, setPdfFileNames] = useState<string[]>([]);
   const [totalBolsistasProcessados, setTotalBolsistasProcessados] = useState(0);
   const [macroDialogOpen, setMacroDialogOpen] = useState(false);
-  const [macroContent, setMacroContent] = useState('');
   const [macroFileName, setMacroFileName] = useState('');
-  const [macroRowsCount, setMacroRowsCount] = useState(0);
-  const [macroContext, setMacroContext] = useState<'sem_pendencias' | 'com_pendencias'>('sem_pendencias');
-  const [dialogMacroRows, setDialogMacroRows] = useState<SiafiMacroInputRow[]>([]);
   const [gridRows, setGridRows] = useState<LcGridRow[]>([]);
   const [savedWorkLists, setSavedWorkLists] = useState<LcSavedList<LcGridRow>[]>(() => loadLcSavedLists<LcGridRow>());
   const [savedListsDialogOpen, setSavedListsDialogOpen] = useState(false);
@@ -112,6 +108,15 @@ export default function LCPage() {
   const [chunkIndex, setChunkIndex] = useState(0);
   const [dialogTab, setDialogTab] = useState<'macro' | 'grid'>('grid');
   const [isCopied, setIsCopied] = useState(false);
+  const [showManualAddPanel, setShowManualAddPanel] = useState(false);
+  const [manualSearchQuery, setManualSearchQuery] = useState('');
+  const [manualCpf, setManualCpf] = useState('');
+  const [manualNome, setManualNome] = useState('');
+  const [manualBanco, setManualBanco] = useState('');
+  const [manualAgencia, setManualAgencia] = useState('');
+  const [manualConta, setManualConta] = useState('');
+  const [manualValor, setManualValor] = useState('300,00');
+  const [copySourceListId, setCopySourceListId] = useState('');
   const [pageLC, setPageLC] = useState(1);
   const [pagePendencias, setPagePendencias] = useState(1);
   const [pageSizeLC, setPageSizeLC] = useState(100);
@@ -125,6 +130,15 @@ export default function LCPage() {
   const queryPendenciasDeferred = useDeferredValue(queryPendencias);
 
   const onlyDigits = (value: string) => (value || '').replace(/\D/g, '');
+  const parseCurrencyInput = (value: string): number | undefined => {
+    const trimmed = (value || '').trim();
+    if (!trimmed) return undefined;
+    const normalized = trimmed.includes(',')
+      ? trimmed.replace(/\./g, '').replace(',', '.')
+      : trimmed;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+  };
   const normalizeSearchValue = (value: string) =>
     (value || '')
       .normalize('NFD')
@@ -343,6 +357,48 @@ export default function LCPage() {
     }
   };
 
+  const dialogMacroRows = useMemo(() => buildMacroRows(gridRows), [gridRows]);
+  const macroRowsCount = dialogMacroRows.length;
+  const macroContext: 'sem_pendencias' | 'com_pendencias' = useMemo(
+    () => (gridRows.some((row) => row.status !== 'ok') ? 'com_pendencias' : 'sem_pendencias'),
+    [gridRows],
+  );
+  const effectiveMacroFileName = useMemo(() => {
+    if (macroRowsCount === 0) return '';
+    if (macroFileName) return macroFileName;
+    const sourceNames = pdfFileNames.length ? pdfFileNames : [workListName || 'lista-manual'];
+    return buildMacroFileName(sourceNames);
+  }, [macroRowsCount, macroFileName, pdfFileNames, workListName]);
+
+  const manualSearchResults = useMemo(() => {
+    const q = normalizeSearchValue(manualSearchQuery);
+    if (!q) return [];
+    const digitsQ = onlyDigits(manualSearchQuery);
+    return rowsForDisplay
+      .filter((row) =>
+        normalizeSearchValue(row.favorecidoNome).includes(q) ||
+        (digitsQ && onlyDigits(row.favorecidoDocumento).includes(digitsQ)),
+      )
+      .slice(0, 6);
+  }, [rowsForDisplay, manualSearchQuery]);
+
+  const handleOpenManualWorkList = () => {
+    setGridRows([]);
+    setPdfFileNames([]);
+    setTotalBolsistasProcessados(0);
+    setMacroFileName('');
+    setExpandedRowId(null);
+    setChunkIndex(0);
+    setDialogTab('grid');
+    setIsCopied(false);
+    setWorkListName('Lista manual');
+    setActiveSavedListId(null);
+    setShowManualAddPanel(true);
+    setManualSearchQuery('');
+    setCopySourceListId('');
+    setMacroDialogOpen(true);
+  };
+
   const handleOpenSavedWorkList = (savedList: LcSavedList<LcGridRow>) => {
     if (!savedList.rows.length) {
       toast.error('A lista salva nao possui linhas.');
@@ -350,31 +406,148 @@ export default function LCPage() {
     }
 
     const macroRows = buildMacroRows(savedList.rows);
-    const hasPendencias = savedList.rows.some((row) => row.status !== 'ok');
-    const macro = macroRows.length > 0
-      ? buildSiafiListaCredoresMacro(macroRows, {
-          scriptName: hasPendencias ? 'Lista de Credores - Pendencias' : 'Lista de Credores',
-          author: 'sistema-gerencial',
-          includeFirstConfirmationEnter: true,
-        })
-      : '';
 
     setGridRows(savedList.rows);
     setPdfFileNames(savedList.sourcePdfNames);
     setTotalBolsistasProcessados(savedList.rows.length);
-    setMacroContent(macro);
     setMacroFileName(macroRows.length > 0 ? buildMacroFileName(savedList.sourcePdfNames) : '');
-    setMacroRowsCount(macroRows.length);
-    setMacroContext(hasPendencias ? 'com_pendencias' : 'sem_pendencias');
-    setDialogMacroRows(macroRows);
     setExpandedRowId(null);
     setChunkIndex(0);
     setDialogTab('grid');
     setIsCopied(false);
     setWorkListName(savedList.name);
     setActiveSavedListId(savedList.id);
+    setShowManualAddPanel(false);
+    setCopySourceListId('');
     setSavedListsDialogOpen(false);
     setMacroDialogOpen(true);
+  };
+
+  const handleCopySavedWorkList = (savedList: LcSavedList<LcGridRow>) => {
+    if (!savedList.rows.length) {
+      toast.error('A lista selecionada nao possui linhas para copiar.');
+      return;
+    }
+
+    const clonedRows = cloneLcGridRowsForCopy(savedList.rows);
+    const macroRows = buildMacroRows(clonedRows);
+    const copyName = `Cópia de ${savedList.name}`.slice(0, 160);
+
+    setGridRows(clonedRows);
+    setPdfFileNames([]);
+    setTotalBolsistasProcessados(clonedRows.length);
+    setMacroFileName(macroRows.length > 0 ? buildMacroFileName([copyName]) : '');
+    setExpandedRowId(null);
+    setChunkIndex(0);
+    setDialogTab('grid');
+    setIsCopied(false);
+    setWorkListName(copyName);
+    setActiveSavedListId(null);
+    setShowManualAddPanel(false);
+    setCopySourceListId('');
+    setSavedListsDialogOpen(false);
+    setMacroDialogOpen(true);
+    toast.success(`Lista "${savedList.name}" copiada. Edite e salve como uma nova lista.`);
+  };
+
+  const handleImportFromSavedList = (sourceId: string) => {
+    const source = savedWorkLists.find((item) => item.id === sourceId);
+    if (!source || !source.rows.length) {
+      toast.error('Selecione uma lista salva válida com alunos.');
+      return;
+    }
+
+    const clonedRows = cloneLcGridRowsForCopy(source.rows);
+    if (gridRows.length === 0) {
+      setGridRows(clonedRows);
+      setTotalBolsistasProcessados(clonedRows.length);
+      if (workListName === 'Lista manual' || !workListName.trim()) {
+        setWorkListName(`Cópia de ${source.name}`.slice(0, 160));
+      }
+      setChunkIndex(0);
+      setExpandedRowId(null);
+      setCopySourceListId('');
+      toast.success(`${clonedRows.length} aluno(s) copiado(s) de "${source.name}".`);
+      return;
+    }
+
+    const existingCpfs = new Set(gridRows.map((row) => onlyDigits(row.cpf)));
+    const newRows = clonedRows.filter((row) => !existingCpfs.has(onlyDigits(row.cpf)));
+    if (!newRows.length) {
+      toast.warning(`Todos os alunos de "${source.name}" já estão na lista atual.`);
+      return;
+    }
+
+    setGridRows((current) => [...current, ...newRows]);
+    setTotalBolsistasProcessados((current) => current + newRows.length);
+    setCopySourceListId('');
+    toast.success(`${newRows.length} aluno(s) adicionado(s) de "${source.name}".`);
+  };
+
+  const handleAddManualRow = (custom?: {
+    cpf: string;
+    nome?: string;
+    banco?: string;
+    agencia?: string;
+    conta?: string;
+    valor?: number;
+  }) => {
+    const cpfDigits = onlyDigits(custom ? custom.cpf : manualCpf);
+    if (cpfDigits.length !== 11) {
+      toast.error('Informe um CPF válido com 11 dígitos.');
+      return;
+    }
+
+    const valor = custom ? custom.valor : parseCurrencyInput(manualValor);
+    const newRow = buildManualLcGridRow(
+      {
+        cpf: cpfDigits,
+        nome: custom ? custom.nome : manualNome,
+        banco: custom ? custom.banco : manualBanco,
+        agencia: custom ? custom.agencia : manualAgencia,
+        conta: custom ? custom.conta : manualConta,
+        valor,
+      },
+      rows,
+      env.siafiContaPagadora || '',
+    );
+
+    setGridRows((current) => {
+      const next = [...current, newRow];
+      const lastChunk = Math.max(0, Math.ceil(next.length / 7) - 1);
+      setChunkIndex(lastChunk);
+      return next;
+    });
+    setTotalBolsistasProcessados((current) => current + 1);
+    setIsCopied(false);
+
+    if (!custom) {
+      setManualCpf('');
+      setManualNome('');
+      setManualBanco('');
+      setManualAgencia('');
+      setManualConta('');
+    }
+    toast.success(`${newRow.nome || cpfDigits} adicionado à lista.`);
+  };
+
+  const handleRemoveGridRow = (rowId: string) => {
+    setGridRows((current) => {
+      const next = current.filter((row) => row.id !== rowId);
+      const maxChunk = Math.max(0, Math.ceil(next.length / 7) - 1);
+      setChunkIndex((prev) => Math.min(prev, maxChunk));
+      return next;
+    });
+    if (expandedRowId === rowId) setExpandedRowId(null);
+    setIsCopied(false);
+  };
+
+  const handleUpdateRowValor = (rowId: string, valueText: string) => {
+    const parsed = parseCurrencyInput(valueText);
+    setGridRows((current) =>
+      current.map((row) => (row.id === rowId ? { ...row, valor: parsed } : row)),
+    );
+    setIsCopied(false);
   };
 
   const handleDeleteSavedWorkList = async (id: string) => {
@@ -391,33 +564,19 @@ export default function LCPage() {
   };
 
   const handleConfirmarGeracaoMacro = () => {
-    if (!dialogMacroRows.length || !macroFileName) {
+    if (!dialogMacroRows.length || !effectiveMacroFileName) {
       toast.error('Nao foi possivel gerar a macro desta comparacao.');
       return;
     }
 
-    // Regenerar a macro com base nos dados e seleções atuais da grade!
-    const updatedMacroRows = dialogMacroRows.map((mRow) => {
-      const match = gridRows.find((gRow) => gRow.cpf === mRow.cpf);
-      if (match) {
-        return {
-          ...mRow,
-          bancoCodigo: match.selectedBanco,
-          agenciaCodigo: match.selectedAgencia,
-          contaFavorecido: match.selectedConta,
-        };
-      }
-      return mRow;
-    });
-
-    const finalMacroContent = buildSiafiListaCredoresMacro(updatedMacroRows, {
+    const finalMacroContent = buildSiafiListaCredoresMacro(dialogMacroRows, {
       scriptName: macroContext === 'sem_pendencias' ? 'Lista de Credores' : 'Lista de Credores - Pendencias',
       author: 'sistema-gerencial',
       includeFirstConfirmationEnter: true,
     });
 
-    downloadSiafiMacroFile(finalMacroContent, macroFileName);
-    toast.success(`Macro gerada com sucesso: ${macroFileName}`);
+    downloadSiafiMacroFile(finalMacroContent, effectiveMacroFileName);
+    toast.success(`Macro gerada com sucesso: ${effectiveMacroFileName}`);
   };
 
   const handleCompararPdf = async (files: FileList | null) => {
@@ -470,24 +629,14 @@ export default function LCPage() {
 
         // A grade (e o salvamento da lista) fica disponivel mesmo quando nenhuma
         // linha esta apta para a macro; nesse caso so a macro fica indisponivel.
-        const macro = macroRows.length > 0
-          ? buildSiafiListaCredoresMacro(macroRows, {
-              scriptName: resultado.length === 0 ? 'Lista de Credores' : 'Lista de Credores - Pendencias',
-              author: 'sistema-gerencial',
-              includeFirstConfirmationEnter: true,
-            })
-          : '';
-
-        setMacroContent(macro);
         setMacroFileName(macroRows.length > 0 ? buildMacroFileName(sourcePdfNames) : '');
-        setMacroRowsCount(macroRows.length);
-        setMacroContext(resultado.length === 0 ? 'sem_pendencias' : 'com_pendencias');
-        setDialogMacroRows(macroRows);
         setGridRows(fullGridRows);
         setExpandedRowId(null);
         setChunkIndex(0);
         setDialogTab('grid');
         setIsCopied(false);
+        setShowManualAddPanel(false);
+        setCopySourceListId('');
         setWorkListName(getDefaultWorkListName(sourcePdfNames));
         setActiveSavedListId(null);
         setMacroDialogOpen(true);
@@ -495,9 +644,7 @@ export default function LCPage() {
           toast.warning('Nao ha linhas aptas para gerar macro; a lista ainda pode ser salva.');
         }
       } else {
-        setMacroContent('');
         setMacroFileName('');
-        setMacroRowsCount(0);
         setMacroDialogOpen(false);
       }
 
@@ -526,7 +673,16 @@ export default function LCPage() {
       <SectionPanel 
         title="Lista de Credores (LC)"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              onClick={handleOpenManualWorkList}
+              size="sm"
+              variant="outline"
+              className="gap-space-2 h-space-9 shadow-shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              Montar lista manualmente
+            </Button>
             <Button
               onClick={() => setSavedListsDialogOpen(true)}
               size="sm"
@@ -759,8 +915,178 @@ export default function LCPage() {
                   </div>
                 </div>
 
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={showManualAddPanel ? 'secondary' : 'outline'}
+                    onClick={() => setShowManualAddPanel((prev) => !prev)}
+                    className="h-8 gap-1.5 text-xs"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    {showManualAddPanel ? 'Ocultar inclusão manual' : 'Adicionar aluno'}
+                  </Button>
+
+                  {savedWorkLists.length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        aria-label="Copiar de lista anterior"
+                        value={copySourceListId}
+                        onChange={(e) => setCopySourceListId(e.target.value)}
+                        className="h-8 max-w-[220px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 text-xs text-slate-700 dark:text-slate-200"
+                      >
+                        <option value="">Copiar de lista anterior...</option>
+                        {savedWorkLists.map((list) => (
+                          <option key={list.id} value={list.id}>
+                            {list.name} ({list.rows.length})
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={!copySourceListId}
+                        onClick={() => handleImportFromSavedList(copySourceListId)}
+                        className="h-8 gap-1 px-2.5 text-xs"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        Copiar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {showManualAddPanel && (
+                  <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 p-3 space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block">
+                        Buscar credor já cadastrado na LC
+                      </label>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          aria-label="Buscar credor na LC para adicionar"
+                          value={manualSearchQuery}
+                          onChange={(e) => setManualSearchQuery(e.target.value)}
+                          placeholder="Digite CPF ou nome do aluno na LC..."
+                          className="h-8 pl-8 text-xs"
+                        />
+                      </div>
+                      {manualSearchResults.length > 0 && (
+                        <div className="max-h-36 overflow-y-auto rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
+                          {manualSearchResults.map((item) => (
+                            <div
+                              key={`${item.obListaCredores}-${item.sequencial}-${item.contaBancaria}`}
+                              className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs"
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-slate-800 dark:text-slate-200">
+                                  {item.favorecidoNome || item.favorecidoDocumento}
+                                </p>
+                                <p className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                                  {item.favorecidoDocumento} · B:{item.bancoCodigo || '-'} A:{item.agenciaCodigo || '-'} C:{item.contaBancaria || '-'}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-[11px] shrink-0"
+                                onClick={() =>
+                                  handleAddManualRow({
+                                    cpf: item.favorecidoDocumento,
+                                    nome: item.favorecidoNome,
+                                    banco: item.bancoCodigo,
+                                    agencia: item.agenciaCodigo,
+                                    conta: item.contaBancaria,
+                                    valor: parseCurrencyInput(manualValor),
+                                  })
+                                }
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Adicionar
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border-t border-slate-200 dark:border-slate-800 pt-2.5 space-y-2">
+                      <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block">
+                        Ou informar dados manualmente
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <Input
+                          aria-label="CPF do aluno"
+                          value={manualCpf}
+                          onChange={(e) => setManualCpf(e.target.value)}
+                          placeholder="CPF *"
+                          className="h-8 text-xs font-mono"
+                        />
+                        <Input
+                          aria-label="Nome do aluno"
+                          value={manualNome}
+                          onChange={(e) => setManualNome(e.target.value)}
+                          placeholder="Nome"
+                          className="h-8 text-xs sm:col-span-2"
+                        />
+                        <Input
+                          aria-label="Banco do aluno"
+                          value={manualBanco}
+                          onChange={(e) => setManualBanco(e.target.value)}
+                          placeholder="Banco (ex: 001)"
+                          className="h-8 text-xs font-mono"
+                        />
+                        <Input
+                          aria-label="Agência do aluno"
+                          value={manualAgencia}
+                          onChange={(e) => setManualAgencia(e.target.value)}
+                          placeholder="Agência"
+                          className="h-8 text-xs font-mono"
+                        />
+                        <Input
+                          aria-label="Conta do aluno"
+                          value={manualConta}
+                          onChange={(e) => setManualConta(e.target.value)}
+                          placeholder="Conta"
+                          className="h-8 text-xs font-mono"
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                            Valor (R$):
+                          </label>
+                          <Input
+                            aria-label="Valor da bolsa em reais"
+                            value={manualValor}
+                            onChange={(e) => setManualValor(e.target.value)}
+                            placeholder="300,00"
+                            className="h-8 w-28 text-xs font-mono"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => handleAddManualRow()}
+                          className="h-8 gap-1.5 px-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Adicionar à lista
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Pagination Info */}
-                {(() => {
+                {gridRows.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-slate-300 dark:border-slate-700 p-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                    Nenhum aluno na lista ainda. Busque na LC, informe os dados acima ou copie de uma lista anterior.
+                  </div>
+                ) : (() => {
                   const totalStudents = gridRows.length;
                   const totalChunks = Math.ceil(totalStudents / 7);
                   const startIdx = chunkIndex * 7;
@@ -874,7 +1200,34 @@ export default function LCPage() {
                                             <p className="text-xs font-bold text-slate-850 dark:text-slate-100">
                                               Resolução de Conta: <span className="font-semibold text-slate-600 dark:text-slate-400">{row.nome}</span>
                                             </p>
-                                            <span className="text-[10px] text-slate-450 italic">Clique na linha do aluno para recolher</span>
+                                            <div className="flex items-center gap-2">
+                                              <div className="flex items-center gap-1.5">
+                                                <label className="text-[11px] text-slate-500 dark:text-slate-400">Valor (R$):</label>
+                                                <Input
+                                                  aria-label={`Valor de ${row.nome || row.cpf}`}
+                                                  type="number"
+                                                  step="0.01"
+                                                  min="0"
+                                                  value={row.valor ?? ''}
+                                                  onClick={(e) => e.stopPropagation()}
+                                                  onChange={(e) => handleUpdateRowValor(row.id, e.target.value)}
+                                                  className="h-7 w-24 text-xs font-mono"
+                                                />
+                                              </div>
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleRemoveGridRow(row.id);
+                                                }}
+                                                className="h-7 px-2 text-[11px] text-destructive hover:text-destructive"
+                                              >
+                                                <Trash2 className="h-3 w-3 mr-1" />
+                                                Remover
+                                              </Button>
+                                            </div>
                                           </div>
                                           
                                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
@@ -1108,7 +1461,7 @@ export default function LCPage() {
                   <div className="grid grid-cols-2 gap-4 text-xs">
                     <div>
                       <span className="text-slate-500 dark:text-slate-450 block mb-0.5">Nome do Arquivo</span>
-                      <span className="font-semibold text-slate-850 dark:text-slate-100 font-mono break-all">{macroFileName}</span>
+                      <span className="font-semibold text-slate-850 dark:text-slate-100 font-mono break-all">{effectiveMacroFileName || '-'}</span>
                     </div>
                     <div>
                       <span className="text-slate-500 dark:text-slate-450 block mb-0.5">Registros a Preencher</span>
@@ -1213,6 +1566,16 @@ export default function LCPage() {
                       className="h-8 px-3 text-xs"
                     >
                       Abrir
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleCopySavedWorkList(savedList)}
+                      aria-label={`Copiar lista ${savedList.name}`}
+                      className="h-8 gap-1 px-2.5 text-xs"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      Copiar
                     </Button>
                     <Button
                       size="icon"
