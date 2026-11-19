@@ -10,7 +10,11 @@ import { authenticateExtensionAccessToken } from '@/lib/extensionSupabase';
 import type { LcSavedList } from '@/lib/lcSavedLists';
 import { SUAP_EXTENSION_ORIGIN } from '@/lib/suapExtensionDispatch';
 import { loadLatestLCRowsFromDb, type LCRegistro } from '@/services/lcImportService';
-import { loadSharedLcSavedLists, saveSharedLcSavedList } from '@/services/lcSavedListsService';
+import {
+  findSharedLcSavedListById,
+  loadSharedLcSavedLists,
+  saveSharedLcSavedList,
+} from '@/services/lcSavedListsService';
 import { countLcGridPendencias, type LcGridRow } from '@/services/lcWorkListBuilder';
 
 export type SuapExtensionLcModalInit = {
@@ -37,6 +41,7 @@ export default function SuapExtensionLc() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lcRows, setLcRows] = useState<LCRegistro[]>([]);
+  const [isLoadingLcRows, setIsLoadingLcRows] = useState(false);
   const [savedWorkLists, setSavedWorkLists] = useState<LcSavedList<LcGridRow>[]>([]);
   const [gridRows, setGridRows] = useState<LcGridRow[]>([]);
   const [workListName, setWorkListName] = useState('Lista de trabalho');
@@ -73,17 +78,9 @@ export default function SuapExtensionLc() {
       if (!active) return;
       clientRef.current = client;
 
-      const [latestLc, sharedLists] = await Promise.all([
-        loadLatestLCRowsFromDb(client),
-        loadSharedLcSavedLists<LcGridRow>(client),
-      ]);
-      if (!active) return;
-
-      setLcRows(latestLc.rows);
-      setSavedWorkLists(sharedLists);
-
       if (initContext.mode === 'open' && initContext.listId) {
-        const target = sharedLists.find((item) => item.id === initContext.listId);
+        const target = await findSharedLcSavedListById<LcGridRow>(initContext.listId, client);
+        if (!active) return;
         if (!target) {
           setErrorMessage('A lista de trabalho indicada não foi encontrada (pode ter sido excluída).');
         } else {
@@ -96,13 +93,34 @@ export default function SuapExtensionLc() {
         setWorkListName(initContext.nome?.trim() || 'Lista manual');
         setActiveSavedListId(null);
       }
+
+      if (active) setIsLoading(false);
+
+      // Carrega listas anteriores e base da LC em segundo plano para nao travar a abertura do modal.
+      void loadSharedLcSavedLists<LcGridRow>(client)
+        .then((sharedLists) => {
+          if (active) setSavedWorkLists(sharedLists);
+        })
+        .catch((error) => {
+          console.warn('Nao foi possivel carregar listas salvas da LC:', error);
+        });
+
+      setIsLoadingLcRows(true);
+      void loadLatestLCRowsFromDb(client)
+        .then((latestLc) => {
+          if (active) setLcRows(latestLc.rows);
+        })
+        .catch((error) => {
+          console.warn('Nao foi possivel carregar base de credores da LC:', error);
+        })
+        .finally(() => {
+          if (active) setIsLoadingLcRows(false);
+        });
     })()
       .catch((error) => {
         if (!active) return;
         setErrorMessage(error instanceof Error ? error.message : 'Não foi possível carregar a Lista de Credores.');
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
+        setIsLoading(false);
       });
 
     return () => {
@@ -158,12 +176,20 @@ export default function SuapExtensionLc() {
   const theme = initContext?.theme === 'light' ? 'light' : 'dark';
   const isDark = theme === 'dark';
 
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('dark', isDark);
+    return () => {
+      root.classList.remove('dark');
+    };
+  }, [isDark]);
+
   const renderExtensionHeader = (copyControl?: React.ReactNode) => (
     <header className={`pb-3 mb-4 border-b flex flex-wrap items-center justify-between gap-3 shrink-0 ${
       isDark ? 'border-zinc-800' : 'border-slate-200'
     }`}>
       <div>
-        <h1 className="text-lg font-bold flex items-center gap-2 tracking-tight">
+        <h1 className={`text-lg font-bold flex items-center gap-2 tracking-tight ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>
           <TableIcon className={`h-5 w-5 ${isDark ? 'text-teal-400' : 'text-emerald-700'}`} />
           Lista de Credores
         </h1>
@@ -226,6 +252,7 @@ export default function SuapExtensionLc() {
           initialShowManualAdd={initContext?.mode === 'manual'}
           contaPagadora={env.siafiContaPagadora || ''}
           variant="suap"
+          isLoadingLcRows={isLoadingLcRows}
           renderHeader={renderExtensionHeader}
         />
       )}

@@ -77,6 +77,21 @@ export async function findSharedLcSavedListBySuapId<Row = unknown>(
   return data ? mapSavedList<Row>(data as unknown as LcSavedListDbRow) : null;
 }
 
+/** Busca uma unica lista salva pelo ID. */
+export async function findSharedLcSavedListById<Row = unknown>(
+  id: string,
+  client: SupabaseClient = supabase,
+): Promise<LcSavedList<Row> | null> {
+  const { data, error } = await client
+    .from('lc_saved_lists')
+    .select(SAVED_LIST_SELECT)
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? mapSavedList<Row>(data as unknown as LcSavedListDbRow) : null;
+}
+
 export async function saveSharedLcSavedList<Row = unknown>(
   input: SaveSharedLcListInput<Row>,
   client: SupabaseClient = supabase,

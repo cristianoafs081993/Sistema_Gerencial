@@ -87,6 +87,7 @@ export type LcWorkListEditorProps = {
   initialShowManualAdd?: boolean;
   contaPagadora?: string;
   variant?: 'default' | 'suap';
+  isLoadingLcRows?: boolean;
   renderHeader?: (copyControl: React.ReactNode) => React.ReactNode;
 };
 
@@ -102,6 +103,7 @@ export function LcWorkListEditor({
   onClose,
   contaPagadora = '',
   variant = 'default',
+  isLoadingLcRows = false,
   renderHeader,
 }: LcWorkListEditorProps) {
   const isSuap = variant === 'suap';
@@ -239,7 +241,7 @@ export function LcWorkListEditor({
         aria-label="Copiar de lista anterior"
         value={copySourceListId}
         onChange={(e) => setCopySourceListId(e.target.value)}
-        className="h-8 max-w-[220px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 text-xs text-slate-700 dark:text-slate-200"
+        className="h-8 max-w-[220px] rounded-md border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 text-xs text-slate-700 dark:text-zinc-100"
       >
         <option value="">Copiar de lista anterior...</option>
         {savedWorkLists.map((list) => (
@@ -270,9 +272,9 @@ export function LcWorkListEditor({
           <div className="flex items-center justify-end">{copyControl}</div>
         ) : null}
 
-          <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 p-3 space-y-3">
+        <div className="rounded-md border border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/70 p-3 space-y-3">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block">
+              <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block">
                 Buscar credor já cadastrado na LC
               </label>
               <div className="relative">
@@ -282,9 +284,14 @@ export function LcWorkListEditor({
                   value={manualSearchQuery}
                   onChange={(e) => setManualSearchQuery(e.target.value)}
                   placeholder="Digite CPF ou nome do aluno na LC..."
-                  className="h-8 pl-8 text-xs"
+                  className="h-8 pl-8 text-xs dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100"
                 />
               </div>
+              {isLoadingLcRows && manualSearchQuery.trim() && (
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                  Carregando base da LC...
+                </p>
+              )}
               {manualSearchResults.length > 0 && (
                 <div className="max-h-36 overflow-y-auto rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
                   {manualSearchResults.map((item) => (
@@ -411,36 +418,36 @@ export function LcWorkListEditor({
               </span>
             </div>
 
-            <div className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
+            <div className="border border-slate-200 dark:border-zinc-800 rounded-md overflow-hidden bg-white dark:bg-zinc-950 shadow-sm">
               <Table>
-                <TableHeader className="bg-slate-50/80 dark:bg-slate-850">
-                  <TableRow className="hover:bg-transparent border-b border-slate-200 dark:border-slate-850">
-                    <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-350">CPF</TableHead>
-                    <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-350">Banco</TableHead>
-                    <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-350">Ag.</TableHead>
-                    <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-350">Conta</TableHead>
-                    <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-350">Valor</TableHead>
+                <TableHeader className="bg-slate-50/80 dark:bg-zinc-800/80">
+                  <TableRow className="hover:bg-transparent border-b border-slate-200 dark:border-zinc-800">
+                    <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-zinc-200">CPF</TableHead>
+                    <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-zinc-200">Banco</TableHead>
+                    <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-zinc-200">Ag.</TableHead>
+                    <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-zinc-200">Conta</TableHead>
+                    <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-zinc-200">Valor</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="text-slate-900 dark:text-zinc-100">
                   {currentChunk.map((row, idx) => {
                     const isSeventhRow = idx === 6 || (startIdx + idx + 1) % 7 === 0;
                     const isExpanded = expandedRowId === row.id;
 
-                    let rowClass = 'hover:bg-slate-50/50 dark:hover:bg-slate-850/30';
+                    let rowClass = 'hover:bg-slate-50/50 dark:hover:bg-zinc-800/40';
                     if (row.status === 'aluno_nao_encontrado') {
-                      rowClass = 'bg-red-50/40 dark:bg-red-950/10 hover:bg-red-50/60 dark:hover:bg-red-950/20 border-l-4 border-l-red-500';
+                      rowClass = 'bg-red-50/40 dark:bg-red-950/25 hover:bg-red-50/60 dark:hover:bg-red-950/35 border-l-4 border-l-red-500';
                     } else if (row.status === 'conta_nao_encontrada') {
-                      rowClass = 'bg-amber-50/40 dark:bg-amber-950/10 hover:bg-amber-50/60 dark:hover:bg-amber-950/20 border-l-4 border-l-amber-500';
+                      rowClass = 'bg-amber-50/40 dark:bg-amber-950/25 hover:bg-amber-50/60 dark:hover:bg-amber-950/35 border-l-4 border-l-amber-500';
                     } else if (isSeventhRow) {
-                      rowClass = 'bg-yellow-50/70 hover:bg-yellow-150/80 dark:bg-yellow-950/20 dark:hover:bg-yellow-900/30 text-yellow-900 dark:text-yellow-100 font-semibold border-y border-yellow-250 dark:border-yellow-900/60';
+                      rowClass = 'bg-yellow-50/70 hover:bg-yellow-150/80 dark:bg-amber-950/30 dark:hover:bg-amber-900/40 text-yellow-900 dark:text-amber-200 font-semibold border-y border-yellow-200 dark:border-amber-900/60';
                     }
 
                     return (
                       <React.Fragment key={row.id}>
                         <TableRow
                           onClick={() => setExpandedRowId(isExpanded ? null : row.id)}
-                          className={`border-b border-slate-100 dark:border-slate-850/50 last:border-0 transition-colors cursor-pointer ${rowClass}`}
+                          className={`border-b border-slate-100 dark:border-zinc-800/80 last:border-0 transition-colors cursor-pointer ${rowClass}`}
                         >
                           <TableCell className="px-4 py-2.5 text-xs font-mono flex items-center gap-1.5">
                             <span>{padLeft(row.cpf, 11)}</span>
