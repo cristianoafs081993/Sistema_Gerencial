@@ -17,6 +17,7 @@ export type SuapExtensionLcModalInit = {
   suapId: string;
   processNumber?: string;
   mode: 'open' | 'manual';
+  theme?: 'dark' | 'light';
   listId?: string;
   nome?: string;
   extensionSession?: {
@@ -154,15 +155,20 @@ export default function SuapExtensionLc() {
     }
   };
 
+  const theme = initContext?.theme === 'light' ? 'light' : 'dark';
+  const isDark = theme === 'dark';
+
   const renderExtensionHeader = (copyControl?: React.ReactNode) => (
-    <header className="pb-3 mb-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+    <header className={`pb-3 mb-4 border-b flex flex-wrap items-center justify-between gap-3 shrink-0 ${
+      isDark ? 'border-zinc-800' : 'border-slate-200'
+    }`}>
       <div>
-        <h1 className="text-lg font-bold flex items-center gap-2">
-          <TableIcon className="h-5 w-5 text-indigo-500" />
+        <h1 className="text-lg font-bold flex items-center gap-2 tracking-tight">
+          <TableIcon className={`h-5 w-5 ${isDark ? 'text-teal-400' : 'text-emerald-700'}`} />
           Lista de Credores
         </h1>
         {initContext?.processNumber && (
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
             Processo {initContext.processNumber}
           </p>
         )}
@@ -175,7 +181,7 @@ export default function SuapExtensionLc() {
           variant="ghost"
           aria-label="Fechar"
           onClick={handleClose}
-          className="h-8 w-8"
+          className={`h-8 w-8 ${isDark ? 'text-zinc-400 hover:bg-zinc-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
         >
           <X className="h-4 w-4" />
         </Button>
@@ -184,11 +190,13 @@ export default function SuapExtensionLc() {
   );
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 p-5 overflow-hidden">
+    <div className={`h-screen w-screen flex flex-col p-5 overflow-hidden ${
+      isDark ? 'dark bg-zinc-900 text-zinc-100' : 'bg-slate-50 text-slate-900'
+    }`}>
       {isLoading ? (
         <>
           {renderExtensionHeader()}
-          <div className="flex-1 flex items-center justify-center gap-2 text-sm text-slate-500">
+          <div className={`flex-1 flex items-center justify-center gap-2 text-sm ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
             <Loader2 className="h-4 w-4 animate-spin" />
             Carregando Lista de Credores...
           </div>
@@ -197,7 +205,7 @@ export default function SuapExtensionLc() {
         <>
           {renderExtensionHeader()}
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
-            <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>
+            <p className={`text-sm ${isDark ? 'text-red-400' : 'text-red-600'}`}>{errorMessage}</p>
             <Button type="button" variant="outline" size="sm" onClick={handleClose}>
               Fechar
             </Button>
@@ -217,6 +225,7 @@ export default function SuapExtensionLc() {
           onClose={handleClose}
           initialShowManualAdd={initContext?.mode === 'manual'}
           contaPagadora={env.siafiContaPagadora || ''}
+          variant="suap"
           renderHeader={renderExtensionHeader}
         />
       )}

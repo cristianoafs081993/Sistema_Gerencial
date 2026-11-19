@@ -86,6 +86,7 @@ export type LcWorkListEditorProps = {
   onClose: () => void;
   initialShowManualAdd?: boolean;
   contaPagadora?: string;
+  variant?: 'default' | 'suap';
   renderHeader?: (copyControl: React.ReactNode) => React.ReactNode;
 };
 
@@ -100,8 +101,10 @@ export function LcWorkListEditor({
   onSave,
   onClose,
   contaPagadora = '',
+  variant = 'default',
   renderHeader,
 }: LcWorkListEditorProps) {
+  const isSuap = variant === 'suap';
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
   const [chunkIndex, setChunkIndex] = useState(0);
   const [isCopied, setIsCopied] = useState(false);
@@ -380,7 +383,11 @@ export function LcWorkListEditor({
                   type="button"
                   size="sm"
                   onClick={() => handleAddManualRow()}
-                  className="h-8 gap-1.5 px-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className={`h-8 gap-1.5 px-3 text-xs text-white ${
+                    isSuap
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-indigo-600 hover:bg-indigo-700'
+                  }`}
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Adicionar à lista
@@ -705,7 +712,9 @@ export function LcWorkListEditor({
                 className={`h-8 px-4 text-xs font-semibold gap-1.5 transition-all ${
                   isCopied
                     ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
+                    : isSuap
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
                 }`}
               >
                 {isCopied ? (

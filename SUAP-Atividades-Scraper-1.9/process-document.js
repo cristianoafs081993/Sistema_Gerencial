@@ -1718,6 +1718,7 @@
       suapId,
       processNumber: getProcessNumber() || '',
       mode,
+      theme: state.theme || 'dark',
       ...(listId ? { listId } : {}),
       ...(nome ? { nome } : {}),
       extensionSession: session?.accessToken ? { accessToken: session.accessToken } : null,
@@ -1734,7 +1735,7 @@
     overlay.setAttribute('aria-modal', 'true');
     Object.assign(overlay.style, { position: 'fixed', inset: '0', zIndex: '2147483647', background: 'rgba(15,23,42,.62)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' });
     const modalPanel = document.createElement('div');
-    Object.assign(modalPanel.style, { position: 'relative', width: 'min(960px,96vw)', height: 'min(860px,94vh)', overflow: 'hidden', borderRadius: '12px', background: '#fff', boxShadow: '0 25px 50px -12px rgba(0,0,0,.55)' });
+    Object.assign(modalPanel.style, { position: 'relative', width: 'min(960px,96vw)', height: 'min(860px,94vh)', overflow: 'hidden', borderRadius: '12px', background: state.theme === 'light' ? '#ffffff' : '#18181b', boxShadow: '0 25px 50px -12px rgba(0,0,0,.55)' });
     const frame = document.createElement('iframe');
     frame.id = LC_IFRAME_ID;
     frame.src = `${SIAGES_ORIGIN}/suap-extensao/lc`;
