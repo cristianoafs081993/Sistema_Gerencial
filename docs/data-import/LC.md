@@ -105,7 +105,14 @@ O fluxo de comparação gera pendências de cruzamento e permite ao usuário:
 
 ## Montagem automática pela extensão (processos de bolsa, 1.9.92)
 
-Ao abrir no SUAP um processo cujo **Tipo** ou **Assunto** contenha `bolsa`/`bolsista` (ex.: Tipo "Ensino: Pagamento de Bolsa"), a extensão monta e salva a lista de trabalho sem que o usuário baixe ou envie PDF.
+Ao abrir no SUAP um processo de pagamento a estudantes, a extensão monta e salva a lista de trabalho sem que o usuário baixe ou envie PDF. O processo é reconhecido pelo **Tipo** ou pelo **Assunto** quando contém:
+- `bolsa`/`bolsista` (ex.: Tipo "Ensino: Pagamento de Bolsa");
+- auxílio estudantil: `auxílio transporte`, `moradia`, `alimentação`, `permanência`, `creche`, `emergencial`, `didático`, `material`, `saúde`, `digital`/`conectividade`/`internet` ou `inclusão`;
+- `programa de auxílio`, `assistência estudantil` ou `PAFE`.
+
+Os processos de auxílio-transporte (507441) e auxílio-moradia (507841) ficavam de fora até a correção, porque o critério só aceitava `bolsa`.
+
+Nesses processos os ofícios da COAES não trazem os alunos ("conforme detalhamento na planilha em anexo"). A lista está na planilha **"Folha de pagamento"**, um PDF exportado do Excel e anexado como documento digitalizado. O layout é de tabela: `Nº NOME MATRÍCULA CPF BANCO AGÊNCIA CONTA VALOR`, com valor individual por linha. O parser lê esse layout por script: 139 de 139 alunos no 507441 (4 páginas) e 7 de 7 no 507841. Quando o script não lê, a IA recebe a planilha/relação antes de qualquer despacho ou ofício.
 
 1. `process-document.js` lê os documentos da timeline (até 15), primeiro os de título ou tipo Ofício/Memorando/Relação/Lista/Planilha/Folha/bolsa.
    - **Documentos eletrônicos** (o ofício com os alunos é desse tipo): o HTML de `/documento_eletronico/conteudo_documento/<id>/` vira texto com uma linha por bloco (`htmlToBlockText`). O layout é o Format A, com rótulos.

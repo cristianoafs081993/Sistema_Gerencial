@@ -70,10 +70,26 @@ const normalize = (value: string | undefined) =>
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase();
 
-/** Mesmo criterio do mapa BPMN de bolsas (suapProcessFlow): assunto ou tipo com "bolsa"/"bolsista". */
+// Pagamentos a estudantes com lista de credores: bolsas e auxilios da assistencia estudantil
+// (ex.: Tipo "Pagamento de Auxílio-Transporte", "Auxílio-moradia", assunto "Programa de Auxílio Transporte").
+const STUDENT_PAYMENT_PATTERN = new RegExp([
+  '\\bbolsas?\\b',
+  '\\bbolsistas?\\b',
+  '\\bauxilios?[\\s-]*(?:estudantil|transporte|moradia|alimentacao|permanencia|creche|emergencial|didatico|material|saude|digital|conectividade|internet|inclusao)\\b',
+  '\\bprograma de auxilio\\b',
+  '\\bassistencia estudantil\\b',
+  '\\bpafe\\b',
+].join('|'));
+
+/** Processo de pagamento a estudantes (bolsa ou auxilio estudantil) pelo assunto ou tipo do SUAP. */
 export function isBolsaProcess(info: Pick<SuapLcProcessInfo, 'assunto' | 'tipoProcesso'>): boolean {
-  return /\bbolsas?\b|\bbolsistas?\b/.test(`${normalize(info.assunto)} ${normalize(info.tipoProcesso)}`);
+  return STUDENT_PAYMENT_PATTERN.test(`${normalize(info.assunto)} ${normalize(info.tipoProcesso)}`);
 }
+
+/** Titulo/tipo de documento que costuma trazer a relacao de alunos (a planilha anexa ao oficio). */
+const LIST_DOCUMENT_PATTERN = /\b(?:planilha|folha|relacao|lista|listagem|bolsistas|beneficiarios|estudantes|alunos)\b/;
+const isListDocument = (document: SuapExtensionLcDocument) =>
+  LIST_DOCUMENT_PATTERN.test(normalize(`${document.type} ${document.title}`));
 
 const hasBankData = (record: BolsistaPdfRecord) => Boolean(record.agencia?.trim() && record.conta?.trim());
 
@@ -99,7 +115,7 @@ async function readDocument(document: SuapExtensionLcDocument, deps: SuapLcAutoB
       records,
       complete: records.filter(hasBankData).length,
       expected: findExpectedBolsasCount(text),
-      mentionsBolsa: /bolsas?|bolsistas?/i.test(text),
+      mentionsBolsa: STUDENT_PAYMENT_PATTERN.test(normalize(text)),
       warnings: [],
     };
   }
@@ -140,12 +156,17 @@ function pickBest(readings: DocumentReading[]): DocumentReading | undefined {
   return [...readings].sort((a, b) => b.complete - a.complete || b.records.length - a.records.length)[0];
 }
 
-/** Documento enviado a IA quando o script falha: o que declara o total de bolsas, o que fala de bolsa, ou o primeiro. */
+/**
+ * Documento enviado a IA quando o script falha. Ordem: o que declara o total de bolsas, a planilha/relacao
+ * de alunos (o oficio costuma dizer "conforme planilha em anexo"), o que fala de bolsa/auxilio, o primeiro PDF.
+ */
 function pickAiCandidate(readings: DocumentReading[], best?: DocumentReading): DocumentReading | undefined {
   const usable = readings.filter((reading) => !reading.document.error && (reading.document.text || reading.document.bytes));
   if (best && best.records.length > 0) return best;
   return usable.find((reading) => reading.expected !== undefined)
+    ?? usable.find((reading) => isListDocument(reading.document))
     ?? usable.find((reading) => reading.mentionsBolsa)
+    ?? usable.find((reading) => reading.document.kind === 'pdf')
     ?? usable[0];
 }
 

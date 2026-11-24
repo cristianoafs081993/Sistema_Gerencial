@@ -24,6 +24,7 @@ Lista de credores automática 1.9.92: as regressões ficam em:
   - erro da extensão;
   - texto antes de PDF, com PDF irrelevante nunca aberto (regressão do travamento no 505643);
   - PDF que nunca termina, coberto pelo prazo, e PDF escaneado enviado à IA;
+  - auxílios estudantis reconhecidos (507441 transporte, 507841 moradia) e a planilha "Folha de pagamento" enviada à IA no lugar do despacho;
 - `SuapExtensionProcessInfo.test.tsx`: pedido de documentos, validação de origem, status e remontar;
 - `suapProcessDocumentExtension.test.ts`: `dt`/`dd`, `htmlToBlockText`, coleta priorizada, resposta com PDF transferido e card com link e remontar;
 - `LC.test.tsx`: `?lista=`, lista inexistente, origem, montagem manual (busca na LC e inclusão direta) e cópia de listas anteriores;

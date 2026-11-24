@@ -68,6 +68,19 @@ describe('isBolsaProcess', () => {
     expect(isBolsaProcess({ assunto: 'Liquidação NF 123 - Bolsas térmicas' })).toBe(true);
     expect(isBolsaProcess({ assunto: 'Liquidação de nota fiscal', tipoProcesso: 'Administração: Pagamento' })).toBe(false);
   });
+
+  it('reconhece auxilios estudantis (processos 507441 e 507841)', () => {
+    expect(isBolsaProcess({
+      tipoProcesso: 'Pagamento de Auxílio-Transporte',
+      assunto: 'Pagamento do Programa de Auxílio Transporte referente ao mês de dezembro de 2026.',
+    })).toBe(true);
+    expect(isBolsaProcess({
+      tipoProcesso: 'Auxílio-moradia',
+      assunto: 'Pagamento do Programa de Auxílio Moradia referente ao mês de novembro de 2026.',
+    })).toBe(true);
+    expect(isBolsaProcess({ assunto: 'Auxílio alimentação estudantil' })).toBe(true);
+    expect(isBolsaProcess({ assunto: 'Auxílio financeiro a pesquisador', tipoProcesso: 'Pesquisa' })).toBe(false);
+  });
 });
 
 describe('runSuapLcAutoBuild', () => {
@@ -204,6 +217,29 @@ describe('runSuapLcAutoBuild', () => {
 
     expect(deps.extractWithAi).toHaveBeenCalledWith(expect.objectContaining({ document: pdf }));
     expect(save.mock.calls[0][0].extraction?.warnings).toContain('PDF que trava: leitura do PDF excedeu o tempo limite.');
+    expect(result).toMatchObject({ stage: 'ready', method: 'ia', found: 1 });
+  });
+
+  it('em auxilio com a lista na planilha anexa, envia a planilha (nao o despacho) para a IA quando o script nao le', async () => {
+    // Estrutura dos processos 507441/507841: oficios sem alunos ("conforme planilha em anexo") e a
+    // "Folha de pagamento" como PDF digitalizado.
+    const planilha: SuapExtensionLcDocument = { id: '2801740', title: 'Folha de pagamento do Auxílio Transporte. Dezembro de 2026', type: 'Planilha', kind: 'pdf', bytes: new ArrayBuffer(8) };
+    const { deps } = makeDeps({
+      requestDocuments: vi.fn(async () => [
+        textDoc('1176001', 'Despacho 558/2026', 'Ao setor de contabilidade para liquidação.'),
+        planilha,
+        textDoc('1175931', 'Ofício Nº 94/2026', 'Solicito o pagamento do Programa de Auxílio Transporte aos estudantes contemplados, conforme detalhamento na planilha em anexo.'),
+      ]),
+      extractFromPdf: vi.fn(async () => ({ records: [], warnings: [] })),
+      extractWithAi: vi.fn(async () => ({
+        records: [{ cpf: '529.982.247-25', nome: 'ALUNA FICTICIA UM', banco: '001', agencia: '1234', conta: '12345678-9', sourceFile: planilha.title, valor: 150 }],
+      })),
+    });
+
+    const result = await runSuapLcAutoBuild({ suapId: '507441', processNumber: '23035.003398.2026-81', tipoProcesso: 'Pagamento de Auxílio-Transporte', assunto: 'Pagamento do Programa de Auxílio Transporte' }, deps);
+
+    expect(deps.extractFromPdf).toHaveBeenCalledWith(planilha);
+    expect(deps.extractWithAi).toHaveBeenCalledWith(expect.objectContaining({ document: planilha }));
     expect(result).toMatchObject({ stage: 'ready', method: 'ia', found: 1 });
   });
 

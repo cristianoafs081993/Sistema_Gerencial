@@ -101,10 +101,10 @@ export function normalizeBolsistasIaResponse(raw: unknown): BolsistasIaResult {
 
 export function buildBolsistasPrompt(title: string, processNumber: string, expectedCount?: number): string {
   return [
-    "Você extrai dados de pagamento de bolsas estudantis de um documento de processo do IFRN (ofício, relação ou planilha).",
+    "Você extrai dados de pagamento a estudantes (bolsas ou auxílios estudantis, como auxílio transporte e auxílio moradia) de um documento de processo do IFRN (ofício, relação, folha de pagamento ou planilha).",
     `Documento: ${title || "não informado"}. Processo: ${processNumber || "não informado"}.`,
     expectedCount ? `O documento declara ${expectedCount} bolsa(s).` : "",
-    "Liste cada aluno bolsista com: nome (sem a matrícula), cpf, banco (como escrito), bancoCodigo (código COMPE de 3 dígitos quando o documento trouxer ou quando o nome do banco for inequívoco; caso contrário, vazio), agencia, conta (com dígito verificador, inclusive X) e valor da bolsa em reais.",
+    "Liste cada aluno beneficiário com: nome (sem a matrícula), cpf, banco (como escrito), bancoCodigo (código COMPE de 3 dígitos quando o documento trouxer ou quando o nome do banco for inequívoco; caso contrário, vazio), agencia, conta (com dígito verificador, inclusive X) e valor a pagar ao aluno em reais (o valor individual da linha, não o total da planilha).",
     "Quando o valor é único para todos (por exemplo, 'corresponde a R$ 400,00 por pessoa'), repita-o em cada aluno.",
     "Regras: use somente o que está no documento; não invente nem complete dados ausentes (deixe vazio); ignore servidores, assinantes e chefias; não repita alunos.",
     "declaredCount: total de bolsas declarado no texto (ex.: '10 (dez) bolsas'), ou null.",

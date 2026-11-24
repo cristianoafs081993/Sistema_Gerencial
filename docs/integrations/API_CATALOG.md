@@ -744,7 +744,7 @@ Function chamada pela extensão na rota oficial de edição de ETP.
 
 `process-document.js` -> iframe `/suap-extensao/processo-info` -> `suapLcAutoBuildService` -> (script) `extractFromText`/`extractBolsistasFromPdfFiles` -> (só se falhar) `extrair-bolsistas-documento` -> `lc_saved_lists`.
 
-- Gatilho: abrir no SUAP um processo cujo Tipo ou Assunto (dados gerais, `dt`/`dd`) contenha `bolsa`/`bolsista`. O contexto passa a levar `tipoProcesso`.
+- Gatilho: abrir no SUAP um processo de pagamento a estudantes, pelo Tipo ou Assunto (dados gerais, `dt`/`dd`). Valem `bolsa`/`bolsista` e auxílios estudantis (transporte, moradia, alimentação e outros), além de `programa de auxílio`, `assistência estudantil` e `PAFE`; a lista completa está em `isBolsaProcess`, em `suapLcAutoBuildService.ts`. O contexto passa a levar `tipoProcesso`.
 - Mensagens da ponte, todas validadas por origem, `source` e `suapId`:
   - `siages:suap-lc-documents-request`, do iframe para a extensão;
   - `siages:suap-lc-documents-result`, da extensão para o iframe. Leva até 15 documentos com `{ id, title, type, kind: 'text'|'pdf', text?, bytes?, error? }`, e os PDFs vão por transferência;
