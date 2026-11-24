@@ -38,6 +38,7 @@ Caixas de marcar, em duas colunas, para os blocos do **Resumo** montado por `pro
 - Blocos sem dados no processo continuam fora do Resumo, mesmo marcados. O aviso de sincronização no topo do Resumo é sempre exibido.
 - Com todos os blocos ocultos, o Resumo mostra um aviso indicando onde reativá-los, em vez de ficar vazio.
 - As outras abas do painel (Orçamentário, Atalhos, IA e Config.) não mudam.
+- O bloco Beneficiário mostra só nome e CPF/CNPJ. O assunto saiu do Resumo porque já aparece nos **Dados gerais** do SUAP; ali a extensão insere um botão `⧉` (`.siages-page-copy`, estilo em `process-toolkit.css`) que copia o texto do `<dd>` do Assunto. O botão não entra no assunto lido pela extensão (`readDefinitionField` ignora o botão) e não é duplicado se o painel for reinstalado. Coberto em `suapProcessDocumentExtension.test.ts`.
 
 ### Valores revisados e mantidos fixos
 

@@ -325,6 +325,42 @@ describe('process-document 1.9', () => {
     }
   });
 
+  it('copia o assunto direto dos Dados gerais do SUAP e não o repete no Resumo', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const assunto = 'Pagamento do Programa de Auxílio Transporte referente ao mês de dezembro de 2026.';
+    document.body.innerHTML = `<main><aside id="timeline"><div>Recebido por COFINC/CN</div></aside><p>Processo 23035.000001.2026-11</p>
+      <dl class="definition-list"><div class="list-item"><dt>Tipo</dt><dd>Pagamento de Auxílio-Transporte</dd></div>
+      <div class="list-item"><dt>Assunto</dt><dd>${assunto}</dd></div></dl></main>`;
+    const api = loadProcessScript();
+    await api.installToolkit();
+
+    const dd = Array.from(document.querySelectorAll('dd')).find((item) => item.textContent?.includes('dezembro'))!;
+    const button = dd.querySelector('.siages-page-copy') as HTMLButtonElement;
+    expect(button).toHaveAttribute('aria-label', 'Copiar assunto');
+    expect(document.querySelectorAll('.siages-page-copy')).toHaveLength(1);
+    button.click();
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(assunto));
+    // O botão não entra no assunto lido pela extensão.
+    expect(api.buildContext()?.payload).toMatchObject({ assunto });
+    // Reinstalar não duplica o botão.
+    await api.installToolkit();
+    expect(dd.querySelectorAll('.siages-page-copy')).toHaveLength(1);
+
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-snapshot', version: 1, payload: {
+        fallback: { suapId: '321', processNumber: '23035.000001.2026-11' },
+        process: { suapId: '321', numProcesso: '23035.000001.2026-11', status: 'success', beneficiario: 'Fornecedor Alfa', cpfCnpj: '12345678000190', assunto, dadosCompletos: {} },
+      } },
+    }));
+    const summary = document.querySelector('[data-panel="summary"]')!;
+    await waitFor(() => expect(summary).toHaveTextContent('Fornecedor Alfa'));
+    expect(summary).not.toHaveTextContent('dezembro de 2026');
+    expect([...summary.querySelectorAll('.suape-data-row > span:first-child')].map((label) => label.textContent)).not.toContain('Assunto');
+  });
+
   it('permite copiar CPF/CNPJ somente com dígitos além do valor original', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });

@@ -258,11 +258,41 @@
 
     return result;
   }
-  function readDefinitionField(label) {
+  function findDefinitionValue(label) {
     const wanted = normalizeDocumentReviewText(label);
     const term = Array.from(document.querySelectorAll('dt')).find((dt) => normalizeDocumentReviewText(dt.textContent) === wanted);
     const value = term?.nextElementSibling;
-    return value?.tagName === 'DD' ? cleanText(value.textContent) : '';
+    return value?.tagName === 'DD' ? value : null;
+  }
+  // Texto do <dd> sem os botões que a extensão insere nele.
+  function definitionValueText(value) {
+    if (!value) return '';
+    const copy = value.cloneNode(true);
+    copy.querySelectorAll(`.${PAGE_COPY_BUTTON_CLASS}`).forEach((button) => button.remove());
+    return cleanText(copy.textContent);
+  }
+  function readDefinitionField(label) {
+    return definitionValueText(findDefinitionValue(label));
+  }
+
+  // Botão de copiar ao lado de campos dos "Dados gerais" do próprio SUAP (hoje, o Assunto).
+  const PAGE_COPY_BUTTON_CLASS = 'siages-page-copy';
+  const PAGE_COPY_FIELDS = ['Assunto'];
+  function installPageCopyButtons() {
+    PAGE_COPY_FIELDS.forEach((label) => {
+      const value = findDefinitionValue(label);
+      if (!value || value.querySelector(`.${PAGE_COPY_BUTTON_CLASS}`) || !definitionValueText(value)) return;
+      const button = createElement('button', PAGE_COPY_BUTTON_CLASS, '⧉');
+      button.type = 'button';
+      button.title = `Copiar ${label.toLowerCase()} (SIAGES)`;
+      button.setAttribute('aria-label', `Copiar ${label.toLowerCase()}`);
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void copyText(definitionValueText(value), button);
+      });
+      value.appendChild(button);
+    });
   }
 
   // Momento em que esta página de processo foi aberta; base da ordem do Alt+V (mais recente primeiro).
@@ -968,7 +998,7 @@
       if (isSummaryBlockVisible('beneficiario')) appendSection(container, 'Beneficiário', (section) => {
         appendCopyRow(section, 'Nome', process.beneficiario);
         appendCopyRow(section, 'CPF/CNPJ', process.cpfCnpj, true, true);
-        appendCopyRow(section, 'Assunto', process.assunto);
+        // O assunto já aparece nos "Dados gerais" do SUAP, que ganham o botão de copiar (installPageCopyButtons).
       });
       if (isSummaryBlockVisible('rps-nps')) renderBeneficiaryDocsCard(container, process.cpfCnpj);
       if (isSummaryBlockVisible('documento-pagamento')) appendSection(container, 'Documento e pagamento', (section) => {
@@ -2190,6 +2220,7 @@
     renderShortcuts(); renderAiPanel(); renderSettings();
     if (state.hasFinanceSummary) renderFinanceSummary(state.financeSummary);
     selectTab(state.activeTab || 'summary'); installDocumentAnalysis(); openProcessBridge(); syncProcessToRegistry();
+    installPageCopyButtons();
   }
   window.addEventListener('pagehide', persistProcessState);
   globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => { if (area === 'sync' && changes[SNIPPETS_KEY]) { state.snippets = changes[SNIPPETS_KEY].newValue || { ...DEFAULT_SNIPPETS }; renderShortcuts(); } });

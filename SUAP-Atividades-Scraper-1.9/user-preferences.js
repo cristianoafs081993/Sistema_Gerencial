@@ -67,7 +67,7 @@
   // A preferência guarda só os ocultos: um bloco novo aparece por padrão.
   const SUMMARY_BLOCKS = Object.freeze([
     Object.freeze({ id: 'processo', label: 'Processo', description: 'Número do processo' }),
-    Object.freeze({ id: 'beneficiario', label: 'Beneficiário', description: 'Nome, CPF/CNPJ e assunto' }),
+    Object.freeze({ id: 'beneficiario', label: 'Beneficiário', description: 'Nome e CPF/CNPJ' }),
     Object.freeze({ id: 'rps-nps', label: 'RPs / NPs', description: 'Documentos hábeis do beneficiário' }),
     Object.freeze({ id: 'documento-pagamento', label: 'Documento e pagamento', description: 'Valor, NS, contrato e notas fiscais' }),
     Object.freeze({ id: 'dados-bancarios', label: 'Dados bancários', description: 'Banco, agência e conta' }),
