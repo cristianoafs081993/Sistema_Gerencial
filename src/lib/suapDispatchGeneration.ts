@@ -1,3 +1,4 @@
+import { despachoCampusHtml, despachoModeloHtml, type DespachoModelo } from '@/lib/despachoModelo';
 import type { ResolvedDocumentContext } from '@/lib/documentGeneration';
 import type { SuapProcesso } from '@/types';
 
@@ -192,7 +193,8 @@ const esc = (value: string) => value.replace(/[&<>"']/g, (character) => ({
 
 const required = (value: string, label: string) => value.trim() ? `<b>${esc(value)}</b>` : `<b>[${esc(label)}]</b>`;
 
-export function buildManualDespachoHtml(fields: ManualDespachoFields) {
+export function buildManualDespachoHtml(fields: ManualDespachoFields, modelo?: DespachoModelo) {
+  const campus = despachoCampusHtml(modelo);
   const processReference = fields.processo.trim() ? ` (Processo n. ${required(fields.processo, 'número do processo')})` : '';
   const valor = required(fields.valor, 'valor da liquidação');
   const empenho = required(fields.empenho.toUpperCase(), 'empenho');
@@ -213,7 +215,7 @@ export function buildManualDespachoHtml(fields: ManualDespachoFields) {
     body = `Considerando a regularidade dos documentos apresentados e o acompanhamento do ${programa}${processReference}, <b>AUTORIZO</b> a liquidação da despesa no valor de ${valor}, referente ao empenho ${empenho}.`;
   } else if (fields.finalidade === 'aquisicao') {
     const objetoAdquirido = required(fields.descricao, 'objeto da aquisição');
-    const destino = `destinado a este <i>Campus</i> Currais Novos${fields.processo.trim() ? ` (Processo n. ${required(fields.processo, 'número do processo')})` : ''}`;
+    const destino = `destinado a este <i>Campus</i> ${campus}${fields.processo.trim() ? ` (Processo n. ${required(fields.processo, 'número do processo')})` : ''}`;
     body = `Considerando a regularidade da documentação apresentada e o ateste do recebimento do objeto adquirido &mdash; ${objetoAdquirido} &mdash; ${destino}, <b>AUTORIZO</b> a liquidação da despesa no valor de ${valor}, referente ao empenho ${empenho}, em favor de ${favorecido}.`;
   } else {
     const reference = required(fields.descricao, 'objeto do serviço');
@@ -221,5 +223,9 @@ export function buildManualDespachoHtml(fields: ManualDespachoFields) {
   }
 
   const nextStep = fields.processo.trim() ? 'Na sequência, encaminhe-se o processo à Direção-Geral para análise e posterior autorização do pagamento.' : 'Na sequência, encaminhe-se o documento à Direção-Geral para análise e posterior autorização do pagamento.';
-  return `<div style="font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; text-align: justify; color: black;"><div>À Coordenação de Finanças e Contratos do <i>Campus</i> Currais Novos</div><div style="font-weight: bold; margin-top: 30px;">Assunto: ${assunto}</div><div style="text-indent: 2.5cm; margin-top: 30px; margin-bottom: 25px;">${body}</div><div style="margin-top: 25px;">${nextStep}</div><div style="margin-top: 40px;">Atenciosamente,</div></div>`;
+  const destinatarioHtml = despachoModeloHtml(modelo, 'destinatario', `À Coordenação de Finanças e Contratos do <i>Campus</i> ${campus}`);
+  const assuntoHtml = despachoModeloHtml(modelo, 'assunto', assunto);
+  const nextStepHtml = despachoModeloHtml(modelo, 'encaminhamento', nextStep);
+  const fechoHtml = despachoModeloHtml(modelo, 'fecho', 'Atenciosamente,');
+  return `<div style="font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; text-align: justify; color: black;"><div>${destinatarioHtml}</div><div style="font-weight: bold; margin-top: 30px;">Assunto: ${assuntoHtml}</div><div style="text-indent: 2.5cm; margin-top: 30px; margin-bottom: 25px;">${body}</div><div style="margin-top: 25px;">${nextStepHtml}</div><div style="margin-top: 40px;">${fechoHtml}</div></div>`;
 }

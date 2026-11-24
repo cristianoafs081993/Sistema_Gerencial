@@ -1,4 +1,5 @@
 import type { SuapPlanSummary } from '@/services/suapPlanSummary';
+import type { DespachoModelo } from '@/lib/despachoModelo';
 import type { SuapDocumentReviewType } from '@/lib/suapDocumentReview';
 import type { SuapProcesso } from '@/types';
 import type { ProcessMappingRecord, SuapProcessFlowSummary, SuapProcessRouteSnapshot } from '@/types/processMapping';
@@ -23,7 +24,23 @@ export type SuapExtensionProcessContext = {
   };
   route?: SuapProcessRouteSnapshot;
   customMappings?: ProcessMappingRecord[];
+  /** Textos do despacho de liquidação personalizados pelo servidor no popup da extensão. */
+  despachoModelo?: Omit<DespachoModelo, 'campus'>;
 };
+
+const DESPACHO_MODELO_LIMITS = { destinatario: 300, assunto: 200, encaminhamento: 1500, fecho: 300 } as const;
+
+/** Aceita só os campos conhecidos, como texto e dentro do limite; o restante é descartado. */
+export function sanitizeDespachoModelo(value: unknown): SuapExtensionProcessContext['despachoModelo'] | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const source = value as Record<string, unknown>;
+  const modelo: NonNullable<SuapExtensionProcessContext['despachoModelo']> = {};
+  for (const [field, max] of Object.entries(DESPACHO_MODELO_LIMITS) as Array<[keyof typeof DESPACHO_MODELO_LIMITS, number]>) {
+    const text = typeof source[field] === 'string' ? source[field].trim().slice(0, max) : '';
+    if (text) modelo[field] = text;
+  }
+  return Object.keys(modelo).length ? modelo : undefined;
+}
 
 export type SuapExtensionProcessContextMessage = {
   source: 'siages-suap-extension';
@@ -509,6 +526,7 @@ export function getSuapExtensionProcessContext(event: MessageEvent, expectedSour
   }
 
   const { suapId, processUrl, processNumber, assunto, tipoProcesso, beneficiario, cpfCnpj, caixa, extensionSession, route } = event.data.payload;
+  const despachoModelo = sanitizeDespachoModelo((event.data.payload as { despachoModelo?: unknown }).despachoModelo);
   return {
     suapId,
     processUrl,
@@ -526,6 +544,7 @@ export function getSuapExtensionProcessContext(event: MessageEvent, expectedSour
       },
     } : {}),
     ...(route ? { route } : {}),
+    ...(despachoModelo ? { despachoModelo } : {}),
   };
 }
 

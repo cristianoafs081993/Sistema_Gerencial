@@ -65,6 +65,32 @@ describe('suapExtensionDispatch', () => {
     expect(getSuapExtensionProcessContext(event, null)).toBeNull();
   });
 
+  it('aceita só os textos conhecidos do modelo de despacho enviados pela extensão', () => {
+    const expectedSource = window.parent;
+    const event = new MessageEvent('message', {
+      origin: SUAP_EXTENSION_ORIGIN,
+      source: expectedSource,
+      data: {
+        ...validMessage,
+        payload: {
+          ...validMessage.payload,
+          despachoModelo: { destinatario: '  À COFIN do Campus {campus} ', assunto: '', fecho: 42, campus: 'Outro', encaminhamento: 'x'.repeat(2000), extra: 'ignorado' },
+        },
+      },
+    });
+
+    expect(getSuapExtensionProcessContext(event, expectedSource)?.despachoModelo).toEqual({
+      destinatario: 'À COFIN do Campus {campus}',
+      encaminhamento: 'x'.repeat(1500),
+    });
+    const invalid = new MessageEvent('message', {
+      origin: SUAP_EXTENSION_ORIGIN,
+      source: expectedSource,
+      data: { ...validMessage, payload: { ...validMessage.payload, despachoModelo: 'texto solto' } },
+    });
+    expect(getSuapExtensionProcessContext(invalid, expectedSource)).not.toHaveProperty('despachoModelo');
+  });
+
   it('aceita somente o contexto do plano concluído 8 enviado pelo SUAP', () => {
     const expectedSource = window.parent;
     const event = new MessageEvent('message', {

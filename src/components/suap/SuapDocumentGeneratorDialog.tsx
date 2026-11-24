@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useData } from '@/contexts/DataContext';
+import type { DespachoModelo } from '@/lib/despachoModelo';
 import { buildDespachoLiquidacaoHtml, buildResolvedContextFromSuapProcess } from '@/lib/documentGeneration';
 import { copySuapDocumentToClipboard } from '@/lib/suapClipboard';
 import { buildSuapCloneUrl, type SuapCloneAutomationMode } from '@/lib/suapCloneAutomation';
@@ -31,6 +32,8 @@ type Props = {
   processos: SuapProcesso[];
   queue: DispatchQueueState | null;
   onQueueChange: (queue: DispatchQueueState | null) => void;
+  /** Campus e textos do servidor (extensão); sem ele, vale o modelo padrão do SIAGES. */
+  despachoModelo?: DespachoModelo;
 };
 
 const updateCurrentItem = (
@@ -41,7 +44,7 @@ const updateCurrentItem = (
   items: queue.items.map((item, index) => index === queue.currentIndex ? { ...item, ...patch } : item),
 });
 
-export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, queue, onQueueChange }: Props) {
+export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, queue, onQueueChange, despachoModelo }: Props) {
   const { empenhos, contratos, contratosEmpenhos } = useData();
   const [isResolving, setIsResolving] = useState(false);
   const resolvingProcessId = useRef<string | null>(null);
@@ -69,7 +72,7 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
       .then((context) => {
         if (!latestOpenRef.current || currentProcessIdRef.current !== processo.id) return;
         onQueueChange(updateCurrentItem(queue, {
-          html: buildDespachoLiquidacaoHtml(context),
+          html: buildDespachoLiquidacaoHtml(context, despachoModelo),
           manualFields: currentItem.manualFields || createManualDespachoFieldsFromResolvedContext(context),
         }));
       })
@@ -86,7 +89,7 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
           setIsResolving(false);
         }
       });
-  }, [contratos, contratosEmpenhos, currentItem, empenhos, isAssisted, onQueueChange, open, processo, queue]);
+  }, [contratos, contratosEmpenhos, currentItem, despachoModelo, empenhos, isAssisted, onQueueChange, open, processo, queue]);
 
   useEffect(() => {
     if (!open || !queue || !currentItem || (!processo && !currentItem.standalone) || isAssisted || currentItem.manualFields) return;
@@ -108,7 +111,7 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
 
   const generateManual = () => {
     if (!queue || !manualFields) return;
-    onQueueChange(updateCurrentItem(queue, { html: buildManualDespachoHtml(manualFields), status: 'pending', error: undefined }));
+    onQueueChange(updateCurrentItem(queue, { html: buildManualDespachoHtml(manualFields, despachoModelo), status: 'pending', error: undefined }));
   };
 
   const updateHtml = (html: string) => {

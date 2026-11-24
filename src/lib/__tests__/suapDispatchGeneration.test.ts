@@ -164,6 +164,24 @@ describe('suapDispatchGeneration', () => {
     expect(servico).not.toContain('recebimento do objeto adquirido');
   });
 
+  it('aplica o campus e os textos do servidor no despacho manual', () => {
+    const html = buildManualDespachoHtml({
+      ...createStandaloneManualDespachoFields(),
+      finalidade: 'aquisicao',
+      processo: '23035.000123.2026-11',
+      favorecido: 'Fornecedor Teste',
+      descricao: 'equipamentos',
+      valor: '1.250,00',
+      empenho: '2026NE000123',
+    }, { campus: 'Caicó', assunto: 'Liquidação de despesa', fecho: 'Atenciosamente,\nCoordenação' });
+
+    expect(html).toContain('<div>À Coordenação de Finanças e Contratos do <i>Campus</i> Caicó</div>');
+    expect(html).toContain('destinado a este <i>Campus</i> Caicó (Processo n.');
+    expect(html).toContain('Assunto: Liquidação de despesa');
+    expect(html).toContain('Atenciosamente,<br>Coordenação');
+    expect(html).toContain('Na sequência, encaminhe-se o processo à Direção-Geral');
+  });
+
   it('omite a referencia ao processo no despacho avulso e a inclui quando informada', () => {
     const fields = {
       ...createStandaloneManualDespachoFields(),

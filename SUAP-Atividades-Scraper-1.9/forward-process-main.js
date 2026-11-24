@@ -8,6 +8,9 @@
   const NOTICE_ID = 'siages-suap-forward-notice';
 
   const clean = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
+  // O despacho configurado pelo servidor pode ter parágrafos: preserva as quebras de linha.
+  const cleanMultiline = (text) => String(text ?? '').replace(/\r\n?/g, '\n').split('\n')
+    .map((line) => line.replace(/[ \t]+/g, ' ').trim()).join('\n').replace(/\n{3,}/g, '\n\n').trim();
   const normalize = (text) => clean(text).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -20,7 +23,7 @@
       const option = (value) => (value?.id ? { id: String(value.id), text: clean(value.text) } : null);
       return {
         suapId: String(payload.suapId || ''),
-        despacho: clean(payload.despacho),
+        despacho: cleanMultiline(payload.despacho),
         campus: option(payload.campus),
         setor: option(payload.setor),
         papel: clean(payload.papel),
@@ -139,7 +142,7 @@
     field('senha')?.focus();
     showNotice(missing.length
       ? `SIAGES: formulário preenchido, mas não encontrei ${missing.join(', ')}. Confira antes de salvar.`
-      : 'SIAGES: encaminhamento à DG/CN preenchido. Informe a senha e clique em Salvar.', missing.length ? 'error' : 'success');
+      : `SIAGES: encaminhamento${payload.setor?.text ? ` para ${payload.setor.text}` : ''} preenchido. Informe a senha e clique em Salvar.`, missing.length ? 'error' : 'success');
     return true;
   }
 

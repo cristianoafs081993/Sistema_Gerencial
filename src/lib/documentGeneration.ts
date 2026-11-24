@@ -1,3 +1,4 @@
+import { despachoCampusHtml, despachoModeloHtml, type DespachoModelo } from '@/lib/despachoModelo';
 import { supabase } from '@/lib/supabase';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { formatCurrency, formatDocumentoId, formatarDocumento, parseCurrency } from '@/lib/utils';
@@ -1369,7 +1370,8 @@ export async function buildResolvedContextFromSuapProcess(
   return buildContextFromSuap(processoLite, relatedMaps.forSuap(processoLite));
 }
 
-export function buildDespachoLiquidacaoHtml(context: ResolvedDocumentContext) {
+export function buildDespachoLiquidacaoHtml(context: ResolvedDocumentContext, modelo?: DespachoModelo) {
+  const campusHtml = despachoCampusHtml(modelo);
   const categoria = inferObjetoCategoria(context);
   const isFolhaPagamento = !!context.favorecido && /folha de pagamento/i.test(context.favorecido);
   const favorecidoHtml = htmlValue(context.favorecido, 'favorecido', { uppercase: true, bold: true });
@@ -1411,17 +1413,17 @@ export function buildDespachoLiquidacaoHtml(context: ResolvedDocumentContext) {
       ? `, referente ao contrato ${htmlValue(context.contrato, 'numero do contrato', { bold: true })}`
       : '';
 
-    htmlTexto = `Considerando a regularidade da documenta&ccedil;&atilde;o apresentada e o ateste ${trechoObjeto}${trechoContrato}, no &acirc;mbito do <i>Campus</i> Currais Novos (Processo n&ordm; ${processoHtml}), <b>AUTORIZO</b> a liquida&ccedil;&atilde;o da despesa no valor de ${valorHtml}, referente ao empenho ${empenhoHtml}, em favor de ${favorecidoHtml}.`;
+    htmlTexto = `Considerando a regularidade da documenta&ccedil;&atilde;o apresentada e o ateste ${trechoObjeto}${trechoContrato}, no &acirc;mbito do <i>Campus</i> ${campusHtml} (Processo n&ordm; ${processoHtml}), <b>AUTORIZO</b> a liquida&ccedil;&atilde;o da despesa no valor de ${valorHtml}, referente ao empenho ${empenhoHtml}, em favor de ${favorecidoHtml}.`;
   }
 
   return `
     <div style="font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; text-align: justify; color: black;">
-      <div>À Coordenação de Finanças e Contratos do <i>Campus</i> Currais Novos</div>
-      <div style="font-weight: bold; margin-top: 30px;">Assunto: Autoriza&ccedil;&atilde;o para a Liquida&ccedil;&atilde;o da Despesa</div>
+      <div>${despachoModeloHtml(modelo, 'destinatario', `À Coordenação de Finanças e Contratos do <i>Campus</i> ${campusHtml}`)}</div>
+      <div style="font-weight: bold; margin-top: 30px;">Assunto: ${despachoModeloHtml(modelo, 'assunto', 'Autoriza&ccedil;&atilde;o para a Liquida&ccedil;&atilde;o da Despesa')}</div>
       <div style="text-indent: 2.5cm; margin-top: 30px; margin-bottom: 25px;">${htmlTexto}</div>
       ${contratoHtml}
-      <div style="margin-top: 25px;">Na sequ&ecirc;ncia, encaminhe-se o processo &agrave; Dire&ccedil;&atilde;o-Geral para an&aacute;lise e posterior autoriza&ccedil;&atilde;o do pagamento, em conformidade com o cronograma e a disponibilidade or&ccedil;ament&aacute;ria desta unidade.</div>
-      <div style="margin-top: 40px;">Atenciosamente,</div>
+      <div style="margin-top: 25px;">${despachoModeloHtml(modelo, 'encaminhamento', 'Na sequ&ecirc;ncia, encaminhe-se o processo &agrave; Dire&ccedil;&atilde;o-Geral para an&aacute;lise e posterior autoriza&ccedil;&atilde;o do pagamento, em conformidade com o cronograma e a disponibilidade or&ccedil;ament&aacute;ria desta unidade.')}</div>
+      <div style="margin-top: 40px;">${despachoModeloHtml(modelo, 'fecho', 'Atenciosamente,')}</div>
     </div>
   `;
 }

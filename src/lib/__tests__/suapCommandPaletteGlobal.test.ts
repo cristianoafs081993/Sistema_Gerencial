@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { extensionFixturePath } from '@/test/extensionFixtures';
 
 const contentScript = readFileSync(extensionFixturePath('command-palette.js'), 'utf8');
+// No manifest, user-preferences.js é carregado antes da paleta e define os atalhos configuráveis.
+const preferencesScript = readFileSync(extensionFixturePath('user-preferences.js'), 'utf8');
 const originalLocationDescriptor = Object.getOwnPropertyDescriptor(window, 'location');
 const testUserId = '11111111-1111-4111-8111-111111111111';
 const testGroupId = '22222222-2222-4222-8222-222222222222';
@@ -380,6 +382,7 @@ describe('paleta global da extensao Suape', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
+    window.eval(preferencesScript);
     window.eval(contentScript);
     const input = openPalette();
     await flushMicrotasks();
@@ -449,6 +452,91 @@ describe('paleta global da extensao Suape', () => {
     expect(document.body.textContent).toContain('Ver Capa do Processo');
   });
 
+  it('usa os atalhos de encaminhamento e o upload configurados pelo servidor no popup', async () => {
+    vi.useFakeTimers();
+    const { fetchMock } = createFetchMock();
+    let assignedUrl = '';
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        hostname: 'example.com',
+        pathname: '/',
+        search: '',
+        set href(url: string) { assignedUrl = url; },
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const storageListeners: Array<(changes: Record<string, { newValue?: unknown }>, area: string) => void> = [];
+    const preferences = {
+      forwardShortcuts: [{
+        shortcut: 'encfin',
+        title: 'Encaminhar à Coordenação de Finanças',
+        despacho: 'À COFIN para pagamento.\nUrgente.',
+        campus: { id: '7', text: 'MO' },
+        setor: { id: '1234', text: 'COFIN/MO' },
+        papel: 'CONTADOR',
+      }],
+      upload: { tipoConferencia: 'Documento Original', tipoDocumento: 'Nota Fiscal', assunto: 'NF do contrato' },
+    };
+    vi.stubGlobal('chrome', {
+      runtime: {},
+      storage: {
+        local: { get: (_keys: unknown, callback?: (data: object) => void) => callback?.({}), set: (_data: unknown, callback?: () => void) => callback?.() },
+        sync: { get: vi.fn(async () => ({ 'siages-user-preferences': preferences })) },
+        onChanged: { addListener: (listener: typeof storageListeners[number]) => storageListeners.push(listener), removeListener: vi.fn() },
+      },
+    });
+
+    installExtensionAuth();
+    window.eval(preferencesScript);
+    window.eval(contentScript);
+    await flushMicrotasks();
+
+    // Com a extensão ativa, a paleta só lista as ações depois de carregar os dados do SIAGES.
+    let input = openPalette();
+    await flushMicrotasks();
+    fireEvent.input(input, { target: { value: 'encfin 498930' } });
+    expect(document.body.textContent).toContain('Encaminhar à Coordenação de Finanças');
+
+    // O encdg padrão some quando o servidor não o mantém na lista.
+    fireEvent.input(input, { target: { value: 'encdg 498930' } });
+    expect(document.body.textContent).not.toContain('Encaminhar à DG para Autorização de Pagamento');
+
+    fireEvent.input(input, { target: { value: 'encfin 498930' } });
+    expect(document.body.textContent).toContain('Encaminhar à Coordenação de Finanças');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(assignedUrl).toContain('https://suap.ifrn.edu.br/processo_eletronico/processo/encaminhar/498930/#siagesEncaminhar=');
+    expect(JSON.parse(decodeURIComponent(assignedUrl.split('#siagesEncaminhar=')[1]))).toEqual({
+      source: 'siages',
+      version: 1,
+      action: 'suap_forward_process',
+      suapId: '498930',
+      despacho: 'À COFIN para pagamento.\nUrgente.',
+      campus: { id: '7', text: 'MO' },
+      setor: { id: '1234', text: 'COFIN/MO' },
+      papel: 'CONTADOR',
+    });
+
+    fireEvent.keyDown(document, { key: 'k', code: 'KeyK', ctrlKey: true });
+    input = document.querySelector<HTMLInputElement>('.suape-cp-input')!;
+    fireEvent.input(input, { target: { value: 'up 498930' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(JSON.parse(decodeURIComponent(assignedUrl.split('#siagesUpload=')[1]))).toMatchObject({
+      tipoConferencia: 'Documento Original',
+      tipoDocumento: 'Nota Fiscal',
+      assunto: 'NF do contrato',
+    });
+
+    // Um atalho criado no popup vale na hora, sem recarregar a página.
+    storageListeners.forEach((listener) => listener({
+      'siages-user-preferences': { newValue: { ...preferences, forwardShortcuts: [...preferences.forwardShortcuts, { ...preferences.forwardShortcuts[0], shortcut: 'encgab', title: 'Encaminhar ao Gabinete' }] } },
+    }, 'sync'));
+    fireEvent.keyDown(document, { key: 'k', code: 'KeyK', ctrlKey: true });
+    input = document.querySelector<HTMLInputElement>('.suape-cp-input')!;
+    fireEvent.input(input, { target: { value: 'encgab 498930' } });
+    expect(document.body.textContent).toContain('Encaminhar ao Gabinete');
+  });
+
   it('injeta badges com ID do processo na tela de caixas de processos com clique para copiar', async () => {
     vi.useFakeTimers();
     let assignedUrl = '';
@@ -478,9 +566,10 @@ describe('paleta global da extensao Suape', () => {
       },
     });
 
+    window.eval(preferencesScript);
     window.eval(contentScript);
 
-    const initBadges = (window as unknown as { __suapeInitProcessBoxIdBadges?: () => void }).__suapeInitProcessBoxIdBadges;
+    const initBadges =(window as unknown as { __suapeInitProcessBoxIdBadges?: () => void }).__suapeInitProcessBoxIdBadges;
     expect(typeof initBadges).toBe('function');
     initBadges?.();
 

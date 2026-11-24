@@ -59,6 +59,31 @@ describe('extractProcessNumbers', () => {
 });
 
 describe('buildDespachoLiquidacaoHtml', () => {
+  it('mantém o texto padrão de Currais Novos quando não há modelo do servidor', () => {
+    const html = buildDespachoLiquidacaoHtml(baseContext);
+    expect(html).toContain('<div>À Coordenação de Finanças e Contratos do <i>Campus</i> Currais Novos</div>');
+    expect(html).toContain('no &acirc;mbito do <i>Campus</i> Currais Novos');
+    expect(html).toContain('Assunto: Autoriza&ccedil;&atilde;o para a Liquida&ccedil;&atilde;o da Despesa');
+    expect(html).toContain('<div style="margin-top: 40px;">Atenciosamente,</div>');
+  });
+
+  it('usa o campus e os textos do servidor, com {campus}, quebras de linha e HTML escapado', () => {
+    const html = buildDespachoLiquidacaoHtml(baseContext, {
+      campus: 'Mossoró',
+      destinatario: 'À COFIN do Campus {campus}',
+      encaminhamento: 'Encaminhe-se à DG/{campus}.\nCumpra-se.',
+      fecho: '<script>alert(1)</script>Respeitosamente,',
+    });
+    expect(html).toContain('<div>À COFIN do <i>Campus</i> Mossoró</div>');
+    expect(html).toContain('no &acirc;mbito do <i>Campus</i> Mossoró');
+    expect(html).toContain('Encaminhe-se à DG/Mossoró.<br>Cumpra-se.');
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;Respeitosamente,');
+    expect(html).not.toContain('<script>');
+    // Campo não personalizado segue o padrão.
+    expect(html).toContain('Assunto: Autoriza&ccedil;&atilde;o para a Liquida&ccedil;&atilde;o da Despesa');
+    expect(html).not.toContain('Currais Novos');
+  });
+
   it('gera minuta para PJ com modelo de servico', () => {
     const html = buildDespachoLiquidacaoHtml(baseContext);
     expect(html).toContain('AUTORIZO');

@@ -5,11 +5,11 @@ import SuapExtensionDispatch from '@/pages/SuapExtensionDispatch';
 import { suapProcessosService } from '@/services/suapProcessos';
 import type { SuapProcesso } from '@/types';
 
-vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'user-1' } }) }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'user-1' }, userCampus: { codigo: '158365', nome: 'Mossoró' } }) }));
 vi.mock('@/services/suapProcessos', () => ({ suapProcessosService: { getBySuapId: vi.fn() } }));
 vi.mock('@/components/suap/SuapDocumentGeneratorDialog', () => ({
-  SuapDocumentGeneratorDialog: ({ processos, queue }: { processos: SuapProcesso[]; queue: { items: Array<{ standalone?: boolean; manualFields?: { processo: string } }> } }) => (
-    <div data-testid="dispatch-dialog" data-process-id={processos[0]?.id || ''} data-standalone={String(Boolean(queue.items[0]?.standalone))} data-process-number={queue.items[0]?.manualFields?.processo || ''} />
+  SuapDocumentGeneratorDialog: ({ processos, queue, despachoModelo }: { processos: SuapProcesso[]; queue: { items: Array<{ standalone?: boolean; manualFields?: { processo: string } }> }; despachoModelo?: Record<string, string> }) => (
+    <div data-testid="dispatch-dialog" data-process-id={processos[0]?.id || ''} data-standalone={String(Boolean(queue.items[0]?.standalone))} data-process-number={queue.items[0]?.manualFields?.processo || ''} data-modelo={JSON.stringify(despachoModelo || {})} />
   ),
 }));
 
@@ -62,6 +62,15 @@ describe('SuapExtensionDispatch', () => {
     const dialog = await screen.findByTestId('dispatch-dialog');
     expect(dialog).toHaveAttribute('data-standalone', 'true');
     expect(dialog).toHaveAttribute('data-process-number', '23035.000987.2026-11');
+  });
+
+  it('passa ao despacho o campus vinculado da conta e os textos personalizados na extensão', async () => {
+    vi.mocked(suapProcessosService.getBySuapId).mockResolvedValue(null);
+    render(<SuapExtensionDispatch />);
+    await sendContext({ ...processContext, payload: { ...processContext.payload, despachoModelo: { fecho: 'Respeitosamente,' } } } as typeof processContext);
+
+    const dialog = await screen.findByTestId('dispatch-dialog');
+    expect(JSON.parse(dialog.getAttribute('data-modelo') || '{}')).toEqual({ campus: 'Mossoró', fecho: 'Respeitosamente,' });
   });
 
   it('ignora mensagem com origem invalida', async () => {

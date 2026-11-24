@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 import { SuapDocumentGeneratorDialog } from '@/components/suap/SuapDocumentGeneratorDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import type { DespachoModelo } from '@/lib/despachoModelo';
 import {
   getSuapExtensionProcessContext,
   SUAP_EXTENSION_DISPATCH_CLOSE_MESSAGE,
@@ -28,11 +29,17 @@ function postMessageToSuapParent(message: unknown) {
 }
 
 export default function SuapExtensionDispatch() {
-  const { user } = useAuth();
+  const { user, userCampus } = useAuth();
   const userId = user?.id;
   const [context, setContext] = useState<SuapExtensionProcessContext | null>(null);
   const [dispatch, setDispatch] = useState<DispatchState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Campus vinculado à conta + textos personalizados no popup da extensão.
+  const campusNome = userCampus?.nome;
+  const despachoModelo = useMemo<DespachoModelo>(
+    () => ({ ...(campusNome ? { campus: campusNome } : {}), ...context?.despachoModelo }),
+    [campusNome, context?.despachoModelo],
+  );
 
   useEffect(() => {
     let readyAttempts = 0;
@@ -106,6 +113,7 @@ export default function SuapExtensionDispatch() {
       processos={dispatch.processo ? [dispatch.processo] : []}
       queue={dispatch.queue}
       onQueueChange={(queue) => setDispatch((current) => current ? { ...current, queue } : current)}
+      despachoModelo={despachoModelo}
     />
   );
 }

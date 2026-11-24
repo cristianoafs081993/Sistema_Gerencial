@@ -66,8 +66,9 @@ it('mostra somente o formulário sem sessão e separa a sincronização da conta
   expect(document.querySelector('.sync-section')?.contains(element('process-box-sync-status'))).toBe(true);
   expect(document.body.textContent).not.toMatch(/Canivete|no banco|ao banco|Segredo de automação/);
   expect(element('automation-secret')).toBeNull();
-  expect((element('plan-sync-panel') as HTMLDetailsElement).open).toBe(false);
-  expect((element('rd-sync-panel') as HTMLDetailsElement).open).toBe(false);
+  expect(element('plan-sync-panel').classList.contains('is-active')).toBe(false);
+  expect(element('rd-sync-panel').classList.contains('is-active')).toBe(false);
+  expect(element('nav-sync-group').hidden).toBe(true);
 });
 
 it('oculta o formulário na sessão ativa e identifica a conta conectada', async () => {

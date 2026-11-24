@@ -8,237 +8,532 @@
       color-scheme: light;
       --background: #f6f9fd; --foreground: #1b2b3a; --card: #fff;
       --border: #dde6f0; --muted: #eef3f9; --muted-foreground: #5b6b7b;
-      --primary: #1976d2; --accent: #eaf3fd; --success: #1f7a4d; --danger: #d03434;
+      --primary: #1976d2; --primary-strong: #1565c0; --accent: #eaf3fd;
+      --success: #1f7a4d; --success-soft: #eaf5ee; --warning: #9a5c00; --warning-soft: #fdf3e2; --danger: #d03434;
+      --shadow-xs: 0 1px 2px rgba(16, 42, 67, .05);
     }
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
-    body { width: 400px; margin: 0; padding: 14px; background: var(--background); color: var(--foreground); font: 13px/1.45 Manrope, 'Segoe UI', Arial, sans-serif; }
-    main { display: flex; flex-direction: column; gap: 10px; }
+    /* 800 × 580: perto do limite de 800 × 600 que o Chrome permite para popups */
+    html, body { height: 580px; }
+    body { width: 800px; margin: 0; overflow: hidden; background: var(--background); color: var(--foreground); font: 13px/1.5 Manrope, 'Segoe UI', Arial, sans-serif; }
     a { color: var(--primary); text-underline-offset: 3px; }
+    svg { flex-shrink: 0; }
 
-    /* Cabeçalho */
-    .brand { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    /* Estrutura: menu lateral fixo e conteúdo com rolagem própria */
+    .shell { display: grid; grid-template-columns: 248px 1fr; height: 100%; }
+    .sidebar { display: flex; flex-direction: column; min-height: 0; padding: 16px 10px 12px; background: var(--card); border-right: 1px solid var(--border); }
+    .content { min-width: 0; overflow-y: auto; padding: 22px 26px 26px; scrollbar-gutter: stable; }
+
+    /* Marca */
+    .brand { padding: 0 8px 14px; }
     .brand-mark { display: flex; align-items: center; gap: 8px; min-width: 0; }
-    .brand-mark img { width: 30px; height: 30px; object-fit: contain; }
-    h1 { margin: 0; color: var(--primary); font-size: 20px; font-weight: 800; letter-spacing: -.5px; }
-    .portal-link { font-size: 12px; font-weight: 700; }
+    .brand-mark img { width: 28px; height: 28px; object-fit: contain; }
+    h1 { margin: 0; color: var(--primary); font-size: 19px; font-weight: 800; letter-spacing: -.5px; }
 
-    /* Tipografia de seções */
-    h2 { margin: 6px 2px 0; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground); }
+    /* Menu lateral */
+    .nav { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; overflow-y: auto; }
+    .nav-label { margin: 14px 10px 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted-foreground); }
+    .nav > .nav-label:first-child { margin-top: 0; }
+    .nav-group { display: flex; flex-direction: column; gap: 2px; }
+    .nav-item { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 36px; margin: 0; padding: 7px 9px; border: 0; border-radius: 8px; background: transparent; color: var(--foreground); font: inherit; font-size: 12.5px; font-weight: 600; text-align: left; cursor: pointer; }
+    .nav-item:hover { background: var(--muted); }
+    .nav-item.is-active { background: var(--accent); color: var(--primary-strong); font-weight: 700; }
+    .nav-item.is-active:not(:has(.nav-badge:not([hidden])))::after { content: ''; flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
+    .nav-icon { position: relative; display: inline-flex; color: var(--muted-foreground); }
+    .nav-item.is-active .nav-icon { color: var(--primary); }
+    .nav-text { flex: 1; min-width: 0; }
+    .nav-badge { flex-shrink: 0; padding: 0 7px; border-radius: 999px; background: var(--muted); color: var(--muted-foreground); font-size: 10.5px; font-weight: 700; line-height: 18px; }
+    .nav-badge[data-tone="info"] { background: var(--accent); color: var(--primary-strong); }
+    .nav-badge[data-tone="success"] { background: var(--success-soft); color: var(--success); }
+    .nav-badge[data-tone="warning"] { background: var(--warning-soft); color: var(--warning); }
+    .nav-item.is-active .nav-badge[data-tone="muted"] { background: var(--card); }
+    .presence { position: absolute; right: -2px; bottom: -2px; width: 8px; height: 8px; border: 2px solid var(--card); border-radius: 50%; background: #c5d0dc; }
+    .nav-item.is-active .presence { border-color: var(--accent); }
+    .presence[data-state="connected"] { background: var(--success); }
+    .presence[data-state="disconnected"] { background: #8b9aab; }
+    .presence[data-state="unknown"] { background: #d9921c; }
+
+    .sidebar-footer { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding: 12px 8px 0; border-top: 1px solid var(--border); }
+    .portal-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; text-decoration: none; }
+    .portal-link:hover { text-decoration: underline; }
+    .shortcut-hint { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.6; }
+    .keys { white-space: nowrap; }
+    kbd { padding: 0 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--card); font-family: inherit; font-size: 10.5px; font-weight: 700; }
+
+    /* Seções: só a escolhida no menu aparece */
+    .view:not(.is-active) { display: none; }
+    .view-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+    .eyebrow { margin: 0 0 2px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted-foreground); }
+    h2 { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
     h3 { margin: 0; font-size: 13px; font-weight: 700; }
-    h4 { margin: 0 0 6px; font-size: 12px; }
-    .helper, .sync-description, .sync-scope p { color: var(--muted-foreground); font-size: 12px; line-height: 1.45; margin: 8px 0 10px; }
+    .view-description { margin: 4px 0 0; color: var(--muted-foreground); font-size: 12.5px; }
+    .helper, .panel-description { color: var(--muted-foreground); font-size: 12px; line-height: 1.5; margin: 6px 0 12px; }
     [data-error="true"], .status-error { color: var(--danger); }
 
-    /* Cartões e grupos */
-    .card { margin: 0; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
-    .group { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-    .group > .card { border: 0; border-radius: 0; }
-    .group > .card + .card { border-top: 1px solid var(--border); }
-    .card-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .badge { padding: 2px 8px; border-radius: 20px; background: var(--muted); color: var(--muted-foreground); font-size: 11px; font-weight: 700; white-space: nowrap; }
-    .badge[data-state="connected"] { color: var(--success); background: #eaf5ee; }
-
-    /* Conta */
-    .account-user { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
-    .account-campus { margin: 10px 0 0; }
-    #extension-auth-user-email { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
-    #btn-extension-sign-out { width: auto; min-height: 28px; margin: 0; padding: 4px 12px; flex-shrink: 0; }
-    #extension-auth-form { margin-top: 10px; }
-    #extension-auth-status { margin: 8px 0 0; }
-    .account-card:has(#extension-auth-user:not([hidden])) #extension-auth-status:not([data-error="true"]):not([data-notice="true"]) { display: none; }
+    /* Painéis */
+    .panel { margin: 0; padding: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-xs); }
+    .panel + .panel { margin-top: 12px; }
+    .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .badge { padding: 2px 9px; border: 1px solid transparent; border-radius: 20px; background: var(--muted); color: var(--muted-foreground); font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .badge[data-state="connected"] { color: var(--success); background: var(--success-soft); border-color: #cfe7d9; }
+    .badge[data-state="unknown"] { color: var(--warning); background: var(--warning-soft); border-color: #f3dfbd; }
 
     /* Formulários e botões */
-    label { display: block; margin-bottom: 10px; font-size: 12px; font-weight: 600; }
-    input, select, textarea { width: 100%; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--foreground); font: inherit; }
-    textarea { min-height: 60px; resize: vertical; }
-    button { width: 100%; min-height: 34px; margin: 0 0 8px; padding: 7px 12px; border: 1px solid transparent; border-radius: 8px; background: var(--primary); color: white; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
-    button:hover { background: #1565c0; }
+    label { display: block; margin-bottom: 12px; font-size: 12px; font-weight: 600; }
+    input, select, textarea { width: 100%; margin-top: 5px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--foreground); font: inherit; }
+    input:hover, select:hover, textarea:hover { border-color: #c6d4e3; }
+    textarea { min-height: 76px; resize: vertical; }
+    button { min-height: 34px; margin: 0; padding: 7px 14px; border: 1px solid transparent; border-radius: 8px; background: var(--primary); color: white; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+    button:hover { background: var(--primary-strong); }
     button:disabled { opacity: .55; cursor: not-allowed; }
-    button:last-child { margin-bottom: 0; }
     .secondary { background: var(--card); border-color: var(--border); color: var(--foreground); }
     .secondary:hover { background: var(--accent); }
-    .button-row { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
-    .button-row button { margin: 0; }
-    :is(button, input, select, textarea, a, summary):focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .actions-end { justify-content: flex-end; }
+    :is(button, input, select, textarea, a):focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
 
-    /* Painéis expansíveis */
-    details.card { padding: 0; }
-    summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 14px; cursor: pointer; list-style: none; }
-    summary::-webkit-details-marker { display: none; }
-    summary::after { content: ''; flex-shrink: 0; width: 7px; height: 7px; margin-right: 3px; border-right: 2px solid var(--muted-foreground); border-bottom: 2px solid var(--muted-foreground); transform: rotate(-45deg); transition: transform .15s; }
-    details[open] > summary::after { transform: rotate(45deg); }
-    summary:hover { background: var(--accent); }
-    .summary-text { min-width: 0; }
-    .summary-description { display: block; margin-top: 1px; color: var(--muted-foreground); font-size: 11.5px; }
-    details[open] > summary { border-bottom: 1px solid var(--border); }
-    .details-body { padding: 12px 14px 14px; }
-    .details-body > .sync-description:first-child { margin-top: 0; }
+    /* Conta */
+    .auth-form { max-width: 360px; }
+    .auth-form button { width: 100%; }
+    .account-user { display: flex; align-items: center; gap: 12px; }
+    .avatar { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; background: var(--primary); color: white; font-size: 15px; font-weight: 800; }
+    .account-identity { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .account-label { color: var(--muted-foreground); font-size: 11.5px; }
+    #extension-auth-user-email { min-width: 0; overflow-wrap: anywhere; font-weight: 700; }
+    .account-campus { margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--border); }
+    .account-campus select { max-width: 360px; }
+    #extension-auth-status { margin: 12px 0 0; }
+    .auth-form + #extension-auth-status { margin-top: 0; }
+    .account-card:has(#extension-auth-user:not([hidden])) #extension-auth-status:not([data-error="true"]):not([data-notice="true"]) { display: none; }
 
     /* SIAFI */
-    #siafi-list-info, #siafi-fill-status { margin: 0 0 10px; color: var(--muted-foreground); font-size: 12px; }
+    #siafi-list-info { margin: 0 0 14px; color: var(--muted-foreground); font-size: 12px; }
+    #siafi-fill-status { margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--background); font-size: 12px; }
     #siafi-fill-status:empty { display: none; }
-    #siafi-fill-status { margin: 8px 0 0; }
 
     /* Sincronização */
-    .sync-scope + .sync-scope { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
-    .sync-option { display: flex; align-items: flex-start; gap: 8px; line-height: 1.45; color: var(--muted-foreground); }
+    .sync-option { display: flex; align-items: flex-start; gap: 8px; margin: 0; line-height: 1.45; color: var(--muted-foreground); font-weight: 600; }
     .sync-option input { width: auto; margin-top: 3px; }
-    .sync-link { display: inline-block; margin-top: 10px; font-size: 12px; }
-    #process-box-sync-status { white-space: pre-line; margin-bottom: 0; }
-    #status { display: none; max-height: 150px; overflow-y: auto; margin-top: 10px; padding: 10px; background: var(--background); border-radius: 8px; overflow-wrap: anywhere; font-size: 12px; }
+    .panel > .sync-option + .actions, .panel > .sync-option + p { margin-top: 12px; }
+    .sync-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; font-size: 12px; font-weight: 700; }
+    .schedule { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .schedule span { padding: 3px 10px; border-radius: 999px; background: var(--accent); color: var(--primary-strong); font-size: 12px; font-weight: 700; }
+    #process-box-sync-status { white-space: pre-line; margin: 6px 0 0; color: var(--foreground); }
+    #rd-sync-status, #rd-all-sync-status { margin: 6px 0 12px; color: var(--muted-foreground); font-size: 12px; overflow-wrap: anywhere; }
+    #status { display: none; max-height: 220px; overflow-y: auto; margin-top: 14px; padding: 10px 12px; background: var(--background); border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; font-size: 12px; }
     .status-line { margin-bottom: 4px; }
     .status-success { color: var(--success); }
     .status-info { color: var(--primary); }
 
+    /* Modelos e preenchimentos */
+    code { padding: 0 5px; border-radius: 5px; background: var(--muted); font-family: 'IBM Plex Mono', Consolas, monospace; font-size: 11.5px; }
+    .form-message { margin: 10px 0 0; }
+    .form-message:empty { display: none; }
+    .forward-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid var(--border); }
+    .forward-item:first-child { border-top: 0; padding-top: 4px; }
+    .forward-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .forward-title { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+    .forward-title .snippet-trigger { margin: 0; }
+    .forward-meta, .forward-despacho { color: var(--muted-foreground); font-size: 12px; overflow-wrap: anywhere; }
+    .forward-despacho { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+    #forward-list > .helper { margin: 4px 0 0; }
+    .undo-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+    .undo-row:has(.form-message:empty):has(.link-button[hidden]) { display: none; }
+    .undo-row .form-message { margin: 0; }
+    .link-button { min-height: 0; padding: 0; border: 0; background: none; color: var(--primary); font-size: 12px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+    .link-button:hover { background: none; color: var(--primary-strong); }
+    .destination { margin: 4px 0 12px; padding: 12px 14px 2px; border: 1px solid var(--border); border-radius: 10px; background: var(--background); }
+    .destination legend { padding: 0 6px; font-size: 12px; font-weight: 700; }
+    .capture-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .capture-row p { margin: 0; color: var(--muted-foreground); font-size: 12px; }
+    .capture-row button { flex-shrink: 0; }
+    .destination-grid { display: grid; grid-template-columns: 1fr 120px; gap: 0 12px; }
+    .field-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 12px; }
+    #despacho-encaminhamento { min-height: 92px; }
+    .block-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; padding: 0; border: 0; }
+    .block-option { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); cursor: pointer; }
+    .block-option:hover { border-color: #c6d4e3; background: var(--background); }
+    .block-option:has(input:checked) { border-color: #b9d4f1; background: var(--accent); }
+    .block-option input { width: auto; margin: 2px 0 0; accent-color: var(--primary); }
+    .block-option span { display: flex; flex-direction: column; min-width: 0; }
+    .block-option strong { font-size: 12.5px; }
+    .block-option small { color: var(--muted-foreground); font-size: 11.5px; font-weight: 500; }
+
     /* Atalhos de texto */
-    #snippet-message { min-height: 0; margin: 8px 0; }
+    .snippet-form-grid { display: grid; grid-template-columns: 170px 1fr; gap: 0 12px; }
+    #snippet-message { margin: 10px 0 0; }
     #snippet-message:empty { display: none; }
-    #snippet-list { margin-top: 8px; max-height: 240px; overflow-y: auto; }
-    .snippet-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
+    .snippet-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+    #snippet-search { max-width: 220px; margin: 0; }
+    .snippet-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
+    .snippet-item:first-child { border-top: 0; }
     .snippet-text { min-width: 0; }
-    .snippet-trigger { display: block; font-weight: 700; color: var(--primary); }
+    .snippet-trigger { display: inline-block; margin-bottom: 2px; padding: 0 7px; border-radius: 6px; background: var(--accent); color: var(--primary-strong); font-family: 'IBM Plex Mono', Consolas, monospace; font-size: 12px; font-weight: 700; }
     .snippet-expansion { display: block; color: var(--muted-foreground); font-size: 12px; overflow-wrap: anywhere; }
     .snippet-actions { display: flex; gap: 4px; flex-shrink: 0; }
-    .snippet-actions button { width: 28px; min-height: 28px; margin: 0; padding: 0; }
-
-    footer { margin-top: 12px; text-align: center; font-size: 11px; color: var(--muted-foreground); }
-    kbd { padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); font-family: inherit; }
+    .snippet-actions button { width: 28px; min-height: 28px; padding: 0; }
+    #snippet-list > .helper { margin: 10px 0 0; }
   </style>
 </head>
 <body>
-  <header class="brand">
-    <div class="brand-mark"><img src="logo-transparent.png" alt="Logo do SIAGES"><h1>SIAGES</h1></div>
-    <a class="portal-link" href="https://www.siages.com.br" target="_blank" rel="noopener noreferrer">Abrir SIAGES ↗</a>
-  </header>
-  <main>
-  <section class="card account-card" aria-labelledby="extension-auth-title">
-    <div class="card-heading">
-      <h3 id="extension-auth-title">Sua conta</h3>
+  <div class="shell">
+  <aside class="sidebar">
+    <header class="brand">
+      <div class="brand-mark"><img src="logo-transparent.png" alt="Logo do SIAGES"><h1>SIAGES</h1></div>
+    </header>
+    <nav class="nav" aria-label="Seções da extensão">
+      <p class="nav-label">Geral</p>
+      <button type="button" class="nav-item is-active" data-section="account" aria-current="page">
+        <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="presence" id="nav-account-presence" data-state="checking"></span></span>
+        <span class="nav-text">Conta</span>
+      </button>
+      <button type="button" class="nav-item" id="nav-siafi" data-section="siafi" hidden>
+        <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
+        <span class="nav-text">Favorecidos SIAFI</span>
+      </button>
+      <button type="button" class="nav-item" data-section="snippets">
+        <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg></span>
+        <span class="nav-text">Atalhos de texto</span>
+        <span class="nav-badge" data-nav-badge="snippets" data-tone="muted" hidden></span>
+      </button>
+      <button type="button" class="nav-item" id="nav-templates" data-section="templates">
+        <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></svg></span>
+        <span class="nav-text">Modelos e preenchimentos</span>
+      </button>
+      <button type="button" class="nav-item" id="nav-process-panel" data-section="process-panel">
+        <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18M7 8h4M7 12h4M7 16h4"/></svg></span>
+        <span class="nav-text">Painel do processo</span>
+        <span class="nav-badge" data-nav-badge="process-panel" data-tone="muted" hidden></span>
+      </button>
+      <div id="nav-sync-group" class="nav-group" hidden>
+        <p class="nav-label">Sincronização</p>
+        <button type="button" class="nav-item" data-section="process-box">
+          <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></span>
+          <span class="nav-text">Caixas de processos</span>
+          <span class="nav-badge" data-nav-badge="process-box" hidden></span>
+        </button>
+        <button type="button" class="nav-item" data-section="plan">
+          <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8M13 12h8M13 18h8"/></svg></span>
+          <span class="nav-text">Atividades — Plano 8</span>
+          <span class="nav-badge" data-nav-badge="plan" hidden></span>
+        </button>
+        <button type="button" class="nav-item" data-section="rds">
+          <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8M16 17H8M10 9H8"/></svg></span>
+          <span class="nav-text">RDs</span>
+          <span class="nav-badge" data-nav-badge="rds" hidden></span>
+        </button>
+      </div>
+    </nav>
+    <footer class="sidebar-footer">
+      <a class="portal-link" href="https://www.siages.com.br" target="_blank" rel="noopener noreferrer">Abrir SIAGES<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a>
+      <p class="shortcut-hint">Comandos nas páginas <span class="keys"><kbd>Ctrl</kbd> + <kbd>K</kbd></span></p>
+    </footer>
+  </aside>
+
+  <main id="popup-content" class="content">
+  <section class="view account-card is-active" data-section="account" aria-labelledby="extension-auth-title">
+    <header class="view-header">
+      <div>
+        <h2 id="extension-auth-title">Sua conta</h2>
+        <p class="view-description">Conta do SIAGES usada pela extensão e campus vinculado.</p>
+      </div>
       <span id="extension-auth-badge" class="badge">Verificando</span>
+    </header>
+    <div class="panel">
+      <form id="extension-auth-form" class="auth-form" hidden>
+        <label>E-mail do SIAGES<input id="extension-auth-email" type="email" autocomplete="username" required></label>
+        <label>Senha<input id="extension-auth-password" type="password" autocomplete="current-password" required></label>
+        <button id="btn-extension-sign-in" type="submit">Entrar no SIAGES</button>
+      </form>
+      <div id="extension-auth-user" class="account-user" hidden>
+        <span id="extension-auth-avatar" class="avatar" aria-hidden="true"></span>
+        <div class="account-identity">
+          <span class="account-label">Conectado como</span>
+          <span id="extension-auth-user-email"></span>
+        </div>
+        <button id="btn-extension-sign-out" type="button" class="secondary">Sair</button>
+      </div>
+      <label id="extension-auth-campus-field" class="account-campus" hidden>
+        Campus vinculado (UASG)
+        <select id="extension-user-campus-select" aria-label="Campus vinculado (UASG)">
+          <option value="158366">158366 — Currais Novos</option>
+          <option value="158155">158155 — Reitoria</option>
+          <option value="158371">158371 — Apodi</option>
+          <option value="158370">158370 — Caicó</option>
+          <option value="154839">154839 — Canguaretama</option>
+          <option value="154838">154838 — Ceará-Mirim</option>
+          <option value="158367">158367 — Ipanguaçu</option>
+          <option value="158373">158373 — João Câmara</option>
+          <option value="158887">158887 — Lajes</option>
+          <option value="158375">158375 — Macau</option>
+          <option value="158365">158365 — Mossoró</option>
+          <option value="158369">158369 — Natal - Central</option>
+          <option value="152711">152711 — Natal - Cidade Alta</option>
+          <option value="158368">158368 — Natal - Zona Norte</option>
+          <option value="152757">152757 — Nova Cruz</option>
+          <option value="158882">158882 — Parelhas</option>
+          <option value="152756">152756 — Parnamirim</option>
+          <option value="158374">158374 — Pau dos Ferros</option>
+          <option value="158372">158372 — Santa Cruz</option>
+          <option value="154582">154582 — São Gonçalo do Amarante</option>
+          <option value="158897">158897 — São Miguel</option>
+          <option value="154840">154840 — São Paulo do Potengi</option>
+          <option value="158896">158896 — Touros</option>
+          <option value="158898">158898 — Umarizal</option>
+        </select>
+      </label>
+      <p id="extension-auth-status" class="helper" role="status" aria-live="polite">Verificando sua sessão…</p>
     </div>
-    <form id="extension-auth-form" hidden>
-      <label>E-mail do SIAGES<input id="extension-auth-email" type="email" autocomplete="username" required></label>
-      <label>Senha<input id="extension-auth-password" type="password" autocomplete="current-password" required></label>
-      <button id="btn-extension-sign-in" type="submit">Entrar no SIAGES</button>
-    </form>
-    <div id="extension-auth-user" class="account-user" hidden>
-      <span id="extension-auth-user-email"></span>
-      <button id="btn-extension-sign-out" type="button" class="secondary">Sair</button>
-    </div>
-    <label id="extension-auth-campus-field" class="account-campus" hidden>
-      Campus vinculado (UASG)
-      <select id="extension-user-campus-select" aria-label="Campus vinculado (UASG)">
-        <option value="158366">158366 — Currais Novos</option>
-        <option value="158155">158155 — Reitoria</option>
-        <option value="158371">158371 — Apodi</option>
-        <option value="158370">158370 — Caicó</option>
-        <option value="154839">154839 — Canguaretama</option>
-        <option value="154838">154838 — Ceará-Mirim</option>
-        <option value="158367">158367 — Ipanguaçu</option>
-        <option value="158373">158373 — João Câmara</option>
-        <option value="158887">158887 — Lajes</option>
-        <option value="158375">158375 — Macau</option>
-        <option value="158365">158365 — Mossoró</option>
-        <option value="158369">158369 — Natal - Central</option>
-        <option value="152711">152711 — Natal - Cidade Alta</option>
-        <option value="158368">158368 — Natal - Zona Norte</option>
-        <option value="152757">152757 — Nova Cruz</option>
-        <option value="158882">158882 — Parelhas</option>
-        <option value="152756">152756 — Parnamirim</option>
-        <option value="158374">158374 — Pau dos Ferros</option>
-        <option value="158372">158372 — Santa Cruz</option>
-        <option value="154582">154582 — São Gonçalo do Amarante</option>
-        <option value="158897">158897 — São Miguel</option>
-        <option value="154840">154840 — São Paulo do Potengi</option>
-        <option value="158896">158896 — Touros</option>
-        <option value="158898">158898 — Umarizal</option>
-      </select>
-    </label>
-    <p id="extension-auth-status" class="helper" role="status" aria-live="polite">Verificando sua sessão…</p>
   </section>
-  <section id="siafi-favorecidos-card" class="card" hidden aria-labelledby="siafi-favorecidos-title">
-    <h3 id="siafi-favorecidos-title">Preencher favorecidos no SIAFI</h3>
-    <label style="margin-top: 10px">
-      Lista de trabalho da LC
-      <select id="siafi-list-select" aria-label="Lista de trabalho da LC">
-        <option value="">Carregando listas...</option>
-      </select>
-    </label>
-    <label>
-      Bloco inicial
-      <select id="siafi-batch-select" aria-label="Bloco inicial" disabled>
-        <option value="">Selecione uma lista</option>
-      </select>
-    </label>
-    <label class="sync-option"><input id="siafi-auto-continue" type="checkbox" checked>Seguir para o próximo bloco quando o anterior terminar sem erro nem pendência</label>
-    <p id="siafi-list-info" aria-live="polite">Selecione uma lista salva no SIAGES. O preenchimento ocorre em blocos de até 10 favorecidos.</p>
-    <div class="button-row">
-      <button id="btn-siafi-refresh" type="button" class="secondary">Atualizar listas</button>
-      <button id="btn-siafi-fill" type="button">Preencher SIAFI</button>
-      <button id="btn-siafi-resume" type="button" class="secondary" disabled>Concluir linhas abertas</button>
+
+  <section id="siafi-favorecidos-card" class="view" data-section="siafi" hidden aria-labelledby="siafi-favorecidos-title">
+    <header class="view-header">
+      <div>
+        <h2 id="siafi-favorecidos-title">Preencher favorecidos no SIAFI</h2>
+        <p class="view-description">Seleciona o Pix cadastrado, formata o valor e confirma cada linha. Sem Pix ou com várias chaves, deixa a escolha pendente.</p>
+      </div>
+    </header>
+    <div class="panel">
+      <div class="field-grid">
+        <label>
+          Lista de trabalho da LC
+          <select id="siafi-list-select" aria-label="Lista de trabalho da LC">
+            <option value="">Carregando listas...</option>
+          </select>
+        </label>
+        <label>
+          Bloco inicial
+          <select id="siafi-batch-select" aria-label="Bloco inicial" disabled>
+            <option value="">Selecione uma lista</option>
+          </select>
+        </label>
+      </div>
+      <p id="siafi-list-info" aria-live="polite">Selecione uma lista salva no SIAGES. O preenchimento ocorre em blocos de até 10 favorecidos.</p>
+      <label class="sync-option"><input id="siafi-auto-continue" type="checkbox" checked>Seguir para o próximo bloco quando o anterior terminar sem erro nem pendência</label>
+      <div class="actions actions-end" style="margin-top: 16px">
+        <button id="btn-siafi-refresh" type="button" class="secondary">Atualizar listas</button>
+        <button id="btn-siafi-resume" type="button" class="secondary" disabled>Concluir linhas abertas</button>
+        <button id="btn-siafi-fill" type="button">Preencher SIAFI</button>
+      </div>
+      <p id="siafi-fill-status" aria-live="polite"></p>
     </div>
-    <p>Seleciona o Pix cadastrado, formata o valor e confirma cada linha. Sem Pix ou com várias chaves, deixa a escolha pendente. Para linhas já preenchidas, selecione a lista correspondente e use “Concluir linhas abertas”.</p>
-    <p id="siafi-fill-status" aria-live="polite"></p>
+    <p class="helper">Para linhas já preenchidas, selecione a lista correspondente e use “Concluir linhas abertas”.</p>
   </section>
-  <h2 id="tools-title">Ferramentas</h2>
-  <div class="group" role="group" aria-labelledby="tools-title">
-  <details class="card" id="snippets-panel"><summary><div class="summary-text"><h3 id="snippets-title">Atalhos de texto</h3><span class="summary-description">Criar, editar e remover atalhos como /cn</span></div></summary><div class="details-body">
-    <p class="sync-description">Digite o atalho seguido de espaço em qualquer campo de texto. Com a conta SIAGES conectada, os atalhos valem em todos os perfis do Chrome.</p>
-    <form id="snippet-form">
-      <label>Atalho<input id="snippet-trigger" placeholder="/exemplo" autocomplete="off"></label>
-      <label>Texto expandido<textarea id="snippet-expansion" placeholder="Texto completo..."></textarea></label>
-      <button id="btn-snippet-save" type="submit">Salvar atalho</button>
-      <button id="btn-snippet-cancel" type="button" class="secondary" hidden>Cancelar edição</button>
-    </form>
-    <p id="snippet-message" class="helper" role="status" aria-live="polite"></p>
-    <input id="snippet-search" type="search" placeholder="Buscar atalhos" aria-label="Buscar atalhos">
-    <div id="snippet-list"></div>
+
+  <section class="view" id="snippets-panel" data-section="snippets" aria-labelledby="snippets-title">
+    <header class="view-header">
+      <div>
+        <h2 id="snippets-title">Atalhos de texto</h2>
+        <p class="view-description">Digite o atalho seguido de espaço em qualquer campo de texto. Com a conta SIAGES conectada, os atalhos valem em todos os perfis do Chrome.</p>
+      </div>
+    </header>
+    <div class="panel">
+      <h3 id="snippet-form-title">Novo atalho</h3>
+      <form id="snippet-form" style="margin-top: 12px">
+        <div class="snippet-form-grid">
+          <label>Atalho<input id="snippet-trigger" placeholder="/exemplo" autocomplete="off"></label>
+          <label>Texto expandido<textarea id="snippet-expansion" placeholder="Texto completo..."></textarea></label>
+        </div>
+        <div class="actions actions-end">
+          <button id="btn-snippet-cancel" type="button" class="secondary" hidden>Cancelar edição</button>
+          <button id="btn-snippet-save" type="submit">Salvar atalho</button>
+        </div>
+      </form>
+      <p id="snippet-message" class="helper" role="status" aria-live="polite"></p>
     </div>
-  </details>
-  </div>
-  <section id="sync-section" class="sync-section" aria-labelledby="sync-title" hidden>
-  <h2 id="sync-title">Sincronização</h2>
-  <div class="group" style="margin-top: 10px">
-  <section class="card" aria-labelledby="process-box-sync-title">
-    <div class="card-heading"><h3 id="process-box-sync-title">Caixas de processos</h3><span class="badge">Automática</span></div>
-    <p class="helper">Dias úteis às 07h, 10h, 13h e 15h. Mantenha o navegador aberto e as sessões do SUAP e SIAGES ativas.</p>
-    <p id="process-box-sync-status" class="helper" aria-live="polite">Consultando próxima execução…</p>
+    <div class="panel">
+      <div class="snippet-toolbar">
+        <h3>Seus atalhos</h3>
+        <input id="snippet-search" type="search" placeholder="Buscar atalhos" aria-label="Buscar atalhos">
+      </div>
+      <div id="snippet-list"></div>
+    </div>
   </section>
-  <details class="card" id="plan-sync-panel"><summary><div class="summary-text"><h3 id="plan-sync-title">Atividades — Plano 8</h3><span class="summary-description">Sincronizar atividades e saldos</span></div></summary><div class="details-body">
-    <p class="sync-description">Coleta as atividades e os saldos do plano para conferência. Depois, aplique a prévia no SIAGES. Escolha esta unidade ou todas as unidades.</p>
-    <button id="btn-extract-en" type="button">Sincronizar atividades desta unidade</button>
-    <button id="btn-extract-all" class="secondary" type="button">Sincronizar atividades de todas as unidades</button>
-    <button id="btn-apply-plan" class="secondary" type="button" hidden>Aplicar conferência das atividades</button>
-    <div id="status" aria-live="polite"></div>
+
+  <section class="view" id="templates-panel" data-section="templates" aria-labelledby="templates-title">
+    <header class="view-header">
+      <div>
+        <h2 id="templates-title">Modelos e preenchimentos</h2>
+        <p class="view-description">O que a extensão preenche por você no SUAP. Vale neste Chrome e acompanha a conta Google conectada ao navegador.</p>
+      </div>
+    </header>
+
+    <div class="panel">
+      <div class="panel-heading">
+        <h3 id="forward-list-title">Atalhos de encaminhamento</h3>
+        <button id="btn-forward-new" type="button" class="secondary">Novo atalho</button>
+      </div>
+      <p class="panel-description">Na paleta (<kbd>Ctrl</kbd> + <kbd>K</kbd>), digite o atalho e o número do processo, como <code>encdg 498930</code>. O encaminhamento abre preenchido; você confere, informa a senha e salva.</p>
+      <div id="forward-list" aria-labelledby="forward-list-title"></div>
+      <div class="undo-row">
+        <p id="forward-message" class="helper form-message" role="status" aria-live="polite"></p>
+        <button id="btn-forward-undo" type="button" class="link-button" hidden>Desfazer</button>
+      </div>
     </div>
-  </details>
-  <details class="card" id="rd-sync-panel"><summary><div class="summary-text"><h3 id="rd-sync-title">RDs — Requisições de despesas</h3><span class="summary-description">Coletar e acompanhar requisições</span></div></summary><div class="details-body">
-    <p class="sync-description">Coleta RDs, reforços, anulações e vínculos oficiais. Os dados validados ficam disponíveis no SIAGES durante a coleta, que pode ser pausada e retomada.</p>
-    <p class="sync-description">Após a primeira aplicação, reaproveita RDs concluídas e seus vínculos. Busca RDs novas e relê as pendentes. Canceladas passam por conferência periódica.</p>
-    <label class="sync-option"><input id="rd-force-full" type="checkbox">Revalidar tudo na próxima coleta (mais demorado)</label>
-    <div class="sync-scope">
-      <h4>Unidade selecionada no SUAP</h4>
+
+    <div class="panel" id="forward-editor" hidden>
+      <h3 id="forward-editor-title">Novo atalho de encaminhamento</h3>
+      <form id="forward-form" style="margin-top: 12px" novalidate>
+        <div class="snippet-form-grid">
+          <label>Atalho<input id="forward-shortcut" placeholder="encfin" autocomplete="off" spellcheck="false" maxlength="15"></label>
+          <label>Nome na paleta<input id="forward-title" placeholder="Encaminhar para o setor escolhido" maxlength="120"></label>
+        </div>
+        <label>Texto do despacho<textarea id="forward-despacho" placeholder="Ex.: Ao Diretor-Geral para autorização de pagamento" maxlength="2000"></textarea></label>
+        <fieldset class="destination">
+          <legend>Destino no SUAP</legend>
+          <div class="capture-row">
+            <p>Abra a tela “Encaminhar” de um processo no SUAP, escolha campus, setor e perfil, e copie daqui.</p>
+            <button id="btn-forward-capture" type="button" class="secondary">Copiar da página aberta</button>
+          </div>
+          <div class="destination-grid">
+            <label>Campus<input id="forward-campus-text" placeholder="CN" maxlength="200"></label>
+            <label>ID no SUAP<input id="forward-campus-id" inputmode="numeric" placeholder="3" maxlength="20" aria-label="ID do campus no SUAP"></label>
+            <label>Setor<input id="forward-setor-text" placeholder="DG/CN" maxlength="200"></label>
+            <label>ID no SUAP<input id="forward-setor-id" inputmode="numeric" placeholder="841" maxlength="20" aria-label="ID do setor no SUAP"></label>
+          </div>
+          <label>Perfil de quem encaminha<input id="forward-papel" placeholder="ASSISTENTE EM ADMINISTRACAO" maxlength="120"></label>
+        </fieldset>
+        <div class="actions actions-end">
+          <button id="btn-forward-cancel" type="button" class="secondary">Cancelar</button>
+          <button id="btn-forward-save" type="submit">Salvar atalho</button>
+        </div>
+        <p id="forward-form-message" class="helper form-message" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h3>Upload de documento (<code>up</code>)</h3>
+      <p class="panel-description">Preenchido em <code>up 498930</code> e no Alt + clique sobre o número do processo.</p>
+      <form id="upload-form" novalidate>
+        <div class="field-grid-3">
+          <label>Tipo de conferência<input id="upload-tipo-conferencia" maxlength="120"></label>
+          <label>Tipo de documento<input id="upload-tipo-documento" maxlength="120"></label>
+          <label>Assunto<input id="upload-assunto" maxlength="120"></label>
+        </div>
+        <div class="actions actions-end">
+          <button id="btn-upload-reset" type="button" class="secondary">Restaurar padrão</button>
+          <button id="btn-upload-save" type="submit">Salvar upload</button>
+        </div>
+        <p id="upload-message" class="helper form-message" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h3>Despacho de liquidação</h3>
+      <p class="panel-description">Partes fixas do despacho gerado pelo SIAGES no SUAP. Em branco, vale o texto padrão. Use <code>{campus}</code> para o nome do campus vinculado à sua conta. Os considerandos e a autorização continuam montados conforme o tipo de despesa.</p>
+      <form id="despacho-form" novalidate>
+        <label>Destinatário<input id="despacho-destinatario" maxlength="300"></label>
+        <label>Assunto<input id="despacho-assunto" maxlength="200"></label>
+        <label>Encaminhamento final<textarea id="despacho-encaminhamento" maxlength="1500"></textarea></label>
+        <label>Fecho<input id="despacho-fecho" maxlength="300"></label>
+        <div class="actions actions-end">
+          <button id="btn-despacho-reset" type="button" class="secondary">Usar texto padrão</button>
+          <button id="btn-despacho-save" type="submit">Salvar modelo</button>
+        </div>
+        <p id="despacho-message" class="helper form-message" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+
+  <section class="view" id="process-panel-view" data-section="process-panel" aria-labelledby="process-panel-title">
+    <header class="view-header">
+      <div>
+        <h2 id="process-panel-title">Painel do processo</h2>
+        <p class="view-description">O painel SIAGES que aparece ao lado das páginas de processo do SUAP. As mudanças valem na hora, inclusive nas abas já abertas.</p>
+      </div>
+    </header>
+    <div class="panel">
+      <div class="panel-heading">
+        <h3 id="summary-blocks-title">Blocos da aba Resumo</h3>
+        <button id="btn-summary-blocks-all" type="button" class="secondary">Mostrar todos</button>
+      </div>
+      <p class="panel-description">Desmarque o que não usa. Blocos sem dados no processo continuam fora do Resumo, mesmo marcados.</p>
+      <fieldset id="summary-blocks" class="block-list" aria-labelledby="summary-blocks-title"></fieldset>
+      <p id="summary-blocks-message" class="helper form-message" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <div id="sync-section" class="sync-section" hidden>
+  <section class="view" data-section="process-box" aria-labelledby="process-box-sync-title">
+    <header class="view-header">
+      <div>
+        <p class="eyebrow">Sincronização</p>
+        <h2 id="process-box-sync-title">Caixas de processos</h2>
+        <p class="view-description">Mantenha o navegador aberto e as sessões do SUAP e do SIAGES ativas.</p>
+      </div>
+      <span class="badge">Automática</span>
+    </header>
+    <div class="panel">
+      <h3>Agenda</h3>
+      <p class="panel-description" style="margin-bottom: 0">Dias úteis, nos horários:</p>
+      <div class="schedule"><span>07h</span><span>10h</span><span>13h</span><span>15h</span></div>
+    </div>
+    <div class="panel">
+      <h3>Situação</h3>
+      <p id="process-box-sync-status" class="helper" aria-live="polite">Consultando próxima execução…</p>
+    </div>
+  </section>
+
+  <section class="view" id="plan-sync-panel" data-section="plan" aria-labelledby="plan-sync-title">
+    <header class="view-header">
+      <div>
+        <p class="eyebrow">Sincronização</p>
+        <h2 id="plan-sync-title">Atividades — Plano 8</h2>
+        <p class="view-description">Coleta as atividades e os saldos do plano para conferência. Depois, aplique a prévia no SIAGES.</p>
+      </div>
+    </header>
+    <div class="panel">
+      <h3>Escolha o alcance</h3>
+      <p class="panel-description">Sincronize a unidade aberta no SUAP ou todas as unidades de uma vez.</p>
+      <div class="actions">
+        <button id="btn-extract-en" type="button">Sincronizar atividades desta unidade</button>
+        <button id="btn-extract-all" class="secondary" type="button">Sincronizar atividades de todas as unidades</button>
+        <button id="btn-apply-plan" class="secondary" type="button" hidden>Aplicar conferência das atividades</button>
+      </div>
+      <div id="status" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="view" id="rd-sync-panel" data-section="rds" aria-labelledby="rd-sync-title">
+    <header class="view-header">
+      <div>
+        <p class="eyebrow">Sincronização</p>
+        <h2 id="rd-sync-title">RDs — Requisições de despesas</h2>
+        <p class="view-description">Coleta RDs, reforços, anulações e vínculos oficiais. Os dados validados ficam disponíveis no SIAGES durante a coleta, que pode ser pausada e retomada.</p>
+      </div>
+    </header>
+    <div class="panel">
+      <h3>Como a coleta funciona</h3>
+      <p class="panel-description">Após a primeira aplicação, reaproveita RDs concluídas e seus vínculos. Busca RDs novas e relê as pendentes. Canceladas passam por conferência periódica.</p>
+      <label class="sync-option"><input id="rd-force-full" type="checkbox">Revalidar tudo na próxima coleta (mais demorado)</label>
+    </div>
+    <div class="panel">
+      <h3>Unidade selecionada no SUAP</h3>
       <p id="rd-sync-status" aria-live="polite">Abra o Plano 8 ou a lista de RDs da unidade no SUAP.</p>
-      <button id="btn-collect-rds" type="button" disabled>Coletar / retomar RDs desta unidade</button>
-      <button id="btn-pause-rds" class="secondary" type="button" hidden>Pausar RDs desta unidade</button>
-      <button id="btn-apply-rds" class="secondary" type="button" hidden>Aplicar RDs desta unidade</button>
+      <div class="actions">
+        <button id="btn-collect-rds" type="button" disabled>Coletar / retomar RDs desta unidade</button>
+        <button id="btn-pause-rds" class="secondary" type="button" hidden>Pausar RDs desta unidade</button>
+        <button id="btn-apply-rds" class="secondary" type="button" hidden>Aplicar RDs desta unidade</button>
+      </div>
     </div>
-    <div class="sync-scope">
-      <h4>Todas as unidades</h4>
+    <div class="panel">
+      <h3>Todas as unidades</h3>
       <p id="rd-all-sync-status" aria-live="polite">Cada unidade mantém sua própria conferência e associação ao campus.</p>
-      <button id="btn-collect-all-rds" type="button">Coletar / retomar RDs de todas as unidades</button>
-      <button id="btn-pause-all-rds" class="secondary" type="button" hidden>Pausar RDs de todas as unidades</button>
-      <button id="btn-apply-all-rds" class="secondary" type="button" hidden>Aplicar RDs das unidades conferidas</button>
+      <div class="actions">
+        <button id="btn-collect-all-rds" type="button">Coletar / retomar RDs de todas as unidades</button>
+        <button id="btn-pause-all-rds" class="secondary" type="button" hidden>Pausar RDs de todas as unidades</button>
+        <button id="btn-apply-all-rds" class="secondary" type="button" hidden>Aplicar RDs das unidades conferidas</button>
+      </div>
     </div>
-    <a class="sync-link" href="https://www.siages.com.br/importacao-dados" target="_blank" rel="noopener noreferrer">Conferir RDs no SIAGES</a>
-    </div>
-  </details>
-  </div>
+    <a class="sync-link" href="https://www.siages.com.br/importacao-dados" target="_blank" rel="noopener noreferrer">Conferir RDs no SIAGES<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a>
   </section>
+  </div>
   </main>
-  <footer>Comandos e buscas nas páginas: <kbd>Ctrl + K</kbd></footer>
+  </div>
   <script src="extension-auth-client.js"></script>
+  <script src="user-preferences.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

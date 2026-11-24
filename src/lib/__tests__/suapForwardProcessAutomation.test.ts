@@ -88,6 +88,19 @@ describe('automação do encaminhamento à DG/CN (encdg)', () => {
     expect(document.getElementById('siages-suap-forward-notice')).toHaveTextContent('Informe a senha');
   });
 
+  it('preserva os parágrafos do despacho configurado e cita o setor escolhido no aviso', async () => {
+    const api = (window as ForwardWindow).__siagesForwardProcess!;
+    const custom = { ...payload, despacho: 'À COFIN para pagamento.\r\n\r\n\r\nPrazo:   hoje.', setor: { id: '1234', text: 'COFIN/CN' } };
+    const parsed = api.parsePayloadFromHash(`#siagesEncaminhar=${encodeURIComponent(JSON.stringify(custom))}`)!;
+    expect(parsed.despacho).toBe('À COFIN para pagamento.\n\nPrazo: hoje.');
+
+    const task = api.run(parsed);
+    await vi.advanceTimersByTimeAsync(2000);
+    await expect(task).resolves.toBe(true);
+    expect((document.getElementById('id_despacho_corpo') as HTMLTextAreaElement).value).toBe('À COFIN para pagamento.\n\nPrazo: hoje.');
+    expect(document.getElementById('siages-suap-forward-notice')).toHaveTextContent('encaminhamento para COFIN/CN preenchido');
+  });
+
   it('avisa quando o perfil não existe para o usuário', async () => {
     const api = (window as ForwardWindow).__siagesForwardProcess!;
     const task = api.run({ ...api.parsePayloadFromHash(`#siagesEncaminhar=${encodeURIComponent(JSON.stringify(payload))}`)!, papel: 'PERFIL INEXISTENTE' });

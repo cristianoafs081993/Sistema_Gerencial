@@ -15,6 +15,11 @@
   const COLLAPSED_KEY = 'siages-toolkit-collapsed';
   const SECTIONS_COLLAPSED_KEY = 'siages-toolkit-sections-collapsed';
   const SNIPPETS_KEY = 'siages-snippets';
+  // Preferências do popup (user-preferences.js): textos do despacho de liquidação
+  // (null = padrão do SIAGES) e blocos da aba Resumo que o servidor escolheu ocultar.
+  const userPreferencesApi = globalThis.SiagesUserPreferences || null;
+  let despachoModelo = null;
+  let hiddenSummaryBlocks = new Set();
   const PROCESS_STATE_KEY_PREFIX = 'siages-process-state:';
   const PROCESS_MAPPING_KEY_PREFIX = 'siages-process-mapping:';
   const PROCESS_STEP_KEY_PREFIX = 'siages-process-step:';
@@ -699,6 +704,7 @@
           ...(state.manualStepNodeId ? { manualCurrentStepNodeId: state.manualStepNodeId } : {}),
         },
         ...(session ? { extensionSession: { accessToken: session.accessToken, ...(session.expiresAt ? { expiresAt: session.expiresAt } : {}), ...(session.campusUasg ? { campusUasg: session.campusUasg } : (state.campusUasg ? { campusUasg: state.campusUasg } : {})) } } : {}),
+        ...(despachoModelo ? { despachoModelo } : {}),
       },
     };
   }
@@ -937,11 +943,12 @@
     }
     container.appendChild(status);
   }
+  const isSummaryBlockVisible = (blockId) => !hiddenSummaryBlocks.has(blockId);
   function renderSummary(snapshot = state.snapshot) {
     const container = panel('summary'); if (!container) return;
     container.innerHTML = ''; renderSyncStatus(container);
     const process = snapshot?.process; const fallback = snapshot?.fallback || { suapId: getProcessId(), processNumber: getProcessNumber() };
-    appendSection(container, 'Processo', (section) => {
+    if (isSummaryBlockVisible('processo')) appendSection(container, 'Processo', (section) => {
       appendCopyRow(section, 'Processo', process?.numProcesso || fallback.processNumber, true);
     });
     if (process) {
@@ -958,13 +965,13 @@
         : [];
       const hasMultipleInvoices = invoices.length > 1;
       const workflow = full.workflow || {};
-      appendSection(container, 'Beneficiário', (section) => {
+      if (isSummaryBlockVisible('beneficiario')) appendSection(container, 'Beneficiário', (section) => {
         appendCopyRow(section, 'Nome', process.beneficiario);
         appendCopyRow(section, 'CPF/CNPJ', process.cpfCnpj, true, true);
         appendCopyRow(section, 'Assunto', process.assunto);
       });
-      renderBeneficiaryDocsCard(container, process.cpfCnpj);
-      appendSection(container, 'Documento e pagamento', (section) => {
+      if (isSummaryBlockVisible('rps-nps')) renderBeneficiaryDocsCard(container, process.cpfCnpj);
+      if (isSummaryBlockVisible('documento-pagamento')) appendSection(container, 'Documento e pagamento', (section) => {
         appendCopyRow(section, 'Valor', full.val_nf);
         appendCopyRow(section, 'NS', workflow.nsNumero || full.ns_numero, true);
         appendCopyRow(section, 'Contrato', process.contrato || full.contrato_numero, true);
@@ -975,13 +982,13 @@
           appendCopyRow(section, `Valor NF${suffix}`, invoice.valor);
         });
       });
-      appendSection(container, 'Dados bancários', (section) => {
+      if (isSummaryBlockVisible('dados-bancarios')) appendSection(container, 'Dados bancários', (section) => {
         appendCopyRow(section, 'Banco', bank.banco);
         appendCopyRow(section, 'Agência', bank.agencia, true);
         appendCopyRow(section, 'Conta', bank.conta, true);
       });
       const empenhos = normalizeEmpenhos(full.empenhos);
-      appendSection(container, hasMultipleInvoices ? 'Empenhos' : 'Retenções e empenhos', (section) => {
+      if (isSummaryBlockVisible('retencoes-empenhos')) appendSection(container, hasMultipleInvoices ? 'Empenhos' : 'Retenções e empenhos', (section) => {
         if (!hasMultipleInvoices) {
           if (taxes.optante_simples_nacional) appendCopyRow(section, 'Regime', 'Optante pelo Simples Nacional');
           [['ISS', taxes.iss], ['INSS', taxes.inss], ['IR', taxes.ir], ['CSLL', taxes.csll], ['COFINS', taxes.cofins], ['PIS/PASEP', taxes.pis_pasep]].forEach(([label, value]) => appendCopyRow(section, label, value));
@@ -989,15 +996,30 @@
         empenhos.forEach((value, index) => appendCopyRow(section, `Empenho ${index + 1}`, value, true));
         if (empenhos.length > 1) appendCopyRow(section, 'Todos', empenhos.join(', '), true);
       });
-      if (workflow.concluido) appendSection(container, 'Conclusão', (section) => {
+      if (workflow.concluido && isSummaryBlockVisible('conclusao')) appendSection(container, 'Conclusão', (section) => {
         appendCopyRow(section, 'NS registrada', workflow.nsNumero || full.ns_numero, true);
         appendCopyRow(section, 'Concluído em', workflow.concluidoEm ? formatDate(workflow.concluidoEm) : '');
         appendCopyRow(section, 'Concluído por', workflow.concluidoPor);
         appendCopyRow(section, 'Análise', workflow.analiseLiquidacao?.resumo);
       });
     }
-    renderProcessFlow(container);
-    renderLcCard(container);
+    if (isSummaryBlockVisible('caminho-processo')) renderProcessFlow(container);
+    if (isSummaryBlockVisible('lista-credores')) renderLcCard(container);
+    // Tudo oculto: explica onde reativar, em vez de deixar a aba vazia.
+    if (hiddenSummaryBlocks.size && !container.querySelector('.suape-section, .suape-flow-card')) {
+      container.appendChild(createElement('div', 'suape-empty suape-summary-hidden-note', 'Os blocos do Resumo estão ocultos. Escolha quais mostrar no popup da extensão, em “Painel do processo”.'));
+    }
+  }
+
+  function applyUserPreferences(raw) {
+    if (!userPreferencesApi) return;
+    const preferences = userPreferencesApi.normalize(raw);
+    despachoModelo = userPreferencesApi.despachoModelo(preferences);
+    const nextHidden = new Set(preferences.hiddenSummaryBlocks);
+    const changed = nextHidden.size !== hiddenSummaryBlocks.size || [...nextHidden].some((blockId) => !hiddenSummaryBlocks.has(blockId));
+    hiddenSummaryBlocks = nextHidden;
+    // Com o painel já aberto, a escolha feita no popup vale na hora.
+    if (changed && document.getElementById(ROOT_ID)) renderSummary();
   }
 
   function renderProcessFlow(container) {
@@ -2136,13 +2158,16 @@
   async function installToolkit() {
     if (!getProcessId() || document.getElementById(ROOT_ID)) return;
     const processMappingKey = getProcessMappingKey();
-    const [theme, collapsed, storedSnippets, selectedMappingId, storedCollapsedSections] = await Promise.all([
+    const [theme, collapsed, storedSnippets, selectedMappingId, storedCollapsedSections, storedPreferences] = await Promise.all([
       storageGet('local', THEME_KEY, 'dark'),
       storageGet('local', COLLAPSED_KEY, false),
       storageGet('sync', SNIPPETS_KEY, null),
       storageGet('local', processMappingKey, ''),
       storageGet('local', SECTIONS_COLLAPSED_KEY, []),
+      userPreferencesApi ? storageGet('sync', userPreferencesApi.STORAGE_KEY, null) : null,
     ]);
+    // Antes do primeiro desenho, para os blocos ocultos não piscarem no Resumo.
+    applyUserPreferences(storedPreferences);
     const hasPersistedProcessState = await restorePersistedProcessState();
     state.theme = theme === 'light' ? 'light' : 'dark';
     state.collapsed = isScannedDocumentPage() ? true : Boolean(collapsed);
@@ -2168,6 +2193,11 @@
   }
   window.addEventListener('pagehide', persistProcessState);
   globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => { if (area === 'sync' && changes[SNIPPETS_KEY]) { state.snippets = changes[SNIPPETS_KEY].newValue || { ...DEFAULT_SNIPPETS }; renderShortcuts(); } });
+  if (userPreferencesApi) void storageGet('sync', userPreferencesApi.STORAGE_KEY, null).then(applyUserPreferences);
+  globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => {
+    const change = userPreferencesApi && area === 'sync' ? changes?.[userPreferencesApi.STORAGE_KEY] : null;
+    if (change) applyUserPreferences(change.newValue);
+  });
   globalThis.chrome?.runtime?.onMessage?.addListener((message, _sender, sendResponse) => {
     if (message?.source === 'suape-process-registry' && message?.type === 'get-process-data') {
       sendResponse({

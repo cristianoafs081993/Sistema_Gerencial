@@ -952,15 +952,36 @@
     return null;
   }
 
+  // Preferências do servidor (user-preferences.js): atalhos de encaminhamento e valores do upload.
+  // Sem o módulo, o upload segue os padrões do upload-document.js e não há atalhos de encaminhamento.
+  const userPreferencesApi = globalThis.SiagesUserPreferences || null;
+  let userPreferences = userPreferencesApi ? userPreferencesApi.normalize(null) : null;
+
+  async function loadUserPreferences() {
+    const syncStorage = globalThis.chrome?.storage?.sync;
+    if (!userPreferencesApi || !syncStorage?.get) return;
+    userPreferences = await userPreferencesApi.load(syncStorage);
+  }
+  void loadUserPreferences();
+
+  function getForwardShortcuts() {
+    return userPreferences?.forwardShortcuts || [];
+  }
+
+  function forwardShortcutTitle(item) {
+    return userPreferencesApi ? userPreferencesApi.forwardTitle(item) : item.title;
+  }
+
   function buildUploadAutomationData(processId) {
+    const upload = userPreferences?.upload || {};
     const payload = {
       source: 'siages',
       version: 1,
       action: 'suap_upload_document',
       suapId: String(processId),
-      tipoConferencia: 'Cópia Simples',
-      tipoDocumento: 'Liquidação',
-      assunto: 'Liquidação',
+      ...(upload.tipoConferencia ? { tipoConferencia: upload.tipoConferencia } : {}),
+      ...(upload.tipoDocumento ? { tipoDocumento: upload.tipoDocumento } : {}),
+      ...(upload.assunto ? { assunto: upload.assunto } : {}),
     };
     const hashPayload = encodeURIComponent(JSON.stringify(payload));
     return {
@@ -969,18 +990,18 @@
     };
   }
 
-  // Valores do encaminhamento para autorização de pagamento pela DG/CN.
-  // Os IDs são os do SUAP (Campus CN = 3, setor DG/CN = 841); a senha nunca é preenchida.
-  function buildForwardDgAutomationData(processId) {
+  // Encaminhamento preenchido por um atalho configurado (ex.: encdg → DG/CN).
+  // Campus e setor levam os IDs do SUAP; a senha nunca é preenchida.
+  function buildForwardAutomationData(processId, item) {
     const payload = {
       source: 'siages',
       version: 1,
       action: 'suap_forward_process',
       suapId: String(processId),
-      despacho: 'Ao Diretor geral para autorização de pagamento',
-      campus: { id: '3', text: 'CN' },
-      setor: { id: '841', text: 'DG/CN' },
-      papel: 'ASSISTENTE EM ADMINISTRACAO',
+      ...(item.despacho ? { despacho: item.despacho } : {}),
+      ...(item.campus ? { campus: item.campus } : {}),
+      ...(item.setor ? { setor: item.setor } : {}),
+      ...(item.papel ? { papel: item.papel } : {}),
     };
     const hashPayload = encodeURIComponent(JSON.stringify(payload));
     return {
@@ -1028,16 +1049,16 @@
         color: '#2563eb',
         badge: 'enc',
       },
-      {
-        id: 'proc-encaminhar-dg',
-        title: 'Encaminhar à DG para Autorização de Pagamento',
-        subtitle: `Tramitar processo #${processId} à DG/CN com despacho preenchido`,
-        shortcuts: ['encdg'],
-        url: buildForwardDgAutomationData(processId).url,
+      ...getForwardShortcuts().map((item) => ({
+        id: `proc-encaminhar-atalho-${item.shortcut}`,
+        title: forwardShortcutTitle(item),
+        subtitle: `Tramitar processo #${processId} para ${item.setor?.text || 'o setor configurado'} com o formulário preenchido`,
+        shortcuts: [item.shortcut],
+        url: buildForwardAutomationData(processId, item).url,
         icon: 'send',
         color: '#1d4ed8',
-        badge: 'encdg',
-      },
+        badge: item.shortcut,
+      })),
       {
         id: 'proc-encaminhar-sem-despacho',
         title: 'Encaminhar Sem Despacho',
@@ -2019,7 +2040,7 @@
     const PROCESS_SHORTCUTS = new Set([
       'up', 'upload', 'doc', 'upld', 'anexar',
       'enc', 'encaminhar', 'despacho', 'tramitar',
-      'encdg',
+      ...getForwardShortcuts().map((item) => item.shortcut),
       'encs', 'semdespacho', 'encsem', 'tramitarsem', 'sem',
       'capa', 'proc', 'processo', 'p', 'home',
       'vis', 'docs', 'arvore', 'timeline',
@@ -2165,7 +2186,13 @@
       const shortcutGuides = [
         { shortcut: 'up', title: 'Fazer Upload de Documento', example: 'up 498930', desc: 'Digite "up <id_processo>" para abrir o upload direto' },
         { shortcut: 'enc', title: 'Encaminhar Processo', example: 'enc 498930', desc: 'Digite "enc <id_processo>" para tramitar com despacho' },
-        { shortcut: 'encdg', title: 'Encaminhar à DG para Autorização de Pagamento', example: 'encdg 498930', desc: 'Digite "encdg <id_processo>" para tramitar à DG/CN com o formulário preenchido' },
+        ...getForwardShortcuts().map((item) => ({
+          shortcut: item.shortcut,
+          title: forwardShortcutTitle(item),
+          example: `${item.shortcut} 498930`,
+          desc: `Digite "${item.shortcut} <id_processo>" para tramitar a ${item.setor?.text || 'o setor configurado'} com o formulário preenchido`,
+          icon: 'send',
+        })),
         { shortcut: 'encs', title: 'Encaminhar Sem Despacho', example: 'encs 498930', desc: 'Digite "encs <id_processo>" para tramitar direto' },
         { shortcut: 'capa', title: 'Ver Capa do Processo', example: 'capa 498930', desc: 'Digite "capa <id_processo>" para abrir a página principal' },
         { shortcut: 'vis', title: 'Visualizar Árvore de Documentos', example: 'vis 498930', desc: 'Digite "vis <id_processo>" para ver a timeline e documentos' },
@@ -2180,7 +2207,7 @@
           subtitle: matchedGuide.desc,
           shortcuts: [matchedGuide.shortcut],
           url: `/processo_eletronico/caixa_processos/`,
-          icon: matchedGuide.shortcut === 'up' ? 'upload' : (matchedGuide.shortcut.startsWith('enc') ? 'send' : 'folder'),
+          icon: matchedGuide.icon || (matchedGuide.shortcut === 'up' ? 'upload' : (matchedGuide.shortcut.startsWith('enc') ? 'send' : 'folder')),
           color: '#0A7F70',
           badge: matchedGuide.shortcut,
         });
@@ -3884,6 +3911,17 @@
       chrome.storage.onChanged.addListener(storageChangeListener);
     }
   } catch (_) {}
+  // Atalhos e modelos editados no popup valem na hora, sem recarregar a página.
+  const userPreferencesChangeListener = (changes, areaName) => {
+    if (commandPaletteDisposed || areaName !== 'sync' || !userPreferencesApi) return;
+    const change = changes?.[userPreferencesApi.STORAGE_KEY];
+    if (change) userPreferences = userPreferencesApi.normalize(change.newValue);
+  };
+  try {
+    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged?.addListener) {
+      chrome.storage.onChanged.addListener(userPreferencesChangeListener);
+    }
+  } catch (_) {}
 
   solrecfinReady = readSolrecfinStorage().then(entries => {
     solrecfinEntries = retainSolrecfinHistory(entries);
@@ -3971,6 +4009,7 @@
         window.removeEventListener('siages-siafi-capture-complete', solrecfinCaptureListener);
         try { chrome?.runtime?.onMessage?.removeListener?.(runtimeMessageListener); } catch (_) {}
         try { chrome?.storage?.onChanged?.removeListener?.(storageChangeListener); } catch (_) {}
+        try { chrome?.storage?.onChanged?.removeListener?.(userPreferencesChangeListener); } catch (_) {}
       } };
   }
 

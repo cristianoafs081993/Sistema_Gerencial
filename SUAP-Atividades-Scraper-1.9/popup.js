@@ -52,6 +52,92 @@ let siafiLists = [];
 let siafiBatchProgress = null;
 let siafiActiveTab = null;
 
+// Menu lateral: mostra uma seção por vez e reabre a última escolhida.
+// A seção desejada só aparece quando está disponível (SIAFI aberto, superadmin);
+// até lá, o popup exibe a conta.
+const SECTION_STORAGE_KEY = 'siages-popup-section';
+const DEFAULT_SECTION = 'account';
+const navItems = Array.from(document.querySelectorAll('.nav-item[data-section]'));
+const sectionViews = Array.from(document.querySelectorAll('.view[data-section]'));
+const navSiafiItem = document.getElementById('nav-siafi');
+const navSyncGroup = document.getElementById('nav-sync-group');
+const navAccountPresence = document.getElementById('nav-account-presence');
+const popupContent = document.getElementById('popup-content');
+const extensionAuthAvatar = document.getElementById('extension-auth-avatar');
+let desiredSection = readSavedSection() || DEFAULT_SECTION;
+let visibleSection = null;
+
+function readSavedSection() {
+  try { return localStorage.getItem(SECTION_STORAGE_KEY) || ''; } catch { return ''; }
+}
+
+function saveSection(name) {
+  try { localStorage.setItem(SECTION_STORAGE_KEY, name); } catch { /* preferência opcional */ }
+}
+
+function isSectionAvailable(name) {
+  const view = sectionViews.find((candidate) => candidate.dataset.section === name);
+  return Boolean(view && !view.closest('[hidden]'));
+}
+
+function renderSection() {
+  const name = isSectionAvailable(desiredSection) ? desiredSection : DEFAULT_SECTION;
+  if (name === visibleSection) return;
+  visibleSection = name;
+  sectionViews.forEach((view) => view.classList.toggle('is-active', view.dataset.section === name));
+  navItems.forEach((item) => {
+    const active = item.dataset.section === name;
+    item.classList.toggle('is-active', active);
+    if (active) item.setAttribute('aria-current', 'page');
+    else item.removeAttribute('aria-current');
+  });
+  if (popupContent) popupContent.scrollTop = 0;
+}
+
+function selectSection(name, { remember = true } = {}) {
+  desiredSection = name;
+  if (remember) saveSection(name);
+  renderSection();
+}
+
+function updateNavVisibility() {
+  if (navSiafiItem) navSiafiItem.hidden = Boolean(siafiFavorecidosCard?.hidden ?? true);
+  if (navSyncGroup) navSyncGroup.hidden = syncSection.hidden;
+  renderSection();
+}
+
+function setNavBadge(section, text = '', tone = 'info') {
+  const badge = document.querySelector(`[data-nav-badge="${section}"]`);
+  if (!badge) return;
+  badge.textContent = text;
+  badge.hidden = !text;
+  if (text) badge.dataset.tone = tone;
+}
+
+function setAccountPresence(state) {
+  if (navAccountPresence) navAccountPresence.dataset.state = state;
+}
+
+const rdNavState = { unit: '', all: '' };
+function updateRdNavBadge() {
+  const states = Object.values(rdNavState);
+  if (states.includes('running')) setNavBadge('rds', 'Coletando', 'info');
+  else if (states.includes('preview')) setNavBadge('rds', 'Conferir', 'success');
+  else if (states.includes('error')) setNavBadge('rds', 'Aviso', 'warning');
+  else setNavBadge('rds');
+}
+
+function clearSyncNavBadges() {
+  rdNavState.unit = '';
+  rdNavState.all = '';
+  ['process-box', 'plan', 'rds'].forEach((section) => setNavBadge(section));
+}
+
+navItems.forEach((item) => {
+  item.addEventListener('click', () => selectSection(item.dataset.section));
+});
+renderSection();
+
 function setExtensionAuthStatus(message, isError = false, isNotice = false) {
   extensionAuthStatus.textContent = message;
   extensionAuthStatus.dataset.error = String(isError);
@@ -67,6 +153,8 @@ function renderExtensionAccount(session) {
   extensionAuthBadge.textContent = connected ? 'Conectado' : 'Desconectado';
   extensionAuthBadge.dataset.state = connected ? 'connected' : 'disconnected';
   extensionAuthUserEmail.textContent = connected ? session.user?.email || 'Conta SIAGES conectada' : '';
+  if (extensionAuthAvatar) extensionAuthAvatar.textContent = connected ? (session.user?.email || 'S').trim().charAt(0).toUpperCase() : '';
+  setAccountPresence(connected ? 'connected' : 'disconnected');
   if (extensionUserCampusSelect) {
     extensionUserCampusSelect.value = session?.campusUasg || '158366';
   }
@@ -93,6 +181,7 @@ function updateSyncAccess(session) {
   const wasAllowed = canViewSync;
   canViewSync = allowed;
   syncSection.hidden = !allowed;
+  updateNavVisibility();
   if (!allowed) {
     rdUnit = null;
     processBoxSyncStatus.textContent = '';
@@ -100,8 +189,7 @@ function updateSyncAccess(session) {
     rdAllStatusEl.textContent = '';
     statusEl.replaceChildren();
     statusEl.style.display = 'none';
-    document.getElementById('plan-sync-panel').open = false;
-    document.getElementById('rd-sync-panel').open = false;
+    clearSyncNavBadges();
     btnApplyPlan.hidden = true;
     btnCollectRds.disabled = true;
   } else if (!wasAllowed) {
@@ -151,6 +239,7 @@ async function updateExtensionAuthStatus() {
     extensionAuthForm.hidden = !extensionAuthUser.hidden;
     extensionAuthBadge.textContent = 'Verificar acesso';
     extensionAuthBadge.dataset.state = 'unknown';
+    setAccountPresence('unknown');
     setExtensionAuthStatus(error instanceof Error ? error.message : 'Não foi possível renovar a sessão agora. A sessão continua salva para uma nova tentativa.', true);
   }
 }
@@ -171,9 +260,14 @@ function updateProcessBoxSyncStatus() {
       if (!canViewSync || request !== authStatusRequest) return;
       if (chrome.runtime.lastError || !response?.ok) {
         processBoxSyncStatus.textContent = 'Não foi possível consultar a sincronização. Reabra a extensão para tentar novamente.';
+        setNavBadge('process-box', 'Aviso', 'warning');
         return;
       }
       const status = response.status || {};
+      const running = status.phase === 'inventory' || status.phase === 'processing';
+      if (running) setNavBadge('process-box', 'Rodando', 'info');
+      else if (status.lastError) setNavBadge('process-box', 'Aviso', 'warning');
+      else setNavBadge('process-box');
       const lines = [`Próxima execução: ${formatLocalScheduleDate(status.nextRunAt)} (dias úteis).`];
       if (status.phase === 'inventory' || status.phase === 'processing') {
         lines.push(status.message || 'Sincronização em andamento...');
@@ -261,7 +355,6 @@ chrome?.storage?.onChanged?.addListener((changes, areaName) => {
 
 function log(msg, type = 'info') {
   if (!canViewSync) return;
-  document.getElementById('plan-sync-panel').open = true;
   statusEl.style.display = 'block';
   const div = document.createElement('div');
   div.className = `status-line status-${type}`;
@@ -314,7 +407,8 @@ async function updateAllRdStatus() {
   const previews = entries.filter(entry => entry.run?.status === 'preview' && entry.run.complete);
   const applied = entries.filter(entry => entry.run?.status === 'applied');
   const failed = entries.filter(entry => entry.error);
-  if (running || previews.length || failed.length) document.getElementById('rd-sync-panel').open = true;
+  rdNavState.all = running ? 'running' : previews.length ? 'preview' : failed.length || status?.error ? 'error' : '';
+  updateRdNavBadge();
   const reused = entries.reduce((sum,entry) => sum + (entry.run?.reusedDetails || 0),0);
   const published = entries.reduce((sum,entry) => sum + (entry.run?.appliedSnapshots || 0),0);
   const captured = entries.reduce((sum,entry) => sum + (entry.run?.snapshotCount || 0),0);
@@ -338,7 +432,8 @@ async function updateRdStatus() {
   const running = result.running;
   btnApplyRds.hidden = run?.status !== 'preview' || !run?.complete || running;
   btnPauseRds.hidden = !running;
-  if (running || run?.status === 'preview' || status?.error) document.getElementById('rd-sync-panel').open = true;
+  rdNavState.unit = running ? 'running' : run?.status === 'preview' && run?.complete ? 'preview' : status?.error ? 'error' : '';
+  updateRdNavBadge();
   btnCollectRds.disabled = running;
   const totals = run?.summary;
   const reuse = run?.syncMode === 'incremental' ? ` ${run.reusedDetails || 0} RDs reaproveitadas; ${run.refreshedDetails || 0} relidas; ${run.reusedActivities || 0} relações de atividades reaproveitadas.` : '';
@@ -512,7 +607,7 @@ async function updatePlanPreviewButton() {
   const hasPreview = Boolean(preview?.runId || preview?.id || batchPreview?.batchId || batchPreview?.id);
   btnApplyPlan.textContent = batchPreview?.batchId || batchPreview?.id ? 'Aplicar atividades das unidades conferidas' : 'Aplicar atividades desta unidade';
   btnApplyPlan.hidden = !hasPreview;
-  if (hasPreview) document.getElementById('plan-sync-panel').open = true;
+  setNavBadge('plan', hasPreview ? 'Prévia' : '', 'success');
   btnApplyPlan.disabled = !hasPreview;
 }
 
@@ -874,6 +969,9 @@ async function initializeSiafiFiller() {
   if (!isSiafiUrl(activeTab?.url)) return;
   siafiActiveTab = activeTab;
   siafiFavorecidosCard.hidden = false;
+  updateNavVisibility();
+  // No SIAFI, o preenchimento é a ferramenta da vez; não substitui a seção salva.
+  selectSection('siafi', { remember: false });
   await loadSiafiLists();
 }
 async function applyPlanPreview() {
@@ -1036,6 +1134,7 @@ const snippetCancel = document.getElementById('btn-snippet-cancel');
 const snippetMessage = document.getElementById('snippet-message');
 const snippetSearch = document.getElementById('snippet-search');
 const snippetList = document.getElementById('snippet-list');
+const snippetFormTitle = document.getElementById('snippet-form-title');
 let snippets = { ...DEFAULT_SNIPPETS };
 let snippetEditingKey = null;
 
@@ -1047,6 +1146,7 @@ function normalizeSnippetKey(value) {
 
 function renderSnippets() {
   if (!snippetList) return;
+  setNavBadge('snippets', String(Object.keys(snippets).length), 'muted');
   const query = String(snippetSearch?.value || '').trim().toLowerCase();
   const keys = Object.keys(snippets)
     .filter((key) => key.includes(query) || String(snippets[key]).toLowerCase().includes(query))
@@ -1093,6 +1193,7 @@ function resetSnippetForm() {
   snippetEditingKey = null;
   snippetForm.reset();
   snippetCancel.hidden = true;
+  if (snippetFormTitle) snippetFormTitle.textContent = 'Novo atalho';
 }
 
 function startSnippetEdit(key) {
@@ -1100,6 +1201,7 @@ function startSnippetEdit(key) {
   snippetTrigger.value = key;
   snippetExpansion.value = snippets[key] || '';
   snippetCancel.hidden = false;
+  if (snippetFormTitle) snippetFormTitle.textContent = `Editar atalho ${key}`;
   snippetMessage.textContent = '';
   snippetTrigger.focus();
 }
@@ -1159,3 +1261,377 @@ chrome.storage?.onChanged?.addListener((changes, area) => {
   renderSnippets();
 });
 void initializeSnippets();
+
+// Modelos e preenchimentos: atalhos de encaminhamento da paleta, valores do "up" e
+// partes fixas do despacho de liquidação. Regras e padrões ficam em user-preferences.js.
+const preferencesApi = globalThis.SiagesUserPreferences || null;
+const templatesView = document.getElementById('templates-panel');
+const navTemplatesItem = document.getElementById('nav-templates');
+const forwardListEl = document.getElementById('forward-list');
+const forwardMessage = document.getElementById('forward-message');
+const forwardUndoButton = document.getElementById('btn-forward-undo');
+const forwardNewButton = document.getElementById('btn-forward-new');
+const forwardEditor = document.getElementById('forward-editor');
+const forwardEditorTitle = document.getElementById('forward-editor-title');
+const forwardForm = document.getElementById('forward-form');
+const forwardFormMessage = document.getElementById('forward-form-message');
+const forwardFields = {
+  shortcut: document.getElementById('forward-shortcut'),
+  title: document.getElementById('forward-title'),
+  despacho: document.getElementById('forward-despacho'),
+  campusText: document.getElementById('forward-campus-text'),
+  campusId: document.getElementById('forward-campus-id'),
+  setorText: document.getElementById('forward-setor-text'),
+  setorId: document.getElementById('forward-setor-id'),
+  papel: document.getElementById('forward-papel'),
+};
+const uploadForm = document.getElementById('upload-form');
+const uploadMessage = document.getElementById('upload-message');
+const uploadFields = {
+  tipoConferencia: document.getElementById('upload-tipo-conferencia'),
+  tipoDocumento: document.getElementById('upload-tipo-documento'),
+  assunto: document.getElementById('upload-assunto'),
+};
+const despachoForm = document.getElementById('despacho-form');
+const despachoMessage = document.getElementById('despacho-message');
+const despachoFields = {
+  destinatario: document.getElementById('despacho-destinatario'),
+  assunto: document.getElementById('despacho-assunto'),
+  encaminhamento: document.getElementById('despacho-encaminhamento'),
+  fecho: document.getElementById('despacho-fecho'),
+};
+const FORWARD_PAGE_PATTERN = /^https:\/\/suap\.ifrn\.edu\.br\/processo_eletronico\/processo\/encaminhar\/\d+\/?(?:[?#].*)?$/;
+let userPreferences = preferencesApi ? preferencesApi.normalize(null) : null;
+let forwardEditingIndex = -1;
+let lastRemovedForward = null;
+
+function setFormMessage(element, message, isError = false) {
+  if (!element) return;
+  element.textContent = message;
+  element.dataset.error = String(isError);
+}
+
+function describeForwardDestination(item) {
+  const parts = [`Para ${item.setor?.text || '—'}`];
+  if (item.campus?.text) parts.push(`campus ${item.campus.text}`);
+  if (item.papel) parts.push(`perfil ${item.papel}`);
+  return parts.join(' · ');
+}
+
+function renderForwardShortcuts() {
+  if (!forwardListEl || !userPreferences) return;
+  const items = userPreferences.forwardShortcuts.map((item, index) => {
+    const row = document.createElement('div');
+    row.className = 'forward-item';
+    const text = document.createElement('div');
+    text.className = 'forward-text';
+    const title = document.createElement('div');
+    title.className = 'forward-title';
+    const trigger = document.createElement('span');
+    trigger.className = 'snippet-trigger';
+    trigger.textContent = item.shortcut;
+    const name = document.createElement('span');
+    name.textContent = preferencesApi.forwardTitle(item);
+    title.append(trigger, name);
+    const meta = document.createElement('span');
+    meta.className = 'forward-meta';
+    meta.textContent = describeForwardDestination(item);
+    text.append(title, meta);
+    if (item.despacho) {
+      const despacho = document.createElement('span');
+      despacho.className = 'forward-despacho';
+      despacho.textContent = item.despacho;
+      text.append(despacho);
+    }
+    const actions = document.createElement('div');
+    actions.className = 'snippet-actions';
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'secondary';
+    edit.textContent = '✎';
+    edit.setAttribute('aria-label', `Editar ${item.shortcut}`);
+    edit.addEventListener('click', () => openForwardEditor(index));
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'secondary';
+    remove.textContent = '×';
+    remove.setAttribute('aria-label', `Remover ${item.shortcut}`);
+    remove.addEventListener('click', () => { void removeForwardShortcut(index); });
+    actions.append(edit, remove);
+    row.append(text, actions);
+    return row;
+  });
+  if (!items.length) {
+    const empty = document.createElement('p');
+    empty.className = 'helper';
+    empty.textContent = 'Nenhum atalho de encaminhamento. Use “Novo atalho” para criar um.';
+    items.push(empty);
+  }
+  forwardListEl.replaceChildren(...items);
+  if (forwardNewButton) forwardNewButton.disabled = userPreferences.forwardShortcuts.length >= preferencesApi.MAX_FORWARD_SHORTCUTS;
+}
+
+function fillUploadForm() {
+  for (const [key, input] of Object.entries(uploadFields)) {
+    if (!input) continue;
+    input.value = userPreferences.upload[key] || '';
+    input.placeholder = preferencesApi.DEFAULT_UPLOAD[key];
+  }
+}
+
+function fillDespachoForm() {
+  for (const [key, input] of Object.entries(despachoFields)) {
+    if (!input) continue;
+    input.value = userPreferences.despacho[key] || '';
+    input.placeholder = preferencesApi.DESPACHO_PLACEHOLDERS[key];
+  }
+}
+
+function openForwardEditor(index) {
+  forwardEditingIndex = index;
+  const editing = index >= 0 ? userPreferences.forwardShortcuts[index] : null;
+  // Num atalho novo, campus e perfil costumam ser os mesmos do primeiro atalho.
+  const base = userPreferences.forwardShortcuts[0];
+  const item = editing || { shortcut: '', title: '', despacho: '', campus: base?.campus || null, setor: null, papel: base?.papel || '' };
+  forwardFields.shortcut.value = item.shortcut;
+  forwardFields.title.value = item.title;
+  forwardFields.despacho.value = item.despacho;
+  forwardFields.campusText.value = item.campus?.text || '';
+  forwardFields.campusId.value = item.campus?.id || '';
+  forwardFields.setorText.value = item.setor?.text || '';
+  forwardFields.setorId.value = item.setor?.id || '';
+  forwardFields.papel.value = item.papel;
+  forwardEditorTitle.textContent = editing ? `Editar atalho ${editing.shortcut}` : 'Novo atalho de encaminhamento';
+  setFormMessage(forwardFormMessage, '');
+  forwardEditor.hidden = false;
+  forwardEditor.scrollIntoView?.({ block: 'nearest' });
+  forwardFields.shortcut.focus();
+}
+
+function closeForwardEditor() {
+  forwardEditingIndex = -1;
+  forwardForm.reset();
+  setFormMessage(forwardFormMessage, '');
+  forwardEditor.hidden = true;
+}
+
+function readForwardForm() {
+  const option = (id, text) => (id.value.trim() || text.value.trim() ? { id: id.value, text: text.value } : null);
+  return preferencesApi.normalizeForwardShortcut({
+    shortcut: forwardFields.shortcut.value,
+    title: forwardFields.title.value,
+    despacho: forwardFields.despacho.value,
+    campus: option(forwardFields.campusId, forwardFields.campusText),
+    setor: option(forwardFields.setorId, forwardFields.setorText),
+    papel: forwardFields.papel.value,
+  });
+}
+
+async function persistPreferences(next) {
+  userPreferences = await preferencesApi.save(next, chrome.storage.sync);
+  renderForwardShortcuts();
+  renderSummaryBlocks();
+}
+
+// Painel do processo: blocos da aba Resumo. A preferência guarda os ocultos.
+const processPanelView = document.getElementById('process-panel-view');
+const navProcessPanelItem = document.getElementById('nav-process-panel');
+const summaryBlocksEl = document.getElementById('summary-blocks');
+const summaryBlocksMessage = document.getElementById('summary-blocks-message');
+
+function renderSummaryBlocks() {
+  if (!summaryBlocksEl || !userPreferences) return;
+  const hidden = new Set(userPreferences.hiddenSummaryBlocks);
+  summaryBlocksEl.replaceChildren(...preferencesApi.SUMMARY_BLOCKS.map((block) => {
+    const option = document.createElement('label');
+    option.className = 'block-option';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.dataset.block = block.id;
+    checkbox.checked = !hidden.has(block.id);
+    const text = document.createElement('span');
+    const name = document.createElement('strong');
+    name.textContent = block.label;
+    const description = document.createElement('small');
+    description.textContent = block.description;
+    text.append(name, description);
+    option.append(checkbox, text);
+    return option;
+  }));
+  const total = preferencesApi.SUMMARY_BLOCKS.length;
+  setNavBadge('process-panel', hidden.size ? `${total - hidden.size}/${total}` : '', 'muted');
+}
+
+async function saveSummaryBlocks(hiddenSummaryBlocks) {
+  try {
+    await persistPreferences({ ...userPreferences, hiddenSummaryBlocks });
+    const total = preferencesApi.SUMMARY_BLOCKS.length;
+    const visible = total - userPreferences.hiddenSummaryBlocks.length;
+    setFormMessage(summaryBlocksMessage, visible
+      ? `Resumo atualizado: ${visible} de ${total} blocos visíveis.`
+      : 'Todos os blocos ocultos. O Resumo vai mostrar um aviso para reativá-los aqui.');
+  } catch (error) {
+    setFormMessage(summaryBlocksMessage, formatExtensionAuthError(error), true);
+    renderSummaryBlocks();
+  }
+}
+
+summaryBlocksEl?.addEventListener('change', () => {
+  const hidden = Array.from(summaryBlocksEl.querySelectorAll('input[type="checkbox"][data-block]'))
+    .filter((checkbox) => !checkbox.checked)
+    .map((checkbox) => checkbox.dataset.block);
+  void saveSummaryBlocks(hidden);
+});
+document.getElementById('btn-summary-blocks-all')?.addEventListener('click', () => { void saveSummaryBlocks([]); });
+
+async function saveForwardShortcut(event) {
+  event.preventDefault();
+  const item = readForwardForm();
+  const others = userPreferences.forwardShortcuts.filter((_, index) => index !== forwardEditingIndex);
+  const error = preferencesApi.validateForwardShortcut(item, others);
+  if (error) {
+    setFormMessage(forwardFormMessage, error, true);
+    return;
+  }
+  const list = [...userPreferences.forwardShortcuts];
+  if (forwardEditingIndex >= 0) list[forwardEditingIndex] = item;
+  else list.push(item);
+  try {
+    await persistPreferences({ ...userPreferences, forwardShortcuts: list });
+    closeForwardEditor();
+    lastRemovedForward = null;
+    if (forwardUndoButton) forwardUndoButton.hidden = true;
+    setFormMessage(forwardMessage, `Atalho ${item.shortcut} salvo. Na paleta, use “${item.shortcut} <número do processo>”.`);
+  } catch (saveError) {
+    setFormMessage(forwardFormMessage, formatExtensionAuthError(saveError), true);
+  }
+}
+
+async function removeForwardShortcut(index) {
+  const removed = userPreferences.forwardShortcuts[index];
+  if (!removed) return;
+  try {
+    await persistPreferences({ ...userPreferences, forwardShortcuts: userPreferences.forwardShortcuts.filter((_, position) => position !== index) });
+    if (forwardEditingIndex === index) closeForwardEditor();
+    lastRemovedForward = { item: removed, index };
+    if (forwardUndoButton) forwardUndoButton.hidden = false;
+    setFormMessage(forwardMessage, `Atalho ${removed.shortcut} removido.`);
+  } catch (removeError) {
+    setFormMessage(forwardMessage, formatExtensionAuthError(removeError), true);
+  }
+}
+
+async function undoRemoveForwardShortcut() {
+  if (!lastRemovedForward) return;
+  const { item, index } = lastRemovedForward;
+  const list = [...userPreferences.forwardShortcuts];
+  if (preferencesApi.validateForwardShortcut(item, list)) {
+    setFormMessage(forwardMessage, `Não foi possível restaurar ${item.shortcut}: o atalho já está em uso.`, true);
+    return;
+  }
+  list.splice(Math.min(index, list.length), 0, item);
+  try {
+    await persistPreferences({ ...userPreferences, forwardShortcuts: list });
+    lastRemovedForward = null;
+    forwardUndoButton.hidden = true;
+    setFormMessage(forwardMessage, `Atalho ${item.shortcut} restaurado.`);
+  } catch (undoError) {
+    setFormMessage(forwardMessage, formatExtensionAuthError(undoError), true);
+  }
+}
+
+// Executada na aba do SUAP: lê o destino escolhido no formulário "Encaminhar".
+function captureForwardDestinationFromPage() {
+  const form = document.getElementById('tramite_formencaminharparasetor') || document.querySelector('form');
+  const field = (name) => form?.querySelector(`[name="${name}"]`) || null;
+  const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+  const selected = (select) => {
+    const option = select?.selectedOptions?.[0];
+    return option && option.value ? { id: String(option.value), text: clean(option.textContent) } : null;
+  };
+  return {
+    campus: selected(field('destinatario_uo')),
+    setor: selected(field('destinatario_setor_autocompletar')),
+    papel: selected(field('papel'))?.text || '',
+    despacho: String(field('despacho_corpo')?.value || '').trim(),
+  };
+}
+
+async function captureForwardDestination() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id || !FORWARD_PAGE_PATTERN.test(tab.url || '')) {
+      setFormMessage(forwardFormMessage, 'Abra a tela “Encaminhar” de um processo no SUAP nesta aba e tente de novo.', true);
+      return;
+    }
+    const results = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: captureForwardDestinationFromPage });
+    const captured = results?.[0]?.result;
+    if (!captured?.campus || !captured?.setor) {
+      setFormMessage(forwardFormMessage, 'Escolha o campus e o setor de destino no SUAP antes de copiar.', true);
+      return;
+    }
+    forwardFields.campusText.value = captured.campus.text;
+    forwardFields.campusId.value = captured.campus.id;
+    forwardFields.setorText.value = captured.setor.text;
+    forwardFields.setorId.value = captured.setor.id;
+    if (captured.papel) forwardFields.papel.value = captured.papel;
+    if (captured.despacho && !forwardFields.despacho.value.trim()) forwardFields.despacho.value = captured.despacho;
+    setFormMessage(forwardFormMessage, `Destino copiado: ${captured.setor.text} (campus ${captured.campus.text}). Confira e salve.`);
+  } catch (captureError) {
+    setFormMessage(forwardFormMessage, formatExtensionAuthError(captureError), true);
+  }
+}
+
+async function saveUploadPreferences(values) {
+  try {
+    await persistPreferences({ ...userPreferences, upload: values });
+    fillUploadForm();
+    setFormMessage(uploadMessage, 'Upload salvo. Vale nos próximos “up” da paleta.');
+  } catch (error) {
+    setFormMessage(uploadMessage, formatExtensionAuthError(error), true);
+  }
+}
+
+async function saveDespachoPreferences(values, message) {
+  try {
+    await persistPreferences({ ...userPreferences, despacho: values });
+    fillDespachoForm();
+    setFormMessage(despachoMessage, message);
+  } catch (error) {
+    setFormMessage(despachoMessage, formatExtensionAuthError(error), true);
+  }
+}
+
+const readFields = (fields) => Object.fromEntries(Object.entries(fields).map(([key, input]) => [key, input?.value || '']));
+
+async function initializeTemplates() {
+  if (!preferencesApi || !chrome?.storage?.sync?.get) {
+    // Sem o módulo ou sem armazenamento sincronizado, as seções de preferências não são oferecidas.
+    [templatesView, navTemplatesItem, processPanelView, navProcessPanelItem].forEach((element) => { if (element) element.hidden = true; });
+    renderSection();
+    return;
+  }
+  userPreferences = await preferencesApi.load(chrome.storage.sync);
+  renderForwardShortcuts();
+  renderSummaryBlocks();
+  fillUploadForm();
+  fillDespachoForm();
+}
+
+forwardNewButton?.addEventListener('click', () => openForwardEditor(-1));
+forwardForm?.addEventListener('submit', (event) => { void saveForwardShortcut(event); });
+document.getElementById('btn-forward-cancel')?.addEventListener('click', closeForwardEditor);
+document.getElementById('btn-forward-capture')?.addEventListener('click', () => { void captureForwardDestination(); });
+forwardUndoButton?.addEventListener('click', () => { void undoRemoveForwardShortcut(); });
+uploadForm?.addEventListener('submit', (event) => { event.preventDefault(); void saveUploadPreferences(readFields(uploadFields)); });
+document.getElementById('btn-upload-reset')?.addEventListener('click', () => { void saveUploadPreferences({ ...preferencesApi?.DEFAULT_UPLOAD }); });
+despachoForm?.addEventListener('submit', (event) => { event.preventDefault(); void saveDespachoPreferences(readFields(despachoFields), 'Modelo salvo. Vale nos próximos despachos gerados no SUAP.'); });
+document.getElementById('btn-despacho-reset')?.addEventListener('click', () => { void saveDespachoPreferences({}, 'O despacho voltou ao texto padrão do SIAGES.'); });
+chrome.storage?.onChanged?.addListener((changes, area) => {
+  if (!preferencesApi || area !== 'sync' || !changes?.[preferencesApi.STORAGE_KEY]) return;
+  // Mudança feita em outro perfil ou janela: atualiza a lista sem apagar o que está sendo digitado.
+  userPreferences = preferencesApi.normalize(changes[preferencesApi.STORAGE_KEY].newValue);
+  renderForwardShortcuts();
+  renderSummaryBlocks();
+});
+void initializeTemplates();

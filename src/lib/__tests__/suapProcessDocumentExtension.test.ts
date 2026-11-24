@@ -81,7 +81,7 @@ function authRuntime(chromeApi: { storage: { local: ReturnType<typeof storageAre
   };
 }
 
-function loadProcessScript() {
+function loadProcessScript({ withPreferences = false } = {}) {
   const testWindow = window as typeof window & {
     __SIAGES_SUAP_PROCESS_TEST__?: boolean;
     __siagesSuapProcessDocument?: ExtensionApi;
@@ -93,6 +93,8 @@ function loadProcessScript() {
   };
   testWindow.chrome = { ...chromeApi, runtime: authRuntime(chromeApi) };
   window.eval(readFileSync(extensionFixturePath('extension-auth-client.js'), 'utf8'));
+  // No manifest, user-preferences.js vem antes do process-document.js.
+  if (withPreferences) window.eval(readFileSync(extensionFixturePath('user-preferences.js'), 'utf8'));
   window.eval(readFileSync(extensionFixturePath('process-document.js'), 'utf8'));
   if (!testWindow.__siagesSuapProcessDocument) throw new Error('Content script nao carregado.');
   return testWindow.__siagesSuapProcessDocument;
@@ -282,6 +284,45 @@ describe('process-document 1.9', () => {
     expect(summary).not.toHaveTextContent('25,00');
     expect(summary).toHaveTextContent('2026NE000002');
     expect(summary?.querySelectorAll('.suape-copy').length).toBeGreaterThan(8);
+  });
+
+  it('oculta os blocos do Resumo escolhidos no popup e reage à mudança com o painel aberto', async () => {
+    const testWindow = window as typeof window & { SiagesUserPreferences?: unknown; chrome?: { storage: { onChanged: { addListener: ReturnType<typeof vi.fn> } } } };
+    syncValues['siages-user-preferences'] = { hiddenSummaryBlocks: ['beneficiario', 'dados-bancarios'] };
+    try {
+      const api = loadProcessScript({ withPreferences: true });
+      await api.installToolkit();
+      await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+      const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+      window.dispatchEvent(new MessageEvent('message', {
+        origin: 'https://www.siages.com.br', source: frame.contentWindow,
+        data: { source: 'siages', type: 'siages:suap-process-snapshot', version: 1, payload: {
+          fallback: { suapId: '321', processNumber: '23035.000001.2026-11' },
+          process: { suapId: '321', numProcesso: '23035.000001.2026-11', status: 'success', beneficiario: 'Fornecedor Alfa', cpfCnpj: '12345678000190', assunto: 'Servico', dadosCompletos: { val_nf: '1.250,00', dados_bancarios: { banco: 'Banco do Brasil', agencia: '1234', conta: '5678-9' }, empenhos: ['2026NE000001'] } },
+        } },
+      }));
+
+      const summary = document.querySelector('[data-panel="summary"]')!;
+      await waitFor(() => expect(summary).toHaveTextContent('1.250,00'));
+      expect(summary).toHaveTextContent('23035.000001.2026-11');
+      expect(summary).toHaveTextContent('2026NE000001');
+      expect(summary).not.toHaveTextContent('Fornecedor Alfa');
+      expect(summary).not.toHaveTextContent('Banco do Brasil');
+
+      const listeners = testWindow.chrome!.storage.onChanged.addListener.mock.calls.map(([listener]) => listener as (changes: object, area: string) => void);
+      const change = (newValue: unknown) => listeners.forEach((listener) => listener({ 'siages-user-preferences': { newValue } }, 'sync'));
+      change({ hiddenSummaryBlocks: ['processo', 'beneficiario', 'rps-nps', 'documento-pagamento', 'dados-bancarios', 'retencoes-empenhos', 'conclusao', 'caminho-processo', 'lista-credores'] });
+      expect(summary).toHaveTextContent('Os blocos do Resumo estão ocultos');
+      expect(summary).not.toHaveTextContent('1.250,00');
+
+      change({});
+      expect(summary).toHaveTextContent('Fornecedor Alfa');
+      expect(summary).toHaveTextContent('Banco do Brasil');
+      expect(summary).not.toHaveTextContent('Os blocos do Resumo estão ocultos');
+    } finally {
+      delete syncValues['siages-user-preferences'];
+      delete testWindow.SiagesUserPreferences;
+    }
   });
 
   it('permite copiar CPF/CNPJ somente com dígitos além do valor original', async () => {

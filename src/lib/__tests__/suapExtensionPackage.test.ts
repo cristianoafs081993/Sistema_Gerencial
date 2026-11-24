@@ -30,7 +30,7 @@ describe('pacote da extensao Suape 1.9', () => {
     const suapCommandPalette = commandPalettes.find((entry: { matches: string[] }) => entry.matches.includes('https://suap.ifrn.edu.br/*'));
     const globalCommandPalette = commandPalettes.find((entry: { matches: string[] }) => entry.matches.includes('<all_urls>'));
     const siagesCommandBridge=commandPalettes.find((entry:{matches:string[]})=>entry.matches.includes('https://www.siages.com.br/*'));
-    expect(siagesCommandBridge).toMatchObject({js:['extension-auth-client.js','command-palette.js'],css:['command-palette.css']});
+    expect(siagesCommandBridge).toMatchObject({js:['extension-auth-client.js','user-preferences.js','command-palette.js'],css:['command-palette.css']});
 
     expect(uploadDoc).toMatchObject({
       matches: ['https://suap.ifrn.edu.br/processo_eletronico/documento_upload/*'],
@@ -66,7 +66,7 @@ describe('pacote da extensao Suape 1.9', () => {
     ]);
     expect(plan.matches).toEqual(['https://suap.ifrn.edu.br/plan_estrategico/plano_concluido/8/']);
     expect(plan.js).toEqual(['extension-auth-client.js', 'plan-summary.js']);
-    expect(process.js).toEqual(['extension-auth-client.js', 'process-document.js']);
+    expect(process.js).toEqual(['extension-auth-client.js', 'user-preferences.js', 'process-document.js']);
     expect(fs.readFileSync(extensionFixturePath('plan-summary.js'), 'utf8')).toContain('siages-plan-column-sort');
     expect(process.matches).not.toContain(plan.matches[0]);
     expect(comprasnet).toMatchObject({
@@ -78,7 +78,7 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(suapCommandPalette).toMatchObject({
       matches: ['https://suap.ifrn.edu.br/*'],
       css: ['command-palette.css'],
-      js: ['extension-auth-client.js', 'command-palette.js'],
+      js: ['extension-auth-client.js', 'user-preferences.js', 'command-palette.js'],
       run_at: 'document_idle',
       all_frames: true,
     });
@@ -109,10 +109,11 @@ describe('pacote da extensao Suape 1.9', () => {
         'https://*.acesso.gov.br/*',
       ],
       css: ['command-palette.css'],
-      js: ['extension-auth-client.js', 'command-palette.js'],
+      js: ['extension-auth-client.js', 'user-preferences.js', 'command-palette.js'],
       run_at: 'document_idle',
       all_frames: true,
     });
+    expect(fs.existsSync(extensionFixturePath('user-preferences.js'))).toBe(true);
     expect(manifest.commands?.['open-command-palette']).toEqual({
       suggested_key: {
         default: 'Ctrl+K',
