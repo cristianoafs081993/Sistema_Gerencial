@@ -988,6 +988,8 @@
     }
   }
   function renderSyncStatus(container) {
+    // Com tudo atualizado o aviso some; ele só aparece enquanto sincroniza ou quando há erro.
+    if (state.syncStatus.stage === 'ready' && !state.syncStatus.retryable) return;
     const status = createElement('div', 'suape-status', state.syncStatus.message);
     status.dataset.stage = state.syncStatus.stage;
     if (state.syncStatus.retryable) {

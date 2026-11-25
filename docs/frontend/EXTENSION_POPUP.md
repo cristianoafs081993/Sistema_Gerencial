@@ -35,7 +35,7 @@ Caixas de marcar, em duas colunas, para os blocos do **Resumo** montado por `pro
 
 - A preferência fica na mesma chave `siages-user-preferences`, em `hiddenSummaryBlocks`. Guarda só os ocultos, então um bloco criado no futuro aparece por padrão. IDs desconhecidos são descartados.
 - O painel lê a preferência antes do primeiro desenho, para os blocos ocultos não aparecerem por um instante, e redesenha o Resumo quando ela muda, inclusive em abas do SUAP já abertas.
-- Blocos sem dados no processo continuam fora do Resumo, mesmo marcados. O aviso de sincronização no topo do Resumo é sempre exibido.
+- Blocos sem dados no processo continuam fora do Resumo, mesmo marcados. O aviso de sincronização no topo do Resumo aparece enquanto o processo é consultado, registrado ou extraído e quando há erro; com o status `ready` (dados atualizados) ele some.
 - Com todos os blocos ocultos, o Resumo mostra um aviso indicando onde reativá-los, em vez de ficar vazio.
 - As outras abas do painel (Orçamentário, Atalhos, IA e Config.) não mudam.
 - O bloco Beneficiário mostra só nome e CPF/CNPJ. O assunto saiu do Resumo porque já aparece nos **Dados gerais** do SUAP; ali a extensão insere um botão `⧉` (`.siages-page-copy`, estilo em `process-toolkit.css`) que copia o texto do `<dd>` do Assunto. O botão não entra no assunto lido pela extensão (`readDefinitionField` ignora o botão) e não é duplicado se o painel for reinstalado. Coberto em `suapProcessDocumentExtension.test.ts`.

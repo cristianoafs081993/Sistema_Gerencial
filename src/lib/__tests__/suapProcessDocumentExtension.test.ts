@@ -360,6 +360,28 @@ describe('process-document 1.9', () => {
     expect([...summary.querySelectorAll('.suape-data-row > span:first-child')].map((label) => label.textContent)).not.toContain('Assunto');
   });
 
+  it('mostra o aviso de sincronização só enquanto atualiza e o esconde quando os dados estão atualizados', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+    const summary = document.querySelector('[data-panel="summary"]')!;
+    const postStatus = (payload: Record<string, unknown>) => window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-sync-status', version: 1, payload },
+    }));
+
+    postStatus({ stage: 'checking', message: 'Consultando o processo no SIAGES...' });
+    await waitFor(() => expect(summary.querySelector('.suape-status')).toHaveTextContent('Consultando o processo no SIAGES...'));
+
+    postStatus({ stage: 'ready', message: 'Dados do processo atualizados.' });
+    await waitFor(() => expect(summary.querySelector('.suape-status')).toBeNull());
+    expect(summary).not.toHaveTextContent('Dados do processo atualizados.');
+
+    postStatus({ stage: 'error', message: 'Falha ao consultar.', retryable: true });
+    await waitFor(() => expect(summary.querySelector('.suape-status')).toHaveTextContent('Falha ao consultar.'));
+  });
+
   it('copia o número do processo no título da página do SUAP e não o repete no Resumo', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
