@@ -567,25 +567,26 @@ textarea.suape-input { min-height: 72px; resize: vertical; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  margin-left: 8px;
+  width: 22px;
+  height: 22px;
+  margin-left: 6px;
   padding: 0;
   vertical-align: middle;
-  border: 1px solid currentColor;
+  border: 0;
   border-radius: 6px;
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1;
-  opacity: .6;
+  opacity: .4;
   cursor: pointer;
+  transition: opacity .15s ease, color .15s ease, background-color .15s ease;
 }
 .siages-page-copy:hover,
 .siages-page-copy:focus-visible {
   opacity: 1;
   outline: none;
   color: #1976d2;
-  border-color: #1976d2;
+  background: rgba(25, 118, 210, .12);
 }
