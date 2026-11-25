@@ -304,14 +304,13 @@ describe('process-document 1.9', () => {
 
       const summary = document.querySelector('[data-panel="summary"]')!;
       await waitFor(() => expect(summary).toHaveTextContent('1.250,00'));
-      expect(summary).toHaveTextContent('23035.000001.2026-11');
       expect(summary).toHaveTextContent('2026NE000001');
       expect(summary).not.toHaveTextContent('Fornecedor Alfa');
       expect(summary).not.toHaveTextContent('Banco do Brasil');
 
       const listeners = testWindow.chrome!.storage.onChanged.addListener.mock.calls.map(([listener]) => listener as (changes: object, area: string) => void);
       const change = (newValue: unknown) => listeners.forEach((listener) => listener({ 'siages-user-preferences': { newValue } }, 'sync'));
-      change({ hiddenSummaryBlocks: ['processo', 'beneficiario', 'rps-nps', 'documento-pagamento', 'dados-bancarios', 'retencoes-empenhos', 'conclusao', 'caminho-processo', 'lista-credores'] });
+      change({ hiddenSummaryBlocks: ['beneficiario', 'rps-nps', 'documento-pagamento', 'dados-bancarios', 'retencoes-empenhos', 'conclusao', 'caminho-processo', 'lista-credores'] });
       expect(summary).toHaveTextContent('Os blocos do Resumo estão ocultos');
       expect(summary).not.toHaveTextContent('1.250,00');
 
@@ -359,6 +358,42 @@ describe('process-document 1.9', () => {
     await waitFor(() => expect(summary).toHaveTextContent('Fornecedor Alfa'));
     expect(summary).not.toHaveTextContent('dezembro de 2026');
     expect([...summary.querySelectorAll('.suape-data-row > span:first-child')].map((label) => label.textContent)).not.toContain('Assunto');
+  });
+
+  it('copia o número do processo no título da página do SUAP e não o repete no Resumo', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    document.body.innerHTML = '<main><span class="status">Em trâmite</span><h2>Processo 23035.000001.2026-11</h2><h2>Documentos</h2></main>';
+    const api = loadProcessScript();
+    await api.installToolkit();
+
+    const heading = document.querySelector('main h2')!;
+    const button = heading.querySelector('.siages-page-copy') as HTMLButtonElement;
+    expect(button).toHaveAttribute('aria-label', 'Copiar número do processo');
+    // Número e botão ficam juntos num span sem quebra, sem mexer no layout do cabeçalho do SUAP.
+    expect(button.parentElement).toHaveClass('siages-page-copy-inline');
+    expect(button.parentElement?.firstChild?.textContent).toBe('23035.000001.2026-11');
+    expect(heading.className).toBe('');
+    expect(heading.textContent).toBe('Processo 23035.000001.2026-11⧉');
+    expect(document.querySelectorAll('.siages-page-copy')).toHaveLength(1);
+    button.click();
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('23035.000001.2026-11'));
+    // O botão não altera o número lido pela extensão nem é duplicado ao reinstalar.
+    expect(api.getProcessNumber()).toBe('23035.000001.2026-11');
+    await api.installToolkit();
+    expect(heading.querySelectorAll('.siages-page-copy')).toHaveLength(1);
+
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-snapshot', version: 1, payload: {
+        fallback: { suapId: '321', processNumber: '23035.000001.2026-11' },
+        process: { suapId: '321', numProcesso: '23035.000001.2026-11', status: 'success', beneficiario: 'Fornecedor Alfa', dadosCompletos: {} },
+      } },
+    }));
+    const summary = document.querySelector('[data-panel="summary"]')!;
+    await waitFor(() => expect(summary).toHaveTextContent('Fornecedor Alfa'));
+    expect(summary).not.toHaveTextContent('23035.000001.2026-11');
   });
 
   it('permite copiar CPF/CNPJ somente com dígitos além do valor original', async () => {
@@ -468,7 +503,6 @@ describe('process-document 1.9', () => {
 
     expect(secondApi.getProcessId()).toBe('321');
     expect(document.querySelector('[data-panel="summary"]')).toHaveTextContent('Fornecedor Alfa');
-    expect(document.querySelector('[data-panel="summary"]')).toHaveTextContent('23035.000001.2026-11');
     expect(document.querySelector('[data-panel="summary"]')).not.toHaveTextContent('Preparando a consulta do processo');
     expect(document.getElementById('siages-suap-finance-panel')).toHaveTextContent('00040/2026');
   });
@@ -861,7 +895,7 @@ describe('process-document 1.9', () => {
     processSectionHeader.click();
     expect(processSectionHeader.getAttribute('aria-expanded')).toBe('false');
     expect(processSectionBody.style.display).toBe('none');
-    expect(localValues['siages-toolkit-sections-collapsed']).toContain('suape-sec-processo');
+    expect(localValues['siages-toolkit-sections-collapsed']).toContain('suape-sec-beneficiario');
 
     // Flow section toggle
     const flowToggle = summaryPanel.querySelector('.suape-flow-toggle') as HTMLButtonElement;
@@ -1104,7 +1138,6 @@ describe('process-document 1.9', () => {
     expect(processSection).toBeTruthy();
     expect(processSection).not.toHaveTextContent('Caixa');
     expect(processSection).not.toHaveTextContent('DIAD');
-    expect(summaryPanel).toHaveTextContent('23035.000001.2026-11');
     expect(summaryPanel).toHaveTextContent('Fornecedor Alfa');
 
     const sections = summaryPanel.querySelectorAll('section');

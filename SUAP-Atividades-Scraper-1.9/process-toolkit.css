@@ -583,6 +583,25 @@ textarea.suape-input { min-height: 72px; resize: vertical; }
   cursor: pointer;
   transition: opacity .15s ease, color .15s ease, background-color .15s ease;
 }
+/* Título do processo: número e botão num <span> sem quebra, ao lado do texto. O SUAP estiliza botões no cabeçalho,
+   então tamanho e posição são travados aqui. */
+.siages-page-copy-inline {
+  display: inline !important;
+  white-space: nowrap;
+}
+.siages-page-copy-inline > .siages-page-copy {
+  display: inline-flex !important;
+  position: static !important;
+  float: none !important;
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 0 !important;
+  margin: 0 0 0 8px !important;
+  padding: 0 !important;
+  vertical-align: middle !important;
+  font-size: 16px !important;
+  font-weight: 400 !important;
+}
 .siages-page-copy:hover,
 .siages-page-copy:focus-visible {
   opacity: 1;

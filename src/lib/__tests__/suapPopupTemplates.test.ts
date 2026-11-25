@@ -152,14 +152,14 @@ it('marca e desmarca os blocos da aba Resumo do painel do processo', async () =>
   (document.querySelector('.nav-item[data-section="process-panel"]') as HTMLButtonElement).click();
   expect(element('process-panel-view').classList.contains('is-active')).toBe(true);
   const checkbox = (id: string) => document.querySelector(`#summary-blocks input[data-block="${id}"]`) as HTMLInputElement;
-  await waitFor(() => expect(document.querySelectorAll('#summary-blocks input[type="checkbox"]')).toHaveLength(9));
+  await waitFor(() => expect(document.querySelectorAll('#summary-blocks input[type="checkbox"]')).toHaveLength(8));
   expect(Array.from(document.querySelectorAll<HTMLInputElement>('#summary-blocks input')).every((input) => input.checked)).toBe(true);
 
   checkbox('dados-bancarios').click();
   checkbox('lista-credores').click();
   await waitFor(() => expect(stored().hiddenSummaryBlocks).toEqual(['dados-bancarios', 'lista-credores']));
-  await waitFor(() => expect(element('summary-blocks-message').textContent).toBe('Resumo atualizado: 7 de 9 blocos visíveis.'));
-  expect(document.querySelector('[data-nav-badge="process-panel"]')?.textContent).toBe('7/9');
+  await waitFor(() => expect(element('summary-blocks-message').textContent).toBe('Resumo atualizado: 6 de 8 blocos visíveis.'));
+  expect(document.querySelector('[data-nav-badge="process-panel"]')?.textContent).toBe('6/8');
   expect(checkbox('dados-bancarios').checked).toBe(false);
 
   element('btn-summary-blocks-all').click();

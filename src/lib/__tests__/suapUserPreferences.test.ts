@@ -102,7 +102,9 @@ describe('preferências do servidor na extensão', () => {
 
   it('guarda só os blocos do Resumo conhecidos que o servidor ocultou', () => {
     expect(api.normalize(null).hiddenSummaryBlocks).toEqual([]);
-    expect(api.normalize({ hiddenSummaryBlocks: ['lista-credores', 'inexistente', 'processo', 'processo'] }).hiddenSummaryBlocks).toEqual(['processo', 'lista-credores']);
+    expect(api.normalize({ hiddenSummaryBlocks: ['lista-credores', 'inexistente', 'conclusao', 'conclusao'] }).hiddenSummaryBlocks).toEqual(['conclusao', 'lista-credores']);
+    // O bloco "Processo" saiu do Resumo (o número é copiado no título da página); preferência antiga é descartada.
+    expect(api.normalize({ hiddenSummaryBlocks: ['processo'] }).hiddenSummaryBlocks).toEqual([]);
     expect(api.normalize({ hiddenSummaryBlocks: 'processo' }).hiddenSummaryBlocks).toEqual([]);
   });
 

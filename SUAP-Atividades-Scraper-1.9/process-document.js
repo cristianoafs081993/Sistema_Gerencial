@@ -275,23 +275,46 @@
     return definitionValueText(findDefinitionValue(label));
   }
 
-  // Botão de copiar ao lado de campos dos "Dados gerais" do próprio SUAP (hoje, o Assunto).
+  // Botões de copiar no próprio SUAP: número do processo no título da página e campos dos "Dados gerais".
   const PAGE_COPY_BUTTON_CLASS = 'siages-page-copy';
   const PAGE_COPY_FIELDS = ['Assunto'];
+  const PROCESS_TITLE_PATTERN = /^Processo\s+(\d{5}\.\d{6}[./]\d{4}-\d{2})\b/i;
+  function createPageCopyButton(label, readValue) {
+    const button = createElement('button', PAGE_COPY_BUTTON_CLASS, '⧉');
+    button.type = 'button';
+    button.title = `Copiar ${label} (SIAGES)`;
+    button.setAttribute('aria-label', `Copiar ${label}`);
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void copyText(readValue(), button);
+    });
+    return button;
+  }
+  // O número é envolvido junto com o botão num <span> sem quebra de linha, no mesmo nó de texto do título:
+  // assim o botão fica colado ao número sem depender do layout (flex, colunas) que o SUAP dá ao cabeçalho.
+  function installProcessTitleCopyButton() {
+    const heading = Array.from(document.querySelectorAll('h1, h2'))
+      .find((item) => PROCESS_TITLE_PATTERN.test(definitionValueText(item)));
+    if (!heading || heading.querySelector(`.${PAGE_COPY_BUTTON_CLASS}`)) return;
+    const number = definitionValueText(heading).match(PROCESS_TITLE_PATTERN)?.[1];
+    if (!number) return;
+    const walker = document.createTreeWalker(heading, NodeFilter.SHOW_TEXT);
+    let textNode = walker.nextNode();
+    while (textNode && !textNode.nodeValue.includes(number)) textNode = walker.nextNode();
+    if (!textNode) return;
+    const numberNode = textNode.splitText(textNode.nodeValue.indexOf(number));
+    numberNode.splitText(number.length);
+    const wrapper = createElement('span', 'siages-page-copy-inline');
+    numberNode.parentNode.insertBefore(wrapper, numberNode);
+    wrapper.append(numberNode, createPageCopyButton('número do processo', () => number));
+  }
   function installPageCopyButtons() {
+    installProcessTitleCopyButton();
     PAGE_COPY_FIELDS.forEach((label) => {
       const value = findDefinitionValue(label);
       if (!value || value.querySelector(`.${PAGE_COPY_BUTTON_CLASS}`) || !definitionValueText(value)) return;
-      const button = createElement('button', PAGE_COPY_BUTTON_CLASS, '⧉');
-      button.type = 'button';
-      button.title = `Copiar ${label.toLowerCase()} (SIAGES)`;
-      button.setAttribute('aria-label', `Copiar ${label.toLowerCase()}`);
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        void copyText(definitionValueText(value), button);
-      });
-      value.appendChild(button);
+      value.appendChild(createPageCopyButton(label.toLowerCase(), () => definitionValueText(value)));
     });
   }
 
@@ -977,10 +1000,8 @@
   function renderSummary(snapshot = state.snapshot) {
     const container = panel('summary'); if (!container) return;
     container.innerHTML = ''; renderSyncStatus(container);
-    const process = snapshot?.process; const fallback = snapshot?.fallback || { suapId: getProcessId(), processNumber: getProcessNumber() };
-    if (isSummaryBlockVisible('processo')) appendSection(container, 'Processo', (section) => {
-      appendCopyRow(section, 'Processo', process?.numProcesso || fallback.processNumber, true);
-    });
+    const process = snapshot?.process;
+    // O número do processo é copiado no título da própria página do SUAP (installProcessTitleCopyButton).
     if (process) {
       const full = process.dadosCompletos || {}; const bank = full.dados_bancarios || {}; const taxes = full.retencoes_tributarias || {};
       const invoices = Array.isArray(full.notas_fiscais)
