@@ -251,6 +251,79 @@ describe('popup da extensao: preenchimento SIAFI', () => {
     expect(sendMessage.mock.calls[1][1].records).toEqual([{ cpf: '98765432100', valor: 80 }]);
   });
 
+  describe('reconhece os blocos já preenchidos ao reabrir o popup', () => {
+    type StoredProgress = Record<string, unknown>;
+
+    function stubList(updatedAt: string, rows = Array.from({ length: 21 }, (_, index) => ({ cpf: String(10000000000 + index), valor: index + 1 }))) {
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => (url.includes('/rest/v1/lc_saved_lists')
+        ? Promise.resolve({ ok: true, json: async () => [{ id: 'list-large', name: 'Lote grande', updated_at: updatedAt, rows }] })
+        : Promise.resolve({ ok: true, json: async () => ({}) }))));
+    }
+
+    /** Preenche o bloco 1 numa primeira abertura e devolve o progresso gravado no storage. */
+    async function fillFirstBlock(): Promise<StoredProgress> {
+      stubList('2026-11-20T10:00:00Z');
+      const { storageSet } = setupChrome(SIAFI_URL);
+      loadPopup();
+      await waitFor(() => expect(element('siafi-batch-select')).not.toBeDisabled());
+      element<HTMLInputElement>('siafi-auto-continue').checked = false;
+      element<HTMLButtonElement>('btn-siafi-fill').click();
+      await waitFor(() => expect(storageSet).toHaveBeenCalled());
+      const progress = storageSet.mock.calls.at(-1)![0]['siages-siafi-batch-progress'] as StoredProgress;
+      expect(progress).toMatchObject({ listId: 'list-large', offset: 10, tabId: 42, tabUrl: SIAFI_URL });
+      expect(progress.fingerprint).toEqual(expect.any(String));
+      return progress;
+    }
+
+    /** Reabre o popup (novo carregamento) com o progresso salvo. */
+    async function reopenPopup(progress: StoredProgress, options: { updatedAt?: string; url?: string; tabId?: number; rows?: Array<{ cpf: string; valor: number }> } = {}) {
+      document.body.innerHTML = '';
+      renderPopup();
+      stubList(options.updatedAt ?? '2026-11-20T10:00:00Z', options.rows);
+      const chromeMocks = setupChrome(options.url ?? SIAFI_URL);
+      chromeMocks.activeTab.id = options.tabId ?? 42;
+      const chromeApi = (globalThis as typeof globalThis & { chrome: { storage: { local: { get: ReturnType<typeof vi.fn> } } } }).chrome;
+      chromeApi.storage.local.get.mockResolvedValue({ 'siages-siafi-batch-progress': progress });
+      loadPopup();
+      await waitFor(() => expect(element('siafi-batch-select')).not.toBeDisabled());
+      return element<HTMLSelectElement>('siafi-batch-select');
+    }
+
+    it('mantém o próximo bloco quando a lista foi regravada com as mesmas linhas (updated_at novo)', async () => {
+      const progress = await fillFirstBlock();
+      const batch = await reopenPopup(progress, { updatedAt: '2026-11-24T18:30:00Z' });
+
+      expect(batch.value).toBe('10');
+      expect(batch.selectedOptions[0]).toHaveTextContent('Bloco 2/3: posições 11-20 (próximo)');
+      expect(element('siafi-list-info')).not.toHaveTextContent('outra aba');
+    });
+
+    it('mantém o próximo bloco quando a URL ou a aba do SIAFI mudou, avisando a origem do progresso', async () => {
+      const progress = await fillFirstBlock();
+      const batch = await reopenPopup(progress, { url: `${SIAFI_URL}?pagina=2`, tabId: 77 });
+
+      expect(batch.value).toBe('10');
+      expect(element('siafi-list-info')).toHaveTextContent('Progresso de 10 favorecido(s) salvo em outra aba ou página do SIAFI');
+      expect(element('siafi-list-info')).toHaveTextContent('Se esta for uma nova transação, escolha o Bloco 1.');
+    });
+
+    it('volta ao Bloco 1 quando as linhas da lista mudaram', async () => {
+      const progress = await fillFirstBlock();
+      const rows = Array.from({ length: 21 }, (_, index) => ({ cpf: String(10000000000 + index), valor: index === 3 ? 999 : index + 1 }));
+      const batch = await reopenPopup(progress, { rows });
+
+      expect(batch.value).toBe('0');
+      expect(batch.selectedOptions[0]).toHaveTextContent('Bloco 1/3: posições 1-10');
+    });
+
+    it('aceita o progresso gravado no formato anterior (sem assinatura) enquanto o updated_at não muda', async () => {
+      const legacy = { listId: 'list-large', updatedAt: '2026-11-20T10:00:00Z', tabId: 42, tabUrl: SIAFI_URL, offset: 20 };
+      const batch = await reopenPopup(legacy);
+      expect(batch.value).toBe('20');
+      expect(batch.selectedOptions[0]).toHaveTextContent('Bloco 3/3: posições 21-21 (próximo)');
+    });
+  });
+
   it('mantem o card oculto fora do SIAFI', async () => {
     setupChrome('https://suap.ifrn.edu.br/plan_estrategico/plano_concluido/8/');
     loadPopup();

@@ -665,12 +665,38 @@ function siafiListUpdatedAt(list) {
   return String(list?.updated_at || list?.updatedAt || '');
 }
 
-function getSiafiBatchOffset(list, tab) {
-  if (!list || !siafiBatchProgress) return 0;
-  if (siafiBatchProgress.listId !== list.id || siafiBatchProgress.updatedAt !== siafiListUpdatedAt(list)) return 0;
-  if (tab && (siafiBatchProgress.tabId !== tab.id || siafiBatchProgress.tabUrl !== tab.url)) return 0;
+// Assinatura das linhas (CPF e valor, na ordem): o progresso continua valendo quando a lista é
+// regravada sem mudar as linhas (modal da LC no SUAP, renomear, remontar igual), o que muda o updated_at.
+function siafiListFingerprint(list) {
+  const source = buildSiafiRecords(list).map((record) => `${record.cpf}:${Math.round((record.valor || 0) * 100)}`).join('|');
+  let hash = 5381;
+  for (let index = 0; index < source.length; index += 1) hash = ((hash * 33) ^ source.charCodeAt(index)) >>> 0;
+  return `${source.length}-${hash.toString(36)}`;
+}
+
+/** Progresso salvo para esta lista, ou null. `sameTab` indica se veio desta mesma aba e URL do SIAFI. */
+function getSiafiBatchProgressInfo(list, tab) {
+  if (!list || !siafiBatchProgress || siafiBatchProgress.listId !== list.id) return null;
+  const sameRows = siafiBatchProgress.fingerprint
+    ? siafiBatchProgress.fingerprint === siafiListFingerprint(list)
+    : siafiBatchProgress.updatedAt === siafiListUpdatedAt(list); // progresso gravado no formato antigo, sem assinatura
+  if (!sameRows) return null;
   const total = Array.isArray(list.rows) ? list.rows.length : 0;
-  return Math.min(Math.max(Number(siafiBatchProgress.offset) || 0, 0), total);
+  return {
+    offset: Math.min(Math.max(Number(siafiBatchProgress.offset) || 0, 0), total),
+    sameTab: !tab || (siafiBatchProgress.tabId === tab.id && siafiBatchProgress.tabUrl === tab.url),
+    savedAt: typeof siafiBatchProgress.savedAt === 'string' ? siafiBatchProgress.savedAt : '',
+  };
+}
+
+function getSiafiBatchOffset(list, tab) {
+  return getSiafiBatchProgressInfo(list, tab)?.offset ?? 0;
+}
+
+function formatSiafiProgressTime(iso) {
+  const date = new Date(iso);
+  if (!iso || Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
 async function loadSiafiBatchProgress() {
@@ -686,10 +712,12 @@ async function loadSiafiBatchProgress() {
 async function saveSiafiBatchProgress(list, tab, offset) {
   siafiBatchProgress = {
     listId: list.id,
+    fingerprint: siafiListFingerprint(list),
     updatedAt: siafiListUpdatedAt(list),
     tabId: tab.id,
     tabUrl: tab.url || '',
     offset,
+    savedAt: new Date().toISOString(),
   };
   await chrome.storage.local.set({ [SIAFI_BATCH_PROGRESS_STORAGE_KEY]: siafiBatchProgress });
 }
@@ -749,9 +777,14 @@ function updateSiafiBatchInfo() {
     return;
   }
   const nextBatchEnd = Math.min(offset + SIAFI_BATCH_SIZE, total);
-  const warning = offset < savedOffset
+  const progressInfo = getSiafiBatchProgressInfo(selected, siafiActiveTab);
+  let warning = offset < savedOffset
     ? ' Atenção: o bloco escolhido é anterior ao progresso salvo; linhas já confirmadas em outra página do SIAFI podem ser duplicadas.'
     : '';
+  if (progressInfo && progressInfo.offset > 0 && !progressInfo.sameTab) {
+    const when = formatSiafiProgressTime(progressInfo.savedAt);
+    warning += ` Progresso de ${progressInfo.offset} favorecido(s) salvo em outra aba ou página do SIAFI${when ? ` (${when})` : ''}. Se esta for uma nova transação, escolha o Bloco 1.`;
+  }
   siafiListInfo.textContent = `${total} favorecido(s) pronto(s) para colagem. Próximo bloco: posições ${offset + 1}-${nextBatchEnd} (máximo ${SIAFI_BATCH_SIZE}).${warning}`;
   siafiFillButton.disabled = false;
 }
