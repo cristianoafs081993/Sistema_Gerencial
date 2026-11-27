@@ -32,12 +32,16 @@ vi.mock('@/components/dashboard/DashboardFiltersSheet', () => ({
   DashboardFiltersSheet: ({
     onFilterPlanoInternoChange,
     onFilterOrigemChange,
+    onFilterUnidadeChange,
+    unidadesDisponiveis,
     onDateStartChange,
     onDateEndChange,
     onClearFilters,
   }: {
     onFilterPlanoInternoChange: (value: string) => void;
     onFilterOrigemChange: (value: string) => void;
+    onFilterUnidadeChange?: (value: string) => void;
+    unidadesDisponiveis?: Array<{ value: string }>;
     onDateStartChange: (value: string) => void;
     onDateEndChange: (value: string) => void;
     onClearFilters: () => void;
@@ -45,6 +49,10 @@ vi.mock('@/components/dashboard/DashboardFiltersSheet', () => ({
     <div>
       <button type="button" onClick={() => onFilterOrigemChange('230446')}>
         filter-origem-pnae
+      </button>
+      <span data-testid="unidades-disponiveis">{(unidadesDisponiveis ?? []).map((item) => item.value).join(',')}</span>
+      <button type="button" onClick={() => onFilterUnidadeChange?.('25')}>
+        filter-unidade-25
       </button>
       <button type="button" onClick={() => onFilterPlanoInternoChange('PI-EN')}>
         filter-pi-en
@@ -1594,6 +1602,53 @@ describe('Dashboard', () => {
       expect(screen.getByTestId('current-pago')).toHaveTextContent(/^100$/);
     },
   );
+
+  it('consolida o planejado de todas as unidades SUAP da UG e permite recortar por unidade', () => {
+    mockedUseData.mockReturnValue({
+      atividades: [
+        makeAtividade({ id: 'ativ-cn', origemRecurso: '231796', valorTotal: 500, suapUnitCode: '19', suapPlanId: 8 }),
+        makeAtividade({ id: 'ativ-juc', origemRecurso: '231796', valorTotal: 200, suapUnitCode: '25', suapPlanId: 8 }),
+        makeAtividade({ id: 'ativ-manual', origemRecurso: '231796', valorTotal: 10 }),
+      ],
+      empenhos: [
+        makeEmpenho({ id: 'emp-ug', numero: '2026NE000001', origemRecurso: '231796', tipo: 'exercicio', valor: 300 }),
+      ],
+      descentralizacoes: [],
+      contaDescentralizacoes: [],
+      contratos: [],
+      contratosEmpenhos: [],
+      creditosDisponiveis: [],
+      isLoading: false,
+      addAtividade: vi.fn(),
+      updateAtividade: vi.fn(),
+      deleteAtividade: vi.fn(),
+      addEmpenho: vi.fn(),
+      updateEmpenho: vi.fn(),
+      deleteEmpenho: vi.fn(),
+      addDescentralizacao: vi.fn(),
+      updateDescentralizacao: vi.fn(),
+      deleteDescentralizacao: vi.fn(),
+      getResumoOrcamentario: vi.fn(),
+      getTotalPlanejado: vi.fn(),
+      getTotalEmpenhado: vi.fn(),
+      getTotalDescentralizado: vi.fn(),
+      getADescentralizar: vi.fn(),
+      getSaldoTotal: vi.fn(),
+      refreshData: vi.fn(),
+    });
+
+    render(<Dashboard />);
+
+    expect(screen.getByTestId('unidades-disponiveis')).toHaveTextContent(/^19,25$/);
+    expect(screen.getByTestId('current-planejado')).toHaveTextContent(/^710$/);
+    expect(screen.queryByTestId('dashboard-unidade-aviso')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'filter-unidade-25' }));
+
+    expect(screen.getByTestId('current-planejado')).toHaveTextContent(/^210$/);
+    expect(screen.getByTestId('current-empenhado')).toHaveTextContent(/^300$/);
+    expect(screen.getByTestId('dashboard-unidade-aviso')).toHaveTextContent('DG/JUC');
+  });
 
   it('separa do empenhado as NEs de TED cujo PTRES não consta do plano do campus', () => {
     mockedUseData.mockReturnValue({

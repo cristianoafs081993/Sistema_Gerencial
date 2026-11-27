@@ -8,12 +8,13 @@ import { empenhosService } from '@/services/empenhos';
 import { dataQueryKeys } from '@/contexts/dataQueryKeys';
 import { useOptionalAuth } from '@/contexts/AuthContext';
 import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
-import { getSuapPlanUnitForCampus } from '@/lib/suapPlanUnits';
+import { ALL_SUAP_PLAN_UNITS } from '@/lib/suapPlanUnits';
 
 export function useDataQueries() {
   const auth = useOptionalAuth();
   const campusUasg = auth?.userCampus.codigo ?? DEFAULT_IFRN_CAMPUS_UASG;
-  const suapUnitCode = getSuapPlanUnitForCampus(campusUasg).value;
+  // O painel consolida o plano de todas as unidades SUAP da UG; o recorte por unidade é feito na tela.
+  const suapUnitCode = ALL_SUAP_PLAN_UNITS;
   // Failed reads require an explicit retry; focus changes must not flood an outage.
   const readOptions = { retry: false as const, staleTime: 60_000, refetchOnWindowFocus: false };
   const atividadesQuery = useQuery({

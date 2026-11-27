@@ -20,6 +20,7 @@ import {
   isRapReinscrito,
 } from '@/utils/rapMetrics';
 import { getOrigensDoPlano, splitEmpenhosPorPlano, summarizeEmpenhosForaDoPlano } from '@/utils/empenhosForaDoPlano';
+import { DEFAULT_SUAP_PLAN_UNIT, getSuapPlanUnitsForCampus } from '@/lib/suapPlanUnits';
 import { useData } from '@/contexts/DataContext';
 import { useOptionalAuth } from '@/contexts/AuthContext';
 import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
@@ -196,6 +197,10 @@ export const isOrigemRecursoIgnoradaNoEmpenhado = (origem?: string | null) => {
   const trimmed = origem.trim();
   return /\b230446\b/.test(trimmed) || trimmed.startsWith('230446');
 };
+
+// Unidade SUAP de cada atividade do Plano 8; atividades manuais não têm unidade e ficam sempre visíveis.
+const getAtividadeUnidade = (atividade: { suapUnitCode?: string; suapPlanId?: number }) =>
+  atividade.suapUnitCode || (atividade.suapPlanId ? DEFAULT_SUAP_PLAN_UNIT : null);
 
 const getContractCommitmentValue = (empenho: Pick<ContratoApiEmpenhoRow, 'valor_empenhado'>) =>
   Math.max(0, Number(empenho.valor_empenhado) || 0);
@@ -1113,6 +1118,7 @@ export default function Dashboard() {
   const [selectedBudgetDimensionCode, setSelectedBudgetDimensionCode] = useState<string | null>(null);
   const [filterPlanoInterno, setFilterPlanoInterno] = useState('all');
   const [filterOrigem, setFilterOrigem] = useState('all');
+  const [filterUnidade, setFilterUnidade] = useState('all');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
   const [activeTab, setActiveTab] = useState<'corrente' | 'contratos' | 'rap'>('corrente');
@@ -1121,6 +1127,18 @@ export default function Dashboard() {
   const [projectionTargetMonths, setProjectionTargetMonths] = useState(12);
   const [contractsWithRenewalAllowed, setContractsWithRenewalAllowed] = useState<string[]>([]);
   const isContractExecutionTabActive = activeTab === 'contratos';
+
+  const unidadesDisponiveis = useMemo(() => {
+    const presentes = new Set(atividades.map(getAtividadeUnidade).filter(Boolean));
+    return getSuapPlanUnitsForCampus(campusUasg)
+      .filter((unit) => presentes.has(unit.value))
+      .map((unit) => ({ value: unit.value, label: `${unit.code} — ${unit.label}` }));
+  }, [atividades, campusUasg]);
+  const unidadeSelecionada = unidadesDisponiveis.find((unit) => unit.value === filterUnidade) ?? null;
+
+  useEffect(() => {
+    setFilterUnidade('all');
+  }, [campusUasg]);
 
   const origensDisponiveis = useMemo(() => {
     const origens = new Set<string>();
@@ -1165,8 +1183,10 @@ export default function Dashboard() {
         filterValue: filterPlanoInterno,
       });
       const matchOrigem = filterOrigem === 'all' || atividade.origemRecurso === filterOrigem;
+      const unidade = getAtividadeUnidade(atividade);
+      const matchUnidade = filterUnidade === 'all' || unidade === null || unidade === filterUnidade;
 
-      return matchPlano && matchOrigem;
+      return matchPlano && matchOrigem && matchUnidade;
     });
 
     const empenhosCorrente = empenhos.filter((empenho) => empenho.tipo === 'exercicio');
@@ -1218,7 +1238,7 @@ export default function Dashboard() {
       empenhosRap: filteredEmpenhosRap,
       descentralizacoes: filteredDescentralizacoes,
     };
-  }, [atividades, empenhos, descentralizacoes, filterPlanoInterno, filterOrigem, dateStart, dateEnd]);
+  }, [atividades, empenhos, descentralizacoes, filterPlanoInterno, filterOrigem, filterUnidade, dateStart, dateEnd]);
 
   const dashboardDescentralizacoes = useMemo(
     () => descentralizacoes.filter((d) => !isExcludedDescentralizacaoOrigem(d.origemRecurso)),
@@ -1797,6 +1817,7 @@ export default function Dashboard() {
 
   const clearFilters = () => {
     setFilterOrigem('all');
+    setFilterUnidade('all');
     setFilterPlanoInterno('all');
     setDateStart('');
     setDateEnd('');
@@ -1805,9 +1826,10 @@ export default function Dashboard() {
   };
 
   const hasActiveFilters =
-    filterOrigem !== 'all' || filterPlanoInterno !== 'all' || dateStart !== '' || dateEnd !== '';
+    filterOrigem !== 'all' || filterUnidade !== 'all' || filterPlanoInterno !== 'all' || dateStart !== '' || dateEnd !== '';
   const activeFiltersCount = [
     filterOrigem !== 'all',
+    filterUnidade !== 'all',
     filterPlanoInterno !== 'all',
     dateStart !== '' || dateEnd !== '',
   ].filter(Boolean).length;
@@ -1839,6 +1861,9 @@ export default function Dashboard() {
               dateStart={dateStart}
               dateEnd={dateEnd}
               origensDisponiveis={origensDisponiveis}
+              filterUnidade={filterUnidade}
+              unidadesDisponiveis={unidadesDisponiveis}
+              onFilterUnidadeChange={setFilterUnidade}
               planosInternosDisponiveis={planosInternosDisponiveis}
               hasActiveFilters={hasActiveFilters}
               activeFiltersCount={activeFiltersCount}
@@ -1876,6 +1901,21 @@ export default function Dashboard() {
         ) : null}
 
         <TabsContent value="corrente" className="mt-0 space-y-6 border-none p-0">
+          {unidadeSelecionada ? (
+            <div
+              role="note"
+              data-testid="dashboard-unidade-aviso"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm"
+            >
+              <span>
+                <strong>Planejado da unidade {unidadeSelecionada.label}.</strong> O empenhado continua sendo o da UG inteira,
+                porque a NE não identifica a unidade do SUAP.
+              </span>
+              <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setFilterUnidade('all')}>
+                Ver todas as unidades
+              </Button>
+            </div>
+          ) : null}
           <DashboardCurrentTab
             isLoading={isLoading}
             filteredData={filteredData}

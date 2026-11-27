@@ -7,7 +7,7 @@ import { Atividade } from '@/types';
 import { normalizeActivityName, normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
 import { resolveTipoAtividade } from '@/utils/atividadeScopes';
 import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
-import { DEFAULT_SUAP_PLAN_UNIT, getSuapPlanUnitForCampus } from '@/lib/suapPlanUnits';
+import { ALL_SUAP_PLAN_UNITS, DEFAULT_SUAP_PLAN_UNIT, getSuapPlanUnitForCampus } from '@/lib/suapPlanUnits';
 
 const SUAP_PLAN_SYNC_SOURCE = 'suap_plan_8';
 const ATIVIDADES_SELECT = 'id,campus_uasg,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,tipo_atividade,atividade,descricao,valor_total,saldo_disponivel,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,sync_source,suap_unit_code,suap_plan_id,suap_activity_id,sync_active,created_at,updated_at';
@@ -54,6 +54,7 @@ export function filterAtividadeRowsForRead(
     return rows.filter((item) => {
         if (item.sync_active === false) return false;
         if (item.sync_source !== SUAP_PLAN_SYNC_SOURCE) return true;
+        if (suapUnitCode === ALL_SUAP_PLAN_UNITS) return true;
 
         return String(item.suap_unit_code || DEFAULT_SUAP_PLAN_UNIT) === suapUnitCode;
     });

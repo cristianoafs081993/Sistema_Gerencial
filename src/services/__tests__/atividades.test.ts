@@ -140,4 +140,15 @@ describe('isolamento do planejamento SUAP na leitura', () => {
     expect(mocks.rangeMock).toHaveBeenNthCalledWith(1, 0, 999);
     expect(mocks.rangeMock).toHaveBeenNthCalledWith(2, 1000, 1999);
   });
+
+  it('consolida todas as unidades da UG quando o painel pede o plano completo', () => {
+    const visible = filterAtividadeRowsForRead([
+      row({ id: 'zona-leste', suap_unit_code: '12', campus_uasg: '158155' }),
+      row({ id: 'proen', suap_unit_code: '2', campus_uasg: '158155' }),
+      row({ id: 'arquivada', suap_unit_code: '2', sync_active: false }),
+    ], 'all');
+
+    expect(visible.map((item) => item.id)).toEqual(['zona-leste', 'proen']);
+  });
 });
+

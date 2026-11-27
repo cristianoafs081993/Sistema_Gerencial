@@ -65,6 +65,12 @@ const UNIT_DEFINITIONS: Array<[string, string, string, string]> = [
 
 export const DEFAULT_SUAP_PLAN_UNIT = '19';
 
+/**
+ * Lê o planejamento de todas as unidades SUAP da UG. A NE é emitida pela UG e não identifica a
+ * unidade, então o painel consolida o plano da UG inteira (Reitoria tem 16 unidades sob 158155).
+ */
+export const ALL_SUAP_PLAN_UNITS = 'all';
+
 export const SUAP_PLAN_UNITS: SuapPlanUnit[] = UNIT_DEFINITIONS
   .map(([value, code, label, parentUasg]) => ({
     value,
@@ -106,4 +112,9 @@ export function parseSuapPlanUnitFromSourceUrl(value: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** Unidades SUAP cujo planejamento é gravado na UG informada. */
+export function getSuapPlanUnitsForCampus(campusUasg: string | null | undefined): SuapPlanUnit[] {
+  return SUAP_PLAN_UNITS.filter((unit) => unit.parentUasg === campusUasg);
 }

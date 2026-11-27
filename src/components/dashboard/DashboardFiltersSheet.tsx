@@ -28,6 +28,9 @@ type DashboardFiltersSheetProps = {
   dateStart: string;
   dateEnd: string;
   origensDisponiveis: string[];
+  filterUnidade?: string;
+  unidadesDisponiveis?: Array<{ value: string; label: string }>;
+  onFilterUnidadeChange?: (value: string) => void;
   planosInternosDisponiveis: string[];
   hasActiveFilters: boolean;
   activeFiltersCount: number;
@@ -45,6 +48,9 @@ export function DashboardFiltersSheet({
   dateStart,
   dateEnd,
   origensDisponiveis,
+  filterUnidade = 'all',
+  unidadesDisponiveis = [],
+  onFilterUnidadeChange,
   planosInternosDisponiveis,
   hasActiveFilters,
   activeFiltersCount,
@@ -75,6 +81,23 @@ export function DashboardFiltersSheet({
           </SheetDescription>
         </SheetHeader>
         <div className="grid gap-4 py-4">
+          {unidadesDisponiveis.length > 1 && onFilterUnidadeChange ? (
+            <div className="space-y-2">
+              <Label>Unidade do SUAP</Label>
+              <Select value={filterUnidade} onValueChange={onFilterUnidadeChange}>
+                <SelectTrigger aria-label="Unidade do SUAP">
+                  <SelectValue placeholder="Todas as unidades" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as unidades (consolidado da UG)</SelectItem>
+                  {unidadesDisponiveis.map((unidade) => (
+                    <SelectItem key={unidade.value} value={unidade.value}>{unidade.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Filtra o planejado. O empenhado é sempre da UG.</p>
+            </div>
+          ) : null}
           <div className="space-y-2">
             <Label>Origem de Recurso</Label>
             <Select value={filterOrigem} onValueChange={onFilterOrigemChange}>

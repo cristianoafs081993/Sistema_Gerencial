@@ -6,6 +6,7 @@ import {
   DEFAULT_SUAP_PLAN_UNIT,
   getSuapPlanUnit,
   getSuapPlanUnitForCampus,
+  getSuapPlanUnitsForCampus,
   parseSuapPlanUnitFromSourceUrl,
   SUAP_PLAN_UNITS,
 } from '@/lib/suapPlanUnits';
@@ -70,5 +71,13 @@ describe('campi com UG própria no SIAFI', () => {
   ])('a unidade %s grava o planejamento na UG %s, a mesma das NEs', (unit, uasg) => {
     expect(getSuapPlanUnit(unit)?.parentUasg).toBe(uasg);
     expect(getSuapPlanUnitForCampus(uasg).value).toBe(unit);
+  });
+});
+
+describe('unidades por UG', () => {
+  it('lista as unidades da Reitoria e as três de Currais Novos', () => {
+    expect(getSuapPlanUnitsForCampus('158155')).toHaveLength(19);
+    expect(getSuapPlanUnitsForCampus('158155').map((unit) => unit.value)).toContain('12');
+    expect(getSuapPlanUnitsForCampus('158366').map((unit) => unit.value)).toEqual(['19', '25', '36']);
   });
 });
