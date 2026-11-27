@@ -71,3 +71,54 @@ export function summarizeEmpenhosForaDoPlano(
     porOrigem: linhas,
   };
 }
+
+/** Unidade SUAP da Diretoria de Gestão de Pessoas (DIGPE/RE), que planeja a folha na UG 158155. */
+export const SUAP_UNIT_DIGPE = '6';
+
+/**
+ * PTRES de folha e benefícios: os que só aparecem em atividades da DIGPE. O crédito de pessoal é
+ * suplementado ao longo do ano, então ele fica num indicador próprio para não distorcer o
+ * "Empenhado x Planejado" de custeio e investimento.
+ */
+export function getOrigensDePessoal(atividades: Pick<Atividade, 'origemRecurso' | 'suapUnitCode'>[]) {
+  const unidadesPorOrigem = new Map<string, Set<string>>();
+  atividades.forEach((atividade) => {
+    const origem = normalizeOrigem(atividade.origemRecurso);
+    if (!origem) return;
+    const unidades = unidadesPorOrigem.get(origem) ?? new Set<string>();
+    unidades.add(atividade.suapUnitCode ?? '');
+    unidadesPorOrigem.set(origem, unidades);
+  });
+
+  return new Set(
+    Array.from(unidadesPorOrigem.entries())
+      .filter(([, unidades]) => unidades.size === 1 && unidades.has(SUAP_UNIT_DIGPE))
+      .map(([origem]) => origem),
+  );
+}
+
+/** Natureza de despesa do GND 1 (pessoal e encargos sociais), ex.: 319011. */
+const isNaturezaPessoal = (natureza?: string | null) => /^\s*31/.test(String(natureza ?? ''));
+
+export function isEmpenhoDePessoal(
+  empenho: Pick<Empenho, 'origemRecurso' | 'naturezaDespesa'>,
+  origensDePessoal: Set<string>,
+) {
+  return origensDePessoal.has(normalizeOrigem(empenho.origemRecurso)) || isNaturezaPessoal(empenho.naturezaDespesa);
+}
+
+export function isAtividadeDePessoal(atividade: Pick<Atividade, 'origemRecurso'>, origensDePessoal: Set<string>) {
+  return origensDePessoal.has(normalizeOrigem(atividade.origemRecurso));
+}
+
+export type PessoalResumo = EmpenhosForaDoPlanoResumo & { planejado: number };
+
+export function summarizePessoal(
+  atividades: Pick<Atividade, 'valorTotal'>[],
+  empenhos: Pick<Empenho, 'origemRecurso' | 'valor' | 'valorPagoOficial' | 'descricao'>[],
+): PessoalResumo {
+  return {
+    ...summarizeEmpenhosForaDoPlano(empenhos),
+    planejado: atividades.reduce((sum, atividade) => sum + (Number(atividade.valorTotal) || 0), 0),
+  };
+}

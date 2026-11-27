@@ -21,7 +21,7 @@ import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency } from '@/lib/utils';
 import type { Atividade, Descentralizacao, Empenho } from '@/types';
-import type { EmpenhosForaDoPlanoResumo } from '@/utils/empenhosForaDoPlano';
+import type { EmpenhosForaDoPlanoResumo, PessoalResumo } from '@/utils/empenhosForaDoPlano';
 import { ExecutionTooltip } from './DashboardChartBits';
 import { GaugeChart } from './GaugeChart';
 import { DashboardOrigemAtividadesModal } from './DashboardOrigemAtividadesModal';
@@ -95,6 +95,7 @@ type DashboardCurrentTabProps = {
   totalLiquidado: number;
   totalPago: number;
   resumoForaDoPlano?: EmpenhosForaDoPlanoResumo;
+  resumoPessoal?: PessoalResumo;
   dadosPorOrigem: OrigemResumo[];
   dadosMensais: MensalResumo[];
   budgetTreemapData: BudgetTreemapNode[];
@@ -119,6 +120,7 @@ export function DashboardCurrentTab({
   totalLiquidado,
   totalPago,
   resumoForaDoPlano,
+  resumoPessoal,
   dadosPorOrigem,
   dadosMensais,
   budgetTreemapData,
@@ -239,6 +241,59 @@ export function DashboardCurrentTab({
           </div>
         </div>
       </section>
+
+      {resumoPessoal && (resumoPessoal.quantidade > 0 || resumoPessoal.planejado > 0) ? (
+        <section
+          aria-label="Pessoal e benefícios"
+          data-testid="empenhado-pessoal"
+          className="rounded-xl border border-border border-l-4 border-l-brand-600 bg-card p-5 shadow-xs"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">Pessoal e benefícios</p>
+              <p className="text-xs text-muted-foreground">
+                Folha, encargos e benefícios (PTRES da DIGPE e natureza 31). O crédito é suplementado ao longo do ano; não entra em Empenhado x Planejado.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-6 text-right">
+              <div>
+                <p className="text-xs text-muted-foreground">Planejado</p>
+                <p className="text-base font-bold tracking-tight">{formatCurrency(resumoPessoal.planejado)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Empenhado</p>
+                <p className="text-base font-bold tracking-tight">{formatCurrency(resumoPessoal.empenhado)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Do planejado</p>
+                <p className="text-base font-bold tracking-tight">{percent(resumoPessoal.empenhado, resumoPessoal.planejado).toFixed(1)}%</p>
+              </div>
+            </div>
+          </div>
+          <Table className="mt-3">
+            <TableHeader>
+              <TableRow>
+                <TableHead>PTRES</TableHead>
+                <TableHead>Exemplo de objeto</TableHead>
+                <TableHead className="text-right">NEs</TableHead>
+                <TableHead className="text-right">Empenhado</TableHead>
+                <TableHead className="text-right">Pago</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {resumoPessoal.porOrigem.map((item) => (
+                <TableRow key={item.origem}>
+                  <TableCell className="font-medium">{item.origem}</TableCell>
+                  <TableCell className="max-w-[420px] truncate text-muted-foreground" title={item.descricao}>{item.descricao || '—'}</TableCell>
+                  <TableCell className="text-right">{item.quantidade}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(item.empenhado)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(item.pago)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </section>
+      ) : null}
 
       {resumoForaDoPlano && resumoForaDoPlano.quantidade > 0 ? (
         <section

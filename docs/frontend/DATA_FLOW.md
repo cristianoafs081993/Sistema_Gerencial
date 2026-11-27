@@ -570,3 +570,7 @@ A opção **Seguir para o próximo bloco…** vem marcada. Após um bloco com `o
 ### Empenhado fora do plano (TED e fontes externas)
 
 Na aba corrente do Dashboard, `Empenhado`, `Liquidado`, `Pago`, o percentual executado e a série mensal usam só os empenhos do exercício cujo PTRES (`origemRecurso`) aparece em alguma atividade do plano do campus (`src/utils/empenhosForaDoPlano.ts`). As NEs de PTRES sem atividade planejada, como as de TED executadas via FUNCERN em Natal Cidade Alta, vão para o cartão "Fora do plano", com totais por PTRES. Elas continuam na tabela por origem e na contagem de empenhos. O PTRES `230446` segue fora de ambos os indicadores. Um campus sem nenhuma atividade sincronizada mantém todos os empenhos no indicador principal.
+
+### Pessoal e benefícios
+
+Os PTRES planejados exclusivamente pela DIGPE (unidade SUAP `6`, UG `158155`) e qualquer NE de natureza `31` (pessoal e encargos) saem de Planejado, Empenhado, Liquidado, Pago, percentual e série mensal e vão para o cartão "Pessoal e benefícios", com planejado e empenhado próprios (`getOrigensDePessoal` em `src/utils/empenhosForaDoPlano.ts`). O crédito de folha é suplementado ao longo do ano: em 27/11/2026 a Reitoria tinha R$ 887,8 mi planejados e R$ 921,5 mi empenhados em pessoal, contra R$ 41,2 mi planejados e R$ 36,9 mi empenhados (89,5%) no restante.

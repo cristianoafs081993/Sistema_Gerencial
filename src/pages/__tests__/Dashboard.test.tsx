@@ -79,6 +79,7 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
     totalLiquidado,
     totalPago,
     resumoForaDoPlano,
+    resumoPessoal,
     dadosPorOrigem,
     dadosMensais,
     activeBudgetDimension,
@@ -91,6 +92,7 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
     totalLiquidado: number;
     totalPago: number;
     resumoForaDoPlano?: { quantidade: number; empenhado: number; porOrigem: Array<{ origem: string }> };
+    resumoPessoal?: { planejado: number; empenhado: number };
     dadosPorOrigem: Array<{ origem: string; empenhado: number }>;
     dadosMensais: Array<{ name: string; planejado: number; empenhado: number; liquidado: number }>;
     activeBudgetDimension: string | null;
@@ -102,6 +104,7 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
       <span data-testid="current-descentralizado">{totalDescentralizado}</span>
       <span data-testid="current-liquidado">{totalLiquidado}</span>
       <span data-testid="current-pago">{totalPago}</span>
+      <span data-testid="current-pessoal">{`${resumoPessoal?.planejado ?? 0}/${resumoPessoal?.empenhado ?? 0}`}</span>
       <span data-testid="current-fora-do-plano">{resumoForaDoPlano?.empenhado ?? 0}</span>
       <span data-testid="current-fora-do-plano-origens">{resumoForaDoPlano?.porOrigem.map((item) => item.origem).join(',')}</span>
       <span data-testid="current-origens">{JSON.stringify(dadosPorOrigem)}</span>
@@ -1648,6 +1651,47 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('current-planejado')).toHaveTextContent(/^210$/);
     expect(screen.getByTestId('current-empenhado')).toHaveTextContent(/^300$/);
     expect(screen.getByTestId('dashboard-unidade-aviso')).toHaveTextContent('DG/JUC');
+  });
+
+  it('separa a folha da DIGPE do Empenhado x Planejado', () => {
+    mockedUseData.mockReturnValue({
+      atividades: [
+        makeAtividade({ id: 'ativ-folha', origemRecurso: '171158', valorTotal: 1000, suapUnitCode: '6', suapPlanId: 8 }),
+        makeAtividade({ id: 'ativ-custeio', origemRecurso: '231796', valorTotal: 500, suapUnitCode: '12', suapPlanId: 8 }),
+      ],
+      empenhos: [
+        makeEmpenho({ id: 'emp-folha', numero: '2026NE000030', origemRecurso: '171158', naturezaDespesa: '319011', tipo: 'exercicio', valor: 1050 }),
+        makeEmpenho({ id: 'emp-custeio', numero: '2026NE000100', origemRecurso: '231796', naturezaDespesa: '339039', tipo: 'exercicio', valor: 400 }),
+      ],
+      descentralizacoes: [],
+      contaDescentralizacoes: [],
+      contratos: [],
+      contratosEmpenhos: [],
+      creditosDisponiveis: [],
+      isLoading: false,
+      addAtividade: vi.fn(),
+      updateAtividade: vi.fn(),
+      deleteAtividade: vi.fn(),
+      addEmpenho: vi.fn(),
+      updateEmpenho: vi.fn(),
+      deleteEmpenho: vi.fn(),
+      addDescentralizacao: vi.fn(),
+      updateDescentralizacao: vi.fn(),
+      deleteDescentralizacao: vi.fn(),
+      getResumoOrcamentario: vi.fn(),
+      getTotalPlanejado: vi.fn(),
+      getTotalEmpenhado: vi.fn(),
+      getTotalDescentralizado: vi.fn(),
+      getADescentralizar: vi.fn(),
+      getSaldoTotal: vi.fn(),
+      refreshData: vi.fn(),
+    });
+
+    render(<Dashboard />);
+
+    expect(screen.getByTestId('current-planejado')).toHaveTextContent(/^500$/);
+    expect(screen.getByTestId('current-empenhado')).toHaveTextContent(/^400$/);
+    expect(screen.getByTestId('current-pessoal')).toHaveTextContent(/^1000\/1050$/);
   });
 
   it('separa do empenhado as NEs de TED cujo PTRES não consta do plano do campus', () => {

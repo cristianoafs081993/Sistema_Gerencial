@@ -19,7 +19,15 @@ import {
   getRapSaldoAtual,
   isRapReinscrito,
 } from '@/utils/rapMetrics';
-import { getOrigensDoPlano, splitEmpenhosPorPlano, summarizeEmpenhosForaDoPlano } from '@/utils/empenhosForaDoPlano';
+import {
+  getOrigensDePessoal,
+  getOrigensDoPlano,
+  isAtividadeDePessoal,
+  isEmpenhoDePessoal,
+  splitEmpenhosPorPlano,
+  summarizeEmpenhosForaDoPlano,
+  summarizePessoal,
+} from '@/utils/empenhosForaDoPlano';
 import { DEFAULT_SUAP_PLAN_UNIT, getSuapPlanUnitsForCampus } from '@/lib/suapPlanUnits';
 import { useData } from '@/contexts/DataContext';
 import { useOptionalAuth } from '@/contexts/AuthContext';
@@ -1273,7 +1281,7 @@ export default function Dashboard() {
   // Empenhos de PTRES que não constam do plano do campus (TED, fontes externas) ficam
   // num indicador próprio para não inflar o "Empenhado x Planejado".
   const origensDoPlano = useMemo(() => getOrigensDoPlano(atividades), [atividades]);
-  const { noPlano: empenhosCorrenteParaSoma, foraDoPlano: empenhosForaDoPlano } = useMemo(
+  const { noPlano: empenhosNoPlano, foraDoPlano: empenhosForaDoPlano } = useMemo(
     () => splitEmpenhosPorPlano(
       filteredData.empenhosCorrente.filter(
         (empenho) => !isOrigemRecursoIgnoradaNoEmpenhado(empenho.origemRecurso),
@@ -1287,7 +1295,26 @@ export default function Dashboard() {
     [empenhosForaDoPlano],
   );
 
-  const totalPlanejado = filteredData.atividades.reduce((total, atividade) => total + atividade.valorTotal, 0);
+  // Folha e benefícios (PTRES exclusivos da DIGPE ou natureza 31) têm crédito suplementado ao longo
+  // do ano e ficam num indicador próprio, fora do "Empenhado x Planejado" de custeio e investimento.
+  const origensDePessoal = useMemo(() => getOrigensDePessoal(atividades), [atividades]);
+  const empenhosCorrenteParaSoma = useMemo(
+    () => empenhosNoPlano.filter((empenho) => !isEmpenhoDePessoal(empenho, origensDePessoal)),
+    [empenhosNoPlano, origensDePessoal],
+  );
+  const atividadesParaSoma = useMemo(
+    () => filteredData.atividades.filter((atividade) => !isAtividadeDePessoal(atividade, origensDePessoal)),
+    [filteredData.atividades, origensDePessoal],
+  );
+  const resumoPessoal = useMemo(
+    () => summarizePessoal(
+      filteredData.atividades.filter((atividade) => isAtividadeDePessoal(atividade, origensDePessoal)),
+      empenhosNoPlano.filter((empenho) => isEmpenhoDePessoal(empenho, origensDePessoal)),
+    ),
+    [filteredData.atividades, empenhosNoPlano, origensDePessoal],
+  );
+
+  const totalPlanejado = atividadesParaSoma.reduce((total, atividade) => total + atividade.valorTotal, 0);
   const totalEmpenhado = empenhosCorrenteParaSoma.reduce((total, empenho) => total + empenho.valor, 0);
   const aDescentralizar = totalPlanejado - totalDescentralizado;
   const percentualExecutado = totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0;
@@ -1670,11 +1697,11 @@ export default function Dashboard() {
 
   const dadosMensais = useMemo(
     () =>
-      buildDadosMensais(filteredData.atividades, empenhosCorrenteParaSoma, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho, contratosApiEmpenhos, {
+      buildDadosMensais(atividadesParaSoma, empenhosCorrenteParaSoma, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho, contratosApiEmpenhos, {
         startDate: dateStart ? parseISO(dateStart) : null,
         endDate: dateEnd ? parseISO(dateEnd) : new Date(),
       }),
-    [filteredData.atividades, empenhosCorrenteParaSoma, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho, contratosApiEmpenhos, dateStart, dateEnd],
+    [atividadesParaSoma, empenhosCorrenteParaSoma, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho, contratosApiEmpenhos, dateStart, dateEnd],
   );
 
   const budgetTreemapData = useMemo(() => {
@@ -1927,6 +1954,7 @@ export default function Dashboard() {
             totalLiquidado={totalLiquidado}
             totalPago={totalPago}
             resumoForaDoPlano={resumoForaDoPlano}
+            resumoPessoal={resumoPessoal}
             dadosPorOrigem={dadosPorOrigem}
             dadosMensais={dadosMensais}
             budgetTreemapData={budgetTreemapData}
