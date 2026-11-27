@@ -6,6 +6,8 @@ Execute `node scripts/siafi-sugestoes-deducoes.cjs 03126525000166` para consulta
 
 Na extensão SIAGES, `Ctrl+K → Consultar códigos históricos de dedução` pede o CNPJ e mostra situações, códigos DARF e natureza encontrados, suas NPs de origem e contratos candidatos. A extensão consulta a cópia `siafi-inventario-deducoes.json` empacotada no diretório da extensão; para refletir novas capturas, atualize essa cópia. Resultado histórico requer conferência pelo usuário.
 
+Para DDF055, a regra operacional informada pelo usuário usa o dia 20 do mês seguinte ao mês corrente do pagamento, recuando para o dia útil imediatamente anterior quando cair em fim de semana ou feriado. A NP 325 foi atualizada em tela para 18/12/2026 (novembro/2026 → 20/12/2026, domingo); continua pendente de revisão/registro. `Ctrl+K → Preencher dedução DDF055` pede o NUP, consulta `processos` com a sessão autenticada do SIAGES e reaproveita CNPJ, fornecedor, notas fiscais e valor bruto já extraídos. O NUP é fonte para a busca de dados; no momento de aplicar, a extensão não o compara com a observação da NP aberta, pois o usuário valida essa relação antes do preenchimento. O valor bruto das notas é exibido em campo próprio e permanece separado do valor da retenção no SIAFI. O CNPJ sugere um par DARF/natureza único observado no inventário histórico do fornecedor. A UG vem da preferência da extensão; se ausente, usa 158366. A data inicial sugere o dia 20 do mês seguinte e recua por fins de semana e feriados nacionais; ambas as datas permanecem editáveis. Para calcular, consulta `referencias_retencao_aliquotas` pela sessão autenticada e aplica o percentual total associado ao código DARF à soma dos valores brutos das notas. A fonte cadastrada é histórica (COAD); o formulário exibe alíquota e fonte para revisão, e não determina sozinho a aplicabilidade tributária atual. O item-alvo é identificado entre os campos de valor editáveis pelo controle visível, painel aberto e situação indicada, ignorando campos ocultos de outros itens. O formulário é não modal: **Minimizar** recolhe os campos sem limpá-los para permitir interação com a tela SIAFI; **Restaurar** recupera o mesmo conteúdo, e **Fechar** encerra o formulário. O comando não registra o DH.
+
 ## Primeiro preenchimento assistido — extensão 1.9.91
 
 Na aba Dedução do SIAFI, com um item **DOB035 já aberto**, `Ctrl+K → Preencher dedução DOB035` abre o formulário local. O usuário informa processo completo, UG, datas, valor e fonte; opcionalmente cola o trecho do termo e usa **Ler valor do trecho**. O extrator aceita somente um valor explícito depois de `Valor calculado para recolhimento na conta vinculada nesta medição:`; não confunde o valor global da nota com o da conta vinculada e recusa valores divergentes. Não há cálculo automático por fornecedor ou preenchimento das demais situações.
@@ -32,6 +34,8 @@ Em DDF050 e DDF055, a tabela de recolhedores apresenta sequência, recolhedor, b
 
 Na NP 308, a base de R$ 44.744,24 foi exibida junto a DDF050 de R$ 3.965,88 e DDF055 de R$ 2.617,54. DOB001 de R$ 2.237,21 e DOB035 de R$ 5.890,05 também foram exibidas. A observação de valores não prova a base ou a alíquota jurídica de cada item; em especial, não derivar um percentual de INSS pela divisão direta sem verificar memória de cálculo, abatimentos e documentos. A DDF055 equivale numericamente a 5,85% da base exibida, sujeita a conferência de enquadramento e arredondamento.
 
+Na extensão DDF055, `processos.valor_nf` não é fonte da base: esse campo pode guardar um valor histórico de liquidação. A sugestão vem das notas de `dados_completos.notas_fiscais`, deduplicadas pelo número da NF; sem número, usa data e valor. Se o mesmo número vier com valores divergentes, a sugestão fica vazia para revisão. Só quando a lista de notas não existe é que `dados_completos.val_nf` pode ser usado como sugestão. O campo fica editável, e tanto o cálculo da retenção quanto a base da Lista de Recolhedores usam o valor efetivamente informado pelo usuário após revisão. Não há fallback para `processos.valor_nf`.
+
 ## Estrutura HTML observada
 
 Os arquivos `outputs/inventario-siafi-2026-10-29/estrutura-deducoes-308.json`, `estrutura-dgr001-307.json` e `estrutura-predoc-darf-308.json` registram uma projeção dos elementos observados, não o HTML integral nem um formulário editável. Não contêm valores de campos, cookies, ViewState ou URL de sessão. Alguns campos de texto selecionados no primeiro arquivo contêm somente códigos e rótulos de receita/natureza. O seletor do item abaixo usa `{i}` como índice variável:
@@ -51,6 +55,25 @@ Os arquivos `outputs/inventario-siafi-2026-10-29/estrutura-deducoes-308.json`, `
 ```
 
 Este trecho é esquemático, reconstituído a partir dos IDs e tags observados; não garante hierarquia direta de todos os elementos. `campoInscricaoA_deducao` representa DARF nos exemplos DDF e GRU na DGR001 (neste caso, o span observado termina em `_output_gru`); `campoInscricaoB_deducao` representa a natureza na DDF055. O pré-documento aparece em `#modalPredoc`, com retorno por `form_manterDocumentoHabil:btnRetornarPredoc`. Datas na DGR001 aparecem em `dataVencimentoDeducao_outputText` e `dataPagamentoDeducao_outputText`. Na consulta, campos que parecem valores de saída são `span`; nomes, controles editáveis, máscaras, eventos e ordem de preenchimento devem ser identificados na tela de edição antes da implementação. Índices mudam conforme os itens; IDs gerados `j_id…` não são contratos estáveis. A atualização AJAX exige aguardar o estado visível e resolver novamente os seletores.
+
+### Linha editável da lista de recolhedores — DDF055
+
+Na tela **Alterar** da NP 325, a lista vazia mostra o total “Valor a Informar” igual ao valor do item DDF055. Clicar em **Incluir** abre uma linha editável sem gravá-la; o formulário da linha expõe recolhedor, base de cálculo, valor da receita, multa e juros, além de **Confirmar** e **Descartar** próprios da linha. O padrão observado usa índice de dedução `{i}` e índice de recolhedor `{r}`:
+
+```text
+form_manterDocumentoHabil:listaDeducao:{i}:deducao_tabela_recolhimentos_painel_incluir
+form_manterDocumentoHabil:listaDeducao:{i}:deducao_tabela_recolhimentos:{r}:deducao_tabela_recolhimentos_recolhedor_input
+form_manterDocumentoHabil:listaDeducao:{i}:deducao_tabela_recolhimentos:{r}:deducao_tabela_recolhimentos_recolhedor_btn
+form_manterDocumentoHabil:listaDeducao:{i}:deducao_tabela_recolhimentos:{r}:deducao_tabela_recolhimentos_base_calculo_input
+form_manterDocumentoHabil:listaDeducao:{i}:deducao_tabela_recolhimentos:{r}:deducao_tabela_recolhimentos_valor_recolhimento_input
+form_manterDocumentoHabil:listaDeducao:{i}:deducao_tabela_recolhimentos:{r}:deducao_tabela_recolhimentos_showModalCalcReceita
+form_manterDocumentoHabil:listaDeducao:{i}:deducao_tabela_recolhimentos:{r}:deducao_tabela_recolhimentos_multa_input
+form_manterDocumentoHabil:listaDeducao:{i}:deducao_tabela_recolhimentos:{r}:deducao_tabela_recolhimentos_juros_input
+form_manterDocumentoHabil:listaDeducao:{i}:deducao_tabela_recolhimentos_painel_confirmar
+form_manterDocumentoHabil:listaDeducao:{i}:deducao_tabela_recolhimentos_painel_cancelar
+```
+
+O botão `%` ao lado de valor da receita é identificado pelo SIAFI como “Calcular Receita”. O cabeçalho da tabela oferece os totais e o botão **Incluir**; IDs de sequência/colunas `j_id…` mudam e não devem ser usados como seletores. A linha vazia aberta para mapear esses controles foi descartada; nenhum recolhedor foi selecionado nem confirmado. O escopo assistido inicial é apenas para casos em que o usuário confirme que existe um único recolhedor e que seu CNPJ coincide com o emissor da NF. Com essa confirmação, a extensão usa o CNPJ do processo, a soma bruta das notas como base de cálculo, o valor da retenção DDF055 como valor da receita e 0,00 para multa/juros. Não abre a pesquisa de recolhedores, não sobrescreve uma lista que já tenha linha e deixa a linha aberta para revisão e confirmação manual. Os demais casos continuam manuais; a extração atual não prova, sozinha, a quantidade de recolhedores nem o emissor por nota.
 
 ## Fontes de dados para o inventário por fornecedor
 

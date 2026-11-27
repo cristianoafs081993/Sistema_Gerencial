@@ -274,6 +274,50 @@ async function handleAuthMessage(message) {
   throw new Error('Operação de autenticação desconhecida.');
 }
 
+async function lookupSiafiDeductionProcess(processNumber) {
+  const normalized = String(processNumber || '').replace(/\s+/g, '').trim();
+  if (!/^\d{5}\.\d{6}\.\d{4}-\d{2}$/.test(normalized)) {
+    throw new Error('Informe o processo SUAP no formato 00000.000000.0000-00.');
+  }
+  const session = await refreshSessionIfNeeded();
+  if (!session?.accessToken) throw new Error('Entre no SIAGES para consultar os dados já extraídos do processo.');
+  const userId = extractUserIdFromSession(session);
+  if (!userId) throw new Error('Não foi possível identificar a conta SIAGES para consultar o processo.');
+  const query = `processos?select=num_processo,suap_id,url,status,cpf_cnpj,beneficiario,contrato,dados_completos&tenant_id=eq.${encodeURIComponent(userId)}&num_processo=eq.${encodeURIComponent(normalized)}&limit=2`;
+  const rows = await fetchSupabaseRest(query, session.accessToken);
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error('Não encontrei esse processo na base já extraída do SUAP. Abra/sincronize o processo no SUAP e tente novamente.');
+  if (rows.length > 1) throw new Error('Encontrei mais de um registro com esse número. Confira a sincronização antes de preencher.');
+  const row = rows[0];
+  const details = row.dados_completos && typeof row.dados_completos === 'object' ? row.dados_completos : {};
+  return {
+    processNumber: row.num_processo,
+    suapId: row.suap_id,
+    processUrl: row.url,
+    status: row.status,
+    cnpj: row.cpf_cnpj || details.cpf_cnpj || '',
+    supplier: row.beneficiario || details.beneficiario || '',
+    // `processos.valor_nf` pode refletir uma liquidação histórica. Para DDF055,
+    // use apenas valores extraídos dos documentos deste processo (`dados_completos`).
+    invoiceValue: details.val_nf || '',
+    contract: row.contrato || details.contrato_numero || '',
+    invoices: Array.isArray(details.notas_fiscais) ? details.notas_fiscais : [],
+    retentions: details.retencoes_tributarias || null,
+    extractionStatus: row.status === 'incomplete_extraction' || details.extraction_job?.last_error_code ? 'incomplete' : 'available',
+  };
+}
+
+async function lookupSiafiDdf055Rate(code) {
+  const normalizedCode = String(code || '').replace(/\D/g, '');
+  if (!/^\d{4}$/.test(normalizedCode)) throw new Error('Informe um código DARF de quatro dígitos para consultar a alíquota.');
+  const session = await refreshSessionIfNeeded();
+  if (!session?.accessToken) throw new Error('Entre no SIAGES para consultar a alíquota cadastrada.');
+  const query = `referencias_retencao_aliquotas?select=documento_id,codigo_receita,ir,csll,cofins,pis_pasep,percentual_total&documento_id=eq.coad-orientacao&codigo_receita=eq.${encodeURIComponent(normalizedCode)}&limit=2`;
+  const rows = await fetchSupabaseRest(query, session.accessToken);
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error(`Não há alíquota cadastrada para o código ${normalizedCode}.`);
+  if (rows.length > 1) throw new Error(`Há mais de uma alíquota cadastrada para o código ${normalizedCode}; confira a fonte antes de calcular.`);
+  return rows[0];
+}
+
 const PROCESS_REGISTRY_SOURCE = 'suape-process-registry';
 const STORAGE_ACTIVE_PROCESSES = 'suape_active_processes';
 const STORAGE_RECENT_PROCESSES = 'suape_recent_processes';
@@ -818,6 +862,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     void handleAuthMessage(message)
       .then((result) => sendResponse({ ok: true, ...result }))
       .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Falha na autenticação da extensão.' }));
+    return true;
+  }
+  if (message?.source === 'siages-siafi-deduction' && message.type === 'lookup-process') {
+    void lookupSiafiDeductionProcess(message.processNumber)
+      .then((process) => sendResponse({ ok: true, process }))
+      .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Falha ao consultar o processo.' }));
+    return true;
+  }
+  if (message?.source === 'siages-siafi-deduction' && message.type === 'lookup-ddf055-rate') {
+    void lookupSiafiDdf055Rate(message.code)
+      .then((rate) => sendResponse({ ok: true, rate }))
+      .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Falha ao consultar a alíquota.' }));
     return true;
   }
   if (message?.source === PROCESS_REGISTRY_SOURCE) {
