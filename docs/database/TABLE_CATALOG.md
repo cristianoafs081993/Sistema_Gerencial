@@ -107,6 +107,7 @@ Campos-chave:
 Observacoes operacionais:
 
 - `componente_funcional` deve permanecer sem prefixo numerico inicial, seguindo o catalogo normalizado de `componentes_funcionais`
+- não há duplicidade por `(campus_uasg, numero)` (verificado em 27/11/2026). Empenhado acima do planejado costuma vir de NEs de TED/fontes externas fora do plano do campus (ex.: Natal Cidade Alta) ou de leitura truncada; as leituras do frontend são paginadas
 - uploads/reprocessamentos SIAFI via frontend criam e atualizam registros em `empenhos`; a RLS deve permitir escrita apenas para o superadministrador autenticado ou papel `superadmin`
 
 Consumido por:

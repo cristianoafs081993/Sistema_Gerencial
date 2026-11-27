@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   selectMock: vi.fn(),
   eqMock: vi.fn(),
   orderMock: vi.fn(),
+  rangeMock: vi.fn(),
   restMock: vi.fn(),
 }));
 
@@ -15,6 +16,7 @@ vi.mock('@/lib/supabase', () => ({
 
 vi.mock('@/lib/supabaseRest', () => ({
   fetchSupabaseRestRows: mocks.restMock,
+  fetchAllSupabaseRestRows: mocks.restMock,
 }));
 
 import { atividadesService, filterAtividadeRowsForRead } from '@/services/atividades';
@@ -47,7 +49,8 @@ describe('isolamento do planejamento SUAP na leitura', () => {
     mocks.fromMock.mockReturnValue({ select: mocks.selectMock });
     mocks.selectMock.mockReturnValue({ eq: mocks.eqMock });
     mocks.eqMock.mockReturnValue({ order: mocks.orderMock });
-    mocks.orderMock.mockResolvedValue({ data: [], error: null });
+    mocks.orderMock.mockReturnValue({ order: mocks.orderMock, range: mocks.rangeMock });
+    mocks.rangeMock.mockResolvedValue({ data: [], error: null });
   });
 
   it('mantém apenas a unidade SUAP selecionada quando várias compartilham o UASG de Currais Novos', () => {
@@ -90,7 +93,7 @@ describe('isolamento do planejamento SUAP na leitura', () => {
   });
 
   it('aplica o filtro também no retorno principal do serviço', async () => {
-    mocks.orderMock.mockResolvedValue({
+    mocks.rangeMock.mockResolvedValue({
       data: [
         row({ id: 'ativo-currais', suap_unit_code: '19', suap_plan_id: 8, suap_activity_id: '32635' }),
         row({ id: 'outra-unidade', suap_unit_code: '36' }),
@@ -107,7 +110,7 @@ describe('isolamento do planejamento SUAP na leitura', () => {
   });
 
   it('aplica o mesmo filtro quando o cliente Supabase cai para REST', async () => {
-    mocks.orderMock.mockResolvedValue({ data: null, error: new Error('cliente indisponível') });
+    mocks.rangeMock.mockResolvedValue({ data: null, error: new Error('cliente indisponível') });
     mocks.restMock.mockResolvedValue([
       row({ id: 'ativo-currais', suap_unit_code: '19' }),
       row({ id: 'outra-unidade', suap_unit_code: '36' }),
@@ -122,5 +125,19 @@ describe('isolamento do planejamento SUAP na leitura', () => {
       expect.stringContaining('suap_unit_code'),
       expect.objectContaining({ filters: { campus_uasg: '158366' } }),
     );
+  });
+
+  it('percorre todas as páginas quando o campus tem mais de 1000 atividades', async () => {
+    const page = (start: number, size: number) =>
+      Array.from({ length: size }, (_, index) => row({ id: `a-${start + index}` }));
+    mocks.rangeMock
+      .mockResolvedValueOnce({ data: page(0, 1000), error: null })
+      .mockResolvedValueOnce({ data: page(1000, 54), error: null });
+
+    const result = await atividadesService.getAll('158366', '19');
+
+    expect(result).toHaveLength(1054);
+    expect(mocks.rangeMock).toHaveBeenNthCalledWith(1, 0, 999);
+    expect(mocks.rangeMock).toHaveBeenNthCalledWith(2, 1000, 1999);
   });
 });

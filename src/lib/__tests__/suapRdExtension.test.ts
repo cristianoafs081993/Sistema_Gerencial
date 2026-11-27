@@ -136,8 +136,9 @@ describe('RDs pela sessão da extensão',()=>{
     const result=await api.collectAll({units:SUAP_PLAN_UNITS,post,capture:vi.fn(),progress:async()=>{}});
     expect(result.results).toHaveLength(44);expect(post).toHaveBeenCalledTimes(44);
     const siblings=result.results.filter(entry=>entry.campusUasg==='158366');
-    expect(siblings.map(entry=>entry.unit)).toEqual(['19','25','29','36']);
-    expect(new Set(siblings.map(entry=>entry.run?.runId)).size).toBe(4);
+    expect(siblings.map(entry=>entry.unit)).toEqual(['19','25','36']);
+    expect(new Set(siblings.map(entry=>entry.run?.runId)).size).toBe(3);
+    expect(result.results.find(entry=>entry.unit==='29')).toMatchObject({campusUasg:'158882'});
   });
   it('continua o lote após falha de uma unidade e mantém prévias das demais',async()=>{
     const units=SUAP_PLAN_UNITS.filter(unit=>['19','25','29'].includes(unit.value));

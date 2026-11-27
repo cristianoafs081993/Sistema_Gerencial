@@ -59,3 +59,16 @@ describe('catálogo do Plano 8 do SUAP', () => {
     });
   });
 });
+
+describe('campi com UG própria no SIAFI', () => {
+  it.each([
+    ['29', '158882'],
+    ['21', '158887'],
+    ['43', '158896'],
+    ['42', '158897'],
+    ['44', '158898'],
+  ])('a unidade %s grava o planejamento na UG %s, a mesma das NEs', (unit, uasg) => {
+    expect(getSuapPlanUnit(unit)?.parentUasg).toBe(uasg);
+    expect(getSuapPlanUnitForCampus(uasg).value).toBe(unit);
+  });
+});

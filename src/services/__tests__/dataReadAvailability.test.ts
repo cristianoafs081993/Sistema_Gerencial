@@ -2,11 +2,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ result: { data: null as unknown, error: null as unknown }, fallback: vi.fn() }));
 vi.mock('@/lib/supabase', () => ({ supabase: { from: () => {
-  const builder = { select: () => builder, eq: () => builder, order: () => builder,
+  const builder = { select: () => builder, eq: () => builder, order: () => builder, range: () => builder,
     then: (done: (value: unknown) => unknown) => Promise.resolve(mocks.result).then(done) };
   return builder;
 } } }));
-vi.mock('@/lib/supabaseRest', () => ({ fetchSupabaseRestRows: mocks.fallback }));
+vi.mock('@/lib/supabaseRest', () => ({ fetchSupabaseRestRows: mocks.fallback, fetchAllSupabaseRestRows: mocks.fallback }));
 import { atividadesService } from '@/services/atividades';
 import { empenhosService } from '@/services/empenhos';
 import { descentralizacoesService } from '@/services/descentralizacoes';

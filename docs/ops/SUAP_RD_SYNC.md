@@ -6,7 +6,7 @@ Implementação de 05/10/2026, com coleta pela extensão Suape em 06/10/2026, co
 
 A primeira coleta lê o inventário de todas as situações de RDs da unidade SUAP, todas as atividades do Plano 8 (inclusive as de saldo zero), a relação oficial `/plan_estrategico/listar_requisicoes_despesa/8/<atividade_id>/` e o detalhe de cada RD. Nas seguintes, detalhes e relações elegíveis são reaproveitados conforme o contrato abaixo. A relação oficial fornece os IDs: nome, processo e PI são conferências e nunca critérios de atribuição no dashboard.
 
-O escopo é `org_id + campus_uasg + suap_unit_code`. O catálogo `suap_rd_units` valida a associação entre unidade SUAP e UASG. A UASG 158366 inclui DG/CN (19), DG/JUC (25), DG/PAAS (29) e DG/CTM (36); elas permanecem separadas. O parser valida a unidade do documento e a UG do número completo da NE. O ano e a gestão da NE são preservados. RDs históricas sem relação oficial no Plano 8 ficam disponíveis como movimentos, sem atribuição a uma atividade de 2026 por nome.
+O escopo é `org_id + campus_uasg + suap_unit_code`. O catálogo `suap_rd_units` valida a associação entre unidade SUAP e UASG. A UASG 158366 inclui DG/CN (19), DG/JUC (25) e DG/CTM (36); elas permanecem separadas. Desde a migration `20261127220000`, DG/PAAS (29), DG/LAJ (21), DG/TOU (43), DG/SM (42) e DG/UMZ (44) apontam para as UGs próprias 158882, 158887, 158896, 158897 e 158898. O parser valida a unidade do documento e a UG do número completo da NE. O ano e a gestão da NE são preservados. RDs históricas sem relação oficial no Plano 8 ficam disponíveis como movimentos, sem atribuição a uma atividade de 2026 por nome.
 
 ## Captura e armazenamento
 
