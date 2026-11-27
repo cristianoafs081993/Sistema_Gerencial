@@ -70,6 +70,7 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
     totalDescentralizado,
     totalLiquidado,
     totalPago,
+    resumoForaDoPlano,
     dadosPorOrigem,
     dadosMensais,
     activeBudgetDimension,
@@ -81,6 +82,7 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
     totalDescentralizado: number;
     totalLiquidado: number;
     totalPago: number;
+    resumoForaDoPlano?: { quantidade: number; empenhado: number; porOrigem: Array<{ origem: string }> };
     dadosPorOrigem: Array<{ origem: string; empenhado: number }>;
     dadosMensais: Array<{ name: string; planejado: number; empenhado: number; liquidado: number }>;
     activeBudgetDimension: string | null;
@@ -92,6 +94,8 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
       <span data-testid="current-descentralizado">{totalDescentralizado}</span>
       <span data-testid="current-liquidado">{totalLiquidado}</span>
       <span data-testid="current-pago">{totalPago}</span>
+      <span data-testid="current-fora-do-plano">{resumoForaDoPlano?.empenhado ?? 0}</span>
+      <span data-testid="current-fora-do-plano-origens">{resumoForaDoPlano?.porOrigem.map((item) => item.origem).join(',')}</span>
       <span data-testid="current-origens">{JSON.stringify(dadosPorOrigem)}</span>
       <span data-testid="current-mensal-labels">{dadosMensais.map((item) => item.name).join(',')}</span>
       <span data-testid="current-mensal-planejado">{dadosMensais.map((item) => item.planejado).join(',')}</span>
@@ -1590,6 +1594,45 @@ describe('Dashboard', () => {
       expect(screen.getByTestId('current-pago')).toHaveTextContent(/^100$/);
     },
   );
+
+  it('separa do empenhado as NEs de TED cujo PTRES não consta do plano do campus', () => {
+    mockedUseData.mockReturnValue({
+      atividades: [makeAtividade({ id: 'ativ-plano', origemRecurso: '231796', valorTotal: 500 })],
+      empenhos: [
+        makeEmpenho({ id: 'emp-plano', numero: '2026NE000001', origemRecurso: '231796', tipo: 'exercicio', valor: 300, valorPagoOficial: 100 }),
+        makeEmpenho({ id: 'emp-ted', numero: '2026NE000054', origemRecurso: '260596', tipo: 'exercicio', valor: 2951047, valorPagoOficial: 2951047 }),
+      ],
+      descentralizacoes: [],
+      contaDescentralizacoes: [],
+      contratos: [],
+      contratosEmpenhos: [],
+      creditosDisponiveis: [],
+      isLoading: false,
+      addAtividade: vi.fn(),
+      updateAtividade: vi.fn(),
+      deleteAtividade: vi.fn(),
+      addEmpenho: vi.fn(),
+      updateEmpenho: vi.fn(),
+      deleteEmpenho: vi.fn(),
+      addDescentralizacao: vi.fn(),
+      updateDescentralizacao: vi.fn(),
+      deleteDescentralizacao: vi.fn(),
+      getResumoOrcamentario: vi.fn(),
+      getTotalPlanejado: vi.fn(),
+      getTotalEmpenhado: vi.fn(),
+      getTotalDescentralizado: vi.fn(),
+      getADescentralizar: vi.fn(),
+      getSaldoTotal: vi.fn(),
+      refreshData: vi.fn(),
+    });
+
+    render(<Dashboard />);
+
+    expect(screen.getByTestId('current-empenhado')).toHaveTextContent(/^300$/);
+    expect(screen.getByTestId('current-pago')).toHaveTextContent(/^100$/);
+    expect(screen.getByTestId('current-fora-do-plano')).toHaveTextContent(/^2951047$/);
+    expect(screen.getByTestId('current-fora-do-plano-origens')).toHaveTextContent(/^260596$/);
+  });
 
   it('identifica corretamente a origem de recurso 230446 para ignorar na soma de empenhado', () => {
     expect(isOrigemRecursoIgnoradaNoEmpenhado('230446')).toBe(true);

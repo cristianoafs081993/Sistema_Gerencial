@@ -566,3 +566,7 @@ A opção **Seguir para o próximo bloco…** vem marcada. Após um bloco com `o
 ### Paginação das leituras de planejamento e execução
 
 `atividadesService.getAll`, `empenhosService.getAll` e `descentralizacoesService.getAll` percorrem todas as páginas de 1000 linhas do PostgREST (`src/lib/supabasePagination.ts`, com desempate por `id`); o fallback REST usa `fetchAllSupabaseRestRows`. Sem isso, a Reitoria (mais de 1000 empenhos e atividades) tinha os totais cortados sem erro.
+
+### Empenhado fora do plano (TED e fontes externas)
+
+Na aba corrente do Dashboard, `Empenhado`, `Liquidado`, `Pago`, o percentual executado e a série mensal usam só os empenhos do exercício cujo PTRES (`origemRecurso`) aparece em alguma atividade do plano do campus (`src/utils/empenhosForaDoPlano.ts`). As NEs de PTRES sem atividade planejada, como as de TED executadas via FUNCERN em Natal Cidade Alta, vão para o cartão "Fora do plano", com totais por PTRES. Elas continuam na tabela por origem e na contagem de empenhos. O PTRES `230446` segue fora de ambos os indicadores. Um campus sem nenhuma atividade sincronizada mantém todos os empenhos no indicador principal.

@@ -21,6 +21,7 @@ import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency } from '@/lib/utils';
 import type { Atividade, Descentralizacao, Empenho } from '@/types';
+import type { EmpenhosForaDoPlanoResumo } from '@/utils/empenhosForaDoPlano';
 import { ExecutionTooltip } from './DashboardChartBits';
 import { GaugeChart } from './GaugeChart';
 import { DashboardOrigemAtividadesModal } from './DashboardOrigemAtividadesModal';
@@ -93,6 +94,7 @@ type DashboardCurrentTabProps = {
   percentualExecutado: number;
   totalLiquidado: number;
   totalPago: number;
+  resumoForaDoPlano?: EmpenhosForaDoPlanoResumo;
   dadosPorOrigem: OrigemResumo[];
   dadosMensais: MensalResumo[];
   budgetTreemapData: BudgetTreemapNode[];
@@ -116,6 +118,7 @@ export function DashboardCurrentTab({
   aDescentralizar,
   totalLiquidado,
   totalPago,
+  resumoForaDoPlano,
   dadosPorOrigem,
   dadosMensais,
   budgetTreemapData,
@@ -236,6 +239,55 @@ export function DashboardCurrentTab({
           </div>
         </div>
       </section>
+
+      {resumoForaDoPlano && resumoForaDoPlano.quantidade > 0 ? (
+        <section
+          aria-label="Empenhado fora do plano"
+          data-testid="empenhado-fora-do-plano"
+          className="rounded-xl border border-border border-l-4 border-l-brand-sky bg-card p-5 shadow-xs"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-sky">Fora do plano</p>
+              <p className="text-xs text-muted-foreground">
+                Empenhado de TED e fontes externas, sem PTRES no planejamento do campus. Não entra em Empenhado x Planejado.
+              </p>
+            </div>
+            <div className="text-right">
+              {isLoading ? (
+                <span className="inline-block h-6 w-32 animate-pulse rounded bg-muted" />
+              ) : (
+                <p className="text-xl font-bold tracking-tight">{formatCurrency(resumoForaDoPlano.empenhado)}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {resumoForaDoPlano.quantidade} {resumoForaDoPlano.quantidade === 1 ? 'NE' : 'NEs'} · pago {formatCurrency(resumoForaDoPlano.pago)}
+              </p>
+            </div>
+          </div>
+          <Table className="mt-3">
+            <TableHeader>
+              <TableRow>
+                <TableHead>PTRES</TableHead>
+                <TableHead>Exemplo de objeto</TableHead>
+                <TableHead className="text-right">NEs</TableHead>
+                <TableHead className="text-right">Empenhado</TableHead>
+                <TableHead className="text-right">Pago</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {resumoForaDoPlano.porOrigem.map((item) => (
+                <TableRow key={item.origem}>
+                  <TableCell className="font-medium">{item.origem}</TableCell>
+                  <TableCell className="max-w-[420px] truncate text-muted-foreground" title={item.descricao}>{item.descricao || '—'}</TableCell>
+                  <TableCell className="text-right">{item.quantidade}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(item.empenhado)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(item.pago)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </section>
+      ) : null}
 
       <section aria-label="Velocímetros de execução" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {[

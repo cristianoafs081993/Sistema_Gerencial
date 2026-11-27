@@ -19,6 +19,7 @@ import {
   getRapSaldoAtual,
   isRapReinscrito,
 } from '@/utils/rapMetrics';
+import { getOrigensDoPlano, splitEmpenhosPorPlano, summarizeEmpenhosForaDoPlano } from '@/utils/empenhosForaDoPlano';
 import { useData } from '@/contexts/DataContext';
 import { useOptionalAuth } from '@/contexts/AuthContext';
 import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
@@ -1249,11 +1250,21 @@ export default function Dashboard() {
   }, [filterPlanoInterno, filteredData.descentralizacoes, resumoDescentralizacoes, filterOrigem]);
 
   // A origem externa permanece no detalhamento, sem compor os indicadores de execução.
-  const empenhosCorrenteParaSoma = useMemo(
-    () => filteredData.empenhosCorrente.filter(
-      (empenho) => !isOrigemRecursoIgnoradaNoEmpenhado(empenho.origemRecurso),
+  // Empenhos de PTRES que não constam do plano do campus (TED, fontes externas) ficam
+  // num indicador próprio para não inflar o "Empenhado x Planejado".
+  const origensDoPlano = useMemo(() => getOrigensDoPlano(atividades), [atividades]);
+  const { noPlano: empenhosCorrenteParaSoma, foraDoPlano: empenhosForaDoPlano } = useMemo(
+    () => splitEmpenhosPorPlano(
+      filteredData.empenhosCorrente.filter(
+        (empenho) => !isOrigemRecursoIgnoradaNoEmpenhado(empenho.origemRecurso),
+      ),
+      origensDoPlano,
     ),
-    [filteredData.empenhosCorrente],
+    [filteredData.empenhosCorrente, origensDoPlano],
+  );
+  const resumoForaDoPlano = useMemo(
+    () => summarizeEmpenhosForaDoPlano(empenhosForaDoPlano),
+    [empenhosForaDoPlano],
   );
 
   const totalPlanejado = filteredData.atividades.reduce((total, atividade) => total + atividade.valorTotal, 0);
@@ -1875,6 +1886,7 @@ export default function Dashboard() {
             percentualExecutado={percentualExecutado}
             totalLiquidado={totalLiquidado}
             totalPago={totalPago}
+            resumoForaDoPlano={resumoForaDoPlano}
             dadosPorOrigem={dadosPorOrigem}
             dadosMensais={dadosMensais}
             budgetTreemapData={budgetTreemapData}
