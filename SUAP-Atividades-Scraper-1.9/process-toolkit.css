@@ -88,6 +88,7 @@
 .suape-lc-body p { margin: 0; }
 .suape-lc-facts { color: var(--suape-muted); font-weight: 700; }
 .suape-lc-warning { padding: 6px 8px; border-radius: 7px; background: var(--suape-primary-soft); color: var(--suape-text); }
+.suape-beneficiary-note { margin: 6px 10px 8px; padding: 6px 8px; border-radius: 7px; background: var(--suape-primary-soft); color: var(--suape-text); font-size: 11px; line-height: 1.35; }
 .suape-lc-card[data-stage="error"] .suape-lc-message { color: var(--suape-danger); }
 .suape-lc-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .suape-lc-actions .suape-button { min-height: 32px; padding: 6px 10px; text-decoration: none; font-size: 11px; }

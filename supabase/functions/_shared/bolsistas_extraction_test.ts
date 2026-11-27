@@ -38,6 +38,25 @@ Deno.test("Normaliza a resposta da IA: formata CPF, limpa conta e descarta CPF i
   assert(second.banco === "Caixa Econômica Federal", "nome do banco deveria ser mantido sem codigo");
 });
 
+Deno.test("Matricula informada no lugar do CPF vira matricula e o aluno nao e descartado", () => {
+  const result = normalizeBolsistasIaResponse({
+    bolsistas: [
+      { nome: "Aluna Ficticia", cpf: "20251030480001", banco: "CAIXA", agencia: "0805", conta: "00011969-3" },
+      { nome: "Aluno Ficticio (20241031120002)", cpf: "", agencia: "1", conta: "2" },
+      { nome: "Aluno Com Campo Proprio", cpf: "", matricula: "2023.1.0311.2000-3", agencia: "1", conta: "2" },
+      { nome: "Repetido", cpf: "20251030480001", agencia: "1", conta: "2" },
+      { nome: "Sem identificacao", cpf: "", agencia: "1", conta: "2" },
+    ],
+  });
+
+  assert(result.bolsistas.length === 3, `esperava 3 bolsistas, veio ${result.bolsistas.length}`);
+  assert(result.discardedInvalidCpf === 0, "matricula contada como CPF invalido");
+  const [first, second, third] = result.bolsistas;
+  assert(first.cpf === "" && first.matricula === "20251030480001", "matricula no campo cpf nao reconhecida");
+  assert(second.matricula === "20241031120002" && second.nome === "Aluno Ficticio", "matricula do nome nao reconhecida");
+  assert(third.matricula === "20231031120003", `matricula do campo proprio nao normalizada: ${third.matricula}`);
+});
+
 Deno.test("Resposta sem lista vira lista vazia", () => {
   const result = normalizeBolsistasIaResponse({ foo: "bar" });
   assert(result.bolsistas.length === 0 && result.discardedInvalidCpf === 0 && result.declaredCount === undefined, "resposta vazia mal tratada");

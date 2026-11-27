@@ -423,6 +423,7 @@ describe('process-document 1.9', () => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     const api = loadProcessScript();
     await api.installToolkit();
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
     const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
     window.dispatchEvent(new MessageEvent('message', {
       origin: 'https://www.siages.com.br', source: frame.contentWindow,
@@ -1313,6 +1314,87 @@ describe('process-document 1.9', () => {
         { id: '1169322', title: 'Despacho 526/2026 - DIAD/DG/CN/RE/IFRN', type: 'Despacho', kind: 'text', text: 'Despacho' },
       ]);
       expect(transfer).toHaveLength(1);
+    });
+
+    // Processo 507612: o servidor informou a matricula do aluno no lugar do CPF.
+    const alunoPage = `<html><head><title>Aluna Ficticia Bolsista (20251030480001) - SUAP</title></head><body>
+      <h2>Aluna Ficticia Bolsista (20251030480001)</h2>
+      <table><tr><td>Nome</td><td>Aluna Ficticia Bolsista</td></tr><tr><td>CPF</td><td>529.982.247-25</td></tr></table>
+      <dl><dt>CPF do Responsável</dt><dd>111.444.777-35</dd></dl>
+    </body></html>`;
+
+    it('le CPF e nome do cadastro do aluno sem confundir com o CPF do responsavel', () => {
+      const api = loadProcessScript() as LcApi & { parseAlunoPage: (html: string, matricula: string) => { cpf: string; nome: string } };
+      expect(api.parseAlunoPage(alunoPage, '20251030480001')).toEqual({ cpf: '529.982.247-25', nome: 'Aluna Ficticia Bolsista' });
+      // Sem rotulo em celula propria: usa o primeiro "CPF: ..." do texto e o nome do titulo.
+      expect(api.parseAlunoPage('<h2>Aluno Ficticio (20241031120002)</h2><p>CPF: 111.444.777-35</p>', '20241031120002'))
+        .toEqual({ cpf: '111.444.777-35', nome: 'Aluno Ficticio' });
+      expect(api.parseAlunoPage('<p>CPF: 123.456.789-00</p>', '20241031120002').cpf).toBe('');
+    });
+
+    it('responde ao pedido de alunos pela matricula lendo a pagina do aluno no SUAP', async () => {
+      const fetchMock = vi.fn(async (url: string) => {
+        if (url === '/edu/aluno/20251030480001/') return new Response(alunoPage);
+        if (url === '/edu/aluno/20241031120002/') return new Response('', { status: 403 });
+        return new Response('', { status: 404 });
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const api = loadProcessScript();
+      await api.installToolkit();
+      await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+      const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+      const framePost = vi.spyOn(frame.contentWindow!, 'postMessage').mockImplementation(() => undefined);
+
+      frameMessage(frame, 'siages:suap-aluno-request', { suapId: '999', matriculas: ['20251030480001'] });
+      frameMessage(frame, 'siages:suap-aluno-request', { suapId: '505643', matriculas: ['20251030480001', '20241031120002', '../admin', '20251030480001'] });
+
+      await waitFor(() => expect(framePost.mock.calls.some(([message]) => (message as { type?: string }).type === 'siages:suap-aluno-result')).toBe(true));
+      const resultCalls = framePost.mock.calls.filter(([message]) => (message as { type?: string }).type === 'siages:suap-aluno-result');
+      expect(resultCalls).toHaveLength(1);
+      const [message, origin] = resultCalls[0] as [{ payload: { suapId: string; alunos: unknown[] } }, string];
+      expect(origin).toBe('https://www.siages.com.br');
+      expect(message.payload).toEqual({
+        suapId: '505643',
+        alunos: [
+          { matricula: '20251030480001', cpf: '529.982.247-25', nome: 'Aluna Ficticia Bolsista' },
+          { matricula: '20241031120002', error: 'O SUAP respondeu 403.' },
+        ],
+      });
+      expect(fetchMock.mock.calls.map(([url]) => url).filter((url) => String(url).startsWith('/edu/aluno/'))).toEqual(['/edu/aluno/20251030480001/', '/edu/aluno/20241031120002/']);
+    });
+
+    it('em bolsa, o card Beneficiario mostra o aluno da lista de credores e nao a pessoa do extrator', async () => {
+      const api = loadProcessScript();
+      await api.installToolkit();
+      await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+      const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+      frameMessage(frame, 'siages:suap-process-snapshot', {
+        suapId: '505643',
+        process: { suapId: '505643', numProcesso: '23035.003293.2026-22', beneficiario: 'PROFESSORA FICTICIA ORIENTADORA', cpfCnpj: '111.444.777-35', dadosCompletos: {} },
+      });
+      const beneficiarySection = () => Array.from(document.querySelectorAll('.suape-section'))
+        .find((section) => section.querySelector('.suape-section-title')?.textContent === 'Beneficiário');
+      await waitFor(() => expect(beneficiarySection()).toHaveTextContent('PROFESSORA FICTICIA ORIENTADORA'));
+
+      // Lista ainda nao montada: mantem o extrator, com aviso.
+      frameMessage(frame, 'siages:suap-lc-status', { suapId: '505643', stage: 'reading', message: 'Lendo...' });
+      expect(beneficiarySection()).toHaveTextContent('Processo de bolsa: o beneficiário é o aluno.');
+
+      frameMessage(frame, 'siages:suap-lc-status', {
+        suapId: '505643', stage: 'ready', message: 'Lista de credores montada com 1 aluno(s).',
+        listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', found: 1, pendencias: 0, method: 'script',
+        beneficiario: { nome: 'ALUNA FICTICIA BOLSISTA', cpf: '529.982.247-25' },
+      });
+      expect(beneficiarySection()).toHaveTextContent('ALUNA FICTICIA BOLSISTA');
+      expect(beneficiarySection()).toHaveTextContent('529.982.247-25');
+      expect(beneficiarySection()).not.toHaveTextContent('PROFESSORA');
+
+      frameMessage(frame, 'siages:suap-lc-status', {
+        suapId: '505643', stage: 'existing', message: 'Lista de credores já montada para este processo.',
+        listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', found: 10, pendencias: 0, method: 'script',
+      });
+      expect(beneficiarySection()).toHaveTextContent('10 alunos (ver Lista de credores)');
+      expect(beneficiarySection()).not.toHaveTextContent('PROFESSORA');
     });
 
     it('mostra o card com link para a lista no SIAGES e remonta sob confirmacao', async () => {

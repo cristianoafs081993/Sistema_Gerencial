@@ -243,6 +243,45 @@ describe('runSuapLcAutoBuild', () => {
     expect(result).toMatchObject({ stage: 'ready', method: 'ia', found: 1 });
   });
 
+  // Processo 507612: o servidor informou a matricula do aluno no lugar do CPF.
+  const requerimentoComMatricula = textDoc('7', 'Requerimento de pagamento de bolsa', [
+    'Interessada: PROFESSORA FICTICIA ORIENTADORA',
+    aluno('ALUNA FICTICIA BOLSISTA', '20251030480001', '20251030480001', 'CAIXA', '0805', '00011969-3'),
+  ].join('\n'));
+
+  it('busca no SUAP o CPF do aluno informado pela matricula e o devolve como beneficiario', async () => {
+    const resolveMatriculas = vi.fn(async () => new Map([['20251030480001', { cpf: '529.982.247-25', nome: 'Aluna Ficticia Bolsista Oficial' }]]));
+    const { deps, save } = makeDeps({ requestDocuments: vi.fn(async () => [requerimentoComMatricula]), resolveMatriculas });
+    const result = await runSuapLcAutoBuild(info, deps);
+
+    expect(resolveMatriculas).toHaveBeenCalledWith(['20251030480001']);
+    expect(deps.extractWithAi).not.toHaveBeenCalled();
+    const input = save.mock.calls[0][0];
+    // O CPF obtido cruza com a LC (que tem outra conta para esse CPF).
+    expect(input.rows.map((row) => [row.cpf, row.nome, row.status])).toEqual([['52998224725', 'Aluna Ficticia Bolsista Oficial', 'conta_nao_encontrada']]);
+    expect(input.extraction?.warnings).toContain('1 aluno(s) identificado(s) pela matrícula: CPF obtido do cadastro do aluno no SUAP.');
+    expect(result).toMatchObject({ stage: 'ready', found: 1, beneficiario: { nome: 'Aluna Ficticia Bolsista Oficial', cpf: '529.982.247-25' } });
+  });
+
+  it('mantem o aluno sem CPF, com aviso e pendencia, quando a matricula nao e encontrada no SUAP', async () => {
+    const resolveMatriculas = vi.fn(async () => new Map());
+    const { deps, save } = makeDeps({ requestDocuments: vi.fn(async () => [requerimentoComMatricula]), resolveMatriculas });
+    const result = await runSuapLcAutoBuild(info, deps);
+
+    const input = save.mock.calls[0][0];
+    expect(input.rows).toHaveLength(1);
+    expect(input.rows[0]).toMatchObject({ cpf: '', nome: 'ALUNA FICTICIA BOLSISTA', status: 'aluno_nao_encontrado', contaPdf: expect.stringContaining('11969') });
+    expect(input.rows[0].id).toContain('mat20251030480001');
+    expect(result?.warnings?.some((warning) => warning.includes('matrícula 20251030480001'))).toBe(true);
+    expect(result).toMatchObject({ stage: 'ready', found: 1, pendencias: 1, beneficiario: { nome: 'ALUNA FICTICIA BOLSISTA', cpf: '' } });
+  });
+
+  it('nao informa beneficiario quando a lista tem varios alunos', async () => {
+    const { deps } = makeDeps();
+    const result = await runSuapLcAutoBuild(info, deps);
+    expect(result?.beneficiario).toBeUndefined();
+  });
+
   it('informa erro quando a extensao nao entrega os documentos', async () => {
     const { deps } = makeDeps({ requestDocuments: vi.fn(async () => { throw new Error('A extensão não enviou os documentos do processo.'); }) });
     await expect(runSuapLcAutoBuild(info, deps)).resolves.toMatchObject({ stage: 'error', retryable: true, message: 'A extensão não enviou os documentos do processo.' });

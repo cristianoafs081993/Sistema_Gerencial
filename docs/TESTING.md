@@ -30,6 +30,15 @@ Lista de credores automática 1.9.92: as regressões ficam em:
 - `LC.test.tsx`: `?lista=`, lista inexistente, origem, montagem manual (busca na LC e inclusão direta) e cópia de listas anteriores;
 - Deno `_shared/bolsistas_extraction_test.ts`.
 
+Matrícula no lugar do CPF 1.9.94 (processo 507612), regressões em:
+- `bolsistasPdfService.test.ts`: matrícula no rótulo `CPF`, rótulo `Matrícula` com nome em `Nome:` e documento com CPF sem usar a busca por matrícula;
+- `bolsistas_extraction_test.ts`: matrícula no campo `cpf`, no nome e em campo próprio, sem contar como CPF inválido;
+- `suapLcAutoBuildService.test.ts`: CPF e nome resolvidos no SUAP, matrícula não encontrada (linha sem CPF, aviso e pendência) e `beneficiario` só com um aluno;
+- `SuapExtensionProcessInfo.test.tsx`: pedido `siages:suap-aluno-request` e resposta inválida ignorada;
+- `suapProcessDocumentExtension.test.ts`: `parseAlunoPage` (sem confundir com o CPF do responsável), resposta da ponte com erro 403 e card Beneficiário (lista pendente, um aluno, vários alunos);
+- `suapProcessPdfAiConfig.test.ts`: regra de bolsa no `EXTRACTION_PROMPT`.
+A estrutura real da página `/edu/aluno/<matrícula>/` ainda não foi conferida com uma sessão logada: o parser cobre `td`/`td`, `dt`/`dd` e `CPF:` no texto.
+
 O parser foi validado no ofício real do processo 505643 (10/10 alunos). O caminho de IA tem só testes com mocks e o smoke test 401 da função publicada; ainda não houve chamada real com documento.
 
 Dedução assistida 1.9.91: regressões focadas verificam extração do valor rotulado de conta vinculada, recusa de valores conflitantes, comparação do processo e da UG, datas inválidas, preservação de campos existentes, situação de item distinta, substituição de elemento durante eventos e ausência de clique em confirmar. O teste do prompt garante Simples desconhecido como null e distinção de alíquota e valor. O preenchimento em SIAFI real e o fluxo das outras situações ainda exigem validação específica.

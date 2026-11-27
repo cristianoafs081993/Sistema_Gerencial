@@ -11,6 +11,14 @@ describe('SUAP process PDF AI extraction flow', () => {
     expect(prompt).toContain('sem trocar aliquota percentual por valor em reais');
     expect(prompt).toContain('nunca some parcelas ambiguas');
   });
+
+  // Processo 507612: em bolsa a IA escolhia a professora que abriu o processo como beneficiaria.
+  it('em bolsa, pede o aluno como beneficiario e proibe usar a matricula como CPF', () => {
+    const shared = readFileSync(path.resolve(process.cwd(), 'supabase/functions/_shared/process_pdf_shared.ts'), 'utf8');
+    const prompt = shared.slice(shared.indexOf('export const EXTRACTION_PROMPT'), shared.indexOf('export const INVOICE_VERIFICATION_PROMPT'));
+    expect(prompt).toContain('"beneficiario" e o aluno que recebe, nunca o servidor/professor');
+    expect(prompt).toContain('a matricula do aluno (numero de 10 a 15 digitos) nunca e CPF');
+  });
   it('enqueues the async worker without treating a pending job as completed', () => {
     const serviceSource = readFileSync(
       path.resolve(process.cwd(), 'src/services/suapScraperService.ts'),
@@ -169,7 +177,7 @@ describe('SUAP process PDF AI extraction flow', () => {
     expect(sharedSource).not.toContain('gemini-3-flash-preview');
   });
 
-  it('uses the Gemini, OpenAI, then OpenRouter fallback order for PDF extraction', () => {
+  it('uses the Gemini then OpenRouter fallback order for PDF extraction, with no OpenAI calls', () => {
     const workerSource = readFileSync(
       path.resolve(process.cwd(), 'supabase/functions/process-pdf-worker/index.ts'),
       'utf8',
@@ -179,24 +187,17 @@ describe('SUAP process PDF AI extraction flow', () => {
       'utf8',
     );
 
-    expect(workerSource).toContain('callOpenAiWithPdfBytes');
-    expect(workerSource).toContain('runOpenAiThenOpenRouter');
-    expect(workerSource).toContain('runOpenAiChunkedFallback');
+    expect(workerSource).toContain('runOpenRouterFallback');
     expect(workerSource).toContain('runGeminiChunkedFallback');
+    expect(workerSource.toLowerCase()).not.toContain('openai');
+    expect(sharedSource.toLowerCase()).not.toContain('openai');
     expect(workerSource).toContain('if (await runGeminiChunkedFallback(job, processo, pdfBytes)) return;');
     expect(workerSource).toContain('buildGeminiFallbackFailure');
     expect(workerSource).toContain('Gemini (tentativa principal) falhou');
-    expect(workerSource).toContain('OpenAI/OpenRouter (fallback) falhou');
-    expect(workerSource).toContain('isOpenAiContextWindowError(openAiError)');
-    expect(workerSource).toContain('const openRouterContext = cleanContextText || cleanString(openAiResult?.rawText);');
-    expect(sharedSource).toContain('Deno.env.get("OPENAI_MODEL") ?? "gpt-5-mini"');
-    expect(sharedSource).toContain('https://api.openai.com/v1/responses');
-    expect(sharedSource).toContain('function extractOpenAiMessage');
-    expect(sharedSource).toContain('response.output');
+    expect(workerSource).toContain('OpenRouter (fallback) falhou');
+    expect(workerSource).toContain('const openRouterContext = cleanString(contextText);');
     expect(sharedSource).toContain('no_extractable_data');
-    expect(sharedSource).toContain('type: "input_file"');
-    expect(sharedSource).toContain('detail: "high"');
-    expect(sharedSource).toContain('p_provider_order: ["gemini", "openai", "openrouter"]');
+    expect(sharedSource).toContain('p_provider_order: ["gemini", "openrouter"]');
   });
 
   it('passes service role auth when triggering the internal worker', () => {

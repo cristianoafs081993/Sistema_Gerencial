@@ -240,6 +240,59 @@ describe('bolsistasPdfService', () => {
     });
   });
 
+  describe('extractFromText com a matricula no lugar do CPF', () => {
+    it('le o aluno quando o campo CPF traz a matricula (sai sem CPF e com a matricula)', () => {
+      const text = [
+        'Pagamento de bolsa de extensão. Valor de R$ 700,00.',
+        'ALUNA FICTICIA DE EXTENSAO (20251030480001)',
+        'Curso',
+        'Técnico em Informática',
+        'CPF',
+        '20251030480001',
+        'Dados bancários',
+        'Banco',
+        'CAIXA',
+        'Agência',
+        '0805',
+        'Conta',
+        '00011969-3',
+      ].join('\n');
+      const results = extractFromText(text, 'Requerimento');
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        cpf: '',
+        matricula: '20251030480001',
+        nome: 'ALUNA FICTICIA DE EXTENSAO',
+        banco: 'CAIXA',
+        agencia: '0805',
+        conta: '00011969-3',
+        valor: 700,
+      });
+    });
+
+    it('le o rotulo Matrícula com o nome no rotulo Nome e ignora a matricula sem dados bancarios', () => {
+      const text = [
+        'Interessado: Professora Ficticia Orientadora',
+        'Matrícula do orientador: 2010103048',
+        'Nome: Aluno Ficticio Bolsista',
+        'Matrícula: 2025.1.0304.8000-2',
+        'Banco: 001',
+        'Agência: 1234-5',
+        'Conta: 98765-4',
+      ].join('\n');
+      const results = extractFromText(text, 'Formulário');
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({ cpf: '', matricula: '20251030480002', nome: 'Aluno Ficticio Bolsista', agencia: '1234-5', conta: '98765-4' });
+    });
+
+    it('nao usa a busca por matricula quando o documento tem CPF', () => {
+      const results = extractFromText('ALUNA FICTICIA (20241031120001)\nCPF\n529.982.247-25\nBanco\n001\nAgência\n1234\nConta\n5678-9', 'Ofício');
+      expect(results).toHaveLength(1);
+      expect(results[0].cpf).toBe('529.982.247-25');
+      expect(results[0].matricula).toBeUndefined();
+    });
+  });
+
   describe('extractFromText in labeled layout (oficio por bolsista)', () => {
     const oficio = `
       Pagamento de bolsa TAL_I - Setembro de 2026.  Senhor Diretor,  na ação de bolsas de Tutoria de Aprendizagem em Laboratório 3 TAL.  Ana Larissia Paixão de Lima (20231031120033) Curso   Técnico em Manutenção e Suporte em Informática  E-mail   l.larissia@escolar.ifrn.edu.br  CPF   128.375.504-18  Empenho   2026NE000028  Dados bancários Banco   Caixa Econômica Federal  Agência   3880  Conta   729602681-3  Fernanda Gabriella da Silva Medeiros (20231031160030) Curso   Técnico em Alimentos  E-mail   f.gabriella@escolar.ifrn.edu.br  CPF   094.043.564-09  Empenho   2026NE000028  Dados bancários Banco   Nu Pagamentos S.A. (Nubank)  Agência   0001  Conta   983711539-2

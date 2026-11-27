@@ -749,17 +749,21 @@ Function chamada pela extensão na rota oficial de edição de ETP.
   - `siages:suap-lc-documents-request`, do iframe para a extensão;
   - `siages:suap-lc-documents-result`, da extensão para o iframe. Leva até 15 documentos com `{ id, title, type, kind: 'text'|'pdf', text?, bytes?, error? }`, e os PDFs vão por transferência;
   - `siages:suap-lc-status`, do iframe para a extensão. Leva `stage`, `message`, `listId`, `found`, `expected`, `pendencias`, `method` e `warnings`;
-  - `siages:suap-lc-rebuild`, da extensão para o iframe.
+  - `siages:suap-lc-rebuild`, da extensão para o iframe;
+  - `siages:suap-aluno-request`, do iframe para a extensão (1.9.94), com `{ suapId, matriculas[] }`: alunos que o documento identifica só pela matrícula;
+  - `siages:suap-aluno-result`, da extensão para o iframe, com `{ suapId, alunos: [{ matricula, cpf?, nome?, error? }] }`. Até 50 matrículas de 10 a 15 dígitos; resposta com matrícula fora do padrão é ignorada inteira (`isValidSuapExtensionAlunoResult`).
+- O status (`siages:suap-lc-status`) leva também `beneficiario: { nome, cpf }` quando a lista tem um aluno só.
+- Página do aluno: a extensão lê `/edu/aluno/<matrícula>/` com a sessão do SUAP (`parseAlunoPage`). O CPF vem do rótulo exato `CPF` (não casa com "CPF do responsável") ou, como reserva, do primeiro `CPF: 000.000.000-00` do texto, sempre com DV válido. O nome vem do rótulo `Nome` ou do título `Nome (matrícula)`. Redirecionamento para fora de `/edu/aluno/` (sessão ou permissão) vira erro. CPFs encontrados ficam em cache em memória na aba.
 - A extensão lê os documentos com a sessão do SUAP: o texto dos documentos eletrônicos vem de `/documento_eletronico/conteudo_documento/<id>/`, convertido em texto com uma linha por bloco, e os PDFs dos digitalizados vêm de `?original=sim`. Cookies do SUAP não saem da aba.
 - Se já existe uma lista para o `suap_id`, nada é sobrescrito e o painel só aponta para ela. "Remontar" substitui as linhas, depois de confirmação.
 
 ## Revisão normativa de documentos SUAP
 
-`process-document.js` -> iframe `/suap-extensao/documento-analise` -> `analisar-documento-licitacao` -> OpenAI Responses com PDF inline (principal) -> Gemini `generateContent` com grounding de busca (fallback).
+`process-document.js` -> iframe `/suap-extensao/documento-analise` -> `analisar-documento-licitacao` -> Gemini `generateContent` com PDF inline e grounding de busca (único provedor; o sistema não chama a OpenAI).
 
-- A extensão fornece o PDF diretamente da aba autenticada do SUAP; não envia cookies ao SIAGES, à OpenAI ou ao Gemini.
+- A extensão fornece o PDF diretamente da aba autenticada do SUAP; não envia cookies ao SIAGES ou ao Gemini.
 - O backend aceita somente tipos `tr`/`etp`, autentica o usuário pelo JWT e valida o PDF antes do processamento.
-- A OpenAI é tentada primeiro; ausência de chave, erro HTTP, timeout, resposta sem conteúdo ou JSON inválido acionam o fallback Gemini.
+- Ausência de chave, erro HTTP, timeout, resposta sem conteúdo ou JSON inválido do Gemini retornam erro à extensão; não há fallback para outro provedor.
 - Fontes permitidas para citações: Planalto, Portal de Compras do Governo Federal e Imprensa Nacional. A resposta informa data de consulta e limitações.
 - O resultado nao altera documentos do SUAP e nao depende da base local de normativos; cada analise concluida e salva em `suap_document_reviews` para consulta futura pelo icone de historico ao lado do icone de geracao.
 ## Sincronizacao do Plano SUAP

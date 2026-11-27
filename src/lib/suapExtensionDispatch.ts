@@ -389,6 +389,8 @@ export type SuapExtensionLcStatus = {
   method?: 'script' | 'ia';
   warnings?: string[];
   retryable?: boolean;
+  /** Aluno da lista quando ha um so: e o beneficiario do processo de bolsa. */
+  beneficiario?: { nome: string; cpf: string };
 };
 
 function isValidLcDocument(value: unknown): value is SuapExtensionLcDocument {
@@ -419,6 +421,50 @@ export function isValidSuapExtensionLcDocumentsResult(
     Array.isArray(payload.documents) &&
     payload.documents.length <= SUAP_EXTENSION_LC_MAX_DOCUMENTS &&
     payload.documents.every(isValidLcDocument) &&
+    (payload.error === undefined || typeof payload.error === 'string');
+}
+
+// --- Aluno pela matricula: o documento traz a matricula no lugar do CPF ------------------------------
+// A extensao le /edu/aluno/<matricula>/ com a sessao do SUAP e devolve CPF e nome do cadastro.
+
+export const SUAP_EXTENSION_ALUNO_REQUEST_TYPE = 'siages:suap-aluno-request' as const;
+export const SUAP_EXTENSION_ALUNO_RESULT_TYPE = 'siages:suap-aluno-result' as const;
+export const SUAP_EXTENSION_ALUNO_MAX_MATRICULAS = 50;
+
+export type SuapExtensionAluno = { matricula: string; cpf?: string; nome?: string; error?: string };
+
+export type SuapExtensionAlunoResultMessage = {
+  source: 'siages-suap-extension';
+  type: typeof SUAP_EXTENSION_ALUNO_RESULT_TYPE;
+  version: 1;
+  payload: { suapId: string; alunos: SuapExtensionAluno[]; error?: string };
+};
+
+function isValidAluno(value: unknown): value is SuapExtensionAluno {
+  if (!value || typeof value !== 'object') return false;
+  const aluno = value as Partial<SuapExtensionAluno>;
+  return typeof aluno.matricula === 'string' && /^\d{10,15}$/.test(aluno.matricula) &&
+    (aluno.cpf === undefined || (typeof aluno.cpf === 'string' && /^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/.test(aluno.cpf))) &&
+    (aluno.nome === undefined || (typeof aluno.nome === 'string' && aluno.nome.length <= 200)) &&
+    (aluno.error === undefined || typeof aluno.error === 'string');
+}
+
+export function isValidSuapExtensionAlunoResult(
+  event: MessageEvent,
+  expectedSource: WindowProxy | null,
+  expectedSuapId: string,
+): event is MessageEvent<SuapExtensionAlunoResultMessage> {
+  if (event.origin !== SUAP_EXTENSION_ORIGIN || event.source !== expectedSource) return false;
+  const message = event.data as Partial<SuapExtensionAlunoResultMessage> | null;
+  const payload = message?.payload;
+  return message?.source === 'siages-suap-extension' &&
+    message.type === SUAP_EXTENSION_ALUNO_RESULT_TYPE &&
+    message.version === 1 &&
+    Boolean(payload) &&
+    payload?.suapId === expectedSuapId &&
+    Array.isArray(payload.alunos) &&
+    payload.alunos.length <= SUAP_EXTENSION_ALUNO_MAX_MATRICULAS &&
+    payload.alunos.every(isValidAluno) &&
     (payload.error === undefined || typeof payload.error === 'string');
 }
 

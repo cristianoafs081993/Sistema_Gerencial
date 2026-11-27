@@ -7,7 +7,6 @@ import {
   assertInternalWorkerRequest,
   buildUpdatePayload,
   callGeminiWithPdfBytes,
-  callOpenAiWithPdfBytes,
   callOpenRouterWithContext,
   claimJob,
   cleanString,
@@ -238,7 +237,7 @@ function buildGeminiFallbackFailure(geminiFailure: Error, fallbackFailure: unkno
   const fallbackError = toError(fallbackFailure);
   const message = [
     `Gemini (tentativa principal) falhou: ${geminiFailure.message}`,
-    `OpenAI/OpenRouter (fallback) falhou: ${fallbackError.message}`,
+    `OpenRouter (fallback) falhou: ${fallbackError.message}`,
   ].join(" | ");
 
   return Object.assign(new Error(message), {
@@ -246,73 +245,7 @@ function buildGeminiFallbackFailure(geminiFailure: Error, fallbackFailure: unkno
   });
 }
 
-function isOpenAiContextWindowError(error: Error | null) {
-  const message = error?.message.toLowerCase() ?? "";
-  return message.includes("context window") || message.includes("context_length_exceeded");
-}
-
-async function runOpenAiChunkedFallback(
-  job: ExtractionJobRow,
-  processo: ProcessRecord,
-  pdfBytes: Uint8Array,
-  processoNumeroAtual: string | null,
-): Promise<boolean> {
-  const chunks = await splitPdfIntoChunks(pdfBytes);
-  if (chunks.length < 2) return false;
-
-  await initializeChunkRows(job.id, chunks);
-  const partialPayloads: ExtractionPayload[] = [];
-  let lastOpenAiError: Error | null = null;
-
-  for (const chunk of chunks) {
-    await extendLease(job.id);
-    await updateChunk(job.id, chunk.chunkIndex, {
-      page_start: chunk.pageStart,
-      page_end: chunk.pageEnd,
-      status: "processing",
-      attempt_count: 2,
-      provider: "openai",
-    });
-
-    try {
-      const result = await callOpenAiWithPdfBytes(chunk.bytes, processoNumeroAtual);
-      await updateChunk(job.id, chunk.chunkIndex, {
-        page_start: chunk.pageStart,
-        page_end: chunk.pageEnd,
-        status: result.validation.ok ? "completed" : "failed",
-        attempt_count: 2,
-        provider: "openai",
-        partial_result: { extracted: result.extracted, validation: result.validation },
-        last_error_code: result.validation.ok ? null : detectErrorCode({ validation: result.validation }),
-        last_error_message: result.validation.ok ? null : result.validation.details.join(", "),
-      });
-      if (result.validation.ok) partialPayloads.push(result.extracted);
-    } catch (error) {
-      lastOpenAiError = toError(error);
-      await updateChunk(job.id, chunk.chunkIndex, {
-        page_start: chunk.pageStart,
-        page_end: chunk.pageEnd,
-        status: "failed",
-        attempt_count: 2,
-        provider: "openai",
-        partial_result: null,
-        last_error_code: detectErrorCode({ error }),
-        last_error_message: lastOpenAiError.message,
-      });
-    }
-  }
-
-  if (partialPayloads.length > 0) {
-    const consolidated = consolidateExtractionPayloads(partialPayloads, processoNumeroAtual);
-    await persistSuccess(job, processo, consolidated, "openai", pdfBytes);
-    return true;
-  }
-
-  if (lastOpenAiError) throw lastOpenAiError;
-  return false;
-}
-
-async function runOpenAiThenOpenRouter(
+async function runOpenRouterFallback(
   job: ExtractionJobRow,
   processo: ProcessRecord,
   pdfBytes: Uint8Array,
@@ -320,52 +253,18 @@ async function runOpenAiThenOpenRouter(
   contextText: string | null,
   partialPayloads: ExtractionPayload[] = [],
 ): Promise<boolean> {
-  let openAiError: Error | null = null;
-  let openAiResult: Awaited<ReturnType<typeof callOpenAiWithPdfBytes>> | null = null;
+  const openRouterContext = cleanString(contextText);
+  if (!openRouterContext) return false;
 
-  try {
-    openAiResult = await callOpenAiWithPdfBytes(pdfBytes, processoNumeroAtual);
-    if (openAiResult.validation.ok) {
-      await persistSuccess(job, processo, openAiResult.extracted, "openai", pdfBytes);
-      return true;
-    }
-  } catch (error) {
-    openAiError = toError(error);
+  const openrouter = await callOpenRouterWithContext(openRouterContext, processoNumeroAtual, partialPayloads);
+  if (openrouter.validation.ok) {
+    await persistSuccess(job, processo, openrouter.extracted, "openrouter", pdfBytes);
+    return true;
   }
 
-  // Large PDFs are first tried whole to preserve cross-page context. If OpenAI
-  // rejects that request for context size, retry it in the same page chunks
-  // already used by the Gemini path instead of surfacing a deterministic 400.
-  if (isOpenAiContextWindowError(openAiError)) {
-    try {
-      if (await runOpenAiChunkedFallback(job, processo, pdfBytes, processoNumeroAtual)) return true;
-    } catch (error) {
-      openAiError = toError(error);
-    }
-  }
-
-  const cleanContextText = cleanString(contextText);
-  const openRouterContext = cleanContextText || cleanString(openAiResult?.rawText);
-  if (openRouterContext) {
-    try {
-      const openrouter = await callOpenRouterWithContext(openRouterContext, processoNumeroAtual, partialPayloads);
-      if (openrouter.validation.ok) {
-        await persistSuccess(job, processo, openrouter.extracted, "openrouter", pdfBytes);
-        return true;
-      }
-    } catch {
-      // Preserve the previous provider result below when the final repair also fails.
-    }
-  }
-
-  if (openAiResult) {
-    throw Object.assign(new Error(`OpenAI returned invalid output: ${openAiResult.validation.reason}`), {
-      code: detectErrorCode({ validation: openAiResult.validation }),
-    });
-  }
-
-  if (openAiError) throw openAiError;
-  return false;
+  throw Object.assign(new Error(`OpenRouter returned invalid output: ${openrouter.validation.reason}`), {
+    code: detectErrorCode({ validation: openrouter.validation }),
+  });
 }
 
 async function runLightPdfPath(job: ExtractionJobRow, processo: ProcessRecord, pdfBytes: Uint8Array, contextText: string | null) {
@@ -398,7 +297,7 @@ async function runLightPdfPath(job: ExtractionJobRow, processo: ProcessRecord, p
   }
 
   try {
-    if (await runOpenAiThenOpenRouter(job, processo, pdfBytes, processoNumeroAtual, contextText)) return;
+    if (await runOpenRouterFallback(job, processo, pdfBytes, processoNumeroAtual, contextText)) return;
   } catch (fallbackError) {
     throw buildGeminiFallbackFailure(geminiFailure, fallbackError);
   }
@@ -489,7 +388,7 @@ async function runHeavyPdfPath(job: ExtractionJobRow, processo: ProcessRecord, p
     }
   } catch (geminiError) {
     try {
-      if (await runOpenAiThenOpenRouter(job, processo, pdfBytes, processoNumeroAtual, contextText, partialPayloads)) return;
+      if (await runOpenRouterFallback(job, processo, pdfBytes, processoNumeroAtual, contextText, partialPayloads)) return;
     } catch (fallbackError) {
       throw buildGeminiFallbackFailure(toError(geminiError), fallbackError);
     }
@@ -517,7 +416,7 @@ async function runHeavyPdfPath(job: ExtractionJobRow, processo: ProcessRecord, p
     { code: detectErrorCode({ validation: { ok: false, reason: "technical_failure", provider: "gemini", details: ["no usable chunks"] } }) },
   );
   try {
-    if (await runOpenAiThenOpenRouter(job, processo, pdfBytes, processoNumeroAtual, contextText, partialPayloads)) return;
+    if (await runOpenRouterFallback(job, processo, pdfBytes, processoNumeroAtual, contextText, partialPayloads)) return;
   } catch (fallbackError) {
     throw buildGeminiFallbackFailure(geminiFailure, fallbackError);
   }

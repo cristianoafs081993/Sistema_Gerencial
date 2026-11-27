@@ -134,16 +134,12 @@ Opcional:
   - default no codigo: `gemini-2.5-flash-lite`
 - `PROCESS_PDF_WORKER_SECRET`
   - default no codigo: `SUPABASE_SERVICE_ROLE_KEY`
-- `OPENAI_API_KEY`
-  - segundo provedor de extracao, acionado quando Gemini falhar
-- opcional `OPENAI_MODEL`
-  - default no codigo: `gpt-5-mini`
 - `OPENROUTER_API_KEY` e `OPENROUTER_MODEL`
-  - terceiro provedor de reparo, acionado depois do OpenAI com contexto explicito ou resposta anterior nao estruturada
+  - segundo provedor de reparo, acionado quando o Gemini falhar e houver contexto textual explicito
 
 Observacoes operacionais:
 
-- `process-pdf` retorna `202` quando a extracao foi enfileirada; o resultado real e gravado depois pelo `process-pdf-worker` em `processos`. A ordem de provedores e Gemini com PDF inteiro, Gemini por blocos, OpenAI e OpenRouter. Se a tentativa inicial Gemini falhar, o mesmo provedor e tentado por blocos de paginas antes de qualquer fallback externo. A OpenAI usa detalhe alto para evitar uma resposta vazia em processos visualmente complexos e, se o PDF completo exceder a janela de contexto, tambem tenta os blocos. OpenRouter e reservado para converter o contexto disponivel ou uma resposta anterior nao estruturada em JSON valido.
+- `process-pdf` retorna `202` quando a extracao foi enfileirada; o resultado real e gravado depois pelo `process-pdf-worker` em `processos`. A ordem de provedores e Gemini com PDF inteiro, Gemini por blocos e OpenRouter. O sistema nao chama a OpenAI. Se a tentativa inicial Gemini falhar, o mesmo provedor e tentado por blocos de paginas antes de qualquer fallback externo. OpenRouter e reservado para converter o contexto textual disponivel em JSON valido; sem contexto textual, nao ha fallback.
 - a resposta da Edge Function confirma apenas o enfileiramento. O frontend deve considerar a IA finalizada somente quando `processos.status` chegar a `success`, `incomplete_extraction` ou `extraction_failed`; enquanto houver fila ou processamento, a tela acompanha a atualizacao em segundo plano.
 
 ### `validar-pesquisa-precos`
@@ -463,7 +459,7 @@ Opcionais:
 
 ### Revisão de documentos de licitação
 
-A função `analisar-documento-licitacao` usa `OPENAI_API_KEY` como rota principal; o modelo pode ser ajustado por `OPENAI_SUAP_DOCUMENT_REVIEW_MODEL`, com default `gpt-5.6-luna`. Em caso de ausência ou falha da OpenAI, usa `GEMINI_API_KEY` como fallback, com `GEMINI_SUAP_DOCUMENT_REVIEW_MODEL` e default `gemini-2.5-flash`. O PDF recebido é temporário e limitado a 20 MB/200 páginas. A função não usa a base local de normativos e consulta somente fontes oficiais online.
+A função `analisar-documento-licitacao` usa somente `GEMINI_API_KEY`, com `GEMINI_SUAP_DOCUMENT_REVIEW_MODEL` e default `gemini-2.5-flash`; não há chamadas à OpenAI. O PDF recebido é temporário e limitado a 20 MB/200 páginas. A função não usa a base local de normativos e consulta somente fontes oficiais online.
 
 ### Consultor
 

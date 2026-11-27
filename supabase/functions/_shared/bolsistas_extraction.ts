@@ -3,7 +3,9 @@
 
 export type BolsistaIa = {
   nome: string;
+  /** Vazio quando o documento traz so a matricula do aluno (a extensao busca o CPF no SUAP). */
   cpf: string;
+  matricula?: string;
   banco: string;
   agencia: string;
   conta: string;
@@ -61,6 +63,26 @@ function money(value: unknown): number | undefined {
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed * 100) / 100 : undefined;
 }
 
+/** Matricula de aluno do SUAP: so digitos, de 10 a 15 (ex.: 20251030480001). */
+export const MATRICULA_PATTERN = /^\d{10,15}$/;
+
+/**
+ * Le o identificador do aluno. Servidores as vezes informam a matricula no lugar do CPF: numero so com
+ * digitos que nao e um CPF valido vira matricula. CPF pontuado com DV invalido e erro de leitura (descartado).
+ */
+function readIdentity(entry: Record<string, unknown>): { cpf: string; matricula: string; invalidCpf: boolean } {
+  const rawCpf = text(entry.cpf, 30);
+  const cpfDigits = rawCpf.replace(/\D/g, "");
+  const nameMatricula = text(entry.nome, 160).match(/\((\d{10,15})\)\s*$/)?.[1] ?? "";
+  const explicitMatricula = text(entry.matricula, 30).replace(/\D/g, "");
+  let matricula = MATRICULA_PATTERN.test(explicitMatricula) ? explicitMatricula : nameMatricula;
+
+  if (cpfDigits.length === 11 && isValidCpf(cpfDigits)) return { cpf: cpfDigits, matricula, invalidCpf: false };
+  const looksLikeFormattedCpf = /^\d{3}\.?\d{3}\.?\d{3}-\d{2}$/.test(rawCpf) && /[.-]/.test(rawCpf);
+  if (cpfDigits && !looksLikeFormattedCpf && MATRICULA_PATTERN.test(cpfDigits) && !matricula) matricula = cpfDigits;
+  return { cpf: "", matricula, invalidCpf: Boolean(cpfDigits) && looksLikeFormattedCpf };
+}
+
 export function normalizeBolsistasIaResponse(raw: unknown): BolsistasIaResult {
   const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
   const items = Array.isArray(source.bolsistas) ? source.bolsistas : [];
@@ -71,19 +93,20 @@ export function normalizeBolsistasIaResponse(raw: unknown): BolsistasIaResult {
   for (const item of items.slice(0, 500)) {
     if (!item || typeof item !== "object" || Array.isArray(item)) continue;
     const entry = item as Record<string, unknown>;
-    const cpfDigits = text(entry.cpf, 20).replace(/\D/g, "");
-    if (!cpfDigits) continue;
-    if (!isValidCpf(cpfDigits)) {
-      discardedInvalidCpf += 1;
+    const { cpf, matricula, invalidCpf } = readIdentity(entry);
+    if (!cpf && (invalidCpf || !matricula)) {
+      if (invalidCpf) discardedInvalidCpf += 1;
       continue;
     }
-    if (seen.has(cpfDigits)) continue;
-    seen.add(cpfDigits);
+    const key = cpf ? `cpf:${cpf}` : `mat:${matricula}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
 
     const valor = money(entry.valor);
     bolsistas.push({
       nome: text(entry.nome, 120).replace(/\s*\(\d{6,}\)\s*$/, ""),
-      cpf: formatCpf(cpfDigits),
+      cpf: cpf ? formatCpf(cpf) : "",
+      ...(matricula ? { matricula } : {}),
       banco: text(entry.bancoCodigo, 3).replace(/\D/g, "") || text(entry.banco, 80),
       agencia: bankField(entry.agencia),
       conta: bankField(entry.conta),
@@ -104,11 +127,12 @@ export function buildBolsistasPrompt(title: string, processNumber: string, expec
     "Você extrai dados de pagamento a estudantes (bolsas ou auxílios estudantis, como auxílio transporte e auxílio moradia) de um documento de processo do IFRN (ofício, relação, folha de pagamento ou planilha).",
     `Documento: ${title || "não informado"}. Processo: ${processNumber || "não informado"}.`,
     expectedCount ? `O documento declara ${expectedCount} bolsa(s).` : "",
-    "Liste cada aluno beneficiário com: nome (sem a matrícula), cpf, banco (como escrito), bancoCodigo (código COMPE de 3 dígitos quando o documento trouxer ou quando o nome do banco for inequívoco; caso contrário, vazio), agencia, conta (com dígito verificador, inclusive X) e valor a pagar ao aluno em reais (o valor individual da linha, não o total da planilha).",
+    "Liste cada aluno beneficiário com: nome (sem a matrícula), cpf, matricula (só dígitos, quando o documento trouxer), banco (como escrito), bancoCodigo (código COMPE de 3 dígitos quando o documento trouxer ou quando o nome do banco for inequívoco; caso contrário, vazio), agencia, conta (com dígito verificador, inclusive X) e valor a pagar ao aluno em reais (o valor individual da linha, não o total da planilha).",
     "Quando o valor é único para todos (por exemplo, 'corresponde a R$ 400,00 por pessoa'), repita-o em cada aluno.",
-    "Regras: use somente o que está no documento; não invente nem complete dados ausentes (deixe vazio); ignore servidores, assinantes e chefias; não repita alunos.",
+    "Às vezes o servidor informa a matrícula do aluno (número de 10 a 15 dígitos, ex.: 20251030480001) no lugar do CPF: nesse caso preencha matricula e deixe cpf vazio. Inclua o aluno mesmo sem CPF quando houver a matrícula.",
+    "Regras: use somente o que está no documento; não invente nem complete dados ausentes (deixe vazio); ignore servidores, professores orientadores, coordenadores, assinantes e chefias (o beneficiário é sempre o aluno); não repita alunos.",
     "declaredCount: total de bolsas declarado no texto (ex.: '10 (dez) bolsas'), ou null.",
-    'Retorne exclusivamente JSON: {"declaredCount": number|null, "bolsistas": [{"nome":"","cpf":"","banco":"","bancoCodigo":"","agencia":"","conta":"","valor":0}]}.',
+    'Retorne exclusivamente JSON: {"declaredCount": number|null, "bolsistas": [{"nome":"","cpf":"","matricula":"","banco":"","bancoCodigo":"","agencia":"","conta":"","valor":0}]}.',
   ].filter(Boolean).join("\n");
 }
 
@@ -123,13 +147,14 @@ export const BOLSISTAS_RESPONSE_SCHEMA = {
         properties: {
           nome: { type: "STRING" },
           cpf: { type: "STRING" },
+          matricula: { type: "STRING" },
           banco: { type: "STRING" },
           bancoCodigo: { type: "STRING" },
           agencia: { type: "STRING" },
           conta: { type: "STRING" },
           valor: { type: "NUMBER", nullable: true },
         },
-        required: ["nome", "cpf", "agencia", "conta"],
+        required: ["nome", "agencia", "conta"],
       },
     },
   },

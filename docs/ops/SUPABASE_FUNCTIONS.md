@@ -158,8 +158,9 @@ Uso:
 
 - `process-pdf` autentica o usuário, valida o processo e, por padrão, enfileira a estratégia `full` com o PDF canônico de `processos.pdf_url` no bucket `suap-pdfs`.
 - No piloto manual de `/suap`, `input_strategy: "eligible_documents"` aceita somente IDs do inventário do próprio tenant que estejam classificados como `included`, baixados e com `storage_path`; a função recusa itens ausentes, não elegíveis ou uma segunda estratégia enquanto outra estiver em processamento.
-- `process-pdf-worker` une temporariamente os PDFs elegíveis na ordem do inventário e preserva a mesma inspeção de peso, divisão em blocos, ordem Gemini/OpenAI/OpenRouter e consolidação de notas fiscais. Uma peça disponível já pode ser processada; se o resultado ficar incompleto ou sem nota fiscal utilizável e o PDF completo canônico já estiver disponível, o worker enfileira uma segunda execução `full` de complementação. A execução grava em `process_extraction_runs` os documentos, bytes, páginas, tempos recebidos, provedor, fallback, resultado ou falha; `dados_completos.extraction_job` recebe `run_id` e estratégia.
+- `process-pdf-worker` une temporariamente os PDFs elegíveis na ordem do inventário e preserva a mesma inspeção de peso, divisão em blocos, ordem Gemini/OpenRouter e consolidação de notas fiscais. Uma peça disponível já pode ser processada; se o resultado ficar incompleto ou sem nota fiscal utilizável e o PDF completo canônico já estiver disponível, o worker enfileira uma segunda execução `full` de complementação. A execução grava em `process_extraction_runs` os documentos, bytes, páginas, tempos recebidos, provedor, fallback, resultado ou falha; `dados_completos.extraction_job` recebe `run_id` e estratégia.
 - O fluxo padrão, a sincronização automática e a extensão continuam enviando apenas `suap_id` e usando o PDF completo. A resposta `202` confirma somente o enfileiramento; o frontend acompanha `processos.status` até o resultado final.
+- `EXTRACTION_PROMPT` (processo 507612): em pagamento de bolsa ou auxílio a estudante, `beneficiario` é o aluno, nunca o servidor ou professor que abriu, assinou, orienta ou é interessado no processo; com vários alunos, `"Varios (Lista de credores)"`. A matrícula do aluno nunca é usada como `cpf_cnpj`. Vale para processos extraídos ou reextraídos depois do deploy; o painel da extensão já mostra o aluno da Lista de credores em vez do valor gravado.
 
 Dependencias:
 
@@ -167,8 +168,7 @@ Dependencias:
 - `GEMINI_API_KEY`
 - opcional `GEMINI_MODEL`, com default `gemini-2.5-flash-lite`
 - opcional `PROCESS_PDF_WORKER_SECRET`; quando ausente, usa `SUPABASE_SERVICE_ROLE_KEY`
-- `OPENAI_API_KEY` e opcional `OPENAI_MODEL`, com default `gpt-5-mini`, como segundo provedor
-- opcional `OPENROUTER_API_KEY` e `OPENROUTER_MODEL` como terceiro provedor de reparo de JSON
+- opcional `OPENROUTER_API_KEY` e `OPENROUTER_MODEL` como segundo provedor de reparo de JSON
 
 ### `cleanup-suap-pdfs`
 
@@ -858,12 +858,11 @@ Function versionada para revisão temporária de Termo de Referência e Estudo T
 
 - `verify_jwt = false` no `supabase/config.toml`; a função valida o bearer token internamente com `supabase.auth.getUser`.
 - Recebe `documentType`, `documentTitle`, `processNumber`, `pageCount` opcional e `pdfBase64` de até 20 MB/200 páginas.
-- Usa PDF inline na OpenAI Responses API como rota principal; quando a chave estiver ausente ou a chamada falhar, usa Gemini `generateContent` como fallback.
-- A OpenAI usa `OPENAI_SUAP_DOCUMENT_REVIEW_MODEL`, com default `gpt-5.6-luna`; o fallback Gemini usa `GEMINI_SUAP_DOCUMENT_REVIEW_MODEL`, com default `gemini-2.5-flash` e grounding de busca oficial.
+- Usa PDF inline no Gemini `generateContent` (único provedor; sem chamadas à OpenAI), com `GEMINI_SUAP_DOCUMENT_REVIEW_MODEL`, default `gemini-2.5-flash`, e grounding de busca oficial.
 - O parser de resposta repara quebras de linha, tabulações e outros caracteres de controle literais dentro de strings antes da validação JSON, pois os modelos podem emitir esse formato mesmo quando solicitados a escapar esses caracteres.
 - Não consulta nem persiste dados em `normativos`, `normativos_chunks`, `buscar_normativos`, storage ou tabelas de histórico.
 - Retorna status, resumo, achados com severidade/página, texto sugerido, bases legais, fontes consultadas e limitações.
-- Os segredos `OPENAI_API_KEY` e `GEMINI_API_KEY`, além dos modelos opcionais, são lidos apenas no ambiente da Edge Function.
+- O segredo `GEMINI_API_KEY`, além do modelo opcional, é lido apenas no ambiente da Edge Function.
 
 ## extrair-bolsistas-documento
 
@@ -873,8 +872,9 @@ IA de reserva da montagem automática da Lista de Credores pela extensão (1.9.9
 - Chamador: `extractBolsistasWithAi` em [suapLcAutoBuildService.ts](/C:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/services/suapLcAutoBuildService.ts), no iframe `/suap-extensao/processo-info`, com o JWT da extensão.
 - `verify_jwt = false` no `supabase/config.toml`; o bearer token é validado internamente (`authenticateUserFromToken`).
 - Entrada: `text` (documento eletrônico, até 200 mil caracteres) ou `pdfBase64` (até 20 MB), `title`, `processNumber` e `expectedCount` opcional.
-- Gemini `generateContent` com `responseSchema` é a rota principal (`GEMINI_LC_BOLSISTAS_MODEL`, padrão `gemini-2.5-flash`); a OpenAI Responses é a reserva (`OPENAI_LC_BOLSISTAS_MODEL`, padrão `gpt-5.6-luna`).
-- Saída: `{ bolsistas: [{ nome, cpf, banco, agencia, conta, valor? }], declaredCount?, discardedInvalidCpf, provider }`. Os CPFs com dígito verificador inválido ou repetidos são descartados, e a matrícula sai do nome.
+- Gemini `generateContent` com `responseSchema` é a rota principal (`GEMINI_LC_BOLSISTAS_MODEL`, padrão `gemini-2.5-flash`); não há provedor de reserva e o sistema não chama a OpenAI.
+- Saída: `{ bolsistas: [{ nome, cpf, matricula?, banco, agencia, conta, valor? }], declaredCount?, discardedInvalidCpf, provider }`. CPFs pontuados com dígito verificador inválido e repetidos são descartados, e a matrícula sai do nome.
+- Matrícula no lugar do CPF (1.9.94): o prompt pede `matricula` e permite aluno sem CPF; `cpf` deixou de ser obrigatório no `responseSchema`. Número só com dígitos (10 a 15) que não é CPF válido vira `matricula`, com `cpf: ''`; a montagem da LC busca o CPF no cadastro do aluno no SUAP. O prompt também manda ignorar professores orientadores e coordenadores.
 - Não persiste nada. O log registra só contagens (provedor, tipo, encontrados, descartados), nunca CPF ou conta.
 - Após alterações: `supabase functions deploy extrair-bolsistas-documento`.
 

@@ -8,14 +8,10 @@ import {
 import { parseJsonResponse } from "../_shared/json_response.ts";
 
 type ReviewType = "tr" | "etp";
-type ReviewProvider = "openai" | "gemini";
 
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 const MAX_PAGES = 200;
 const MODEL = Deno.env.get("GEMINI_SUAP_DOCUMENT_REVIEW_MODEL") ?? "gemini-2.5-flash";
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-const OPENAI_MODEL = Deno.env.get("OPENAI_SUAP_DOCUMENT_REVIEW_MODEL") ?? "gpt-5.6-luna";
-const REVIEW_TIMEOUT_MS = 120000;
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const OFFICIAL_SOURCES = [
   {
@@ -70,72 +66,15 @@ function decodePdf(value: unknown) {
   return input;
 }
 
-function buildPrompt(documentType: ReviewType, title: string, processNumber: string, pageCount?: number, provider: ReviewProvider = "gemini") {
+function buildPrompt(documentType: ReviewType, title: string, processNumber: string, pageCount?: number) {
   const label = documentType === "tr" ? "Termo de Referência" : "Estudo Técnico Preliminar";
   const checklist = documentType === "tr"
     ? "Verifique, conforme aplicável, objeto, natureza, quantitativos, prazo, especificações, entrega/recebimento, garantia, fundamentação, solução e ciclo de vida, requisitos, execução, gestão, medição/pagamento, seleção do fornecedor, estimativa de preços e adequação orçamentária."
     : "Verifique, conforme aplicável, necessidade, previsão no planejamento, requisitos, estimativas de quantidades, levantamento de mercado, solução, quantidades/valores, parcelamento, resultados, providências, contratações correlatas, impactos ambientais e conclusão sobre viabilidade.";
-  const onlineInstruction = provider === "gemini"
-    ? "Use Google Search apenas para consultar fontes oficiais nos domínios planalto.gov.br, gov.br e in.gov.br."
-    : "Considere somente fontes oficiais nos domínios planalto.gov.br, gov.br e in.gov.br.";
+  const onlineInstruction = "Use Google Search apenas para consultar fontes oficiais nos domínios planalto.gov.br, gov.br e in.gov.br.";
   return `Você é um revisor técnico de documentos de contratação pública federal no Brasil. Analise o PDF anexado como ${label}.\n\nDocumento: ${title}\nProcesso: ${processNumber || "não informado"}\nPáginas informadas: ${pageCount || "não informado"}\n\nBase oficial mínima: ${OFFICIAL_SOURCES.map((source) => `${source.title} (${source.url})`).join("; ")}. ${onlineInstruction} Não use bases locais, tabelas internas, memória do sistema ou fontes comerciais.\n\nChecklist principal: ${checklist}\n\nRegras: diferencie ausência comprovada de informação não localizada; considere exceções e justificativas previstas nas normas; não invente fatos, valores, artigos ou fontes; não produza opinião jurídica definitiva; priorize achados verificáveis no PDF; proponha correção apenas quando houver base e evidência; indique página quando possível. Se a evidência for insuficiente, registre isso em limitations e use status insufficient_evidence. Em valores de texto do JSON, escape quebras de linha, tabulações e outros caracteres de controle como \\n, \\t e \\u0000; nunca insira esses caracteres literalmente dentro de uma string.\n\nRetorne exclusivamente JSON válido neste formato: {"documentType":"tr|etp","checkedAt":"ISO-8601","status":"critical|attention|no_major_finding|insufficient_evidence","summary":"...","counts":{"critical":0,"high":0,"medium":0,"low":0},"findings":[{"id":"...","severity":"critical|high|medium|low","category":"...","title":"...","page":1,"excerpt":"...","problem":"...","recommendation":"...","suggestedText":"...","confidence":"high|medium|low","legalBases":[{"title":"...","reference":"...","url":"https://..."}]}],"sources":[{"title":"...","reference":"...","url":"https://..."}],"limitations":["..."]}.`;
 }
 
-function extractOpenAiMessage(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
-  const response = value as Record<string, unknown>;
-  if (typeof response.output_text === "string" && response.output_text.trim()) return response.output_text.trim();
-  const output = Array.isArray(response.output) ? response.output : [];
-  return output
-    .flatMap((item) => item && typeof item === "object" && Array.isArray((item as Record<string, unknown>).content)
-      ? (item as Record<string, unknown>).content as Array<Record<string, unknown>>
-      : [])
-    .filter((part) => part.type === "output_text")
-    .map((part) => typeof part.text === "string" ? part.text.trim() : "")
-    .filter(Boolean)
-    .join("\n");
-}
-
-async function requestOpenAi(prompt: string, pdfBase64: string) {
-  if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY não configurada no Supabase.");
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REVIEW_TIMEOUT_MS);
-  try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        input: [{
-          role: "user",
-          content: [
-            {
-              type: "input_file",
-              filename: "documento-licitacao.pdf",
-              file_data: `data:application/pdf;base64,${pdfBase64}`,
-            },
-            { type: "input_text", text: prompt },
-          ],
-        }],
-        text: { format: { type: "json_object" } },
-      }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const detail = cleanText(payload?.error?.message, 500);
-      throw new Error(detail || `OpenAI respondeu HTTP ${response.status}.`);
-    }
-    const text = extractOpenAiMessage(payload);
-    if (!text) throw new Error("OpenAI não retornou uma análise estruturada.");
-    return { parsed: parseJsonResponse(text), grounding: [] as unknown[] };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
 async function requestGemini(prompt: string, pdfBase64: string) {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY não configurada no Supabase.");
   const controller = new AbortController();
@@ -180,20 +119,7 @@ async function requestReview(
   pageCount: number | undefined,
   pdfBase64: string,
 ) {
-  let openAiFailure = "";
-  try {
-    return await requestOpenAi(buildPrompt(documentType, title, processNumber, pageCount, "openai"), pdfBase64);
-  } catch (error) {
-    openAiFailure = error instanceof Error ? error.message : String(error);
-    console.warn("[analisar-documento-licitacao] OpenAI falhou; Gemini será usado como fallback.", openAiFailure);
-  }
-
-  try {
-    return await requestGemini(buildPrompt(documentType, title, processNumber, pageCount, "gemini"), pdfBase64);
-  } catch (error) {
-    const geminiFailure = error instanceof Error ? error.message : String(error);
-    throw new Error(`OpenAI falhou: ${openAiFailure.slice(0, 500)}; Gemini fallback falhou: ${geminiFailure.slice(0, 500)}`);
-  }
+  return await requestGemini(buildPrompt(documentType, title, processNumber, pageCount), pdfBase64);
 }
 function sourceFromValue(value: unknown, checkedAt: string) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;

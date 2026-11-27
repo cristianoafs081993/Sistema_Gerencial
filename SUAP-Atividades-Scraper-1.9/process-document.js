@@ -1018,12 +1018,33 @@
         : [];
       const hasMultipleInvoices = invoices.length > 1;
       const workflow = full.workflow || {};
+      // Processo de bolsa (só eles têm Lista de credores): o beneficiário é o aluno da lista, não a pessoa
+      // que o extrator geral escolheu (pode ser o servidor que abriu o processo).
+      const lc = state.lcStatus?.suapId === getProcessId() ? state.lcStatus : null;
+      const lcReady = Boolean(lc && ['ready', 'existing'].includes(lc.stage) && lc.listId);
+      const lcAluno = lcReady && lc.beneficiario && (lc.beneficiario.nome || lc.beneficiario.cpf) ? lc.beneficiario : null;
+      const lcVariosAlunos = lcReady && !lcAluno && (lc.found ?? 0) > 1;
       if (isSummaryBlockVisible('beneficiario')) appendSection(container, 'Beneficiário', (section) => {
+        if (lcAluno) {
+          appendCopyRow(section, 'Aluno', lcAluno.nome);
+          appendCopyRow(section, 'CPF', lcAluno.cpf, true, true);
+          if (!lcAluno.cpf) section.appendChild(createElement('p', 'suape-beneficiary-note', 'CPF do aluno não encontrado: confira na Lista de credores.'));
+          return;
+        }
+        if (lcVariosAlunos) {
+          appendCopyRow(section, 'Alunos', `${lc.found} alunos (ver Lista de credores)`);
+          return;
+        }
         appendCopyRow(section, 'Nome', process.beneficiario);
         appendCopyRow(section, 'CPF/CNPJ', process.cpfCnpj, true, true);
+        if (lc) section.appendChild(createElement('p', 'suape-beneficiary-note', 'Processo de bolsa: o beneficiário é o aluno. Confira na Lista de credores.'));
         // O assunto já aparece nos "Dados gerais" do SUAP, que ganham o botão de copiar (installPageCopyButtons).
       });
-      if (isSummaryBlockVisible('rps-nps')) renderBeneficiaryDocsCard(container, process.cpfCnpj);
+      // As RPs/NPs são buscadas pelo CPF/CNPJ do extrator geral: em bolsa só valem se forem do próprio aluno.
+      const docsDigits = String(state.beneficiaryDocs?.cpfCnpj || '').replace(/\D/g, '');
+      const lcAlunoDigits = String(lcAluno?.cpf || '').replace(/\D/g, '');
+      const docsMatchBeneficiary = !(lcAluno || lcVariosAlunos) || (lcAlunoDigits && docsDigits === lcAlunoDigits);
+      if (isSummaryBlockVisible('rps-nps') && docsMatchBeneficiary) renderBeneficiaryDocsCard(container, lcAluno?.cpf || process.cpfCnpj);
       if (isSummaryBlockVisible('documento-pagamento')) appendSection(container, 'Documento e pagamento', (section) => {
         appendCopyRow(section, 'Valor', full.val_nf);
         appendCopyRow(section, 'NS', workflow.nsNumero || full.ns_numero, true);
@@ -1772,6 +1793,74 @@
     for (const source of collectLcDocumentSources()) documents.push(await readLcDocument(source));
     return documents;
   }
+
+  // --- Aluno pela matricula ------------------------------------------------------------------------
+  // Em alguns processos de bolsa o servidor informa a matricula do aluno no lugar do CPF. O CPF e o
+  // nome oficial vem do cadastro do aluno no SUAP (/edu/aluno/<matricula>/), lido com a sessao do usuario.
+  const ALUNO_MATRICULA_PATTERN = /^\d{10,15}$/;
+  const ALUNO_MAX_MATRICULAS = 50;
+  const alunoByMatriculaCache = new Map();
+  function isValidCpfDigits(digits) {
+    if (!/^\d{11}$/.test(digits) || /^(\d)\1{10}$/.test(digits)) return false;
+    const calc = (length) => {
+      let sum = 0;
+      for (let i = 0; i < length; i += 1) sum += Number(digits[i]) * (length + 1 - i);
+      const rest = (sum * 10) % 11;
+      return rest === 10 ? 0 : rest;
+    };
+    return calc(9) === Number(digits[9]) && calc(10) === Number(digits[10]);
+  }
+  const formatCpfDigits = (digits) => `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+  /** Valor ao lado do rotulo exato (dt/dd, th/td, td/td): "CPF do responsável" nao casa com "CPF". */
+  function readAlunoLabel(parsed, wanted) {
+    const elements = parsed.querySelectorAll('dt, th, td, label, strong, span, div.label, .list-item > *');
+    for (const element of elements) {
+      if (element.children.length > 1 || normalizeDocumentReviewText(element.textContent) !== wanted) continue;
+      const value = cleanText(element.nextElementSibling?.textContent);
+      if (value) return value;
+    }
+    return '';
+  }
+  function parseAlunoPage(html, matricula) {
+    const parsed = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    parsed.querySelectorAll('script, style, noscript, template').forEach((node) => node.remove());
+    let cpf = readAlunoLabel(parsed, 'cpf').replace(/\D/g, '');
+    if (!isValidCpfDigits(cpf)) {
+      // Reserva: o primeiro "CPF: 000.000.000-00" do texto (dados do proprio aluno vem antes dos do responsavel).
+      const match = htmlToBlockText(html).match(/\bCPF\b[\s:]*(\d{3}\.?\d{3}\.?\d{3}-?\d{2})(?!\d)/i);
+      cpf = (match?.[1] || '').replace(/\D/g, '');
+    }
+    const heading = Array.from(parsed.querySelectorAll('h1, h2, title'))
+      .map((element) => cleanText(element.textContent))
+      // So o rotulo com dois-pontos: em "Aluno Ficticio (matricula)" o "Aluno" e parte do nome.
+      .map((text) => text.match(new RegExp(`^(?:Alun[oa]\\s*:\\s*)?(.+?)\\s*\\(\\s*${matricula}\\s*\\)`, 'i'))?.[1] || '')
+      .find(Boolean);
+    const nome = cleanText(readAlunoLabel(parsed, 'nome') || heading || '').slice(0, 200);
+    return { cpf: isValidCpfDigits(cpf) ? formatCpfDigits(cpf) : '', nome };
+  }
+  async function fetchAlunoByMatricula(matricula) {
+    if (!ALUNO_MATRICULA_PATTERN.test(matricula)) return { matricula, error: 'Matrícula inválida.' };
+    if (alunoByMatriculaCache.has(matricula)) return alunoByMatriculaCache.get(matricula);
+    let result;
+    try {
+      const response = await fetch(`/edu/aluno/${matricula}/`, { credentials: 'include' });
+      if (!response.ok) throw new Error(`O SUAP respondeu ${response.status}.`);
+      if (response.url && !new URL(response.url, location.origin).pathname.startsWith('/edu/aluno/')) throw new Error('O SUAP não abriu a página do aluno (sessão ou permissão).');
+      const { cpf, nome } = parseAlunoPage(await response.text(), matricula);
+      result = cpf ? { matricula, cpf, ...(nome ? { nome } : {}) } : { matricula, error: 'CPF não encontrado na página do aluno.' };
+    } catch (error) {
+      result = { matricula, error: error instanceof Error ? error.message : 'Falha ao consultar o aluno.' };
+    }
+    // Falha de rede nao fica em cache: uma nova tentativa pode funcionar.
+    if (result.cpf) alunoByMatriculaCache.set(matricula, result);
+    return result;
+  }
+  async function fetchAlunosByMatricula(matriculas) {
+    const unique = Array.from(new Set((Array.isArray(matriculas) ? matriculas : []).map((value) => String(value || '').replace(/\D/g, '')).filter((value) => ALUNO_MATRICULA_PATTERN.test(value)))).slice(0, ALUNO_MAX_MATRICULAS);
+    const alunos = [];
+    for (const matricula of unique) alunos.push(await fetchAlunoByMatricula(matricula));
+    return alunos;
+  }
   function requestLcRebuild() {
     const frame = document.getElementById(BRIDGE_FRAME_ID); const suapId = getProcessId();
     if (!frame?.contentWindow || !suapId) return;
@@ -2160,6 +2249,12 @@
           frame.contentWindow?.postMessage({ source: 'siages-suap-extension', type: 'siages:suap-lc-documents-result', version: 1, payload: { suapId, documents, ...(error ? { error } : {}) } }, SIAGES_ORIGIN, transfer);
           return;
         }
+        if (isSiagesFrameMessage(event, frame, 'siages:suap-aluno-request')) {
+          const suapId = event.data.payload?.suapId; if (suapId !== getProcessId()) return;
+          const alunos = await fetchAlunosByMatricula(event.data.payload?.matriculas);
+          frame.contentWindow?.postMessage({ source: 'siages-suap-extension', type: 'siages:suap-aluno-result', version: 1, payload: { suapId, alunos } }, SIAGES_ORIGIN);
+          return;
+        }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-pdf-request')) {
           const suapId = event.data.payload?.suapId; if (suapId !== getProcessId()) return;
           try { const bytes = await downloadProcessPdfFromSuap(suapId, (message) => { state.syncStatus = { stage: 'requesting-pdf', message }; renderSummary(); }); frame.contentWindow?.postMessage({ source: 'siages-suap-extension', type: 'siages:suap-process-pdf-result', version: 1, payload: { suapId, bytes } }, SIAGES_ORIGIN, [bytes]); }
@@ -2269,6 +2364,6 @@
     }
     return undefined;
   });
-  window.__siagesSuapProcessDocument = { isScannedDocumentPage, getProcessId, getProcessNumber, buildContext, parseProcessRoute, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, renderAiPanel, openModal, closeModal, openBeneficiaryDocsModal, closeBeneficiaryDocsModal, openDocumentAnalysisModal, closeDocumentAnalysisModal, scanDocumentCards, installDocumentAnalysis, disposeDocumentAnalysis, classifyDocumentForAnalysis, downloadProcessPdfFromSuap, htmlToBlockText, collectLcDocumentSources, collectLcDocuments, readDefinitionField, renderLcCard, requestLcRebuild, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed, syncProcessToRegistry };
+  window.__siagesSuapProcessDocument = { isScannedDocumentPage, getProcessId, getProcessNumber, buildContext, parseProcessRoute, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, renderAiPanel, openModal, closeModal, openBeneficiaryDocsModal, closeBeneficiaryDocsModal, openDocumentAnalysisModal, closeDocumentAnalysisModal, scanDocumentCards, installDocumentAnalysis, disposeDocumentAnalysis, classifyDocumentForAnalysis, downloadProcessPdfFromSuap, htmlToBlockText, collectLcDocumentSources, collectLcDocuments, parseAlunoPage, fetchAlunosByMatricula, readDefinitionField, renderLcCard, requestLcRebuild, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed, syncProcessToRegistry };
   if (!window.__SIAGES_SUAP_PROCESS_TEST__) void installToolkit();
 })();

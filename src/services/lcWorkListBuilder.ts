@@ -54,7 +54,8 @@ export function buildLcGridRows(
 ): LcGridRow[] {
   return bolsistas.map((b) => {
     const doc = onlyDigits(b.cpf);
-    const lcList = lcRows.filter((r) => onlyDigits(r.favorecidoDocumento) === doc);
+    // Sem CPF (aluno so com matricula nao encontrada no SUAP) a linha fica como aluno nao encontrado.
+    const lcList = doc ? lcRows.filter((r) => onlyDigits(r.favorecidoDocumento) === doc) : [];
 
     const lcAccounts = lcList
       .map((r) => ({
@@ -85,7 +86,7 @@ export function buildLcGridRows(
     }
 
     return {
-      id: `${doc}-${b.sourceFile}`,
+      id: `${doc || `mat${onlyDigits(b.matricula)}`}-${b.sourceFile}`,
       cpf: doc,
       nome: b.nome,
       bancoPdf,

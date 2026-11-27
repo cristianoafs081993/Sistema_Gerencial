@@ -8,7 +8,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = typeof bundledWorkerUrl === 'string'
   : new URL('../../node_modules/pdfjs-dist/build/pdf.worker.min.js', import.meta.url).href;
 
 export interface BolsistaPdfRecord {
+  /** Vazio quando o documento so traz a matricula do aluno; a montagem da LC busca o CPF no SUAP. */
   cpf: string;
+  /** Matricula do aluno no SUAP, quando informada no lugar do CPF. */
+  matricula?: string;
   nome: string;
   banco: string;
   agencia: string;
@@ -265,9 +268,83 @@ export function extractFromText(rawText: string, sourceFile: string): BolsistaPd
         ...(fromOcr ? { ocr: true } : {}),
       });
     }
+
+    // Sem nenhum CPF: o servidor pode ter informado a matricula do aluno no lugar dele.
+    if (!found.length) {
+      found.push(...extractLabeledByMatricula(text, sourceFile, docValor, overlapsOcr));
+    }
   }
 
   return isOldTableFormat || isNewTableFormat ? markOcr(found) : found;
+}
+
+/** CPF so com digitos (sem pontuacao) e DV valido. */
+export function isValidCpfDigits(value: string): boolean {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
+  const calc = (length: number) => {
+    let sum = 0;
+    for (let i = 0; i < length; i += 1) sum += Number(digits[i]) * (length + 1 - i);
+    const rest = (sum * 10) % 11;
+    return rest === 10 ? 0 : rest;
+  };
+  return calc(9) === Number(digits[9]) && calc(10) === Number(digits[10]);
+}
+
+const formatCpfDigits = (digits: string) => `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+
+/**
+ * Layout rotulado identificado pela matricula: "Nome (20251030480001)", "Matrícula: 20251030480001" ou a
+ * matricula no rotulo "CPF". Os dados bancarios vem do trecho seguinte, como no layout por CPF.
+ */
+function extractLabeledByMatricula(
+  text: string,
+  sourceFile: string,
+  docValor: number | undefined,
+  overlapsOcr: (from: number, to: number) => boolean,
+): BolsistaPdfRecord[] {
+  // Sem espacos dentro do numero: "Matrícula: 20251030480001 Banco 104" nao pode virar um numero so.
+  const anchorRegex = /(?:\((\d{10,15})\))|(?:\b(?:Matr[íi]cula|CPF)\b[^\S\n]*(?:n[ºo°.]*)?[^\S\n]*[:—–|]?[^\S\n]*(\d[\d.-]{8,18}\d)(?![\d.-]))/gi;
+  const anchors: Array<{ index: number; end: number; digits: string }> = [];
+  for (const match of text.matchAll(anchorRegex)) {
+    const digits = (match[1] || match[2] || '').replace(/\D/g, '');
+    if (digits.length < 10 || digits.length > 15) continue;
+    // Mesmo aluno citado duas vezes seguidas ("Nome (matricula)" e "Matrícula: ..."): fica a primeira.
+    if (anchors.some((anchor) => anchor.digits === digits)) continue;
+    anchors.push({ index: match.index ?? 0, end: (match.index ?? 0) + match[0].length, digits });
+  }
+
+  const records: BolsistaPdfRecord[] = [];
+  anchors.forEach((anchor, i) => {
+    const prevIndex = i > 0 ? anchors[i - 1].end : Math.max(0, anchor.index - 350);
+    const nextIndex = i + 1 < anchors.length ? anchors[i + 1].index : Math.min(text.length, anchor.end + 450);
+    const segment = text.slice(anchor.end, nextIndex);
+    const agencia = extractFieldAfterLabel(segment, /Ag[êe]ncia[\s—–|:]*([0-9A-Za-z-]+)/i);
+    const conta = extractFieldAfterLabel(segment, /Conta[\s—–|:]*([0-9A-Za-z](?:[0-9A-Za-z.-]*[0-9A-Za-z])?)/i);
+    // Sem dados bancarios o numero e so uma citacao (ex.: matricula do orientador), nao um aluno a pagar.
+    if (!agencia || !conta) return;
+
+    const fromOcr = overlapsOcr(prevIndex, nextIndex);
+    const isCpf = anchor.digits.length === 11 && isValidCpfDigits(anchor.digits);
+    const nameContext = text.slice(prevIndex, anchor.index + (text[anchor.index] === '(' ? anchor.end - anchor.index : 0));
+    const nome = extractNameNear(nameContext, 0, nameContext.length)
+      || extractFieldAfterLabel(text.slice(prevIndex, anchor.index), /(?:Nome|Aluno|Aluna|Estudante|Bolsista)[\s:—–|]*([^\n]+)\s*$/i);
+    const banco = extractFieldAfterLabel(segment, /Banco\s*:?\s*(.+?)(?:\s+Dados\b|\s+Empenho\b|\s+Ag[êe]ncia\b|\s+Conta\b|\n|$)/i);
+
+    records.push({
+      cpf: isCpf ? formatCpfDigits(anchor.digits) : '',
+      ...(isCpf ? {} : { matricula: anchor.digits }),
+      // So o rotulo com dois-pontos: "ALUNA FICTICIA" e nome, "Aluna: Fulana" tem rotulo.
+      nome: cleanStudentName(nome.replace(/^(?:Nome|Aluno|Aluna|Estudante|Bolsista)\s*:\s*/i, '')),
+      banco,
+      agencia: fromOcr ? fixOcrDigits(agencia) : agencia,
+      conta: fromOcr ? fixOcrDigits(conta) : conta,
+      sourceFile,
+      valor: docValor,
+      ...(fromOcr ? { ocr: true } : {}),
+    });
+  });
+  return records;
 }
 
 export interface BolsistaPdfWarning {

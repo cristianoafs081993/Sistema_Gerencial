@@ -3,9 +3,6 @@ import { PDFDocument } from "npm:pdf-lib@1.17.1";
 import { mergeInvoiceLists, normalizeInvoiceList, type InvoiceRecord } from "./invoice_utils.ts";
 
 export const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-export const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-export const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") ?? "gpt-5-mini";
-export const OPENAI_TIMEOUT_MS = Number(Deno.env.get("OPENAI_TIMEOUT_MS") ?? "90000");
 export const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 export const OPENROUTER_MODEL = Deno.env.get("OPENROUTER_MODEL") ?? "nvidia/nemotron-3-super-120b-a12b:free";
 export const OPENROUTER_BASE_URL = Deno.env.get("OPENROUTER_BASE_URL") ?? "https://openrouter.ai/api/v1";
@@ -84,6 +81,7 @@ Regras adicionais:
 - optante_simples_nacional deve ser true ou false apenas quando a condicao estiver explicitamente comprovada nos documentos; se nao houver prova, retorne null, nunca presuma false;
 - assunto nunca pode ser rotulo de interface como "Assunto", "Nivel de prioridade", "Nivel de acesso", "Solicitar" ou "Acoes".
 - cpf_cnpj so pode ser retornado se estiver em formato valido de CPF/CNPJ ou um placeholder claro como "Varios (Folha de Pagamento)".
+- em pagamento de bolsa ou auxilio a estudante, "beneficiario" e o aluno que recebe, nunca o servidor/professor que abriu, assinou, orienta ou e interessado no processo; com varios alunos use "Varios (Lista de credores)"; "cpf_cnpj" e o CPF do aluno (ou "Varios (Lista de credores)"), e a matricula do aluno (numero de 10 a 15 digitos) nunca e CPF: sem CPF do aluno, retorne null.
 Retorne APENAS o JSON, sem markdown, sem comentarios e sem HTML.`;
 
 export const INVOICE_VERIFICATION_PROMPT = `Analise novamente todas as paginas e documentos deste PDF do processo do SUAP, com foco exclusivo na identificacao de notas fiscais e DANFE.
@@ -92,7 +90,7 @@ Retorne APENAS o JSON, sem markdown, sem comentarios e sem HTML.
 
 ${EXTRACTION_PROMPT}`;
 
-export type ProviderName = "gemini" | "openai" | "openrouter";
+export type ProviderName = "gemini" | "openrouter";
 export type JobStatus = "queued" | "processing" | "retryable" | "completed" | "failed";
 export type ProcessStatus =
   | "pending_extraction"
@@ -513,79 +511,6 @@ export async function callGeminiWithPdfBytes(
   }
 }
 
-function extractOpenAiMessage(response: Record<string, unknown>): string {
-  const directOutput = cleanString(response.output_text);
-  if (directOutput) return directOutput;
-
-  const output = Array.isArray(response.output) ? response.output as Array<Record<string, unknown>> : [];
-  const parts = output.flatMap((item) => Array.isArray(item.content) ? item.content as Array<Record<string, unknown>> : []);
-  return parts
-    .filter((part) => part.type === "output_text")
-    .map((part) => cleanString(part.text))
-    .filter((text): text is string => Boolean(text))
-    .join("\n");
-}
-
-export async function callOpenAiWithPdfBytes(pdfBytes: Uint8Array, processoNumeroAtual: string | null) {
-  if (!OPENAI_API_KEY) throw new Error("Missing environment variable: OPENAI_API_KEY");
-  const base64Pdf = pdfBytesToBase64(pdfBytes);
-
-  console.time("[process-pdf-worker] openai");
-  try {
-    const response = await withTimeout(OPENAI_TIMEOUT_MS, async (signal) => {
-      const res = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: OPENAI_MODEL,
-          input: [{
-            role: "user",
-            content: [
-              {
-                type: "input_file",
-                filename: "processo.pdf",
-                file_data: `data:application/pdf;base64,${base64Pdf}`,
-                detail: "high",
-              },
-              { type: "input_text", text: EXTRACTION_PROMPT },
-            ],
-          }],
-          text: { format: { type: "json_object" } },
-        }),
-        signal,
-      });
-
-      if (!res.ok) {
-        const errText = await res.text();
-        if (res.status === 429 || res.status >= 500) {
-          throw new Error(`provider unavailable: openai ${res.status} ${errText}`);
-        }
-        throw new Error(`OpenAI API error: ${res.status} details: ${errText.substring(0, 200)}`);
-      }
-      return await res.json();
-    });
-
-    const rawText = extractOpenAiMessage(response as Record<string, unknown>) || "{}";
-    try {
-      const extracted = normalizePayload(normalizeJson(rawText), processoNumeroAtual);
-      const validation = validatePayload(extracted, "openai");
-      return { extracted, validation, rawText };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const reason = message.toLowerCase().includes("json") ? "technical_failure" : "schema_invalid";
-      return {
-        extracted: emptyPayload(processoNumeroAtual),
-        validation: { ok: false, reason, provider: "openai", details: [message] } as ExtractionValidation,
-        rawText,
-      };
-    }
-  } finally {
-    console.timeEnd("[process-pdf-worker] openai");
-  }
-}
 function buildOpenRouterPrompt(contextText: string, partialPayloads: ExtractionPayload[] = []) {
   const partialSection = partialPayloads.length > 0
     ? `\n\nDados parciais ja extraidos com alta confianca:\n${JSON.stringify(partialPayloads.slice(0, 12), null, 2)}`
@@ -871,7 +796,7 @@ export async function enqueueJob(
     p_tenant_id: tenantId,
     p_suap_id: suapId,
     p_context_text: contextText,
-    p_provider_order: ["gemini", "openai", "openrouter"],
+    p_provider_order: ["gemini", "openrouter"],
     p_input_strategy: options.inputStrategy ?? "full",
     p_input_document_ids: options.inputDocumentIds ?? [],
     p_stage_metrics: options.stageMetrics ?? {},

@@ -20,8 +20,6 @@ const MAX_PDF_BYTES = 20 * 1024 * 1024;
 const TIMEOUT_MS = 120_000;
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const GEMINI_MODEL = Deno.env.get("GEMINI_LC_BOLSISTAS_MODEL") ?? "gemini-2.5-flash";
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-const OPENAI_MODEL = Deno.env.get("OPENAI_LC_BOLSISTAS_MODEL") ?? "gpt-5.6-luna";
 
 type DocumentInput = { kind: "text"; text: string } | { kind: "pdf"; pdfBase64: string };
 
@@ -90,52 +88,8 @@ async function requestGemini(prompt: string, doc: DocumentInput) {
   });
 }
 
-function extractOpenAiMessage(value: any): string {
-  if (typeof value?.output_text === "string" && value.output_text.trim()) return value.output_text.trim();
-  return (Array.isArray(value?.output) ? value.output : [])
-    .flatMap((item: any) => Array.isArray(item?.content) ? item.content : [])
-    .filter((part: any) => part?.type === "output_text" && typeof part.text === "string")
-    .map((part: any) => part.text.trim())
-    .join("\n");
-}
-
-async function requestOpenAi(prompt: string, doc: DocumentInput) {
-  if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY não configurada no Supabase.");
-  return await withTimeout(async (signal) => {
-    const documentPart = doc.kind === "pdf"
-      ? { type: "input_file", filename: "lista-bolsistas.pdf", file_data: `data:application/pdf;base64,${doc.pdfBase64}` }
-      : { type: "input_text", text: `--- DOCUMENTO ---\n${doc.text}\n--- FIM ---` };
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      signal,
-      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        input: [{ role: "user", content: [documentPart, { type: "input_text", text: prompt }] }],
-        text: { format: { type: "json_object" } },
-      }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(cleanText(payload?.error?.message, 500) || `OpenAI respondeu HTTP ${response.status}.`);
-    const text = extractOpenAiMessage(payload);
-    if (!text) throw new Error("OpenAI não retornou a lista de bolsistas.");
-    return parseJsonResponse(text);
-  });
-}
-
 async function extract(prompt: string, doc: DocumentInput) {
-  try {
-    return { provider: "gemini", raw: await requestGemini(prompt, doc) };
-  } catch (error) {
-    const geminiFailure = error instanceof Error ? error.message : String(error);
-    console.warn("[extrair-bolsistas-documento] Gemini falhou; OpenAI será usado como reserva.", geminiFailure);
-    try {
-      return { provider: "openai", raw: await requestOpenAi(prompt, doc) };
-    } catch (fallbackError) {
-      const openAiFailure = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-      throw new Error(`Gemini falhou: ${geminiFailure.slice(0, 300)}; OpenAI falhou: ${openAiFailure.slice(0, 300)}`);
-    }
-  }
+  return { provider: "gemini", raw: await requestGemini(prompt, doc) };
 }
 
 Deno.serve(async (req: Request) => {

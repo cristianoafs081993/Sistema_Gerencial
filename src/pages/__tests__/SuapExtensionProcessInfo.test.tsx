@@ -41,6 +41,8 @@ vi.mock('@/services/suapScraperService', () => ({
 import { DEFAULT_PROCESS_MAPPINGS } from '@/data/defaultProcessMapping';
 import { runSuapLcAutoBuild } from '@/services/suapLcAutoBuildService';
 import {
+  SUAP_EXTENSION_ALUNO_REQUEST_TYPE,
+  SUAP_EXTENSION_ALUNO_RESULT_TYPE,
   SUAP_EXTENSION_LC_DOCUMENTS_REQUEST_TYPE,
   SUAP_EXTENSION_LC_DOCUMENTS_RESULT_TYPE,
   SUAP_EXTENSION_LC_REBUILD_TYPE,
@@ -418,6 +420,32 @@ describe('SuapExtensionProcessInfo', () => {
 
       deps.onStatus({ suapId: '987', stage: 'ready', message: 'ok', listId: 'list-1' });
       expect(postMessage).toHaveBeenCalledWith({ source: 'siages', type: SUAP_EXTENSION_LC_STATUS_TYPE, version: 1, payload: { suapId: '987', stage: 'ready', message: 'ok', listId: 'list-1' } }, SUAP_EXTENSION_ORIGIN);
+      postMessage.mockRestore();
+    });
+
+    it('pede a extensao o CPF dos alunos informados pela matricula e ignora respostas invalidas', async () => {
+      const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
+      render(<SuapExtensionProcessInfo />);
+      await sendContext(bolsaContext);
+      await waitFor(() => expect(runSuapLcAutoBuild).toHaveBeenCalledTimes(1));
+      const deps = vi.mocked(runSuapLcAutoBuild).mock.calls[0][1];
+
+      const alunosPromise = deps.resolveMatriculas!(['20251030480001', '20241031120002']);
+      expect(postMessage).toHaveBeenCalledWith({
+        source: 'siages', type: SUAP_EXTENSION_ALUNO_REQUEST_TYPE, version: 1,
+        payload: { suapId: '987', matriculas: ['20251030480001', '20241031120002'] },
+      }, SUAP_EXTENSION_ORIGIN);
+      const result = (alunos: unknown[]) => new MessageEvent('message', {
+        origin: SUAP_EXTENSION_ORIGIN, source: window.parent,
+        data: { source: 'siages-suap-extension', type: SUAP_EXTENSION_ALUNO_RESULT_TYPE, version: 1, payload: { suapId: '987', alunos } },
+      });
+      // Matricula fora do padrao invalida a resposta inteira; a valida resolve o pedido.
+      window.dispatchEvent(result([{ matricula: '../admin', cpf: '529.982.247-25' }]));
+      window.dispatchEvent(result([
+        { matricula: '20251030480001', cpf: '529.982.247-25', nome: 'Aluna Ficticia' },
+        { matricula: '20241031120002', error: 'O SUAP respondeu 403.' },
+      ]));
+      await expect(alunosPromise).resolves.toEqual(new Map([['20251030480001', { cpf: '529.982.247-25', nome: 'Aluna Ficticia' }]]));
       postMessage.mockRestore();
     });
 

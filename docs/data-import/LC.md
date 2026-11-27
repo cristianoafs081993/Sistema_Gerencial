@@ -124,7 +124,12 @@ Nesses processos os ofícios da COAES não trazem os alunos ("conforme detalhame
    - Lê **os documentos de texto primeiro** e para assim que a lista está completa: há alunos com agência e conta, e o total declarado foi atingido. PDFs só são abertos se ainda faltar aluno. O card mostra qual documento está sendo lido ("Lendo Ofício … (2 de 3)...").
    - Escolhe o documento com mais alunos que tenham agência e conta.
    - Compara com o total declarado (`N (extenso) bolsas`).
-3. **IA só se o script falhar**: com zero alunos ou menos que o declarado, o documento vai para a Edge Function `extrair-bolsistas-documento` (Gemini, com OpenAI de reserva). O resultado da IA só substitui o do script se tiver mais alunos, e as linhas saem com `ia: true`. A grade mostra o selo **IA · conferir**.
+3. **IA só se o script falhar**: com zero alunos ou menos que o declarado, o documento vai para a Edge Function `extrair-bolsistas-documento` (somente Gemini; não há chamadas à OpenAI). O resultado da IA só substitui o do script se tiver mais alunos, e as linhas saem com `ia: true`. A grade mostra o selo **IA · conferir**.
+3a. **Matrícula no lugar do CPF** (extensão 1.9.94, processo 507612): alguns servidores informam a matrícula do aluno (10 a 15 dígitos, ex.: `20251030480001`) onde deveria estar o CPF.
+   - O script, sem nenhum CPF no documento, procura o aluno pela matrícula: `Nome (matrícula)`, `Matrícula: …` ou a matrícula no rótulo `CPF`, desde que o trecho seguinte traga agência e conta. O registro sai com `cpf: ''` e `matricula`.
+   - A IA também devolve `matricula`: número só com dígitos que não é CPF válido vira matrícula, em vez de ser descartado como CPF inválido.
+   - Antes do cruzamento, a montagem pede à extensão o cadastro de cada aluno (`/edu/aluno/<matrícula>/`, com a sessão do SUAP) e preenche o CPF e o nome oficial. Quem não for encontrado segue sem CPF, como `aluno_nao_encontrado`, com o aviso "… o CPF não foi encontrado no SUAP. Preencha na grade."
+   - Com um aluno só, o status leva `beneficiario: { nome, cpf }`, que o card **Beneficiário** do painel usa no lugar do extrator geral.
 4. O cruzamento com `lc_credores` usa `buildLcGridRows` ([lcWorkListBuilder.ts](/C:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/services/lcWorkListBuilder.ts)), a mesma regra da comparação manual por PDF.
 5. A lista é salva em `lc_saved_lists` com:
    - `suap_id`, `process_number`, `origin = 'extensao'` e `extraction`;

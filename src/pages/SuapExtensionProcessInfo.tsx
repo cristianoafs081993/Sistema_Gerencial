@@ -4,10 +4,13 @@ import { Loader2 } from 'lucide-react';
 import {
   getSuapExtensionBeneficiaryDocsMoreRequest,
   getSuapExtensionProcessContext,
+  isValidSuapExtensionAlunoResult,
   isValidSuapExtensionLcDocumentsResult,
   isValidSuapExtensionLcRebuild,
   isValidSuapExtensionProcessPdfResult,
   isValidSuapExtensionProcessRetry,
+  SUAP_EXTENSION_ALUNO_MAX_MATRICULAS,
+  SUAP_EXTENSION_ALUNO_REQUEST_TYPE,
   SUAP_EXTENSION_LC_DOCUMENTS_REQUEST_TYPE,
   SUAP_EXTENSION_LC_STATUS_TYPE,
   SUAP_EXTENSION_ORIGIN,
@@ -29,7 +32,7 @@ import { extractBolsistasFromPdfFiles } from '@/services/bolsistasPdfService';
 import { loadLatestLCRowsFromDb } from '@/services/lcImportService';
 import { findSharedLcSavedListBySuapId, saveSharedLcSavedList } from '@/services/lcSavedListsService';
 import type { LcGridRow } from '@/services/lcWorkListBuilder';
-import { extractBolsistasWithAi, isBolsaProcess, runSuapLcAutoBuild } from '@/services/suapLcAutoBuildService';
+import { extractBolsistasWithAi, isBolsaProcess, runSuapLcAutoBuild, type AlunoPorMatricula } from '@/services/suapLcAutoBuildService';
 import { suapProcessFinanceService, type SuapProcessFinanceSummary } from '@/services/suapProcessFinance';
 import { suapProcessosService } from '@/services/suapProcessos';
 import { suapScraperService } from '@/services/suapScraperService';
@@ -254,6 +257,47 @@ function requestLcDocuments(suapId: string, isActive: () => boolean) {
   });
 }
 
+const ALUNO_TIMEOUT_MS = 60 * 1000;
+
+/**
+ * Pede ao content script do SUAP o CPF e o nome dos alunos pela matricula (pagina do aluno no SUAP).
+ * Versao antiga da extensao nao responde: o prazo resolve sem alunos e as linhas ficam com pendencia.
+ */
+function requestAlunosByMatricula(suapId: string, matriculas: string[], isActive: () => boolean) {
+  const requested = matriculas.slice(0, SUAP_EXTENSION_ALUNO_MAX_MATRICULAS);
+  postMessageToSuapParent({
+    source: 'siages',
+    type: SUAP_EXTENSION_ALUNO_REQUEST_TYPE,
+    version: 1,
+    payload: { suapId, matriculas: requested },
+  });
+
+  return new Promise<Map<string, AlunoPorMatricula>>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener('message', receive);
+      reject(new Error('a extensão não respondeu à consulta dos alunos (atualize a extensão)'));
+    }, ALUNO_TIMEOUT_MS);
+
+    const receive = (event: MessageEvent) => {
+      if (!isValidSuapExtensionAlunoResult(event, window.parent, suapId)) return;
+      window.clearTimeout(timeout);
+      window.removeEventListener('message', receive);
+      if (!isActive()) return;
+      if (event.data.payload.error) {
+        reject(new Error(event.data.payload.error));
+        return;
+      }
+      const found = new Map<string, AlunoPorMatricula>();
+      for (const aluno of event.data.payload.alunos) {
+        if (aluno.cpf && requested.includes(aluno.matricula)) found.set(aluno.matricula, { cpf: aluno.cpf, nome: aluno.nome });
+      }
+      resolve(found);
+    };
+
+    window.addEventListener('message', receive);
+  });
+}
+
 async function delay(milliseconds: number) {
   await new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
@@ -351,6 +395,7 @@ export default function SuapExtensionProcessInfo() {
         { suapId: context.suapId, processNumber: context.processNumber, assunto, tipoProcesso: context.tipoProcesso },
         {
           requestDocuments: () => requestLcDocuments(context.suapId, isActive),
+          resolveMatriculas: (matriculas) => requestAlunosByMatricula(context.suapId, matriculas, isActive),
           extractFromPdf: async (document) => {
             const warnings: string[] = [];
             let expected: number | undefined;

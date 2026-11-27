@@ -42,8 +42,16 @@ export type AiExtractionResult = {
   declaredCount?: number;
 };
 
+/** Aluno encontrado no SUAP pela matricula (pagina /edu/aluno/<matricula>/). */
+export type AlunoPorMatricula = { cpf: string; nome?: string };
+
 export type SuapLcAutoBuildDeps = {
   requestDocuments: () => Promise<SuapExtensionLcDocument[]>;
+  /**
+   * Busca o CPF dos alunos que o documento identifica so pela matricula (o servidor informou a matricula
+   * no lugar do CPF). Sem essa dep, as linhas ficam sem CPF e com pendencia.
+   */
+  resolveMatriculas?: (matriculas: string[]) => Promise<Map<string, AlunoPorMatricula>>;
   extractFromPdf: (document: SuapExtensionLcDocument) => Promise<PdfExtractionResult>;
   extractWithAi: (input: AiExtractionInput) => Promise<AiExtractionResult>;
   loadLcRows: () => Promise<LCRegistro[]>;
@@ -93,14 +101,61 @@ const isListDocument = (document: SuapExtensionLcDocument) =>
 
 const hasBankData = (record: BolsistaPdfRecord) => Boolean(record.agencia?.trim() && record.conta?.trim());
 
+const onlyDigits = (value: string | undefined) => String(value || '').replace(/\D/g, '');
+
+/** Remove repetidos pelo CPF ou, sem CPF, pela matricula; registro sem nenhum dos dois e descartado. */
 function dedupeByCpf(records: BolsistaPdfRecord[]): BolsistaPdfRecord[] {
   const seen = new Set<string>();
   return records.filter((record) => {
-    const key = record.cpf.replace(/\D/g, '');
+    const cpf = onlyDigits(record.cpf);
+    const matricula = onlyDigits(record.matricula);
+    const key = cpf ? `cpf:${cpf}` : matricula ? `mat:${matricula}` : '';
     if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+}
+
+const formatCpf = (digits: string) => `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+
+/**
+ * Preenche o CPF (e o nome oficial) dos alunos identificados so pela matricula, consultando o SUAP.
+ * Os que nao forem encontrados seguem sem CPF, com aviso: a grade os marca como pendencia.
+ */
+async function resolveRecordsByMatricula(
+  records: BolsistaPdfRecord[],
+  deps: SuapLcAutoBuildDeps,
+  warnings: string[],
+): Promise<BolsistaPdfRecord[]> {
+  const pending = records.filter((record) => !onlyDigits(record.cpf) && onlyDigits(record.matricula));
+  if (!pending.length) return records;
+
+  let found = new Map<string, AlunoPorMatricula>();
+  if (deps.resolveMatriculas) {
+    try {
+      found = await deps.resolveMatriculas([...new Set(pending.map((record) => onlyDigits(record.matricula)))]);
+    } catch (error) {
+      warnings.push(`Não foi possível consultar os alunos no SUAP: ${error instanceof Error ? error.message : 'falha desconhecida'}.`);
+    }
+  }
+
+  const resolved = records.map((record) => {
+    const matricula = onlyDigits(record.matricula);
+    if (onlyDigits(record.cpf) || !matricula) return record;
+    const aluno = found.get(matricula);
+    const cpf = onlyDigits(aluno?.cpf);
+    if (cpf.length !== 11) {
+      warnings.push(`O documento traz a matrícula ${matricula}${record.nome ? ` (${record.nome})` : ''} no lugar do CPF e o CPF não foi encontrado no SUAP. Preencha na grade.`);
+      return record;
+    }
+    // O nome do cadastro do aluno no SUAP e o oficial; o do documento pode vir com o nome de quem assina.
+    return { ...record, cpf: formatCpf(cpf), nome: aluno?.nome?.trim() || record.nome };
+  });
+  const resolvedCount = pending.length - resolved.filter((record) => !onlyDigits(record.cpf)).length;
+  if (resolvedCount > 0) {
+    warnings.push(`${resolvedCount} aluno(s) identificado(s) pela matrícula: CPF obtido do cadastro do aluno no SUAP.`);
+  }
+  return dedupeByCpf(resolved);
 }
 
 async function readDocument(document: SuapExtensionLcDocument, deps: SuapLcAutoBuildDeps): Promise<DocumentReading> {
@@ -178,7 +233,16 @@ function buildListName(info: SuapLcProcessInfo): string {
 
 function statusFromList(suapId: string, list: LcSavedList<LcGridRow>, stage: 'ready' | 'existing', message: string): SuapExtensionLcStatus {
   const extraction = list.extraction;
+  // Com um aluno so, ele e o beneficiario do processo (o card Beneficiario do painel usa este dado
+  // no lugar do extrator geral, que pode ter escolhido o servidor que abriu o processo).
+  const single = list.rows.length === 1 ? list.rows[0] : undefined;
+  const singleCpf = onlyDigits(single?.cpf);
+  const singleNome = single?.nome?.trim() || '';
+  const beneficiario = single && (singleNome || singleCpf)
+    ? { nome: singleNome, cpf: singleCpf.length === 11 ? formatCpf(singleCpf) : singleCpf }
+    : undefined;
   return {
+    ...(beneficiario ? { beneficiario } : {}),
     suapId,
     stage,
     message,
@@ -272,6 +336,11 @@ export async function runSuapLcAutoBuild(
       });
     }
 
+    if (records.some((record) => !onlyDigits(record.cpf))) {
+      emit({ suapId, stage: 'reading', message: 'Buscando no SUAP o CPF dos alunos informados pela matrícula...' });
+      records = await resolveRecordsByMatricula(records, deps, warnings);
+    }
+
     if (expected !== undefined && records.length < expected) {
       warnings.push(`O documento declara ${expected} bolsa(s), mas só ${records.length} aluno(s) foram identificados. Confira o documento.`);
     }
@@ -334,7 +403,7 @@ function arrayBufferToBase64(bytes: ArrayBuffer): string {
 }
 
 type AiFunctionResponse = {
-  bolsistas?: Array<{ nome?: string; cpf?: string; banco?: string; agencia?: string; conta?: string; valor?: number }>;
+  bolsistas?: Array<{ nome?: string; cpf?: string; matricula?: string; banco?: string; agencia?: string; conta?: string; valor?: number }>;
   declaredCount?: number;
   error?: string;
 };
@@ -359,6 +428,7 @@ export async function extractBolsistasWithAi(input: AiExtractionInput, client: S
     records: (data?.bolsistas ?? []).map((item) => ({
       nome: item.nome || '',
       cpf: item.cpf || '',
+      ...(item.matricula ? { matricula: item.matricula } : {}),
       banco: item.banco || '',
       agencia: item.agencia || '',
       conta: item.conta || '',
