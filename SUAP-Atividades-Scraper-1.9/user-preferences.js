@@ -113,8 +113,8 @@
     if (!SHORTCUT_PATTERN.test(item?.shortcut || '')) return 'O atalho deve ter de 2 a 15 letras, sem números, acentos ou espaços.';
     if (RESERVED_SHORTCUTS.includes(item.shortcut)) return `"${item.shortcut}" já é um comando da paleta. Escolha outro atalho.`;
     if (others.some((other) => other.shortcut === item.shortcut)) return `O atalho "${item.shortcut}" já está em uso.`;
-    if (!item.campus) return 'Informe o campus de destino (nome e ID no SUAP).';
-    if (!item.setor) return 'Informe o setor de destino (nome e ID no SUAP).';
+    if (!item.campus) return 'Escolha o campus de destino na lista do SUAP.';
+    if (!item.setor) return 'Escolha o setor de destino na lista do SUAP.';
     return '';
   }
 

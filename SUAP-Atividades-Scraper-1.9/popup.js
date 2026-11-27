@@ -57,15 +57,21 @@ let siafiActiveTab = null;
 // até lá, o popup exibe a conta.
 const SECTION_STORAGE_KEY = 'siages-popup-section';
 const DEFAULT_SECTION = 'account';
+const SECTION_ALIASES = { templates: 'templates-forwards' };
 const navItems = Array.from(document.querySelectorAll('.nav-item[data-section]'));
+const navSubmenuToggles = Array.from(document.querySelectorAll('.nav-parent[aria-controls]'));
 const sectionViews = Array.from(document.querySelectorAll('.view[data-section]'));
 const navSiafiItem = document.getElementById('nav-siafi');
 const navSyncGroup = document.getElementById('nav-sync-group');
 const navAccountPresence = document.getElementById('nav-account-presence');
 const popupContent = document.getElementById('popup-content');
 const extensionAuthAvatar = document.getElementById('extension-auth-avatar');
-let desiredSection = readSavedSection() || DEFAULT_SECTION;
+let desiredSection = resolveSection(readSavedSection()) || DEFAULT_SECTION;
 let visibleSection = null;
+
+function resolveSection(name) {
+  return SECTION_ALIASES[name] || name;
+}
 
 function readSavedSection() {
   try { return localStorage.getItem(SECTION_STORAGE_KEY) || ''; } catch { return ''; }
@@ -73,6 +79,12 @@ function readSavedSection() {
 
 function saveSection(name) {
   try { localStorage.setItem(SECTION_STORAGE_KEY, name); } catch { /* preferência opcional */ }
+}
+
+function setSubmenuExpanded(toggle, expanded) {
+  const panel = document.getElementById(toggle.getAttribute('aria-controls') || '');
+  toggle.setAttribute('aria-expanded', String(expanded));
+  if (panel) panel.hidden = !expanded;
 }
 
 function isSectionAvailable(name) {
@@ -91,12 +103,19 @@ function renderSection() {
     if (active) item.setAttribute('aria-current', 'page');
     else item.removeAttribute('aria-current');
   });
+  navSubmenuToggles.forEach((toggle) => {
+    const panel = document.getElementById(toggle.getAttribute('aria-controls') || '');
+    const hasActiveChild = Boolean(panel?.querySelector('.nav-item.is-active[data-section]'));
+    toggle.classList.toggle('is-parent-active', hasActiveChild);
+    if (hasActiveChild) setSubmenuExpanded(toggle, true);
+  });
   if (popupContent) popupContent.scrollTop = 0;
 }
 
 function selectSection(name, { remember = true } = {}) {
-  desiredSection = name;
-  if (remember) saveSection(name);
+  const resolved = resolveSection(name);
+  desiredSection = resolved;
+  if (remember) saveSection(resolved);
   renderSection();
 }
 
@@ -135,6 +154,12 @@ function clearSyncNavBadges() {
 
 navItems.forEach((item) => {
   item.addEventListener('click', () => selectSection(item.dataset.section));
+});
+navSubmenuToggles.forEach((toggle) => {
+  toggle.addEventListener('click', () => {
+    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+    setSubmenuExpanded(toggle, !expanded);
+  });
 });
 renderSection();
 
@@ -1298,7 +1323,10 @@ void initializeSnippets();
 // Modelos e preenchimentos: atalhos de encaminhamento da paleta, valores do "up" e
 // partes fixas do despacho de liquidação. Regras e padrões ficam em user-preferences.js.
 const preferencesApi = globalThis.SiagesUserPreferences || null;
-const templatesView = document.getElementById('templates-panel');
+const templatesViews = ['templates-forwards-panel', 'templates-documents-panel', 'templates-uploads-panel']
+  .map((id) => document.getElementById(id))
+  .filter(Boolean);
+const navTemplatesGroup = document.getElementById('nav-templates-group');
 const navTemplatesItem = document.getElementById('nav-templates');
 const forwardListEl = document.getElementById('forward-list');
 const forwardMessage = document.getElementById('forward-message');
@@ -1308,14 +1336,15 @@ const forwardEditor = document.getElementById('forward-editor');
 const forwardEditorTitle = document.getElementById('forward-editor-title');
 const forwardForm = document.getElementById('forward-form');
 const forwardFormMessage = document.getElementById('forward-form-message');
+const forwardCatalogStatus = document.getElementById('forward-catalog-status');
+const forwardRefreshButton = document.getElementById('btn-forward-refresh');
 const forwardFields = {
   shortcut: document.getElementById('forward-shortcut'),
   title: document.getElementById('forward-title'),
   despacho: document.getElementById('forward-despacho'),
-  campusText: document.getElementById('forward-campus-text'),
-  campusId: document.getElementById('forward-campus-id'),
-  setorText: document.getElementById('forward-setor-text'),
-  setorId: document.getElementById('forward-setor-id'),
+  campus: document.getElementById('forward-campus'),
+  setorFilter: document.getElementById('forward-setor-filter'),
+  setor: document.getElementById('forward-setor'),
   papel: document.getElementById('forward-papel'),
 };
 const uploadForm = document.getElementById('upload-form');
@@ -1333,10 +1362,508 @@ const despachoFields = {
   encaminhamento: document.getElementById('despacho-encaminhamento'),
   fecho: document.getElementById('despacho-fecho'),
 };
-const FORWARD_PAGE_PATTERN = /^https:\/\/suap\.ifrn\.edu\.br\/processo_eletronico\/processo\/encaminhar\/\d+\/?(?:[?#].*)?$/;
+const SUAP_ORIGIN = 'https://suap.ifrn.edu.br';
+const SUAP_UO_ENDPOINT = `${SUAP_ORIGIN}/json/rh/unidadeorganizacional/`;
+const SUAP_SETOR_ENDPOINT = `${SUAP_ORIGIN}/json/rh/setor/`;
+const SUAP_FORWARD_CATALOG_KEY = 'siages-suap-forward-catalog';
+const SUAP_DEFAULT_CONTROLS = {
+  uo: '04c4a208298e9bb90fbc3af712f42636a8ce4dea732d43c3eee06f1800650ccd',
+  setor: 'e38d32439ee53b9ef53d3a0be73e36140c3204ee4dfa36d9e43b4bb58dc78c5f',
+};
+const SUAP_PAGE_SIZE = 20;
+const SUAP_MAX_UO_PAGES = 10;
+const SUAP_MAX_SETOR_PAGES = 10;
+const SUAP_FORWARD_PAGE_REGEX = /\/processo_eletronico\/processo\/encaminhar\/(\d+)\/?/;
+const SUAP_PROCESS_PAGE_REGEX = /\/processo_eletronico\/(?:processo|visualizar_processo)\/(\d+)\/?/;
 let userPreferences = preferencesApi ? preferencesApi.normalize(null) : null;
 let forwardEditingIndex = -1;
 let lastRemovedForward = null;
+const suapCatalog = {
+  campuses: [],
+  sectorsByCampus: {},
+  papeis: [],
+  controls: { ...SUAP_DEFAULT_CONTROLS },
+  cacheLoaded: false,
+  refreshedOnce: false,
+};
+let forwardCatalogRequest = 0;
+let setorLoadRequest = 0;
+let setorSearchTimer = null;
+
+function cleanSingleLine(value) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeSearchText(value) {
+  return cleanSingleLine(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function createSuapLoginError() {
+  const error = new Error('Faça login no SUAP no navegador e clique em “Atualizar do SUAP”.');
+  error.code = 'SUAP_LOGIN_REQUIRED';
+  return error;
+}
+
+function parseSuapSetorItem(item) {
+  const id = String(item?.id ?? '').trim();
+  const text = cleanSingleLine(item?.text);
+  if (!/^\d+$/.test(id) || !text) return null;
+  let label = text;
+  if (item?.html && typeof DOMParser === 'function') {
+    const doc = new DOMParser().parseFromString(String(item.html), 'text/html');
+    const span = doc.querySelector('.admin-setor');
+    const title = cleanSingleLine(span?.getAttribute('title'));
+    const spanText = cleanSingleLine(span?.textContent);
+    if (title && normalizeSearchText(title) !== normalizeSearchText(text)) {
+      label = `${text} — ${title}`;
+    } else if (spanText && spanText.length > text.length) {
+      label = spanText;
+    }
+  }
+  return { id, text, label };
+}
+
+function mergeSuapSectors(existing, incoming) {
+  const byId = new Map();
+  for (const item of [...(existing || []), ...(incoming || [])]) {
+    if (!item?.id || !item?.text) continue;
+    const prev = byId.get(item.id);
+    if (!prev || (item.label && item.label.length > (prev.label || '').length)) {
+      byId.set(item.id, { id: String(item.id), text: item.text, label: item.label || item.text });
+    }
+  }
+  return Array.from(byId.values()).sort((a, b) => a.text.localeCompare(b.text, 'pt-BR'));
+}
+
+function parseForwardPageMetadata(html) {
+  if (!html || typeof DOMParser !== 'function') return null;
+  const doc = new DOMParser().parseFromString(String(html), 'text/html');
+  const papelSelect = doc.querySelector('select[name="papel"]');
+  const papeis = papelSelect
+    ? Array.from(papelSelect.options)
+        .filter((opt) => cleanSingleLine(opt.value) !== '')
+        .map((opt) => cleanSingleLine(opt.textContent))
+        .filter((text) => text && !/^-+$/.test(text))
+    : [];
+  const uoControl = html.match(/\/json\/rh\/unidadeorganizacional\/[\s\S]{0,400}?control\s*:\s*['"]([a-f0-9]{32,128})['"]/i)?.[1] || '';
+  const setorControl = html.match(/\/json\/rh\/setor\/[\s\S]{0,400}?control\s*:\s*['"]([a-f0-9]{32,128})['"]/i)?.[1] || '';
+  return {
+    papeis: Array.from(new Set(papeis)),
+    controls: {
+      ...(uoControl ? { uo: uoControl } : {}),
+      ...(setorControl ? { setor: setorControl } : {}),
+    },
+  };
+}
+
+async function fetchSuapJsonPage(endpoint, params) {
+  const url = `${endpoint}?${new URLSearchParams(params).toString()}`;
+  const response = await fetch(url, {
+    credentials: 'include',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+  });
+  if ((response.redirected && /\/accounts\/login/i.test(response.url || '')) || response.status === 401 || response.status === 403) {
+    throw createSuapLoginError();
+  }
+  if (!response.ok) {
+    throw new Error(`O SUAP respondeu ${response.status} ao carregar as listas.`);
+  }
+  const contentType = response.headers?.get?.('content-type') || '';
+  const data = await response.json().catch(() => null);
+  if (!data || !Array.isArray(data.items)) {
+    if (contentType.includes('text/html')) throw createSuapLoginError();
+    throw new Error('Resposta inesperada do SUAP ao carregar as listas.');
+  }
+  return { items: data.items, total: Number(data.total) || data.items.length };
+}
+
+async function fetchSuapCampuses(control = suapCatalog.controls.uo) {
+  const first = await fetchSuapJsonPage(SUAP_UO_ENDPOINT, { q: '', control, page: '1' });
+  const totalPages = Math.min(SUAP_MAX_UO_PAGES, Math.max(1, Math.ceil(first.total / SUAP_PAGE_SIZE)));
+  const rest = totalPages > 1
+    ? await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, i) =>
+          fetchSuapJsonPage(SUAP_UO_ENDPOINT, { q: '', control, page: String(i + 2) })
+        )
+      )
+    : [];
+  const seen = new Map();
+  for (const page of [first, ...rest]) {
+    for (const raw of page.items) {
+      const id = String(raw?.id ?? '').trim();
+      const text = cleanSingleLine(raw?.text);
+      if (/^\d+$/.test(id) && text && !seen.has(id)) seen.set(id, { id, text });
+    }
+  }
+  return Array.from(seen.values()).sort((a, b) => a.text.localeCompare(b.text, 'pt-BR'));
+}
+
+async function fetchSuapSectors(campusId, { query = '', control = suapCatalog.controls.setor } = {}) {
+  const uoId = String(campusId || '').trim();
+  if (!/^\d+$/.test(uoId)) return { items: [], total: 0, complete: true };
+  const q = cleanSingleLine(query);
+  const baseParams = { q, control, filter_pks: JSON.stringify({ uo_id: uoId }) };
+  const first = await fetchSuapJsonPage(SUAP_SETOR_ENDPOINT, { ...baseParams, page: '1' });
+  const maxPages = q ? 3 : SUAP_MAX_SETOR_PAGES;
+  const neededPages = Math.max(1, Math.ceil(first.total / SUAP_PAGE_SIZE));
+  const pagesToFetch = Math.min(maxPages, neededPages);
+  const rest = pagesToFetch > 1
+    ? await Promise.all(
+        Array.from({ length: pagesToFetch - 1 }, (_, i) =>
+          fetchSuapJsonPage(SUAP_SETOR_ENDPOINT, { ...baseParams, page: String(i + 2) })
+        )
+      )
+    : [];
+  const parsed = [];
+  for (const page of [first, ...rest]) {
+    for (const raw of page.items) {
+      const item = parseSuapSetorItem(raw);
+      if (item) parsed.push(item);
+    }
+  }
+  return {
+    items: mergeSuapSectors([], parsed),
+    total: first.total,
+    complete: neededPages <= pagesToFetch,
+  };
+}
+
+async function fetchSuapHtmlPage(path) {
+  const url = path.startsWith('http') ? path : `${SUAP_ORIGIN}${path}`;
+  const response = await fetch(url, { credentials: 'include' });
+  if (response.redirected && /\/accounts\/login/i.test(response.url || '')) {
+    throw createSuapLoginError();
+  }
+  if (!response.ok) return null;
+  const html = await response.text();
+  if (/id="id_username"|name="username"[\s\S]{0,300}name="password"/i.test(html) && !/name="papel"/i.test(html)) {
+    throw createSuapLoginError();
+  }
+  return html;
+}
+
+async function fetchSuapPapeisAndControls() {
+  const candidateIds = [];
+  const addCandidate = (id) => {
+    const clean = String(id || '').trim();
+    if (/^\d+$/.test(clean) && !candidateIds.includes(clean)) candidateIds.push(clean);
+  };
+
+  if (chrome?.tabs?.query) {
+    const tabs = await Promise.resolve(chrome.tabs.query({ url: `${SUAP_ORIGIN}/processo_eletronico/*` })).catch(() => []);
+    for (const tab of Array.isArray(tabs) ? tabs : []) {
+      const url = String(tab?.url || '');
+      const forwardMatch = url.match(SUAP_FORWARD_PAGE_REGEX);
+      if (forwardMatch) addCandidate(forwardMatch[1]);
+    }
+    for (const tab of Array.isArray(tabs) ? tabs : []) {
+      const url = String(tab?.url || '');
+      const processMatch = url.match(SUAP_PROCESS_PAGE_REGEX);
+      if (processMatch) addCandidate(processMatch[1]);
+    }
+  }
+
+  for (const id of candidateIds.slice(0, 2)) {
+    const html = await fetchSuapHtmlPage(`/processo_eletronico/processo/encaminhar/${id}/`);
+    const meta = parseForwardPageMetadata(html);
+    if (meta?.papeis?.length) return meta;
+  }
+
+  for (const boxPath of [
+    '/processo_eletronico/caixa_processos/?tab=tab_aguardando_encaminhamento',
+    '/processo_eletronico/caixa_processos/',
+  ]) {
+    const html = await fetchSuapHtmlPage(boxPath);
+    if (!html) continue;
+    for (const match of html.matchAll(/\/processo_eletronico\/processo\/encaminhar\/(\d+)\//g)) {
+      addCandidate(match[1]);
+    }
+    for (const match of html.matchAll(/\/processo_eletronico\/processo\/(\d+)\//g)) {
+      addCandidate(match[1]);
+    }
+    if (candidateIds.length >= 6) break;
+  }
+
+  let fallbackMeta = null;
+  for (const id of candidateIds.slice(0, 6)) {
+    const html = await fetchSuapHtmlPage(`/processo_eletronico/processo/encaminhar/${id}/`);
+    const meta = parseForwardPageMetadata(html);
+    if (!meta) continue;
+    if (meta.papeis.length) return meta;
+    if (!fallbackMeta && (meta.controls.uo || meta.controls.setor)) fallbackMeta = meta;
+  }
+  return fallbackMeta;
+}
+
+async function loadSuapCatalogCache() {
+  if (suapCatalog.cacheLoaded || !chrome?.storage?.local?.get) return;
+  suapCatalog.cacheLoaded = true;
+  const stored = await chrome.storage.local.get(SUAP_FORWARD_CATALOG_KEY).catch(() => ({}));
+  const cached = stored?.[SUAP_FORWARD_CATALOG_KEY];
+  if (!cached || typeof cached !== 'object') return;
+  if (Array.isArray(cached.campuses) && cached.campuses.length) suapCatalog.campuses = cached.campuses;
+  if (cached.sectorsByCampus && typeof cached.sectorsByCampus === 'object') suapCatalog.sectorsByCampus = cached.sectorsByCampus;
+  if (Array.isArray(cached.papeis) && cached.papeis.length) suapCatalog.papeis = cached.papeis;
+  if (cached.controls?.uo) suapCatalog.controls.uo = cached.controls.uo;
+  if (cached.controls?.setor) suapCatalog.controls.setor = cached.controls.setor;
+}
+
+function saveSuapCatalogCache() {
+  if (!chrome?.storage?.local?.set) return;
+  const payload = {
+    campuses: suapCatalog.campuses,
+    sectorsByCampus: suapCatalog.sectorsByCampus,
+    papeis: suapCatalog.papeis,
+    controls: suapCatalog.controls,
+    updatedAt: Date.now(),
+  };
+  void Promise.resolve(chrome.storage.local.set({ [SUAP_FORWARD_CATALOG_KEY]: payload })).catch(() => undefined);
+}
+
+function getSelectedSuapOption(select) {
+  const option = select?.selectedOptions?.[0];
+  const id = cleanSingleLine(option?.value);
+  if (!id) return null;
+  return { id, text: cleanSingleLine(option.dataset?.text || option.textContent) || id };
+}
+
+function renderCampusSelect(selectedCampus) {
+  const select = forwardFields.campus;
+  if (!select) return;
+  const list = [...suapCatalog.campuses];
+  if (selectedCampus?.id && !list.some((item) => item.id === selectedCampus.id)) {
+    list.push({ id: selectedCampus.id, text: selectedCampus.text || selectedCampus.id });
+    list.sort((a, b) => a.text.localeCompare(b.text, 'pt-BR'));
+  }
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = list.length ? 'Escolha o campus' : 'Carregando campi do SUAP…';
+  const options = [placeholder, ...list.map((item) => {
+    const opt = document.createElement('option');
+    opt.value = item.id;
+    opt.dataset.text = item.text;
+    opt.textContent = item.text;
+    return opt;
+  })];
+  select.replaceChildren(...options);
+  select.value = selectedCampus?.id || '';
+}
+
+function renderSetorSelect(campusId, selectedSetor, { filterText = '', loading = false } = {}) {
+  const select = forwardFields.setor;
+  if (!select) return;
+  const uoId = cleanSingleLine(campusId);
+  const entry = uoId ? suapCatalog.sectorsByCampus[uoId] : null;
+  const normalizedFilter = normalizeSearchText(filterText);
+  let list = entry?.items ? [...entry.items] : [];
+  if (normalizedFilter) {
+    list = list.filter((item) =>
+      normalizeSearchText(item.text).includes(normalizedFilter) ||
+      normalizeSearchText(item.label).includes(normalizedFilter)
+    );
+  } else if (selectedSetor?.id && !list.some((item) => item.id === selectedSetor.id)) {
+    list.push({ id: selectedSetor.id, text: selectedSetor.text || selectedSetor.id, label: selectedSetor.text || selectedSetor.id });
+    list.sort((a, b) => a.text.localeCompare(b.text, 'pt-BR'));
+  }
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  if (!uoId) {
+    placeholder.textContent = 'Escolha um campus primeiro';
+  } else if (loading && !list.length) {
+    placeholder.textContent = 'Carregando setores do SUAP…';
+  } else if (normalizedFilter && !list.length) {
+    placeholder.textContent = 'Nenhum setor encontrado';
+  } else if (normalizedFilter) {
+    placeholder.textContent = `Escolha o setor (${list.length} encontrado${list.length === 1 ? '' : 's'})`;
+  } else {
+    placeholder.textContent = 'Escolha o setor';
+  }
+  const options = [placeholder, ...list.map((item) => {
+    const opt = document.createElement('option');
+    opt.value = item.id;
+    opt.dataset.text = item.text;
+    opt.textContent = item.label || item.text;
+    return opt;
+  })];
+  select.replaceChildren(...options);
+  select.disabled = !uoId && !list.length;
+  if (forwardFields.setorFilter) forwardFields.setorFilter.disabled = !uoId;
+  select.value = selectedSetor?.id && list.some((item) => item.id === selectedSetor.id) ? selectedSetor.id : '';
+}
+
+function renderPapelSelect(selectedPapel) {
+  const select = forwardFields.papel;
+  if (!select) return;
+  const known = new Set(suapCatalog.papeis);
+  for (const shortcut of userPreferences?.forwardShortcuts || []) {
+    if (shortcut.papel) known.add(shortcut.papel);
+  }
+  if (selectedPapel) known.add(selectedPapel);
+  const list = Array.from(known).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Não preencher automaticamente';
+  const options = [placeholder, ...list.map((papel) => {
+    const opt = document.createElement('option');
+    opt.value = papel;
+    opt.textContent = papel;
+    return opt;
+  })];
+  select.replaceChildren(...options);
+  select.value = selectedPapel || '';
+}
+
+function summarizeSuapCatalogStatus(campusId) {
+  const parts = [];
+  if (suapCatalog.campuses.length) parts.push(`${suapCatalog.campuses.length} campi`);
+  const sectorEntry = campusId ? suapCatalog.sectorsByCampus[campusId] : null;
+  if (sectorEntry?.items?.length) {
+    parts.push(`${sectorEntry.total || sectorEntry.items.length} setores`);
+  }
+  if (suapCatalog.papeis.length) parts.push(`${suapCatalog.papeis.length} perfis`);
+  if (!parts.length) return 'Listas carregadas direto do SUAP.';
+  if (!suapCatalog.papeis.length) {
+    return `Listas do SUAP (${parts.join(' · ')}). Para carregar seus perfis, abra um processo para encaminhar no SUAP e clique em “Atualizar do SUAP”.`;
+  }
+  return `Listas carregadas do SUAP (${parts.join(' · ')}).`;
+}
+
+async function loadSectorsForCampus(campusId, { force = false, query = '' } = {}) {
+  const uoId = cleanSingleLine(campusId);
+  if (!/^\d+$/.test(uoId)) return;
+  const existing = suapCatalog.sectorsByCampus[uoId];
+  if (!force && !query && existing?.items?.length) {
+    renderSetorSelect(uoId, getSelectedSuapOption(forwardFields.setor), { filterText: forwardFields.setorFilter?.value || '' });
+    return;
+  }
+  const requestId = ++setorLoadRequest;
+  const selectedSetor = getSelectedSuapOption(forwardFields.setor);
+  if (!existing?.items?.length && !query) {
+    renderSetorSelect(uoId, selectedSetor, { filterText: forwardFields.setorFilter?.value || '', loading: true });
+  }
+  try {
+    const result = await fetchSuapSectors(uoId, { query });
+    if (requestId !== setorLoadRequest || cleanSingleLine(forwardFields.campus?.value) !== uoId) return;
+    if (query) {
+      const merged = mergeSuapSectors(existing?.items || [], result.items);
+      suapCatalog.sectorsByCampus[uoId] = {
+        items: merged,
+        total: Math.max(existing?.total || 0, result.total || merged.length),
+        complete: Boolean(existing?.complete),
+      };
+    } else {
+      suapCatalog.sectorsByCampus[uoId] = result;
+    }
+    saveSuapCatalogCache();
+    renderSetorSelect(uoId, getSelectedSuapOption(forwardFields.setor) || selectedSetor, {
+      filterText: forwardFields.setorFilter?.value || '',
+    });
+    if (forwardCatalogStatus && !forwardCatalogStatus.dataset.error?.includes('true')) {
+      setFormMessage(forwardCatalogStatus, summarizeSuapCatalogStatus(uoId));
+    }
+  } catch (error) {
+    if (requestId !== setorLoadRequest) return;
+    renderSetorSelect(uoId, selectedSetor, { filterText: forwardFields.setorFilter?.value || '' });
+    setFormMessage(forwardCatalogStatus, formatExtensionAuthError(error), true);
+  }
+}
+
+async function refreshSuapCatalog({ force = false, campusId = '' } = {}) {
+  const requestId = ++forwardCatalogRequest;
+  await loadSuapCatalogCache();
+  if (requestId !== forwardCatalogRequest) return;
+
+  const activeCampus = getSelectedSuapOption(forwardFields.campus);
+  const activeSetor = getSelectedSuapOption(forwardFields.setor);
+  const activePapel = forwardFields.papel?.value || '';
+  const targetCampusId = cleanSingleLine(campusId || activeCampus?.id);
+
+  renderCampusSelect(activeCampus);
+  renderSetorSelect(targetCampusId, activeSetor, {
+    filterText: forwardFields.setorFilter?.value || '',
+    loading: Boolean(targetCampusId && !suapCatalog.sectorsByCampus[targetCampusId]?.items?.length),
+  });
+  renderPapelSelect(activePapel);
+
+  if (!force && suapCatalog.refreshedOnce && suapCatalog.campuses.length) {
+    setFormMessage(forwardCatalogStatus, summarizeSuapCatalogStatus(targetCampusId));
+    if (targetCampusId && !suapCatalog.sectorsByCampus[targetCampusId]?.items?.length) {
+      await loadSectorsForCampus(targetCampusId);
+    }
+    return;
+  }
+
+  if (forwardRefreshButton) forwardRefreshButton.disabled = true;
+  setFormMessage(forwardCatalogStatus, 'Carregando listas do SUAP…');
+
+  try {
+    const [campusesResult, sectorsResult, metaResult] = await Promise.allSettled([
+      fetchSuapCampuses(suapCatalog.controls.uo),
+      targetCampusId ? fetchSuapSectors(targetCampusId, { control: suapCatalog.controls.setor }) : Promise.resolve(null),
+      fetchSuapPapeisAndControls(),
+    ]);
+    if (requestId !== forwardCatalogRequest) return;
+
+    let controlsChanged = false;
+    if (metaResult.status === 'fulfilled' && metaResult.value) {
+      if (metaResult.value.papeis?.length) suapCatalog.papeis = metaResult.value.papeis;
+      if (metaResult.value.controls?.uo && metaResult.value.controls.uo !== suapCatalog.controls.uo) {
+        suapCatalog.controls.uo = metaResult.value.controls.uo;
+        controlsChanged = true;
+      }
+      if (metaResult.value.controls?.setor && metaResult.value.controls.setor !== suapCatalog.controls.setor) {
+        suapCatalog.controls.setor = metaResult.value.controls.setor;
+        controlsChanged = true;
+      }
+    }
+
+    let finalCampuses = campusesResult;
+    if (controlsChanged && (finalCampuses.status === 'rejected' || !finalCampuses.value?.length)) {
+      finalCampuses = await Promise.allSettled([fetchSuapCampuses(suapCatalog.controls.uo)]).then((r) => r[0]);
+      if (requestId !== forwardCatalogRequest) return;
+    }
+    if (finalCampuses.status === 'fulfilled' && finalCampuses.value?.length) {
+      suapCatalog.campuses = finalCampuses.value;
+    }
+
+    let finalSectors = sectorsResult;
+    if (targetCampusId && controlsChanged && (finalSectors.status === 'rejected' || !finalSectors.value?.items?.length)) {
+      finalSectors = await Promise.allSettled([fetchSuapSectors(targetCampusId, { control: suapCatalog.controls.setor })]).then((r) => r[0]);
+      if (requestId !== forwardCatalogRequest) return;
+    }
+    if (targetCampusId && finalSectors.status === 'fulfilled' && finalSectors.value) {
+      suapCatalog.sectorsByCampus[targetCampusId] = finalSectors.value;
+    }
+
+    const currentCampus = getSelectedSuapOption(forwardFields.campus) || activeCampus;
+    const currentSetor = getSelectedSuapOption(forwardFields.setor) || activeSetor;
+    const currentPapel = forwardFields.papel?.value || activePapel;
+    renderCampusSelect(currentCampus);
+    renderSetorSelect(currentCampus?.id || targetCampusId, currentSetor, {
+      filterText: forwardFields.setorFilter?.value || '',
+    });
+    renderPapelSelect(currentPapel);
+
+    const errors = [finalCampuses, finalSectors, metaResult]
+      .filter((result) => result.status === 'rejected')
+      .map((result) => result.reason);
+    const loginError = errors.find((err) => err?.code === 'SUAP_LOGIN_REQUIRED');
+
+    if (suapCatalog.campuses.length) {
+      suapCatalog.refreshedOnce = true;
+      saveSuapCatalogCache();
+      setFormMessage(forwardCatalogStatus, summarizeSuapCatalogStatus(currentCampus?.id || targetCampusId));
+    } else if (loginError) {
+      setFormMessage(forwardCatalogStatus, loginError.message, true);
+    } else if (errors[0]) {
+      setFormMessage(forwardCatalogStatus, formatExtensionAuthError(errors[0]), true);
+    } else {
+      setFormMessage(forwardCatalogStatus, 'Nenhuma opção retornada pelo SUAP. Verifique sua sessão e tente novamente.', true);
+    }
+  } finally {
+    if (requestId === forwardCatalogRequest && forwardRefreshButton) forwardRefreshButton.disabled = false;
+  }
+}
 
 function setFormMessage(element, message, isError = false) {
   if (!element) return;
@@ -1429,33 +1956,40 @@ function openForwardEditor(index) {
   forwardFields.shortcut.value = item.shortcut;
   forwardFields.title.value = item.title;
   forwardFields.despacho.value = item.despacho;
-  forwardFields.campusText.value = item.campus?.text || '';
-  forwardFields.campusId.value = item.campus?.id || '';
-  forwardFields.setorText.value = item.setor?.text || '';
-  forwardFields.setorId.value = item.setor?.id || '';
-  forwardFields.papel.value = item.papel;
+  if (forwardFields.setorFilter) forwardFields.setorFilter.value = '';
+  renderCampusSelect(item.campus);
+  renderSetorSelect(item.campus?.id || '', item.setor, {
+    loading: Boolean(item.campus?.id && !suapCatalog.sectorsByCampus[item.campus.id]?.items?.length),
+  });
+  renderPapelSelect(item.papel);
   forwardEditorTitle.textContent = editing ? `Editar atalho ${editing.shortcut}` : 'Novo atalho de encaminhamento';
   setFormMessage(forwardFormMessage, '');
   forwardEditor.hidden = false;
   forwardEditor.scrollIntoView?.({ block: 'nearest' });
   forwardFields.shortcut.focus();
+  void refreshSuapCatalog({ campusId: item.campus?.id || '' });
 }
 
 function closeForwardEditor() {
   forwardEditingIndex = -1;
+  forwardCatalogRequest += 1;
+  setorLoadRequest += 1;
+  if (setorSearchTimer) {
+    clearTimeout(setorSearchTimer);
+    setorSearchTimer = null;
+  }
   forwardForm.reset();
   setFormMessage(forwardFormMessage, '');
   forwardEditor.hidden = true;
 }
 
 function readForwardForm() {
-  const option = (id, text) => (id.value.trim() || text.value.trim() ? { id: id.value, text: text.value } : null);
   return preferencesApi.normalizeForwardShortcut({
     shortcut: forwardFields.shortcut.value,
     title: forwardFields.title.value,
     despacho: forwardFields.despacho.value,
-    campus: option(forwardFields.campusId, forwardFields.campusText),
-    setor: option(forwardFields.setorId, forwardFields.setorText),
+    campus: getSelectedSuapOption(forwardFields.campus),
+    setor: getSelectedSuapOption(forwardFields.setor),
     papel: forwardFields.papel.value,
   });
 }
@@ -1573,45 +2107,35 @@ async function undoRemoveForwardShortcut() {
   }
 }
 
-// Executada na aba do SUAP: lê o destino escolhido no formulário "Encaminhar".
-function captureForwardDestinationFromPage() {
-  const form = document.getElementById('tramite_formencaminharparasetor') || document.querySelector('form');
-  const field = (name) => form?.querySelector(`[name="${name}"]`) || null;
-  const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
-  const selected = (select) => {
-    const option = select?.selectedOptions?.[0];
-    return option && option.value ? { id: String(option.value), text: clean(option.textContent) } : null;
-  };
-  return {
-    campus: selected(field('destinatario_uo')),
-    setor: selected(field('destinatario_setor_autocompletar')),
-    papel: selected(field('papel'))?.text || '',
-    despacho: String(field('despacho_corpo')?.value || '').trim(),
-  };
+function handleForwardCampusChange() {
+  const campusId = cleanSingleLine(forwardFields.campus?.value);
+  if (setorSearchTimer) {
+    clearTimeout(setorSearchTimer);
+    setorSearchTimer = null;
+  }
+  if (forwardFields.setorFilter) forwardFields.setorFilter.value = '';
+  renderSetorSelect(campusId, null, {
+    loading: Boolean(campusId && !suapCatalog.sectorsByCampus[campusId]?.items?.length),
+  });
+  if (campusId) void loadSectorsForCampus(campusId);
 }
 
-async function captureForwardDestination() {
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id || !FORWARD_PAGE_PATTERN.test(tab.url || '')) {
-      setFormMessage(forwardFormMessage, 'Abra a tela “Encaminhar” de um processo no SUAP nesta aba e tente de novo.', true);
-      return;
-    }
-    const results = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: captureForwardDestinationFromPage });
-    const captured = results?.[0]?.result;
-    if (!captured?.campus || !captured?.setor) {
-      setFormMessage(forwardFormMessage, 'Escolha o campus e o setor de destino no SUAP antes de copiar.', true);
-      return;
-    }
-    forwardFields.campusText.value = captured.campus.text;
-    forwardFields.campusId.value = captured.campus.id;
-    forwardFields.setorText.value = captured.setor.text;
-    forwardFields.setorId.value = captured.setor.id;
-    if (captured.papel) forwardFields.papel.value = captured.papel;
-    if (captured.despacho && !forwardFields.despacho.value.trim()) forwardFields.despacho.value = captured.despacho;
-    setFormMessage(forwardFormMessage, `Destino copiado: ${captured.setor.text} (campus ${captured.campus.text}). Confira e salve.`);
-  } catch (captureError) {
-    setFormMessage(forwardFormMessage, formatExtensionAuthError(captureError), true);
+function handleForwardSetorFilterInput() {
+  const campusId = cleanSingleLine(forwardFields.campus?.value);
+  const query = forwardFields.setorFilter?.value || '';
+  const selectedSetor = getSelectedSuapOption(forwardFields.setor);
+  renderSetorSelect(campusId, selectedSetor, { filterText: query });
+  if (setorSearchTimer) {
+    clearTimeout(setorSearchTimer);
+    setorSearchTimer = null;
+  }
+  const entry = campusId ? suapCatalog.sectorsByCampus[campusId] : null;
+  const trimmed = cleanSingleLine(query);
+  if (campusId && trimmed && !entry?.complete) {
+    setorSearchTimer = setTimeout(() => {
+      setorSearchTimer = null;
+      void loadSectorsForCampus(campusId, { query: trimmed });
+    }, 250);
   }
 }
 
@@ -1640,7 +2164,7 @@ const readFields = (fields) => Object.fromEntries(Object.entries(fields).map(([k
 async function initializeTemplates() {
   if (!preferencesApi || !chrome?.storage?.sync?.get) {
     // Sem o módulo ou sem armazenamento sincronizado, as seções de preferências não são oferecidas.
-    [templatesView, navTemplatesItem, processPanelView, navProcessPanelItem].forEach((element) => { if (element) element.hidden = true; });
+    [...templatesViews, navTemplatesGroup, navTemplatesItem, processPanelView, navProcessPanelItem].forEach((element) => { if (element) element.hidden = true; });
     renderSection();
     return;
   }
@@ -1654,7 +2178,9 @@ async function initializeTemplates() {
 forwardNewButton?.addEventListener('click', () => openForwardEditor(-1));
 forwardForm?.addEventListener('submit', (event) => { void saveForwardShortcut(event); });
 document.getElementById('btn-forward-cancel')?.addEventListener('click', closeForwardEditor);
-document.getElementById('btn-forward-capture')?.addEventListener('click', () => { void captureForwardDestination(); });
+forwardRefreshButton?.addEventListener('click', () => { void refreshSuapCatalog({ force: true, campusId: forwardFields.campus?.value || '' }); });
+forwardFields.campus?.addEventListener('change', handleForwardCampusChange);
+forwardFields.setorFilter?.addEventListener('input', handleForwardSetorFilterInput);
 forwardUndoButton?.addEventListener('click', () => { void undoRemoveForwardShortcut(); });
 uploadForm?.addEventListener('submit', (event) => { event.preventDefault(); void saveUploadPreferences(readFields(uploadFields)); });
 document.getElementById('btn-upload-reset')?.addEventListener('click', () => { void saveUploadPreferences({ ...preferencesApi?.DEFAULT_UPLOAD }); });

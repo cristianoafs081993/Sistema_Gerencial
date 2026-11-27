@@ -11,6 +11,8 @@ const FORWARD_URL = 'https://suap.ifrn.edu.br/processo_eletronico/processo/encam
 
 const element = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = (id: string) => element<HTMLInputElement>(id);
+const select = (id: string) => element<HTMLSelectElement>(id);
+const optionValues = (id: string) => Array.from(select(id).options).map((opt) => ({ value: opt.value, text: opt.textContent }));
 const shortcuts = () => Array.from(document.querySelectorAll('#forward-list .forward-item .snippet-trigger')).map((item) => item.textContent);
 type StoredPreferences = {
   forwardShortcuts: Array<{ shortcut: string; title: string; despacho: string; campus: { id: string; text: string } | null; setor: { id: string; text: string } | null; papel: string }>;
@@ -19,10 +21,106 @@ type StoredPreferences = {
   hiddenSummaryBlocks: string[];
 };
 
-function openPopup({ stored, tabUrl = 'https://example.com', captured }: { stored?: unknown; tabUrl?: string; captured?: unknown } = {}) {
+const SUAP_CAMPUSES_PAGE_1 = [
+  { id: 3, html: '<div>CN</div>', text: 'CN' },
+  { id: 1, html: '<div>RE</div>', text: 'RE' },
+];
+const SUAP_SECTORS_BY_CAMPUS: Record<string, Array<{ id: number; text: string; html: string }>> = {
+  '3': [
+    {
+      id: 841,
+      text: 'DG/CN',
+      html: '<span class="admin-setor" title="Direção-Geral">DG/CN (Direção-Geral)</span>',
+    },
+    {
+      id: 900,
+      text: 'COFIN/CN',
+      html: '<span class="admin-setor" title="Coordenação de Finanças e Contratos">COFIN/CN (Coordenação de Finanças e Contratos)</span>',
+    },
+  ],
+  '1': [
+    {
+      id: 1200,
+      text: 'PROAD/RE',
+      html: '<span class="admin-setor" title="Pró-Reitoria de Administração">PROAD/RE (Pró-Reitoria de Administração)</span>',
+    },
+  ],
+};
+const SUAP_FORWARD_HTML = `
+  <form id="tramite_formencaminharparasetor">
+    <select name="papel" id="id_papel">
+      <option value="">---------</option>
+      <option value="19532">ASSISTENTE EM ADMINISTRACAO</option>
+      <option value="110853">DIRETOR(A) DE DIRETORIA - SUB-CHEFIA - DIAD/CN</option>
+      <option value="22000">CONTADOR</option>
+    </select>
+  </form>`;
+
+function createSuapFetch({ loginRequired = false }: { loginRequired?: boolean } = {}) {
+  return vi.fn(async (rawUrl: string) => {
+    const url = new URL(String(rawUrl));
+    if (loginRequired) {
+      return {
+        ok: true,
+        status: 200,
+        redirected: true,
+        url: 'https://suap.ifrn.edu.br/accounts/login/?next=/json/rh/unidadeorganizacional/',
+        headers: new Headers({ 'content-type': 'text/html' }),
+        json: async () => { throw new Error('html'); },
+        text: async () => '<form><input name="username"><input name="password"></form>',
+      };
+    }
+    if (url.pathname === '/json/rh/unidadeorganizacional/') {
+      return {
+        ok: true,
+        status: 200,
+        redirected: false,
+        url: url.href,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({ items: SUAP_CAMPUSES_PAGE_1, total: SUAP_CAMPUSES_PAGE_1.length }),
+      };
+    }
+    if (url.pathname === '/json/rh/setor/') {
+      const filterPks = JSON.parse(url.searchParams.get('filter_pks') || '{}') as { uo_id?: string };
+      const items = SUAP_SECTORS_BY_CAMPUS[filterPks.uo_id || ''] || [];
+      return {
+        ok: true,
+        status: 200,
+        redirected: false,
+        url: url.href,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({ items, total: items.length }),
+      };
+    }
+    if (url.pathname === '/processo_eletronico/caixa_processos/') {
+      return {
+        ok: true,
+        status: 200,
+        redirected: false,
+        url: url.href,
+        headers: new Headers({ 'content-type': 'text/html' }),
+        text: async () => '<a href="/processo_eletronico/processo/encaminhar/498930/">Encaminhar</a>',
+      };
+    }
+    if (url.pathname === '/processo_eletronico/processo/encaminhar/498930/') {
+      return {
+        ok: true,
+        status: 200,
+        redirected: false,
+        url: url.href,
+        headers: new Headers({ 'content-type': 'text/html' }),
+        text: async () => SUAP_FORWARD_HTML,
+      };
+    }
+    return { ok: false, status: 404, redirected: false, url: url.href, headers: new Headers(), json: async () => ({}), text: async () => '' };
+  });
+}
+
+function openPopup({ stored, tabUrl = 'https://example.com', loginRequired = false }: { stored?: unknown; tabUrl?: string; loginRequired?: boolean } = {}) {
   document.body.innerHTML = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)![1];
   const sync: Record<string, unknown> = stored ? { [KEY]: stored } : {};
-  const executeScript = vi.fn(async () => [{ result: captured }]);
+  const local: Record<string, unknown> = {};
+  const fetchMock = createSuapFetch({ loginRequired });
   vi.stubGlobal('chrome', {
     runtime: { sendMessage: vi.fn(async () => ({ ok: true })) },
     storage: {
@@ -30,17 +128,20 @@ function openPopup({ stored, tabUrl = 'https://example.com', captured }: { store
         get: vi.fn(async (key: string) => (key in sync ? { [key]: sync[key] } : {})),
         set: vi.fn(async (value: Record<string, unknown>) => { Object.assign(sync, value); }),
       },
-      local: { get: vi.fn(async () => ({})), set: vi.fn(), remove: vi.fn() },
+      local: {
+        get: vi.fn(async (key: string) => (key in local ? { [key]: local[key] } : {})),
+        set: vi.fn(async (value: Record<string, unknown>) => { Object.assign(local, value); }),
+        remove: vi.fn(),
+      },
       onChanged: { addListener: vi.fn() },
     },
     tabs: { query: vi.fn().mockResolvedValue([{ id: 5, url: tabUrl }]) },
-    scripting: { executeScript },
   });
   vi.stubGlobal('SiagesExtensionAuth', { getSession: vi.fn().mockResolvedValue(null) });
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({}) })));
+  vi.stubGlobal('fetch', fetchMock);
   window.eval(preferencesScript);
   new Function(script)();
-  return { sync, stored: () => sync[KEY] as StoredPreferences, executeScript };
+  return { sync, local, stored: () => sync[KEY] as StoredPreferences, fetchMock };
 }
 
 beforeEach(() => localStorage.clear());
@@ -50,39 +151,72 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-it('mostra o encdg padrão e os valores atuais do upload', async () => {
+it('separa encaminhamentos, modelos de documentos e uploads em submenus e mostra os valores padrão', async () => {
   openPopup();
-  (document.querySelector('.nav-item[data-section="templates"]') as HTMLButtonElement).click();
-  expect(element('templates-panel').classList.contains('is-active')).toBe(true);
+  const parent = element<HTMLButtonElement>('nav-templates');
+  const submenu = element('nav-templates-submenu');
+  expect(parent.getAttribute('aria-expanded')).toBe('false');
+  expect(submenu.hidden).toBe(true);
+
+  parent.click();
+  expect(parent.getAttribute('aria-expanded')).toBe('true');
+  expect(submenu.hidden).toBe(false);
+  expect(Array.from(submenu.querySelectorAll('.nav-subitem .nav-text')).map((item) => item.textContent)).toEqual([
+    'Encaminhamentos',
+    'Modelos de documentos',
+    'Uploads',
+  ]);
+
+  (document.querySelector('.nav-item[data-section="templates-forwards"]') as HTMLButtonElement).click();
+  expect(element('templates-forwards-panel').classList.contains('is-active')).toBe(true);
+  expect(element('templates-documents-panel').classList.contains('is-active')).toBe(false);
+  expect(element('templates-uploads-panel').classList.contains('is-active')).toBe(false);
   await waitFor(() => expect(shortcuts()).toEqual(['encdg']));
   expect(document.querySelector('#forward-list .forward-meta')?.textContent).toBe('Para DG/CN · campus CN · perfil ASSISTENTE EM ADMINISTRACAO');
-  expect(input('upload-tipo-conferencia').value).toBe('Cópia Simples');
-  expect(input('upload-tipo-documento').value).toBe('Liquidação');
+
+  (document.querySelector('.nav-item[data-section="templates-documents"]') as HTMLButtonElement).click();
+  expect(element('templates-documents-panel').classList.contains('is-active')).toBe(true);
+  expect(element('templates-forwards-panel').classList.contains('is-active')).toBe(false);
   expect(input('despacho-destinatario').value).toBe('');
   expect(input('despacho-destinatario').placeholder).toBe('À Coordenação de Finanças e Contratos do Campus {campus}');
+
+  (document.querySelector('.nav-item[data-section="templates-uploads"]') as HTMLButtonElement).click();
+  expect(element('templates-uploads-panel').classList.contains('is-active')).toBe(true);
+  expect(element('templates-documents-panel').classList.contains('is-active')).toBe(false);
+  expect(input('upload-tipo-conferencia').value).toBe('Cópia Simples');
+  expect(input('upload-tipo-documento').value).toBe('Liquidação');
 });
 
-it('cria um atalho copiando o destino da tela Encaminhar aberta no SUAP', async () => {
-  const { stored, executeScript } = openPopup({
-    tabUrl: FORWARD_URL,
-    captured: { campus: { id: '3', text: 'CN' }, setor: { id: '900', text: 'COFIN/CN' }, papel: 'CONTADOR', despacho: 'Para pagamento.' },
-  });
+it('carrega campi, setores e perfis direto do SUAP, filtra setores e salva o atalho sem IDs manuais', async () => {
+  const { stored } = openPopup({ tabUrl: FORWARD_URL });
   await waitFor(() => expect(shortcuts()).toEqual(['encdg']));
   element('btn-forward-new').click();
   expect(element('forward-editor').hidden).toBe(false);
-  // Campus e perfil partem do primeiro atalho.
-  expect(input('forward-campus-id').value).toBe('3');
-  expect(input('forward-papel').value).toBe('ASSISTENTE EM ADMINISTRACAO');
+  expect(document.getElementById('forward-campus-id')).toBeNull();
+  expect(document.getElementById('forward-setor-id')).toBeNull();
 
-  element('btn-forward-capture').click();
-  await waitFor(() => expect(input('forward-setor-id').value).toBe('900'));
-  expect(executeScript).toHaveBeenCalledWith(expect.objectContaining({ target: { tabId: 5 } }));
-  expect(input('forward-setor-text').value).toBe('COFIN/CN');
-  expect(input('forward-papel').value).toBe('CONTADOR');
-  expect(element<HTMLTextAreaElement>('forward-despacho').value).toBe('Para pagamento.');
+  // Campus e perfil partem do primeiro atalho e carregam as listas completas do SUAP.
+  expect(select('forward-campus').value).toBe('3');
+  expect(select('forward-papel').value).toBe('ASSISTENTE EM ADMINISTRACAO');
+  await waitFor(() => expect(optionValues('forward-campus').map((opt) => opt.value)).toEqual(['', '3', '1']));
+  await waitFor(() => expect(optionValues('forward-setor').map((opt) => opt.text)).toEqual([
+    'Escolha o setor',
+    'COFIN/CN — Coordenação de Finanças e Contratos',
+    'DG/CN — Direção-Geral',
+  ]));
+  await waitFor(() => expect(optionValues('forward-papel').map((opt) => opt.value)).toContain('CONTADOR'));
 
+  // Filtrar setor reduz a lista exibida sem perder o texto real do setor.
+  input('forward-setor-filter').value = 'finanças';
+  fireEvent.input(input('forward-setor-filter'));
+  expect(optionValues('forward-setor').map((opt) => opt.value)).toEqual(['', '900']);
+
+  select('forward-setor').value = '900';
+  select('forward-papel').value = 'CONTADOR';
+  element<HTMLTextAreaElement>('forward-despacho').value = 'Para pagamento.';
   input('forward-shortcut').value = ' EncFin ';
   fireEvent.submit(element('forward-form'));
+
   await waitFor(() => expect(shortcuts()).toEqual(['encdg', 'encfin']));
   expect(element('forward-editor').hidden).toBe(true);
   expect(stored().forwardShortcuts[1]).toEqual({
@@ -91,12 +225,26 @@ it('cria um atalho copiando o destino da tela Encaminhar aberta no SUAP', async 
   expect(element('forward-message').textContent).toContain('encfin <número do processo>');
 });
 
-it('recusa atalho reservado ou sem setor e pede a tela Encaminhar para copiar o destino', async () => {
-  const { sync } = openPopup();
+it('atualiza a lista de setores ao trocar o campus selecionado', async () => {
+  openPopup();
   await waitFor(() => expect(shortcuts()).toEqual(['encdg']));
   element('btn-forward-new').click();
-  element('btn-forward-capture').click();
-  await waitFor(() => expect(element('forward-form-message').textContent).toContain('Abra a tela “Encaminhar”'));
+  await waitFor(() => expect(optionValues('forward-campus').map((opt) => opt.value)).toContain('1'));
+
+  select('forward-campus').value = '1';
+  fireEvent.change(select('forward-campus'));
+  await waitFor(() => expect(optionValues('forward-setor').map((opt) => opt.text)).toEqual([
+    'Escolha o setor',
+    'PROAD/RE — Pró-Reitoria de Administração',
+  ]));
+});
+
+it('avisa quando o SUAP pede login e recusa atalho reservado ou sem setor', async () => {
+  const { sync } = openPopup({ loginRequired: true });
+  await waitFor(() => expect(shortcuts()).toEqual(['encdg']));
+  element('btn-forward-new').click();
+  await waitFor(() => expect(element('forward-catalog-status').textContent).toContain('Faça login no SUAP'));
+  expect(element('forward-catalog-status').dataset.error).toBe('true');
 
   input('forward-shortcut').value = 'encs';
   fireEvent.submit(element('forward-form'));
@@ -179,7 +327,10 @@ it('não oferece a seção quando o módulo de preferências não está disponí
   vi.stubGlobal('SiagesExtensionAuth', { getSession: vi.fn().mockResolvedValue(null) });
   vi.stubGlobal('SiagesUserPreferences', undefined);
   new Function(script)();
-  await waitFor(() => expect(element('nav-templates').hidden).toBe(true));
+  await waitFor(() => expect(element('nav-templates-group').hidden).toBe(true));
+  expect(element('nav-templates').hidden).toBe(true);
   expect(element('nav-process-panel').hidden).toBe(true);
-  expect(element('templates-panel').classList.contains('is-active')).toBe(false);
+  expect(element('templates-forwards-panel').classList.contains('is-active')).toBe(false);
+  expect(element('templates-documents-panel').classList.contains('is-active')).toBe(false);
+  expect(element('templates-uploads-panel').classList.contains('is-active')).toBe(false);
 });

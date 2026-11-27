@@ -5,6 +5,7 @@ import { extensionFixturePath } from '@/test/extensionFixtures';
 
 const html = readFileSync(extensionFixturePath('popup.html'), 'utf8');
 const script = readFileSync(extensionFixturePath('popup.js'), 'utf8');
+const preferencesScript = readFileSync(extensionFixturePath('user-preferences.js'), 'utf8');
 const SECTION_KEY = 'siages-popup-section';
 const admin = { accessToken: 'test-token', user: { email: 'gestor@example.com', app_metadata: { role: 'superadmin' } } };
 const user = { accessToken: 'test-token', user: { email: 'usuario@example.com' } };
@@ -14,7 +15,7 @@ const element = (id: string) => document.getElementById(id)!;
 const navItem = (section: string) => document.querySelector(`.nav-item[data-section="${section}"]`) as HTMLButtonElement;
 const activeViews = () => Array.from(document.querySelectorAll('.view.is-active')).map((view) => (view as HTMLElement).dataset.section);
 
-function openPopup(session: Session, { tabUrl = 'https://example.com', rdRunning = false } = {}) {
+function openPopup(session: Session, { tabUrl = 'https://example.com', rdRunning = false, withPreferences = false } = {}) {
   document.body.innerHTML = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)![1];
   const listeners: Array<(changes: Record<string, unknown>, area: string) => void> = [];
   const auth = {
@@ -40,6 +41,7 @@ function openPopup(session: Session, { tabUrl = 'https://example.com', rdRunning
     tabs: { query: vi.fn().mockResolvedValue([{ id: 1, url: tabUrl }]) },
     scripting: { executeScript: vi.fn().mockResolvedValue([{ result: { unit: '' } }]) },
   });
+  if (withPreferences) window.eval(preferencesScript);
   new Function(script)();
   return { auth };
 }
@@ -109,4 +111,36 @@ it('abre direto no preenchimento de favorecidos quando a aba é do SIAFI, sem tr
   await waitFor(() => expect(activeViews()).toEqual(['siafi']));
   expect(navItem('siafi').hidden).toBe(false);
   expect(localStorage.getItem(SECTION_KEY)).toBe('snippets');
+});
+
+it('expande e recolhe os submenus de Modelos e preenchimentos e lembra o subitem ativo', () => {
+  openPopup(user, { withPreferences: true });
+  const parent = element('nav-templates');
+  const submenu = element('nav-templates-submenu');
+  expect(parent.getAttribute('aria-expanded')).toBe('false');
+  expect(submenu.hidden).toBe(true);
+
+  parent.click();
+  expect(parent.getAttribute('aria-expanded')).toBe('true');
+  expect(submenu.hidden).toBe(false);
+
+  navItem('templates-uploads').click();
+  expect(activeViews()).toEqual(['templates-uploads']);
+  expect(navItem('templates-uploads').getAttribute('aria-current')).toBe('page');
+  expect(parent.classList.contains('is-parent-active')).toBe(true);
+  expect(localStorage.getItem(SECTION_KEY)).toBe('templates-uploads');
+
+  parent.click();
+  expect(parent.getAttribute('aria-expanded')).toBe('false');
+  expect(submenu.hidden).toBe(true);
+  expect(parent.classList.contains('is-parent-active')).toBe(true);
+});
+
+it('reabre o submenu salvo e migra a chave antiga templates para Encaminhamentos', () => {
+  localStorage.setItem(SECTION_KEY, 'templates');
+  openPopup(user, { withPreferences: true });
+  expect(activeViews()).toEqual(['templates-forwards']);
+  expect(element('nav-templates').getAttribute('aria-expanded')).toBe('true');
+  expect(element('nav-templates-submenu').hidden).toBe(false);
+  expect(navItem('templates-forwards').getAttribute('aria-current')).toBe('page');
 });
