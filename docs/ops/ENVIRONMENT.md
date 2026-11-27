@@ -146,6 +146,19 @@ Observacoes operacionais:
 - `process-pdf` retorna `202` quando a extracao foi enfileirada; o resultado real e gravado depois pelo `process-pdf-worker` em `processos`. A ordem de provedores e Gemini com PDF inteiro, Gemini por blocos, OpenAI e OpenRouter. Se a tentativa inicial Gemini falhar, o mesmo provedor e tentado por blocos de paginas antes de qualquer fallback externo. A OpenAI usa detalhe alto para evitar uma resposta vazia em processos visualmente complexos e, se o PDF completo exceder a janela de contexto, tambem tenta os blocos. OpenRouter e reservado para converter o contexto disponivel ou uma resposta anterior nao estruturada em JSON valido.
 - a resposta da Edge Function confirma apenas o enfileiramento. O frontend deve considerar a IA finalizada somente quando `processos.status` chegar a `success`, `incomplete_extraction` ou `extraction_failed`; enquanto houver fila ou processamento, a tela acompanha a atualizacao em segundo plano.
 
+### `cleanup-suap-pdfs`
+
+Necessarias no ambiente do Supabase:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUAP_PDF_RETENTION_SECRET`
+  - comparado ao header `x-retention-secret`; sem ele a function responde `401`
+  - o mesmo valor deve estar no Vault como `suap_pdf_retention_secret`, lido por `public.dispatch_suap_pdf_retention()` no cron diário (06:15 UTC = 03:15 em Brasília)
+
+Observacoes operacionais:
+
+- não versione o valor do segredo; `supabase/config.toml` mantém `verify_jwt = false` porque a chamada vem do cron. Ver [SUPABASE_FUNCTIONS](SUPABASE_FUNCTIONS.md#cleanup-suap-pdfs).
+
 ### `validar-pesquisa-precos`
 
 Necessarias no ambiente do Supabase:

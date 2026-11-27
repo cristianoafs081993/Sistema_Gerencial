@@ -1338,7 +1338,7 @@ Campos-chave:
 Observações operacionais:
 
 - Isolamento por Tenant (RLS `tenant_isolation`): `(auth.uid() = tenant_id)`. O usuário só pode ver e editar processos criados por ele mesmo.
-- O inventário preserva dados e PDFs em `processos`, mas a visibilidade na UI depende de pelo menos um vínculo ativo em `suap_processo_caixas`.
+- O inventário preserva os dados em `processos`, mas a visibilidade na UI depende de pelo menos um vínculo ativo em `suap_processo_caixas`. Os PDFs seguem a retenção do bucket `suap-pdfs` descrita abaixo.
 - Processos ausentes de uma caixa lida com sucesso perdem apenas esse vínculo; se retornarem a qualquer caixa cadastrada, reaparecem com o mesmo histórico.
 
 ### `process_mappings`
@@ -1424,6 +1424,7 @@ Observações operacionais e RLS:
 - **SELECT**: Leitura permitida para o próprio usuário autenticado que enviou o arquivo.
 - **UPDATE**: Atualização permitida para o próprio usuário autenticado dono da pasta (RLS `Tenant can update their own PDFs`), essencial para a funcionalidade de `upsert` na sincronização.
 - **DELETE**: Remoção permitida para o próprio usuário autenticado dono da pasta (RLS `Tenant can delete their own PDFs`).
+- **Retenção**: a rotina `cleanup-suap-pdfs` roda uma vez por dia às 03h15 de Brasília e remove, em lotes de até 50, os PDFs com mais de 72 horas desde a última gravação, inclusive peças e arquivos sem referência. PDFs em uso por extração na fila ou em andamento, ou com atividade nos últimos 30 minutos, são pulados. Depois da remoção, `pdf_url`/`storage_path` são limpos e os dados extraídos ficam preservados; extrações interrompidas recebem `pdf_expired`. Para usar o PDF de novo, basta baixá-lo outra vez do SUAP. Detalhes em [SUPABASE_FUNCTIONS](../ops/SUPABASE_FUNCTIONS.md#cleanup-suap-pdfs).
 
 ## Fundação operacional e Almoxarifado
 
