@@ -213,7 +213,13 @@ Uso:
 - gera magic link para concluir a sessao do app apenas se `loginSupabase` for verdadeiro
 - grava `user_metadata.matricula` normalizada para ser a chave de terceirizados
 - quando a matricula existe em `terceirizados`, sincroniza `user_id` em `terceirizados` e `terceirizado_permissions`, associa o usuario ao grupo `terceirizado` e remove memberships incompatíveis
-- quando nao ha cadastro de terceirizado e o usuario ainda nao possui grupo, associa ao grupo `diretores`
+- quando nao ha cadastro de terceirizado e `suap_access_settings.require_grant` esta desligado (padrao), associa ao grupo `diretores` (regra antiga)
+- autorizacao por matricula (`user_access_grants` ativa e dentro da validade): os grupos do usuario passam a ser exatamente os de `user_access_grant_groups`, e o campus ativo fica dentro de `user_access_grant_campi` quando houver campi cadastrados
+- com `require_grant` ligado, quem nao tem autorizacao nem terceirizado mantem os grupos que ja possui; quem nao tem nenhum grupo fica sem acesso, a resposta traz `access_pending: true` e a matricula vai para `suap_access_requests`
+- grava `app_metadata.matricula`, `suap_vinculo`, `suap_campus` e `suap_campus_uasg` (somente o servidor escreve app_metadata)
+- le o campus do vinculo (`vinculo.campus`, sigla ou nome) e converte para UASG por `suap_campus_map` ou pelo nome em `licitacoes_pncp_uasgs`; o campus ativo so e definido para usuario criado no proprio login ou quando a autorizacao limita os campi (usuarios existentes mantem o campus atual)
+- grava a foto do SUAP em `user_profiles.foto_url`, preservando `foto_visivel`
+- regras puras em `_shared/suap_access.ts`, testadas em `src/lib/__tests__/suapAccessRules.test.ts`
 
 Dependencias:
 

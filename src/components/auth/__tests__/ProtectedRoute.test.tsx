@@ -91,6 +91,8 @@ describe('ProtectedRoute', () => {
       isLoading: false,
       ...authDefaults,
       canAccessPath: vi.fn(() => false),
+      userGroups: [{ id: 'g-1', name: 'Diretores', slug: 'diretores' }],
+      screenAccessIds: ['dashboard'],
       isSuperAdmin: false,
       canInviteUsers: false,
       signInWithPassword: vi.fn(),
@@ -110,6 +112,36 @@ describe('ProtectedRoute', () => {
     );
 
     expect(await screen.findByText('Acesso restrito')).toBeInTheDocument();
+    expect(screen.queryByText('controle-page')).not.toBeInTheDocument();
+  });
+
+  it('avisa que o acesso aguarda liberacao quando o usuario nao tem nenhum perfil', async () => {
+    mockedUseAuth.mockReturnValue({
+      session: { user: { id: 'user-2', email: 'novo@ifrn.edu.br' } } as never,
+      user: { id: 'user-2', email: 'novo@ifrn.edu.br' } as never,
+      isAuthenticated: true,
+      isLoading: false,
+      ...authDefaults,
+      canAccessPath: vi.fn(() => false),
+      isSuperAdmin: false,
+      canInviteUsers: false,
+      signInWithPassword: vi.fn(),
+      updatePassword: vi.fn(),
+      requestPasswordReset: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/controle-usuarios']}>
+        <Routes>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/controle-usuarios" element={<div>controle-page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Acesso aguardando liberação')).toBeInTheDocument();
     expect(screen.queryByText('controle-page')).not.toBeInTheDocument();
   });
 

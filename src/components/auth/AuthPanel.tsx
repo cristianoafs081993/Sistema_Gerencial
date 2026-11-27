@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { normalizeNextPath } from '@/lib/auth';
-import { buildSuapAuthorizeUrl } from '@/lib/suapAuth';
+import { buildSuapAuthorizeUrl, createSuapLoginState } from '@/lib/suapAuth';
 
 type AuthPanelProps = {
   title: string;
@@ -52,7 +52,7 @@ export function AuthPanel({ title, description }: AuthPanelProps) {
 
   const handleSuapLogin = () => {
     localStorage.setItem('suap_login_next', nextPath);
-    const suapAuthUrl = buildSuapAuthorizeUrl({ state: 'app' });
+    const suapAuthUrl = buildSuapAuthorizeUrl({ state: createSuapLoginState() });
     window.location.href = suapAuthUrl;
   };
 
@@ -63,6 +63,24 @@ export function AuthPanel({ title, description }: AuthPanelProps) {
         {description ? <CardDescription className="text-sm font-medium text-muted-foreground">{description}</CardDescription> : null}
       </CardHeader>
       <CardContent className="space-y-4">
+        <Button
+          type="button"
+          onClick={handleSuapLogin}
+          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-11 shadow-sm rounded-xl font-bold gap-2 flex items-center justify-center transition-all"
+        >
+          <GraduationCap className="h-5 w-5" />
+          Entrar com SUAP
+        </Button>
+        <p className="text-center text-xs text-muted-foreground">Servidores do IFRN: use a sua matrícula e senha do SUAP.</p>
+
+        <div className="relative flex py-2 items-center">
+          <div className="flex-grow border-t border-border"></div>
+          <span className="flex-shrink mx-4 text-xs text-muted-foreground uppercase font-bold tracking-wider">
+            ou entre com e-mail e senha
+          </span>
+          <div className="flex-grow border-t border-border"></div>
+        </div>
+
         <div className="space-y-2">
           <label htmlFor="auth-email" className="text-sm font-medium text-foreground">
             E-mail
@@ -115,26 +133,9 @@ export function AuthPanel({ title, description }: AuthPanelProps) {
           </div>
         </div>
 
-        <Button type="button" className="h-11 w-full" disabled={isSubmitting} onClick={() => void handleLogin()}>
+        <Button type="button" variant="outline" className="h-11 w-full" disabled={isSubmitting} onClick={() => void handleLogin()}>
           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />}
           {isSubmitting ? 'Entrando...' : 'Entrar'}
-        </Button>
-
-        <div className="relative flex py-2 items-center">
-          <div className="flex-grow border-t border-border"></div>
-          <span className="flex-shrink mx-4 text-xs text-muted-foreground uppercase font-bold tracking-wider">
-            ou acesse com
-          </span>
-          <div className="flex-grow border-t border-border"></div>
-        </div>
-
-        <Button
-          type="button"
-          onClick={handleSuapLogin}
-          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-11 shadow-sm rounded-xl font-bold gap-2 flex items-center justify-center transition-all"
-        >
-          <GraduationCap className="h-5 w-5" />
-          Entrar com SUAP
         </Button>
 
       </CardContent>

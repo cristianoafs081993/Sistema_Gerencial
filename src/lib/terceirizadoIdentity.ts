@@ -4,6 +4,7 @@ export type AuthUserIdentityLike = {
   id?: string | null;
   email?: string | null;
   user_metadata?: MetadataLike | null;
+  app_metadata?: MetadataLike | null;
 };
 
 export type TerceirizadoIdentityLike = {
@@ -32,7 +33,9 @@ function metadataString(metadata: MetadataLike | null | undefined, key: string) 
 export function getAuthUserMatricula(user?: AuthUserIdentityLike | null) {
   if (!user) return '';
 
+  // app_metadata é gravado só pelo servidor no login SUAP; user_metadata fica como legado.
   return normalizeMatricula(
+    metadataString(user.app_metadata, 'matricula') ||
     metadataString(user.user_metadata, 'matricula') ||
       metadataString(user.user_metadata, 'username') ||
       metadataString(user.user_metadata, 'identificacao'),

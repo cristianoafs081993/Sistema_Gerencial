@@ -60,6 +60,8 @@ export function ProtectedRoute() {
       return <Navigate to={firstAllowedPath} replace />;
     }
 
+    const hasNoAccess = screenAccessIds.length === 0 && userGroups.length === 0;
+
     return (
       <div className="min-h-screen bg-background px-4 py-10">
         <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-xl items-center justify-center">
@@ -68,9 +70,13 @@ export function ProtectedRoute() {
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div className="mt-5 space-y-2">
-              <p className="text-lg font-bold text-foreground">Acesso restrito</p>
+              <p className="text-lg font-bold text-foreground">
+                {hasNoAccess ? 'Acesso aguardando liberação' : 'Acesso restrito'}
+              </p>
               <p className="text-sm leading-6 text-muted-foreground">
-                Seu grupo de usuários não possui permissão para acessar esta tela.
+                {hasNoAccess
+                  ? 'Seu login foi reconhecido, mas sua matrícula ainda não tem perfil liberado no SIAGES. Peça ao administrador do sistema para cadastrar seu acesso.'
+                  : 'Seu grupo de usuários não possui permissão para acessar esta tela.'}
               </p>
             </div>
           </div>

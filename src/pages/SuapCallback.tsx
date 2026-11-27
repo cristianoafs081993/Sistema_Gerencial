@@ -4,7 +4,7 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { env } from '@/lib/env';
-import { getSuapRedirectUri } from '@/lib/suapAuth';
+import { getSuapRedirectUri, isValidSuapLoginState } from '@/lib/suapAuth';
 import { supabase } from '@/lib/supabase';
 
 export default function SuapCallback() {
@@ -49,6 +49,10 @@ export default function SuapCallback() {
       const isAppLogin = state === 'app' || (state && state.startsWith('app'));
 
       try {
+        if (isAppLogin && !isValidSuapLoginState(state)) {
+          throw new Error('A solicitação de login não confere com a iniciada neste navegador. Tente entrar novamente.');
+        }
+
         const redirectUri = getSuapRedirectUri();
         
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suap-token-exchange`, {
@@ -107,7 +111,11 @@ export default function SuapCallback() {
             const nextPath = localStorage.getItem('suap_login_next') || '/';
             localStorage.removeItem('suap_login_next');
             navigate(nextPath, { replace: true });
-            toast.success('Autenticado com sucesso!');
+            if (data?.access_pending) {
+              toast.info('Login feito. Seu acesso ainda aguarda liberação pelo administrador.');
+            } else {
+              toast.success('Autenticado com sucesso!');
+            }
           } else if (data?.action_link) {
             // Fallback: redirect to action_link (works when redirect URLs are whitelisted)
             window.location.href = data.action_link;

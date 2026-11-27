@@ -50,3 +50,11 @@ describe('terceirizadoIdentity', () => {
     ).toBe(true);
   });
 });
+
+describe('matrícula confiável', () => {
+  it('prefere a matrícula gravada pelo servidor em app_metadata', async () => {
+    const { getAuthUserMatricula } = await import('@/lib/terceirizadoIdentity');
+    expect(getAuthUserMatricula({ app_metadata: { matricula: '111' }, user_metadata: { matricula: '222' } })).toBe('111');
+    expect(getAuthUserMatricula({ user_metadata: { matricula: '22.2' } })).toBe('222');
+  });
+});

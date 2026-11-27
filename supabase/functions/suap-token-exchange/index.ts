@@ -1,4 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import {
+  buildSuapPhotoUrl,
+  decideCampusPreference,
+  decideGroupSync,
+  extractSuapCampus,
+  isGrantActive,
+  resolveCampusUasg,
+} from '../_shared/suap_access.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -97,10 +105,11 @@ Deno.serve(async (req) => {
       matricula: profileData.matricula || profileData.username || profileData.identificacao || '',
       vinculo: profileData.tipo_vinculo || profileData.vinculo?.tipo_vinculo || '',
       email: profileData.email || profileData.email_secundario || profileData.email_institucional || profileData.email_preferencial || profileData.email_google || '',
-      foto: profileData.url_foto_150x200 
-        ? (profileData.url_foto_150x200.startsWith('http') ? profileData.url_foto_150x200 : `https://suap.ifrn.edu.br${profileData.url_foto_150x200}`) 
-        : null,
+      foto: buildSuapPhotoUrl(profileData),
     };
+    const suapCampus = extractSuapCampus(profileData);
+    let suapCampusUasg: string | null = null;
+    let accessPending = false;
     const normalizedMatricula = String(userProfile.matricula || '').trim().replace(/[^0-9A-Za-z]/g, '').toLowerCase();
 
     let actionLink = null;
@@ -135,6 +144,21 @@ Deno.serve(async (req) => {
         }
 
         let userId = userObj?.id;
+        let isNewUser = false;
+
+        // Campus do SUAP -> UASG (sem a tabela de mapa, resolve só pelo nome do campus).
+        if (suapCampus) {
+          try {
+            const [{ data: campusMap }, { data: uasgRows }] = await Promise.all([
+              supabaseAdmin.from('suap_campus_map').select('sigla,campus_uasg'),
+              supabaseAdmin.from('licitacoes_pncp_uasgs').select('codigo_uasg,nome_uasg').eq('cnpj_orgao', '10877412000168'),
+            ]);
+            suapCampusUasg = resolveCampusUasg(suapCampus, campusMap || [], uasgRows || []);
+            if (!suapCampusUasg) console.warn('Campus do SUAP sem UASG correspondente:', suapCampus);
+          } catch (err) {
+            console.error('Falha ao resolver campus do SUAP:', err);
+          }
+        }
 
         // 2. If user doesn't exist, create them
         if (!userId) {
@@ -167,6 +191,7 @@ Deno.serve(async (req) => {
               }
             } else {
               userId = createData.user?.id;
+              isNewUser = Boolean(userId);
             }
           } catch (err) {
             if (err.message?.includes('already been registered')) {
@@ -193,8 +218,18 @@ Deno.serve(async (req) => {
               uses_default_password: false,
             };
 
+            // app_metadata só é gravado pelo servidor: é a fonte confiável de matrícula e campus.
+            const mergedAppMetadata = {
+              ...(userObj?.app_metadata || {}),
+              ...(normalizedMatricula ? { matricula: normalizedMatricula } : {}),
+              ...(userProfile.vinculo ? { suap_vinculo: userProfile.vinculo } : {}),
+              ...(suapCampus?.sigla ? { suap_campus: suapCampus.sigla } : {}),
+              ...(suapCampusUasg ? { suap_campus_uasg: suapCampusUasg } : {}),
+            };
+
             const { error: updateUserError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
               user_metadata: mergedMetadata,
+              app_metadata: mergedAppMetadata,
             });
 
             if (updateUserError) {
@@ -202,6 +237,21 @@ Deno.serve(async (req) => {
             }
           } catch (err) {
             console.error('Falha ao sincronizar metadados SUAP do usuario:', err);
+          }
+
+          // Foto e campus do SUAP no perfil (preserva a escolha de ocultar a foto).
+          try {
+            const { error: profileError } = await supabaseAdmin.from('user_profiles').upsert({
+              user_id: userId,
+              foto_url: userProfile.foto,
+              suap_matricula: normalizedMatricula || null,
+              suap_campus_sigla: suapCampus?.sigla || suapCampus?.nome || null,
+              suap_campus_uasg: suapCampusUasg,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id' });
+            if (profileError) console.error('Erro ao gravar perfil SUAP do usuario:', profileError);
+          } catch (err) {
+            console.error('Falha ao gravar perfil SUAP do usuario:', err);
           }
 
           let isTerceirizado = false;
@@ -262,6 +312,59 @@ Deno.serve(async (req) => {
                 .eq('user_email', email);
             }
           }
+
+          // Autorização por matrícula e configuração do login SUAP.
+          let requireGrant = false;
+          {
+            const { data: settingsRow, error: settingsError } = await supabaseAdmin
+              .from('suap_access_settings')
+              .select('require_grant')
+              .eq('id', true)
+              .maybeSingle();
+            // Sem a tabela (migration ainda não aplicada) ou com erro, mantém a regra antiga.
+            if (settingsError) console.warn('Configuracao do login SUAP indisponivel:', settingsError.message);
+            requireGrant = settingsRow?.require_grant === true;
+          }
+
+          let grant: { matricula: string; status: string; valid_until: string | null } | null = null;
+          let grantGroupIds: string[] = [];
+          let grantCampi: string[] = [];
+          if (normalizedMatricula) {
+            const { data: grantRow, error: grantError } = await supabaseAdmin
+              .from('user_access_grants')
+              .select('matricula,status,valid_until')
+              .eq('matricula', normalizedMatricula)
+              .maybeSingle();
+            if (grantError) {
+              console.warn('Autorizacao por matricula indisponivel:', grantError.message);
+            } else if (grantRow) {
+              grant = grantRow;
+              const [{ data: grantGroups }, { data: grantCampusRows }] = await Promise.all([
+                supabaseAdmin.from('user_access_grant_groups').select('group_id').eq('matricula', normalizedMatricula),
+                supabaseAdmin.from('user_access_grant_campi').select('campus_uasg').eq('matricula', normalizedMatricula),
+              ]);
+              grantGroupIds = (grantGroups || []).map((row) => row.group_id);
+              grantCampi = (grantCampusRows || []).map((row) => row.campus_uasg);
+            }
+          }
+
+          const grantActive = isGrantActive(grant, new Date().toISOString().slice(0, 10));
+
+          if (grant) {
+            const { error: grantUpdateError } = await supabaseAdmin
+              .from('user_access_grants')
+              .update({
+                user_id: userId,
+                nome: userProfile.nome,
+                email_suap: email,
+                suap_campus_sigla: suapCampus?.sigla || suapCampus?.nome || null,
+                last_login_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('matricula', grant.matricula);
+            if (grantUpdateError) console.error('Erro ao atualizar autorizacao por matricula:', grantUpdateError);
+          }
+
           const { data: memberships, error: memError } = await supabaseAdmin
             .from('user_group_memberships')
             .select('group_id')
@@ -270,47 +373,120 @@ Deno.serve(async (req) => {
           if (memError) {
             console.error('Erro ao buscar grupos do usuário:', memError);
           } else {
-            const targetGroupSlug = isTerceirizado ? 'terceirizado' : 'diretores';
-            const { data: groupData, error: groupError } = await supabaseAdmin
-              .from('user_groups')
-              .select('id')
-              .eq('slug', targetGroupSlug)
-              .single();
+            const currentGroupIds = (memberships || []).map((membership) => membership.group_id);
+            const decision = decideGroupSync({
+              grantActive,
+              grantGroupIds,
+              isTerceirizado,
+              requireGrant,
+              isAppLogin: Boolean(loginSupabase),
+              currentGroupIds,
+            });
 
-            if (groupError) {
-              console.error(`Erro ao buscar o grupo ${targetGroupSlug}:`, groupError);
-            } else if (groupData) {
-              if (isTerceirizado) {
-                const { error: cleanupError } = await supabaseAdmin
+            if (decision.mode === 'grant') {
+              const toRemove = currentGroupIds.filter((groupId) => !decision.groupIds.includes(groupId));
+              const toAdd = decision.groupIds.filter((groupId) => !currentGroupIds.includes(groupId));
+              if (toRemove.length > 0) {
+                const { error } = await supabaseAdmin
                   .from('user_group_memberships')
                   .delete()
                   .eq('user_id', userId)
-                  .neq('group_id', groupData.id);
+                  .in('group_id', toRemove);
+                if (error) console.error('Erro ao remover grupos fora da autorizacao:', error);
+              }
+              if (toAdd.length > 0) {
+                const { error } = await supabaseAdmin
+                  .from('user_group_memberships')
+                  .insert(toAdd.map((groupId) => ({ user_id: userId, email, group_id: groupId })));
+                if (error) console.error('Erro ao aplicar grupos da autorizacao:', error);
+              }
+            } else if (decision.mode === 'terceirizado' || decision.mode === 'legacy-default') {
+              // Regra anterior, sem alteração.
+              const targetGroupSlug = decision.mode === 'terceirizado' ? 'terceirizado' : decision.groupSlug;
+              const { data: groupData, error: groupError } = await supabaseAdmin
+                .from('user_groups')
+                .select('id')
+                .eq('slug', targetGroupSlug)
+                .single();
 
-                if (cleanupError) {
-                  console.error('Erro ao remover grupos incompatíveis do terceirizado:', cleanupError);
+              if (groupError) {
+                console.error(`Erro ao buscar o grupo ${targetGroupSlug}:`, groupError);
+              } else if (groupData) {
+                if (decision.mode === 'terceirizado') {
+                  const { error: cleanupError } = await supabaseAdmin
+                    .from('user_group_memberships')
+                    .delete()
+                    .eq('user_id', userId)
+                    .neq('group_id', groupData.id);
+
+                  if (cleanupError) {
+                    console.error('Erro ao remover grupos incompatíveis do terceirizado:', cleanupError);
+                  }
+                }
+
+                if (!currentGroupIds.includes(groupData.id)) {
+                  console.log(`Associando usuario ${email} ao grupo ${targetGroupSlug}`);
+                  const { error: insertError } = await supabaseAdmin
+                    .from('user_group_memberships')
+                    .insert({
+                      user_id: userId,
+                      email,
+                      group_id: groupData.id,
+                    });
+
+                  if (insertError) {
+                    console.error('Erro ao associar usuario ao grupo:', insertError);
+                  }
                 }
               }
-
-              const alreadyInTargetGroup = (memberships || []).some((membership) => membership.group_id === groupData.id);
-              if (!alreadyInTargetGroup) {
-                console.log(`Associando usuario ${email} ao grupo ${targetGroupSlug}`);
-                const { error: insertError } = await supabaseAdmin
-                  .from('user_group_memberships')
-                  .insert({
-                    user_id: userId,
-                    email,
-                    group_id: groupData.id,
-                  });
-
-                if (insertError) {
-                  console.error('Erro ao associar usuario ao grupo:', insertError);
-                }
+            } else if (decision.mode === 'pending') {
+              accessPending = true;
+              if (normalizedMatricula) {
+                const { data: existingRequest } = await supabaseAdmin
+                  .from('suap_access_requests')
+                  .select('attempts')
+                  .eq('matricula', normalizedMatricula)
+                  .maybeSingle();
+                const { error: requestError } = await supabaseAdmin.from('suap_access_requests').upsert({
+                  matricula: normalizedMatricula,
+                  nome: userProfile.nome,
+                  email,
+                  user_id: userId,
+                  vinculo: userProfile.vinculo || null,
+                  suap_campus_sigla: suapCampus?.sigla || suapCampus?.nome || null,
+                  suap_campus_uasg: suapCampusUasg,
+                  attempts: (existingRequest?.attempts || 0) + 1,
+                  last_seen_at: new Date().toISOString(),
+                }, { onConflict: 'matricula' });
+                if (requestError) console.error('Erro ao registrar solicitacao de acesso:', requestError);
               }
             }
+            // decision.mode === 'keep': grupos atuais preservados.
+          }
+
+          // Campus ativo: só para usuário novo ou quando a autorização limita os campi.
+          try {
+            const { data: currentPreference } = await supabaseAdmin
+              .from('user_campus_preferences')
+              .select('campus_uasg')
+              .eq('user_id', userId)
+              .maybeSingle();
+            const campusToSet = decideCampusPreference({
+              isNewUser,
+              suapCampusUasg,
+              grantCampi: grantActive ? grantCampi : [],
+              currentCampusUasg: currentPreference?.campus_uasg || null,
+            });
+            if (campusToSet) {
+              const { error: campusError } = await supabaseAdmin
+                .from('user_campus_preferences')
+                .upsert({ user_id: userId, campus_uasg: campusToSet, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+              if (campusError) console.error('Erro ao definir campus do usuario:', campusError);
+            }
+          } catch (err) {
+            console.error('Falha ao definir campus do usuario:', err);
           }
         }
-
         // 4. Generate login verification link (magiclink) only if loginSupabase is true
         if (loginSupabase) {
           const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
@@ -346,6 +522,9 @@ Deno.serve(async (req) => {
       hashed_token: hashedToken,
       email_otp: emailOtp,
       verification_type: verificationType,
+      access_pending: accessPending,
+      suap_campus: suapCampus,
+      suap_campus_uasg: suapCampusUasg,
       rawProfile: profileData
     }), {
       status: 200,

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMyProfilePhoto } from '@/services/userProfile';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Banknote,
@@ -10,6 +11,8 @@ import {
   FolderSync,
   FileText,
   KeyRound,
+  ImageOff,
+  Image as ImageIcon,
   Landmark,
   Loader2,
   LogOut,
@@ -226,6 +229,9 @@ export function Layout({ children }: LayoutProps) {
   const isMapeamentos = location.pathname.startsWith('/mapeamentos');
   const isFullScreenPage = isConsultor || isMapeamentos;
   const userEmail = session?.user?.email || null;
+  const myPhoto = useMyProfilePhoto(session?.user?.id);
+  const [failedPhotoUrl, setFailedPhotoUrl] = useState<string | null>(null);
+  const visiblePhotoUrl = myPhoto.fotoVisivel && myPhoto.fotoUrl !== failedPhotoUrl ? myPhoto.fotoUrl : null;
   const orgLabel = isAccessLoading ? 'Carregando órgão...' : userOrg?.name || 'Órgão não vinculado';
 
   const toggleSidebarCollapsed = () => {
@@ -722,8 +728,18 @@ export function Layout({ children }: LayoutProps) {
                       className="flex items-center gap-2 rounded-lg border-l border-border py-1 pl-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:gap-2.5 md:pl-3"
                       aria-label="Abrir configurações do usuário"
                     >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground select-none">
-                        {userEmail ? userEmail.substring(0, 1).toUpperCase() : 'U'}
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-xs font-bold text-primary-foreground select-none">
+                        {visiblePhotoUrl ? (
+                          <img
+                            src={visiblePhotoUrl}
+                            alt="Foto do usuário"
+                            className="h-full w-full object-cover"
+                            referrerPolicy="no-referrer"
+                            onError={() => setFailedPhotoUrl(visiblePhotoUrl)}
+                          />
+                        ) : (
+                          userEmail ? userEmail.substring(0, 1).toUpperCase() : 'U'
+                        )}
                       </div>
                       <div className="hidden flex-col text-right sm:flex">
                         <span className="text-xs font-semibold leading-none text-foreground">
@@ -780,6 +796,21 @@ export function Layout({ children }: LayoutProps) {
                       <FolderSync className="h-4 w-4 text-primary" />
                       Configurar integração com o SUAP
                     </DropdownMenuItem>
+                    {myPhoto.fotoUrl ? (
+                      <DropdownMenuItem
+                        disabled={myPhoto.isSaving}
+                        onSelect={() => {
+                          const nextVisible = !myPhoto.fotoVisivel;
+                          void myPhoto.setVisible(nextVisible)
+                            .then(() => toast.success(nextVisible ? 'Sua foto do SUAP voltou a aparecer.' : 'Sua foto foi ocultada para os outros usuários.'))
+                            .catch((error) => toast.error(error instanceof Error ? error.message : 'Não foi possível atualizar a foto.'));
+                        }}
+                        className="gap-2"
+                      >
+                        {myPhoto.fotoVisivel ? <ImageOff className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
+                        {myPhoto.fotoVisivel ? 'Ocultar minha foto' : 'Mostrar minha foto'}
+                      </DropdownMenuItem>
+                    ) : null}
                     <DropdownMenuItem onSelect={() => setIsPasswordDialogOpen(true)} className="gap-2">
                       <KeyRound className="h-4 w-4" />
                       Alterar senha

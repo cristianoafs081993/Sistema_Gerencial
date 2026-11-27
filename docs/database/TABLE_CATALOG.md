@@ -756,6 +756,26 @@ Observacoes operacionais:
 - a migration inicial associa usuarios existentes, exceto o superadministrador, ao grupo `Diretores`
 - escritas administrativas passam pela Edge Function `admin-users` com `SUPABASE_SERVICE_ROLE_KEY`
 
+### `user_access_grants`, `user_access_grant_groups`, `user_access_grant_campi`
+
+Finalidade:
+
+- autorizacao de acesso por matricula SUAP (normalizada como em `terceirizados`): perfis (`user_groups`) e campi permitidos
+- aplicada pela Edge Function `suap-token-exchange` a cada login SUAP; administrada pelo superadmin em Controle de usuarios (RLS `is_superadmin_jwt`)
+- `set_user_campus_uasg` recusa campus fora de `user_access_grant_campi` para quem tem autorizacao com campi; sem autorizacao, nada muda
+
+### `suap_access_settings`, `suap_access_requests`, `suap_campus_map`
+
+- `suap_access_settings` (linha unica): `require_grant` liga a exigencia de autorizacao para novos acessos pelo SUAP; padrao `false` (regra antiga)
+- `suap_access_requests`: quem entrou pelo SUAP sem autorizacao com `require_grant` ligado
+- `suap_campus_map`: sigla do campus no SUAP -> UASG, editavel; leitura liberada para autenticados
+
+### `user_profiles`
+
+- foto (`foto_url`) e campus vindos do SUAP; `foto_visivel` controlada pelo proprio usuario via RPC `set_my_photo_visibility`
+- leitura direta so do proprio registro; fotos de outros usuarios via RPC `get_visible_user_photos`, que nunca devolve foto oculta
+- migration `20261127210000_suap_access_grants.sql` (aditiva, nao altera usuarios existentes)
+
 ## Preferencias de usuario
 
 ### `user_favorites`

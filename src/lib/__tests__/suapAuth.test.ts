@@ -39,3 +39,35 @@ describe('suapAuth', () => {
     expect(getSuapRedirectUri('http://localhost:5173')).toBe('http://localhost:5173/suap-callback');
   });
 });
+
+describe('state do login SUAP', () => {
+  function memoryStorage() {
+    const data = new Map<string, string>();
+    return {
+      getItem: (key: string) => data.get(key) ?? null,
+      setItem: (key: string, value: string) => void data.set(key, value),
+      removeItem: (key: string) => void data.delete(key),
+    };
+  }
+
+  it('gera state aleatório com prefixo app e aceita só o mesmo valor no retorno', async () => {
+    const { createSuapLoginState, isValidSuapLoginState } = await import('@/lib/suapAuth');
+    const storage = memoryStorage();
+    const state = createSuapLoginState(storage);
+    expect(state).toMatch(/^app:[0-9a-z]{16,}$/);
+    expect(createSuapLoginState(memoryStorage())).not.toBe(state);
+    expect(isValidSuapLoginState('app:outro', storage)).toBe(false);
+
+    const storage2 = memoryStorage();
+    const state2 = createSuapLoginState(storage2);
+    expect(isValidSuapLoginState(state2, storage2)).toBe(true);
+    // Uso único.
+    expect(isValidSuapLoginState(state2, storage2)).toBe(false);
+  });
+
+  it('mantém aceito o formato antigo e o fluxo de feedback público', async () => {
+    const { isValidSuapLoginState } = await import('@/lib/suapAuth');
+    expect(isValidSuapLoginState('app', memoryStorage())).toBe(true);
+    expect(isValidSuapLoginState('AMB-123', memoryStorage())).toBe(true);
+  });
+});

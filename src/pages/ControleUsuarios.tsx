@@ -26,6 +26,7 @@ import { buildInviteRedirectUrl, isLocalAuthRedirectUrl, resolveAuthRedirectOrig
 import { env } from '@/lib/env';
 import { useOptionalAuth } from '@/contexts/AuthContext';
 import { MaintenanceAdminPanel } from '@/components/admin/MaintenanceAdminPanel';
+import { SuapAccessGrantsPanel } from '@/components/admin/SuapAccessGrantsPanel';
 import {
   createDirectUser,
   deleteAdminUser,
@@ -395,6 +396,8 @@ export default function ControleUsuarios() {
               </div>
             </FilterPanel>
           </div>
+
+          <SuapAccessGrantsPanel groups={state.groups} onChanged={() => void loadState()} />
 
           <DataTablePanel title="Usuários" description="Associação de usuários aos grupos de acesso.">
             <Table>
