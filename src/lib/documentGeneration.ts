@@ -1,4 +1,4 @@
-import { despachoCampusHtml, despachoModeloHtml, type DespachoModelo } from '@/lib/despachoModelo';
+import { despachoCampusHtml, despachoFieldHtml, type DespachoFinalidadeModelo, type DespachoModelo, type DespachoVariables } from '@/lib/despachoModelo';
 import { supabase } from '@/lib/supabase';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { formatCurrency, formatDocumentoId, formatarDocumento, parseCurrency } from '@/lib/utils';
@@ -1390,6 +1390,21 @@ export function buildDespachoLiquidacaoHtml(context: ResolvedDocumentContext, mo
     ? `<div style="margin-bottom: 12px;"><b>Contrato:</b> ${htmlValue(context.contrato, 'numero do contrato', { bold: true })}</div>`
     : '';
 
+  // Modelo da finalidade (personalizável na extensão) e valores das variáveis do texto.
+  const finalidade: DespachoFinalidadeModelo = categoria === 'bolsa'
+    ? (context.projeto ? 'projeto' : 'bolsa-sem-projeto')
+    : categoria === 'aquisicao' ? 'aquisicao' : 'servico';
+  const variables: DespachoVariables = {
+    processo: context.processo,
+    favorecido: context.favorecido?.toUpperCase(),
+    valor: minRequiredValue == null || Number.isNaN(minRequiredValue) ? undefined : formatCurrency(minRequiredValue),
+    empenho: normalizeEmpenhoDisplay(context.empenho),
+    objeto: objetoLimpo,
+    contrato: context.contrato,
+    projeto: context.projeto,
+    edital: context.edital,
+  };
+
   let htmlTexto = '';
 
   if (categoria === 'bolsa') {
@@ -1416,14 +1431,17 @@ export function buildDespachoLiquidacaoHtml(context: ResolvedDocumentContext, mo
     htmlTexto = `Considerando a regularidade da documenta&ccedil;&atilde;o apresentada e o ateste ${trechoObjeto}${trechoContrato}, no &acirc;mbito do <i>Campus</i> ${campusHtml} (Processo n&ordm; ${processoHtml}), <b>AUTORIZO</b> a liquida&ccedil;&atilde;o da despesa no valor de ${valorHtml}, referente ao empenho ${empenhoHtml}, em favor de ${favorecidoHtml}.`;
   }
 
+  const field = (name: Parameters<typeof despachoFieldHtml>[2], fallbackHtml: string) =>
+    despachoFieldHtml(modelo, finalidade, name, variables, fallbackHtml);
+
   return `
     <div style="font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; text-align: justify; color: black;">
-      <div>${despachoModeloHtml(modelo, 'destinatario', `À Coordenação de Finanças e Contratos do <i>Campus</i> ${campusHtml}`)}</div>
-      <div style="font-weight: bold; margin-top: 30px;">Assunto: ${despachoModeloHtml(modelo, 'assunto', 'Autoriza&ccedil;&atilde;o para a Liquida&ccedil;&atilde;o da Despesa')}</div>
-      <div style="text-indent: 2.5cm; margin-top: 30px; margin-bottom: 25px;">${htmlTexto}</div>
+      <div>${field('destinatario', `À Coordenação de Finanças e Contratos do <i>Campus</i> ${campusHtml}`)}</div>
+      <div style="font-weight: bold; margin-top: 30px;">Assunto: ${field('assunto', 'Autoriza&ccedil;&atilde;o para a Liquida&ccedil;&atilde;o da Despesa')}</div>
+      <div style="text-indent: 2.5cm; margin-top: 30px; margin-bottom: 25px;">${field('corpo', htmlTexto)}</div>
       ${contratoHtml}
-      <div style="margin-top: 25px;">${despachoModeloHtml(modelo, 'encaminhamento', 'Na sequ&ecirc;ncia, encaminhe-se o processo &agrave; Dire&ccedil;&atilde;o-Geral para an&aacute;lise e posterior autoriza&ccedil;&atilde;o do pagamento, em conformidade com o cronograma e a disponibilidade or&ccedil;ament&aacute;ria desta unidade.')}</div>
-      <div style="margin-top: 40px;">${despachoModeloHtml(modelo, 'fecho', 'Atenciosamente,')}</div>
+      <div style="margin-top: 25px;">${field('encaminhamento', 'Na sequ&ecirc;ncia, encaminhe-se o processo &agrave; Dire&ccedil;&atilde;o-Geral para an&aacute;lise e posterior autoriza&ccedil;&atilde;o do pagamento, em conformidade com o cronograma e a disponibilidade or&ccedil;ament&aacute;ria desta unidade.')}</div>
+      <div style="margin-top: 40px;">${field('fecho', 'Atenciosamente,')}</div>
     </div>
   `;
 }

@@ -1,4 +1,4 @@
-import { despachoCampusHtml, despachoModeloHtml, type DespachoModelo } from '@/lib/despachoModelo';
+import { despachoCampusHtml, despachoFieldHtml, type DespachoModelo, type DespachoVariables } from '@/lib/despachoModelo';
 import type { ResolvedDocumentContext } from '@/lib/documentGeneration';
 import type { SuapProcesso } from '@/types';
 
@@ -223,9 +223,22 @@ export function buildManualDespachoHtml(fields: ManualDespachoFields, modelo?: D
   }
 
   const nextStep = fields.processo.trim() ? 'Na sequência, encaminhe-se o processo à Direção-Geral para análise e posterior autorização do pagamento.' : 'Na sequência, encaminhe-se o documento à Direção-Geral para análise e posterior autorização do pagamento.';
-  const destinatarioHtml = despachoModeloHtml(modelo, 'destinatario', `À Coordenação de Finanças e Contratos do <i>Campus</i> ${campus}`);
-  const assuntoHtml = despachoModeloHtml(modelo, 'assunto', assunto);
-  const nextStepHtml = despachoModeloHtml(modelo, 'encaminhamento', nextStep);
-  const fechoHtml = despachoModeloHtml(modelo, 'fecho', 'Atenciosamente,');
+  // Modelo da finalidade (personalizável na extensão); sem personalização, valem os textos acima.
+  const variables: DespachoVariables = {
+    processo: fields.processo,
+    favorecido: fields.favorecido.toUpperCase(),
+    valor: fields.valor,
+    empenho: fields.empenho.toUpperCase(),
+    objeto: fields.descricao,
+    projeto: fields.projeto,
+    edital: fields.edital,
+  };
+  const field = (name: Parameters<typeof despachoFieldHtml>[2], fallbackHtml: string) =>
+    despachoFieldHtml(modelo, fields.finalidade, name, variables, fallbackHtml);
+  body = field('corpo', body);
+  const destinatarioHtml = field('destinatario', `À Coordenação de Finanças e Contratos do <i>Campus</i> ${campus}`);
+  const assuntoHtml = field('assunto', assunto);
+  const nextStepHtml = field('encaminhamento', nextStep);
+  const fechoHtml = field('fecho', 'Atenciosamente,');
   return `<div style="font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; text-align: justify; color: black;"><div>${destinatarioHtml}</div><div style="font-weight: bold; margin-top: 30px;">Assunto: ${assuntoHtml}</div><div style="text-indent: 2.5cm; margin-top: 30px; margin-bottom: 25px;">${body}</div><div style="margin-top: 25px;">${nextStepHtml}</div><div style="margin-top: 40px;">${fechoHtml}</div></div>`;
 }

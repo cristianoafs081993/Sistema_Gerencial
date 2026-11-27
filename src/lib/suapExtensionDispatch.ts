@@ -1,5 +1,5 @@
 import type { SuapPlanSummary } from '@/services/suapPlanSummary';
-import type { DespachoModelo } from '@/lib/despachoModelo';
+import { DESPACHO_FINALIDADES, DESPACHO_TEMPLATE_FIELDS, type DespachoModelo } from '@/lib/despachoModelo';
 import type { SuapDocumentReviewType } from '@/lib/suapDocumentReview';
 import type { SuapProcesso } from '@/types';
 import type { ProcessMappingRecord, SuapProcessFlowSummary, SuapProcessRouteSnapshot } from '@/types/processMapping';
@@ -29,6 +29,7 @@ export type SuapExtensionProcessContext = {
 };
 
 const DESPACHO_MODELO_LIMITS = { destinatario: 300, assunto: 200, encaminhamento: 1500, fecho: 300 } as const;
+const DESPACHO_TEMPLATE_LIMITS = { ...DESPACHO_MODELO_LIMITS, corpo: 2000 } as const;
 
 /** Aceita só os campos conhecidos, como texto e dentro do limite; o restante é descartado. */
 export function sanitizeDespachoModelo(value: unknown): SuapExtensionProcessContext['despachoModelo'] | undefined {
@@ -38,6 +39,23 @@ export function sanitizeDespachoModelo(value: unknown): SuapExtensionProcessCont
   for (const [field, max] of Object.entries(DESPACHO_MODELO_LIMITS) as Array<[keyof typeof DESPACHO_MODELO_LIMITS, number]>) {
     const text = typeof source[field] === 'string' ? source[field].trim().slice(0, max) : '';
     if (text) modelo[field] = text;
+  }
+  // Modelos por finalidade: só finalidades e campos conhecidos, como texto e dentro do limite.
+  const rawModelos = source.modelos;
+  if (rawModelos && typeof rawModelos === 'object' && !Array.isArray(rawModelos)) {
+    const modelos: NonNullable<DespachoModelo['modelos']> = {};
+    for (const finalidade of DESPACHO_FINALIDADES) {
+      const rawTemplate = (rawModelos as Record<string, unknown>)[finalidade];
+      if (!rawTemplate || typeof rawTemplate !== 'object' || Array.isArray(rawTemplate)) continue;
+      const template: Record<string, string> = {};
+      for (const field of DESPACHO_TEMPLATE_FIELDS) {
+        const raw = (rawTemplate as Record<string, unknown>)[field];
+        const text = typeof raw === 'string' ? raw.trim().slice(0, DESPACHO_TEMPLATE_LIMITS[field]) : '';
+        if (text) template[field] = text;
+      }
+      if (Object.keys(template).length) modelos[finalidade] = template;
+    }
+    if (Object.keys(modelos).length) modelo.modelos = modelos;
   }
   return Object.keys(modelo).length ? modelo : undefined;
 }

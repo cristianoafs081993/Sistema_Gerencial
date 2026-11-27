@@ -389,7 +389,8 @@ describe('paleta global da extensao Suape', () => {
 
     // 1. Atalho 'up 498930' (aciona automação com payload no hash e no storage)
     fireEvent.input(input, { target: { value: 'up 498930' } });
-    expect(document.body.textContent).toContain('Fazer Upload de Documento');
+    // "up" é o atalho inicial da lista de uploads do popup.
+    expect(document.body.textContent).toContain('Upload de liquidação');
     expect(document.body.textContent).toContain('#498930');
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(assignedUrl).toContain('https://suap.ifrn.edu.br/processo_eletronico/documento_upload/498930/#siagesUpload=');
@@ -535,6 +536,125 @@ describe('paleta global da extensao Suape', () => {
     input = document.querySelector<HTMLInputElement>('.suape-cp-input')!;
     fireEvent.input(input, { target: { value: 'encgab 498930' } });
     expect(document.body.textContent).toContain('Encaminhar ao Gabinete');
+  });
+
+  it('usa atalhos de upload e de documento configurados no popup', async () => {
+    vi.useFakeTimers();
+    const { fetchMock } = createFetchMock();
+    let assignedUrl = '';
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        hostname: 'example.com',
+        pathname: '/',
+        search: '',
+        set href(url: string) { assignedUrl = url; },
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const openSpy = vi.fn();
+    vi.stubGlobal('open', openSpy);
+    const preferences = {
+      forwardShortcuts: [],
+      uploadShortcuts: [
+        { shortcut: 'upliq', title: 'Upload da liquidação', tipoConferencia: 'Cópia Simples', tipoDocumento: 'Liquidação', assunto: 'Liquidação' },
+        { shortcut: 'upnf', title: 'Upload de nota fiscal', tipoConferencia: 'Documento Original', tipoDocumento: 'Nota Fiscal', assunto: 'NF do contrato' },
+      ],
+      documentShortcuts: [
+        { shortcut: 'despliq', title: 'Despacho de liquidação', templateId: '1026154', assunto: 'Autorização para a Liquidação da Despesa', texto: 'À Direção-Geral.\n\nAtenciosamente,' },
+      ],
+    };
+    vi.stubGlobal('chrome', {
+      runtime: {},
+      storage: {
+        local: { get: (_keys: unknown, callback?: (data: object) => void) => callback?.({}), set: (_data: unknown, callback?: () => void) => callback?.() },
+        sync: { get: vi.fn(async () => ({ 'siages-user-preferences': preferences })) },
+        onChanged: { addListener: vi.fn(), removeListener: vi.fn() },
+      },
+    });
+
+    installExtensionAuth();
+    window.eval(preferencesScript);
+    window.eval(contentScript);
+    await flushMicrotasks();
+
+    let input = openPalette();
+    await flushMicrotasks();
+    // "up" deixou de existir quando o servidor o renomeou; "upnf" leva os próprios valores.
+    fireEvent.input(input, { target: { value: 'up 498930' } });
+    expect(document.body.textContent).not.toContain('Upload de nota fiscal');
+    fireEvent.input(input, { target: { value: 'upnf 498930' } });
+    expect(document.body.textContent).toContain('Upload de nota fiscal');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    const uploadPayload = JSON.parse(decodeURIComponent(assignedUrl.split('#siagesUpload=')[1]));
+    expect(uploadPayload).toEqual({
+      source: 'siages', version: 1, action: 'suap_upload_document', suapId: '498930',
+      tipoConferencia: 'Documento Original', tipoDocumento: 'Nota Fiscal', assunto: 'NF do contrato',
+    });
+    expect(JSON.parse(sessionStorage.getItem('siagesUploadPendingV1') || '{}').payload).toEqual(uploadPayload);
+
+    // "upload" usa o primeiro da lista (upload padrão).
+    fireEvent.keyDown(document, { key: 'k', code: 'KeyK', ctrlKey: true });
+    input = document.querySelector<HTMLInputElement>('.suape-cp-input')!;
+    fireEvent.input(input, { target: { value: 'upload 498930' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(JSON.parse(decodeURIComponent(assignedUrl.split('#siagesUpload=')[1]))).toMatchObject({ tipoDocumento: 'Liquidação' });
+
+    // Atalho de documento: abre a clonagem do modelo no SUAP com assunto e texto (fora do SUAP, em nova aba).
+    fireEvent.keyDown(document, { key: 'k', code: 'KeyK', ctrlKey: true });
+    input = document.querySelector<HTMLInputElement>('.suape-cp-input')!;
+    fireEvent.input(input, { target: { value: 'despliq' } });
+    expect(document.body.textContent).toContain('Despacho de liquidação');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    const [cloneUrl, target] = openSpy.mock.calls[0];
+    expect(target).toBe('_blank');
+    expect(cloneUrl).toContain('https://suap.ifrn.edu.br/documento_eletronico/clonar_documento/1026154/#siagesClone=');
+    const clonePayload = JSON.parse(new URLSearchParams(cloneUrl.split('#')[1]).get('siagesClone')!);
+    expect(clonePayload).toEqual({
+      source: 'siages',
+      version: 1,
+      documentType: 'despacho',
+      subject: 'Autorização para a Liquidação da Despesa',
+      mode: 'review',
+      contentHtml: '<p>À Direção-Geral.</p><p>Atenciosamente,</p>',
+      plainText: 'À Direção-Geral.\n\nAtenciosamente,',
+    });
+  });
+
+  it('relê os atalhos ao abrir a paleta, mesmo sem o aviso de mudança do Chrome', async () => {
+    vi.useFakeTimers();
+    const { fetchMock } = createFetchMock();
+    let assignedUrl = '';
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { hostname: 'example.com', pathname: '/', search: '', set href(url: string) { assignedUrl = url; } },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const forward = { shortcut: 'encdg', title: 'Encaminhar à DG', despacho: 'Ao DG.', campus: { id: '3', text: 'CN' }, setor: { id: '841', text: 'DG/CN' }, papel: '' };
+    let stored: Record<string, unknown> = { forwardShortcuts: [forward] };
+    vi.stubGlobal('chrome', {
+      runtime: {},
+      storage: {
+        local: { get: (_keys: unknown, callback?: (data: object) => void) => callback?.({}), set: (_data: unknown, callback?: () => void) => callback?.() },
+        sync: { get: vi.fn(async () => ({ 'siages-user-preferences': stored })) },
+        // O aviso de mudança nunca chega (ex.: aba aberta antes de recarregar a extensão).
+        onChanged: { addListener: vi.fn(), removeListener: vi.fn() },
+      },
+    });
+
+    installExtensionAuth();
+    window.eval(preferencesScript);
+    window.eval(contentScript);
+    await flushMicrotasks();
+
+    stored = { forwardShortcuts: [forward, { ...forward, shortcut: 'encdiad', title: 'Encaminhar à DIAD', setor: { id: '950', text: 'DIAD/CN' } }] };
+    const input = openPalette();
+    await flushMicrotasks();
+    fireEvent.input(input, { target: { value: 'encdiad 498930' } });
+    expect(document.body.textContent).toContain('Encaminhar à DIAD');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(JSON.parse(decodeURIComponent(assignedUrl.split('#siagesEncaminhar=')[1]))).toMatchObject({ setor: { id: '950', text: 'DIAD/CN' } });
   });
 
   it('injeta badges com ID do processo na tela de caixas de processos com clique para copiar', async () => {

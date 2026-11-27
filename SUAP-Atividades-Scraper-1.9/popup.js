@@ -376,6 +376,9 @@ chrome?.storage?.onChanged?.addListener((changes, areaName) => {
     const nextVal = changes['siages-user-campus-uasg'].newValue;
     if (typeof nextVal === 'string' && nextVal) extensionUserCampusSelect.value = nextVal;
   }
+  if (areaName === 'local' && changes['siages-user-campus-uasg']?.newValue) {
+    void applyCampusDefaultForward(changes['siages-user-campus-uasg'].newValue);
+  }
 });
 
 function log(msg, type = 'info') {
@@ -1320,7 +1323,7 @@ chrome.storage?.onChanged?.addListener((changes, area) => {
 });
 void initializeSnippets();
 
-// Modelos e preenchimentos: atalhos de encaminhamento da paleta, valores do "up" e
+// Modelos e preenchimentos: atalhos de encaminhamento, de upload e de documento da paleta, e
 // partes fixas do despacho de liquidação. Regras e padrões ficam em user-preferences.js.
 const preferencesApi = globalThis.SiagesUserPreferences || null;
 const templatesViews = ['templates-forwards-panel', 'templates-documents-panel', 'templates-uploads-panel']
@@ -1343,41 +1346,56 @@ const forwardFields = {
   title: document.getElementById('forward-title'),
   despacho: document.getElementById('forward-despacho'),
   campus: document.getElementById('forward-campus'),
-  setorFilter: document.getElementById('forward-setor-filter'),
+  setorSearch: document.getElementById('forward-setor-search'),
+  setorOptions: document.getElementById('forward-setor-options'),
   setor: document.getElementById('forward-setor'),
   papel: document.getElementById('forward-papel'),
 };
-const uploadForm = document.getElementById('upload-form');
-const uploadMessage = document.getElementById('upload-message');
 const uploadFields = {
+  shortcut: document.getElementById('upload-shortcut'),
+  title: document.getElementById('upload-title'),
   tipoConferencia: document.getElementById('upload-tipo-conferencia'),
   tipoDocumento: document.getElementById('upload-tipo-documento'),
   assunto: document.getElementById('upload-assunto'),
 };
+const documentFields = {
+  shortcut: document.getElementById('document-shortcut'),
+  title: document.getElementById('document-title'),
+  templateId: document.getElementById('document-template-id'),
+  assunto: document.getElementById('document-assunto'),
+  texto: document.getElementById('document-texto'),
+};
+const documentFormMessage = document.getElementById('document-form-message');
+const SUAP_DOCUMENT_PAGE_REGEX = /^https:\/\/suap\.ifrn\.edu\.br\/documento_eletronico\/(?:visualizar_documento|documento|editar_documento|clonar_documento)\/(\d+)\//;
 const despachoForm = document.getElementById('despacho-form');
 const despachoMessage = document.getElementById('despacho-message');
+const despachoFormMessage = document.getElementById('despacho-form-message');
+const despachoListEl = document.getElementById('despacho-list');
+const despachoEditor = document.getElementById('despacho-editor');
+const despachoEditorTitle = document.getElementById('despacho-editor-title');
+const despachoVariablesEl = document.getElementById('despacho-variables');
 const despachoFields = {
   destinatario: document.getElementById('despacho-destinatario'),
   assunto: document.getElementById('despacho-assunto'),
+  corpo: document.getElementById('despacho-corpo'),
   encaminhamento: document.getElementById('despacho-encaminhamento'),
   fecho: document.getElementById('despacho-fecho'),
 };
+let despachoEditing = '';
+let despachoLastField = null;
 const SUAP_ORIGIN = 'https://suap.ifrn.edu.br';
 const SUAP_UO_ENDPOINT = `${SUAP_ORIGIN}/json/rh/unidadeorganizacional/`;
 const SUAP_SETOR_ENDPOINT = `${SUAP_ORIGIN}/json/rh/setor/`;
-const SUAP_FORWARD_CATALOG_KEY = 'siages-suap-forward-catalog';
+const SUAP_FORWARD_CATALOG_KEY = 'siages-suap-forward-catalog-v2';
 const SUAP_DEFAULT_CONTROLS = {
   uo: '04c4a208298e9bb90fbc3af712f42636a8ce4dea732d43c3eee06f1800650ccd',
   setor: 'e38d32439ee53b9ef53d3a0be73e36140c3204ee4dfa36d9e43b4bb58dc78c5f',
 };
-const SUAP_PAGE_SIZE = 20;
 const SUAP_MAX_UO_PAGES = 10;
-const SUAP_MAX_SETOR_PAGES = 10;
+const SUAP_MAX_SETOR_PAGES = 60;
 const SUAP_FORWARD_PAGE_REGEX = /\/processo_eletronico\/processo\/encaminhar\/(\d+)\/?/;
 const SUAP_PROCESS_PAGE_REGEX = /\/processo_eletronico\/(?:processo|visualizar_processo)\/(\d+)\/?/;
 let userPreferences = preferencesApi ? preferencesApi.normalize(null) : null;
-let forwardEditingIndex = -1;
-let lastRemovedForward = null;
 const suapCatalog = {
   campuses: [],
   sectorsByCampus: {},
@@ -1474,26 +1492,51 @@ async function fetchSuapJsonPage(endpoint, params) {
     if (contentType.includes('text/html')) throw createSuapLoginError();
     throw new Error('Resposta inesperada do SUAP ao carregar as listas.');
   }
-  return { items: data.items, total: Number(data.total) || data.items.length };
+  const total = Number(data.total);
+  return {
+    items: data.items,
+    total: Number.isFinite(total) && total > 0 ? total : null,
+    more: typeof data.more === 'boolean' ? data.more : null,
+  };
+}
+
+// Lê todas as páginas de uma lista do SUAP. O tamanho da página vem da primeira resposta; sem total,
+// segue até uma página curta, vazia ou repetida. Devolve os itens brutos e se a lista veio completa.
+async function fetchSuapAllPages(endpoint, params, maxPages) {
+  const first = await fetchSuapJsonPage(endpoint, { ...params, page: '1' });
+  const items = [...first.items];
+  const pageSize = first.items.length;
+  if (!pageSize || first.more === false) return { items, total: first.total || items.length, complete: true };
+  if (first.total) {
+    const needed = Math.ceil(first.total / pageSize);
+    const lastPage = Math.min(maxPages, needed);
+    for (let start = 2; start <= lastPage; start += 5) {
+      const batch = Array.from({ length: Math.min(5, lastPage - start + 1) }, (_, i) => start + i);
+      const pages = await Promise.all(batch.map((page) => fetchSuapJsonPage(endpoint, { ...params, page: String(page) })));
+      pages.forEach((page) => items.push(...page.items));
+    }
+    return { items, total: first.total, complete: needed <= lastPage };
+  }
+  const seen = new Set(first.items.map((item) => String(item?.id)));
+  for (let page = 2; page <= maxPages; page += 1) {
+    const next = await fetchSuapJsonPage(endpoint, { ...params, page: String(page) });
+    const fresh = next.items.filter((item) => !seen.has(String(item?.id)));
+    fresh.forEach((item) => seen.add(String(item?.id)));
+    items.push(...fresh);
+    if (!fresh.length || next.items.length < pageSize || next.more === false) {
+      return { items, total: items.length, complete: true };
+    }
+  }
+  return { items, total: items.length, complete: false };
 }
 
 async function fetchSuapCampuses(control = suapCatalog.controls.uo) {
-  const first = await fetchSuapJsonPage(SUAP_UO_ENDPOINT, { q: '', control, page: '1' });
-  const totalPages = Math.min(SUAP_MAX_UO_PAGES, Math.max(1, Math.ceil(first.total / SUAP_PAGE_SIZE)));
-  const rest = totalPages > 1
-    ? await Promise.all(
-        Array.from({ length: totalPages - 1 }, (_, i) =>
-          fetchSuapJsonPage(SUAP_UO_ENDPOINT, { q: '', control, page: String(i + 2) })
-        )
-      )
-    : [];
+  const result = await fetchSuapAllPages(SUAP_UO_ENDPOINT, { q: '', control }, SUAP_MAX_UO_PAGES);
   const seen = new Map();
-  for (const page of [first, ...rest]) {
-    for (const raw of page.items) {
-      const id = String(raw?.id ?? '').trim();
-      const text = cleanSingleLine(raw?.text);
-      if (/^\d+$/.test(id) && text && !seen.has(id)) seen.set(id, { id, text });
-    }
+  for (const raw of result.items) {
+    const id = String(raw?.id ?? '').trim();
+    const text = cleanSingleLine(raw?.text);
+    if (/^\d+$/.test(id) && text && !seen.has(id)) seen.set(id, { id, text });
   }
   return Array.from(seen.values()).sort((a, b) => a.text.localeCompare(b.text, 'pt-BR'));
 }
@@ -1502,30 +1545,13 @@ async function fetchSuapSectors(campusId, { query = '', control = suapCatalog.co
   const uoId = String(campusId || '').trim();
   if (!/^\d+$/.test(uoId)) return { items: [], total: 0, complete: true };
   const q = cleanSingleLine(query);
-  const baseParams = { q, control, filter_pks: JSON.stringify({ uo_id: uoId }) };
-  const first = await fetchSuapJsonPage(SUAP_SETOR_ENDPOINT, { ...baseParams, page: '1' });
-  const maxPages = q ? 3 : SUAP_MAX_SETOR_PAGES;
-  const neededPages = Math.max(1, Math.ceil(first.total / SUAP_PAGE_SIZE));
-  const pagesToFetch = Math.min(maxPages, neededPages);
-  const rest = pagesToFetch > 1
-    ? await Promise.all(
-        Array.from({ length: pagesToFetch - 1 }, (_, i) =>
-          fetchSuapJsonPage(SUAP_SETOR_ENDPOINT, { ...baseParams, page: String(i + 2) })
-        )
-      )
-    : [];
-  const parsed = [];
-  for (const page of [first, ...rest]) {
-    for (const raw of page.items) {
-      const item = parseSuapSetorItem(raw);
-      if (item) parsed.push(item);
-    }
-  }
-  return {
-    items: mergeSuapSectors([], parsed),
-    total: first.total,
-    complete: neededPages <= pagesToFetch,
-  };
+  const result = await fetchSuapAllPages(
+    SUAP_SETOR_ENDPOINT,
+    { q, control, filter_pks: JSON.stringify({ uo_id: uoId }) },
+    q ? 5 : SUAP_MAX_SETOR_PAGES,
+  );
+  const items = mergeSuapSectors([], result.items.map(parseSuapSetorItem).filter(Boolean));
+  return { items, total: Math.max(result.total || 0, items.length), complete: result.complete };
 }
 
 async function fetchSuapHtmlPage(path) {
@@ -1649,35 +1675,19 @@ function renderCampusSelect(selectedCampus) {
   select.value = selectedCampus?.id || '';
 }
 
-function renderSetorSelect(campusId, selectedSetor, { filterText = '', loading = false } = {}) {
+function renderSetorSelect(campusId, selectedSetor, { loading = false } = {}) {
   const select = forwardFields.setor;
   if (!select) return;
   const uoId = cleanSingleLine(campusId);
   const entry = uoId ? suapCatalog.sectorsByCampus[uoId] : null;
-  const normalizedFilter = normalizeSearchText(filterText);
-  let list = entry?.items ? [...entry.items] : [];
-  if (normalizedFilter) {
-    list = list.filter((item) =>
-      normalizeSearchText(item.text).includes(normalizedFilter) ||
-      normalizeSearchText(item.label).includes(normalizedFilter)
-    );
-  } else if (selectedSetor?.id && !list.some((item) => item.id === selectedSetor.id)) {
+  const list = entry?.items ? [...entry.items] : [];
+  if (selectedSetor?.id && !list.some((item) => item.id === selectedSetor.id)) {
     list.push({ id: selectedSetor.id, text: selectedSetor.text || selectedSetor.id, label: selectedSetor.text || selectedSetor.id });
     list.sort((a, b) => a.text.localeCompare(b.text, 'pt-BR'));
   }
   const placeholder = document.createElement('option');
   placeholder.value = '';
-  if (!uoId) {
-    placeholder.textContent = 'Escolha um campus primeiro';
-  } else if (loading && !list.length) {
-    placeholder.textContent = 'Carregando setores do SUAP…';
-  } else if (normalizedFilter && !list.length) {
-    placeholder.textContent = 'Nenhum setor encontrado';
-  } else if (normalizedFilter) {
-    placeholder.textContent = `Escolha o setor (${list.length} encontrado${list.length === 1 ? '' : 's'})`;
-  } else {
-    placeholder.textContent = 'Escolha o setor';
-  }
+  placeholder.textContent = 'Escolha o setor';
   const options = [placeholder, ...list.map((item) => {
     const opt = document.createElement('option');
     opt.value = item.id;
@@ -1687,9 +1697,149 @@ function renderSetorSelect(campusId, selectedSetor, { filterText = '', loading =
   })];
   select.replaceChildren(...options);
   select.disabled = !uoId && !list.length;
-  if (forwardFields.setorFilter) forwardFields.setorFilter.disabled = !uoId;
   select.value = selectedSetor?.id && list.some((item) => item.id === selectedSetor.id) ? selectedSetor.id : '';
+  setorCombobox.sync({ uoId, loading: loading && !list.length });
 }
+
+// Seletor de setor com pesquisa: o texto digitado filtra a lista por sigla ou nome; ao escolher,
+// o setor vai para o <select id="forward-setor"> oculto, que continua sendo o valor do formulário.
+const setorCombobox = (() => {
+  const input = forwardFields.setorSearch;
+  const listEl = forwardFields.setorOptions;
+  const state = { open: false, query: '', active: -1, matches: [], uoId: '', loading: false, searching: false };
+  const selectedOption = () => forwardFields.setor?.selectedOptions?.[0];
+  const selectedLabel = () => (forwardFields.setor?.value ? selectedOption()?.textContent || '' : '');
+  const allOptions = () => Array.from(forwardFields.setor?.options || []).filter((opt) => opt.value);
+
+  function placeholderText() {
+    if (!state.uoId) return 'Escolha um campus primeiro';
+    if (state.loading) return 'Carregando setores do SUAP…';
+    return 'Escolha ou pesquise o setor (ex.: DG, COFIN, DIAD)';
+  }
+
+  function renderList() {
+    if (!listEl) return;
+    const query = normalizeSearchText(state.query);
+    state.matches = allOptions().filter((opt) => !query
+      || normalizeSearchText(opt.dataset.text).includes(query)
+      || normalizeSearchText(opt.textContent).includes(query));
+    if (state.active >= state.matches.length) state.active = state.matches.length - 1;
+    const items = state.matches.map((opt, index) => {
+      const li = document.createElement('li');
+      li.id = `forward-setor-option-${opt.value}`;
+      li.className = `combobox-option${index === state.active ? ' is-active' : ''}`;
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-selected', String(opt.value === forwardFields.setor.value));
+      li.dataset.value = opt.value;
+      li.textContent = opt.textContent;
+      li.addEventListener('mousedown', (event) => event.preventDefault());
+      li.addEventListener('click', () => choose(opt.value));
+      return li;
+    });
+    if (!items.length) {
+      const empty = document.createElement('li');
+      empty.className = 'combobox-empty';
+      empty.textContent = state.loading ? 'Carregando setores do SUAP…' : (state.searching ? 'Pesquisando no SUAP…' : 'Nenhum setor encontrado');
+      items.push(empty);
+    }
+    listEl.replaceChildren(...items);
+    const active = state.matches[state.active];
+    if (active) {
+      input?.setAttribute('aria-activedescendant', `forward-setor-option-${active.value}`);
+      listEl.querySelector('.is-active')?.scrollIntoView?.({ block: 'nearest' });
+    } else {
+      input?.removeAttribute('aria-activedescendant');
+    }
+  }
+
+  // Aberto, o campo fica vazio para pesquisar e o setor escolhido aparece como dica; fechado, mostra o setor.
+  function setOpen(open) {
+    const wasOpen = state.open;
+    state.open = open && Boolean(state.uoId);
+    if (listEl) listEl.hidden = !state.open;
+    input?.setAttribute('aria-expanded', String(state.open));
+    if (state.open && !wasOpen && input) {
+      input.value = state.query;
+      input.placeholder = selectedLabel() || placeholderText();
+    }
+    if (!state.open && input) input.placeholder = placeholderText();
+    if (state.open) renderList();
+  }
+
+  function showSelected() {
+    if (input && !state.open) input.value = selectedLabel();
+  }
+
+  function choose(value) {
+    if (!forwardFields.setor) return;
+    forwardFields.setor.value = value;
+    state.query = '';
+    state.active = -1;
+    setOpen(false);
+    showSelected();
+    forwardFields.setor.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function sync({ uoId = state.uoId, loading = false } = {}) {
+    if (uoId !== state.uoId) state.query = '';
+    state.uoId = uoId;
+    state.loading = loading;
+    if (input) {
+      input.disabled = !uoId;
+      input.placeholder = state.open ? selectedLabel() || placeholderText() : placeholderText();
+    }
+    if (state.open) renderList();
+    else showSelected();
+  }
+
+  // Pesquisa no SUAP em andamento: a lista avisa em vez de dizer que nada foi encontrado.
+  function setSearching(searching) {
+    state.searching = searching;
+    if (state.open) renderList();
+  }
+
+  function reset() {
+    state.query = '';
+    state.active = -1;
+    setOpen(false);
+    showSelected();
+  }
+
+  function openFresh() {
+    if (state.open) return;
+    state.query = '';
+    state.active = Math.max(0, allOptions().findIndex((opt) => opt.value === forwardFields.setor.value));
+    setOpen(true);
+  }
+  input?.addEventListener('focus', openFresh);
+  input?.addEventListener('mousedown', () => { if (document.activeElement === input) openFresh(); });
+  input?.addEventListener('input', () => {
+    state.query = input.value;
+    state.active = 0;
+    setOpen(true);
+    handleForwardSetorSearch(state.query);
+  });
+  input?.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (!state.open) setOpen(true);
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      state.active = Math.min(state.matches.length - 1, Math.max(0, state.active + step));
+      renderList();
+    } else if (event.key === 'Enter') {
+      if (!state.open) return;
+      event.preventDefault();
+      const active = state.matches[state.active] || (state.matches.length === 1 ? state.matches[0] : null);
+      if (active) choose(active.value);
+    } else if (event.key === 'Escape' && state.open) {
+      event.preventDefault();
+      reset();
+    }
+  });
+  input?.addEventListener('blur', reset);
+
+  return { sync, reset, choose, setSearching };
+})();
 
 function renderPapelSelect(selectedPapel) {
   const select = forwardFields.papel;
@@ -1733,13 +1883,13 @@ async function loadSectorsForCampus(campusId, { force = false, query = '' } = {}
   if (!/^\d+$/.test(uoId)) return;
   const existing = suapCatalog.sectorsByCampus[uoId];
   if (!force && !query && existing?.items?.length) {
-    renderSetorSelect(uoId, getSelectedSuapOption(forwardFields.setor), { filterText: forwardFields.setorFilter?.value || '' });
+    renderSetorSelect(uoId, getSelectedSuapOption(forwardFields.setor));
     return;
   }
   const requestId = ++setorLoadRequest;
   const selectedSetor = getSelectedSuapOption(forwardFields.setor);
   if (!existing?.items?.length && !query) {
-    renderSetorSelect(uoId, selectedSetor, { filterText: forwardFields.setorFilter?.value || '', loading: true });
+    renderSetorSelect(uoId, selectedSetor, { loading: true });
   }
   try {
     const result = await fetchSuapSectors(uoId, { query });
@@ -1755,15 +1905,13 @@ async function loadSectorsForCampus(campusId, { force = false, query = '' } = {}
       suapCatalog.sectorsByCampus[uoId] = result;
     }
     saveSuapCatalogCache();
-    renderSetorSelect(uoId, getSelectedSuapOption(forwardFields.setor) || selectedSetor, {
-      filterText: forwardFields.setorFilter?.value || '',
-    });
+    renderSetorSelect(uoId, getSelectedSuapOption(forwardFields.setor) || selectedSetor);
     if (forwardCatalogStatus && !forwardCatalogStatus.dataset.error?.includes('true')) {
       setFormMessage(forwardCatalogStatus, summarizeSuapCatalogStatus(uoId));
     }
   } catch (error) {
     if (requestId !== setorLoadRequest) return;
-    renderSetorSelect(uoId, selectedSetor, { filterText: forwardFields.setorFilter?.value || '' });
+    renderSetorSelect(uoId, selectedSetor);
     setFormMessage(forwardCatalogStatus, formatExtensionAuthError(error), true);
   }
 }
@@ -1780,7 +1928,6 @@ async function refreshSuapCatalog({ force = false, campusId = '' } = {}) {
 
   renderCampusSelect(activeCampus);
   renderSetorSelect(targetCampusId, activeSetor, {
-    filterText: forwardFields.setorFilter?.value || '',
     loading: Boolean(targetCampusId && !suapCatalog.sectorsByCampus[targetCampusId]?.items?.length),
   });
   renderPapelSelect(activePapel);
@@ -1839,9 +1986,7 @@ async function refreshSuapCatalog({ force = false, campusId = '' } = {}) {
     const currentSetor = getSelectedSuapOption(forwardFields.setor) || activeSetor;
     const currentPapel = forwardFields.papel?.value || activePapel;
     renderCampusSelect(currentCampus);
-    renderSetorSelect(currentCampus?.id || targetCampusId, currentSetor, {
-      filterText: forwardFields.setorFilter?.value || '',
-    });
+    renderSetorSelect(currentCampus?.id || targetCampusId, currentSetor);
     renderPapelSelect(currentPapel);
 
     const errors = [finalCampuses, finalSectors, metaResult]
@@ -1878,109 +2023,204 @@ function describeForwardDestination(item) {
   return parts.join(' · ');
 }
 
-function renderForwardShortcuts() {
-  if (!forwardListEl || !userPreferences) return;
-  const items = userPreferences.forwardShortcuts.map((item, index) => {
-    const row = document.createElement('div');
-    row.className = 'forward-item';
-    const text = document.createElement('div');
-    text.className = 'forward-text';
-    const title = document.createElement('div');
-    title.className = 'forward-title';
-    const trigger = document.createElement('span');
-    trigger.className = 'snippet-trigger';
-    trigger.textContent = item.shortcut;
-    const name = document.createElement('span');
-    name.textContent = preferencesApi.forwardTitle(item);
-    title.append(trigger, name);
-    const meta = document.createElement('span');
-    meta.className = 'forward-meta';
-    meta.textContent = describeForwardDestination(item);
-    text.append(title, meta);
-    if (item.despacho) {
-      const despacho = document.createElement('span');
-      despacho.className = 'forward-despacho';
-      despacho.textContent = item.despacho;
-      text.append(despacho);
+// Linhas dos atalhos nos três submenus de "Modelos e preenchimentos": uma linha por atalho,
+// com Editar e Excluir; o formulário de criação e edição abre abaixo da lista.
+const ROW_ICONS = {
+  edit: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  remove: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
+  restore: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
+};
+
+function createRowButton(kind, label, onClick) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = kind === 'remove' ? 'icon-button danger' : 'icon-button';
+  button.title = label;
+  button.setAttribute('aria-label', label);
+  button.innerHTML = ROW_ICONS[kind];
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+function createShortcutRow({ shortcut, name, meta, editing, onEdit, onRemove, secondaryAction = null }) {
+  const row = document.createElement('div');
+  row.className = `shortcut-row${editing ? ' is-editing' : ''}`;
+  row.dataset.shortcut = shortcut;
+  row.title = `${shortcut} · ${name}${meta ? ` · ${meta}` : ''}`;
+  const trigger = document.createElement('span');
+  trigger.className = 'snippet-trigger';
+  trigger.textContent = shortcut;
+  const nameEl = document.createElement('span');
+  nameEl.className = 'shortcut-name';
+  nameEl.textContent = name;
+  nameEl.title = name;
+  const metaEl = document.createElement('span');
+  metaEl.className = 'shortcut-meta';
+  metaEl.textContent = meta;
+  metaEl.title = meta;
+  const actions = document.createElement('div');
+  actions.className = 'row-actions';
+  // Modelos fixos (despacho do SIAGES) trocam Excluir por Restaurar padrão.
+  const second = secondaryAction
+    ? createRowButton(secondaryAction.kind, secondaryAction.label, secondaryAction.onClick)
+    : createRowButton('remove', `Excluir ${shortcut}`, onRemove);
+  if (secondaryAction?.disabled) second.disabled = true;
+  actions.append(createRowButton('edit', `Editar ${secondaryAction?.name || shortcut}`, onEdit), second);
+  row.append(trigger, nameEl, metaEl, actions);
+  return row;
+}
+
+// Lista de atalhos de um submenu: criar, editar (atalho e nome inclusive), excluir e desfazer.
+// O atalho é único entre as três listas (user-preferences.js valida contra todas).
+function createShortcutListController(config) {
+  const state = { editingIndex: -1, lastRemoved: null };
+  const items = () => userPreferences?.[config.key] || [];
+  const othersFor = (index) => preferencesApi.allShortcuts(userPreferences)
+    .filter((entry) => !(entry.kind === config.kind && entry.index === index));
+
+  function render() {
+    if (!config.listEl || !userPreferences) return;
+    const editorOpen = config.editorEl && !config.editorEl.hidden;
+    const rows = items().map((item, index) => createShortcutRow({
+      shortcut: item.shortcut,
+      name: config.title(item),
+      meta: config.meta(item, index),
+      editing: editorOpen && index === state.editingIndex,
+      onEdit: () => open(index),
+      onRemove: () => { void remove(index); },
+    }));
+    if (!rows.length) {
+      const empty = document.createElement('p');
+      empty.className = 'helper';
+      empty.textContent = config.emptyText;
+      // Lista esvaziada pelo servidor: um clique traz de volta o atalho inicial (encdg, up).
+      if (config.defaultShortcut) {
+        const restore = document.createElement('button');
+        restore.type = 'button';
+        restore.className = 'link-button';
+        restore.textContent = `Restaurar o atalho padrão ${config.defaultShortcut}`;
+        restore.addEventListener('click', () => { void restoreDefault(); });
+        empty.append(' ', restore);
+      }
+      rows.push(empty);
     }
-    const actions = document.createElement('div');
-    actions.className = 'snippet-actions';
-    const edit = document.createElement('button');
-    edit.type = 'button';
-    edit.className = 'secondary';
-    edit.textContent = '✎';
-    edit.setAttribute('aria-label', `Editar ${item.shortcut}`);
-    edit.addEventListener('click', () => openForwardEditor(index));
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'secondary';
-    remove.textContent = '×';
-    remove.setAttribute('aria-label', `Remover ${item.shortcut}`);
-    remove.addEventListener('click', () => { void removeForwardShortcut(index); });
-    actions.append(edit, remove);
-    row.append(text, actions);
-    return row;
-  });
-  if (!items.length) {
-    const empty = document.createElement('p');
-    empty.className = 'helper';
-    empty.textContent = 'Nenhum atalho de encaminhamento. Use “Novo atalho” para criar um.';
-    items.push(empty);
+    config.listEl.replaceChildren(...rows);
+    if (config.newButton) config.newButton.disabled = items().length >= config.max;
   }
-  forwardListEl.replaceChildren(...items);
-  if (forwardNewButton) forwardNewButton.disabled = userPreferences.forwardShortcuts.length >= preferencesApi.MAX_FORWARD_SHORTCUTS;
-}
 
-function fillUploadForm() {
-  for (const [key, input] of Object.entries(uploadFields)) {
-    if (!input) continue;
-    input.value = userPreferences.upload[key] || '';
-    input.placeholder = preferencesApi.DEFAULT_UPLOAD[key];
+  function open(index) {
+    state.editingIndex = index;
+    const editing = index >= 0 ? items()[index] : null;
+    const item = editing || config.blank();
+    config.fill(item);
+    config.editorTitleEl.textContent = editing ? `Editar atalho ${editing.shortcut}` : config.newTitle;
+    setFormMessage(config.formMessageEl, '');
+    config.editorEl.hidden = false;
+    config.onOpen?.(item);
+    render();
+    config.editorEl.scrollIntoView?.({ block: 'nearest' });
+    config.fields.shortcut.focus();
   }
-}
 
-function fillDespachoForm() {
-  for (const [key, input] of Object.entries(despachoFields)) {
-    if (!input) continue;
-    input.value = userPreferences.despacho[key] || '';
-    input.placeholder = preferencesApi.DESPACHO_PLACEHOLDERS[key];
+  function close() {
+    state.editingIndex = -1;
+    config.onClose?.();
+    config.formEl.reset();
+    setFormMessage(config.formMessageEl, '');
+    config.editorEl.hidden = true;
+    render();
   }
-}
 
-function openForwardEditor(index) {
-  forwardEditingIndex = index;
-  const editing = index >= 0 ? userPreferences.forwardShortcuts[index] : null;
-  // Num atalho novo, campus e perfil costumam ser os mesmos do primeiro atalho.
-  const base = userPreferences.forwardShortcuts[0];
-  const item = editing || { shortcut: '', title: '', despacho: '', campus: base?.campus || null, setor: null, papel: base?.papel || '' };
-  forwardFields.shortcut.value = item.shortcut;
-  forwardFields.title.value = item.title;
-  forwardFields.despacho.value = item.despacho;
-  if (forwardFields.setorFilter) forwardFields.setorFilter.value = '';
-  renderCampusSelect(item.campus);
-  renderSetorSelect(item.campus?.id || '', item.setor, {
-    loading: Boolean(item.campus?.id && !suapCatalog.sectorsByCampus[item.campus.id]?.items?.length),
-  });
-  renderPapelSelect(item.papel);
-  forwardEditorTitle.textContent = editing ? `Editar atalho ${editing.shortcut}` : 'Novo atalho de encaminhamento';
-  setFormMessage(forwardFormMessage, '');
-  forwardEditor.hidden = false;
-  forwardEditor.scrollIntoView?.({ block: 'nearest' });
-  forwardFields.shortcut.focus();
-  void refreshSuapCatalog({ campusId: item.campus?.id || '' });
-}
-
-function closeForwardEditor() {
-  forwardEditingIndex = -1;
-  forwardCatalogRequest += 1;
-  setorLoadRequest += 1;
-  if (setorSearchTimer) {
-    clearTimeout(setorSearchTimer);
-    setorSearchTimer = null;
+  async function save(event) {
+    event.preventDefault();
+    const item = config.read();
+    const error = config.validate(item, othersFor(state.editingIndex));
+    if (error) {
+      setFormMessage(config.formMessageEl, error, true);
+      return;
+    }
+    const list = [...items()];
+    if (state.editingIndex >= 0) list[state.editingIndex] = item;
+    else list.push(item);
+    try {
+      await persistPreferences({ ...userPreferences, [config.key]: list });
+      close();
+      state.lastRemoved = null;
+      if (config.undoButton) config.undoButton.hidden = true;
+      setFormMessage(config.messageEl, config.savedMessage(item));
+    } catch (saveError) {
+      setFormMessage(config.formMessageEl, formatExtensionAuthError(saveError), true);
+    }
   }
-  forwardForm.reset();
-  setFormMessage(forwardFormMessage, '');
-  forwardEditor.hidden = true;
+
+  async function remove(index) {
+    const removed = items()[index];
+    if (!removed) return;
+    try {
+      await persistPreferences({ ...userPreferences, [config.key]: items().filter((_, position) => position !== index) });
+      if (state.editingIndex === index) close();
+      else if (state.editingIndex > index) {
+        state.editingIndex -= 1;
+        render();
+      }
+      state.lastRemoved = { item: removed, index };
+      if (config.undoButton) config.undoButton.hidden = false;
+      setFormMessage(config.messageEl, `Atalho ${removed.shortcut} excluído.`);
+    } catch (removeError) {
+      setFormMessage(config.messageEl, formatExtensionAuthError(removeError), true);
+    }
+  }
+
+  async function restoreDefault() {
+    let item;
+    try {
+      item = await config.defaultItem();
+    } catch (resolveError) {
+      setFormMessage(config.messageEl, formatExtensionAuthError(resolveError), true);
+      return;
+    }
+    const error = config.validate(item, preferencesApi.allShortcuts(userPreferences));
+    if (error) {
+      setFormMessage(config.messageEl, `Não foi possível restaurar ${item.shortcut}: ${error}`, true);
+      return;
+    }
+    try {
+      await persistPreferences({ ...userPreferences, [config.key]: [...items(), item] });
+      setFormMessage(config.messageEl, `Atalho ${item.shortcut} restaurado.`);
+    } catch (restoreError) {
+      setFormMessage(config.messageEl, formatExtensionAuthError(restoreError), true);
+    }
+  }
+
+  async function undo() {
+    if (!state.lastRemoved) return;
+    const { item, index } = state.lastRemoved;
+    if (config.validate(item, preferencesApi.allShortcuts(userPreferences))) {
+      setFormMessage(config.messageEl, `Não foi possível restaurar ${item.shortcut}: o atalho já está em uso.`, true);
+      return;
+    }
+    const list = [...items()];
+    const position = Math.min(index, list.length);
+    list.splice(position, 0, item);
+    try {
+      await persistPreferences({ ...userPreferences, [config.key]: list });
+      if (state.editingIndex >= position) {
+        state.editingIndex += 1;
+        render();
+      }
+      state.lastRemoved = null;
+      if (config.undoButton) config.undoButton.hidden = true;
+      setFormMessage(config.messageEl, `Atalho ${item.shortcut} restaurado.`);
+    } catch (undoError) {
+      setFormMessage(config.messageEl, formatExtensionAuthError(undoError), true);
+    }
+  }
+
+  config.newButton?.addEventListener('click', () => open(-1));
+  config.formEl?.addEventListener('submit', (event) => { void save(event); });
+  config.cancelButton?.addEventListener('click', close);
+  config.undoButton?.addEventListener('click', () => { void undo(); });
+  return { render, open, close };
 }
 
 function readForwardForm() {
@@ -1994,9 +2234,319 @@ function readForwardForm() {
   });
 }
 
+const forwardShortcutList = createShortcutListController({
+  kind: 'forward',
+  key: 'forwardShortcuts',
+  max: preferencesApi?.MAX_FORWARD_SHORTCUTS || 15,
+  listEl: forwardListEl,
+  newButton: forwardNewButton,
+  messageEl: forwardMessage,
+  undoButton: forwardUndoButton,
+  editorEl: forwardEditor,
+  editorTitleEl: forwardEditorTitle,
+  formEl: forwardForm,
+  formMessageEl: forwardFormMessage,
+  cancelButton: document.getElementById('btn-forward-cancel'),
+  fields: forwardFields,
+  newTitle: 'Novo atalho de encaminhamento',
+  emptyText: 'Nenhum atalho de encaminhamento. Use o botão + para criar um.',
+  defaultShortcut: 'encdg',
+  defaultItem: () => resolveCampusDefaultForward({ required: true }),
+  title: (item) => preferencesApi.forwardTitle(item),
+  meta: (item) => describeForwardDestination(item),
+  // Num atalho novo, campus e perfil costumam ser os mesmos do primeiro atalho.
+  blank: () => {
+    const base = userPreferences.forwardShortcuts[0];
+    return { shortcut: '', title: '', despacho: '', campus: base?.campus || null, setor: null, papel: base?.papel || '' };
+  },
+  fill: (item) => {
+    forwardFields.shortcut.value = item.shortcut;
+    forwardFields.title.value = item.title;
+    forwardFields.despacho.value = item.despacho;
+    setorCombobox.reset();
+    renderCampusSelect(item.campus);
+    renderSetorSelect(item.campus?.id || '', item.setor, {
+      loading: Boolean(item.campus?.id && !suapCatalog.sectorsByCampus[item.campus.id]?.items?.length),
+    });
+    renderPapelSelect(item.papel);
+  },
+  onOpen: (item) => { void refreshSuapCatalog({ campusId: item.campus?.id || '' }); },
+  onClose: () => {
+    forwardCatalogRequest += 1;
+    setorLoadRequest += 1;
+    if (setorSearchTimer) {
+      clearTimeout(setorSearchTimer);
+      setorSearchTimer = null;
+    }
+  },
+  read: readForwardForm,
+  validate: (item, others) => preferencesApi.validateForwardShortcut(item, others),
+  savedMessage: (item) => `Atalho ${item.shortcut} salvo. Na paleta, use “${item.shortcut} <ID do processo>”.`,
+});
+
+const uploadShortcutList = createShortcutListController({
+  kind: 'upload',
+  key: 'uploadShortcuts',
+  max: preferencesApi?.MAX_UPLOAD_SHORTCUTS || 15,
+  listEl: document.getElementById('upload-list'),
+  newButton: document.getElementById('btn-upload-new'),
+  messageEl: document.getElementById('upload-message'),
+  undoButton: document.getElementById('btn-upload-undo'),
+  editorEl: document.getElementById('upload-editor'),
+  editorTitleEl: document.getElementById('upload-editor-title'),
+  formEl: document.getElementById('upload-form'),
+  formMessageEl: document.getElementById('upload-form-message'),
+  cancelButton: document.getElementById('btn-upload-cancel'),
+  fields: uploadFields,
+  newTitle: 'Novo atalho de upload',
+  emptyText: 'Nenhum atalho de upload. Sem atalhos, “upload <processo>” abre o upload com os valores padrão do SUAP.',
+  defaultShortcut: 'up',
+  defaultItem: async () => preferencesApi.cloneDefaultUpload(),
+  title: (item) => preferencesApi.uploadTitle(item),
+  meta: (item, index) => [
+    index === 0 ? 'Padrão' : '',
+    item.tipoDocumento,
+    item.tipoConferencia,
+    item.assunto ? `assunto ${item.assunto}` : '',
+  ].filter(Boolean).join(' · '),
+  blank: () => ({ shortcut: '', title: '', ...preferencesApi.DEFAULT_UPLOAD }),
+  fill: (item) => {
+    for (const [key, input] of Object.entries(uploadFields)) if (input) input.value = item[key] || '';
+  },
+  read: () => preferencesApi.normalizeUploadShortcut(readFields(uploadFields)),
+  validate: (item, others) => preferencesApi.validateUploadShortcut(item, others),
+  savedMessage: (item) => `Atalho ${item.shortcut} salvo. Na paleta, use “${item.shortcut} <ID do processo>”.`,
+});
+
+const documentShortcutList = createShortcutListController({
+  kind: 'document',
+  key: 'documentShortcuts',
+  max: preferencesApi?.MAX_DOCUMENT_SHORTCUTS || 15,
+  listEl: document.getElementById('document-list'),
+  newButton: document.getElementById('btn-document-new'),
+  messageEl: document.getElementById('document-message'),
+  undoButton: document.getElementById('btn-document-undo'),
+  editorEl: document.getElementById('document-editor'),
+  editorTitleEl: document.getElementById('document-editor-title'),
+  formEl: document.getElementById('document-form'),
+  formMessageEl: documentFormMessage,
+  cancelButton: document.getElementById('btn-document-cancel'),
+  fields: documentFields,
+  newTitle: 'Novo atalho de documento',
+  emptyText: 'Nenhum atalho de documento. Use o botão + e informe o documento do SUAP que serve de modelo.',
+  title: (item) => preferencesApi.documentTitle(item),
+  meta: (item) => `Modelo #${item.templateId} · ${item.assunto}`,
+  blank: () => ({ shortcut: '', title: '', templateId: '', assunto: '', texto: '' }),
+  fill: (item) => {
+    for (const [key, input] of Object.entries(documentFields)) if (input) input.value = item[key] || '';
+  },
+  read: () => preferencesApi.normalizeDocumentShortcut(readFields(documentFields)),
+  validate: (item, others) => preferencesApi.validateDocumentShortcut(item, others),
+  savedMessage: (item) => `Atalho ${item.shortcut} salvo. Na paleta, digite “${item.shortcut}” para criar o documento.`,
+});
+
+function renderShortcutLists() {
+  forwardShortcutList.render();
+  uploadShortcutList.render();
+  documentShortcutList.render();
+}
+
+// encdg padrão para o campus vinculado em "Sua conta": a sigla vem da UASG e os IDs do campus e
+// do setor DG/<sigla> vêm das listas do SUAP, com a sessão do servidor no navegador.
+async function getConfiguredCampusUasg() {
+  try {
+    if (typeof globalThis.SiagesExtensionAuth?.getCampus === 'function') {
+      const uasg = await globalThis.SiagesExtensionAuth.getCampus();
+      if (uasg) return String(uasg);
+    }
+  } catch (_) { /* usa o valor salvo abaixo */ }
+  const stored = await Promise.resolve(chrome?.storage?.local?.get?.('siages-user-campus-uasg')).catch(() => null);
+  return String(stored?.['siages-user-campus-uasg'] || extensionUserCampusSelect?.value || '158366');
+}
+
+async function resolveCampusDefaultForward({ required = false, uasg = '' } = {}) {
+  const campusUasg = uasg || await getConfiguredCampusUasg();
+  const sigla = preferencesApi.campusSiglaForUasg(campusUasg);
+  if (!sigla) {
+    if (required) throw new Error('O campus vinculado em “Sua conta” não tem Direção-Geral própria. Crie o atalho com o botão +.');
+    return null;
+  }
+  const fallback = preferencesApi.cloneDefaultForward();
+  if (fallback.campus?.text === sigla) return fallback;
+  const campuses = suapCatalog.campuses.length ? suapCatalog.campuses : await fetchSuapCampuses();
+  const campus = campuses.find((item) => item.text.toUpperCase() === sigla);
+  const setorText = `DG/${sigla}`;
+  const sectors = campus ? await fetchSuapSectors(campus.id, { query: setorText }) : { items: [] };
+  const setor = sectors.items.find((item) => item.text.toUpperCase() === setorText);
+  if (!campus || !setor) {
+    if (required) throw new Error(`Não encontrei o setor ${setorText} no SUAP. Crie o atalho com o botão +.`);
+    return null;
+  }
+  return preferencesApi.campusDefaultForward({ id: campus.id, text: campus.text }, { id: setor.id, text: setor.text });
+}
+
+// Mantém o encdg de fábrica apontando para a DG do campus configurado. Atalho editado pelo servidor
+// (nome, despacho ou destino diferentes) não é alterado.
+let campusDefaultRequest = null;
+function applyCampusDefaultForward(uasg = '') {
+  if (!preferencesApi || !userPreferences) return Promise.resolve();
+  if (campusDefaultRequest) return campusDefaultRequest;
+  campusDefaultRequest = (async () => {
+    const index = userPreferences.forwardShortcuts.findIndex((item) => preferencesApi.isCampusDefaultForward(item));
+    if (index < 0) return;
+    const current = userPreferences.forwardShortcuts[index];
+    const campusUasg = uasg || await getConfiguredCampusUasg();
+    const sigla = preferencesApi.campusSiglaForUasg(campusUasg);
+    if (!sigla || current.campus?.text === sigla) return;
+    const next = await resolveCampusDefaultForward({ uasg: campusUasg }).catch(() => null);
+    if (!next) return;
+    const latest = userPreferences.forwardShortcuts;
+    if (!preferencesApi.isCampusDefaultForward(latest[index])) return;
+    const list = [...latest];
+    list[index] = { ...next, papel: current.papel };
+    await persistPreferences({ ...userPreferences, forwardShortcuts: list });
+    setFormMessage(forwardMessage, `Atalho encdg atualizado para a Direção-Geral do seu campus (${next.setor.text}).`);
+  })().catch(() => undefined).finally(() => { campusDefaultRequest = null; });
+  return campusDefaultRequest;
+}
+
+// O ID do documento modelo vem da aba aberta, quando ela mostra um documento do SUAP.
+async function captureDocumentTemplate() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const match = String(tab?.url || '').match(SUAP_DOCUMENT_PAGE_REGEX);
+    if (!match) {
+      setFormMessage(documentFormMessage, 'Abra no SUAP o documento que servirá de modelo e tente de novo.', true);
+      return;
+    }
+    documentFields.templateId.value = match[1];
+    setFormMessage(documentFormMessage, `Documento #${match[1]} copiado da aba aberta.`);
+  } catch (error) {
+    setFormMessage(documentFormMessage, formatExtensionAuthError(error), true);
+  }
+}
+
+// Despachos de liquidação do SIAGES: uma linha por finalidade, com o texto completo editável e variáveis.
+function despachoModeloInfo(id) {
+  return preferencesApi.DESPACHO_MODELOS.find((modelo) => modelo.id === id);
+}
+
+function renderDespachoModels() {
+  if (!despachoListEl || !userPreferences) return;
+  const editorOpen = despachoEditor && !despachoEditor.hidden;
+  despachoListEl.replaceChildren(...preferencesApi.DESPACHO_MODELOS.map((modelo) => {
+    const customized = preferencesApi.isDespachoCustomized(userPreferences, modelo.id);
+    const corpo = preferencesApi.despachoTemplate(userPreferences, modelo.id).corpo.replace(/\s+/g, ' ');
+    return createShortcutRow({
+      shortcut: modelo.code,
+      name: modelo.label,
+      meta: `${customized ? 'Personalizado' : 'Padrão do SIAGES'} · ${corpo}`,
+      editing: editorOpen && despachoEditing === modelo.id,
+      onEdit: () => openDespachoEditor(modelo.id),
+      secondaryAction: {
+        kind: 'restore',
+        name: `despacho ${modelo.label}`,
+        label: `Restaurar o padrão do despacho ${modelo.label}`,
+        disabled: !customized,
+        onClick: () => { void restoreDespachoModel(modelo.id); },
+      },
+    });
+  }));
+}
+
+function renderDespachoVariables() {
+  if (!despachoVariablesEl || despachoVariablesEl.childElementCount) return;
+  despachoVariablesEl.replaceChildren(...preferencesApi.DESPACHO_VARIABLES.map((variable) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'variable-chip';
+    chip.textContent = `{${variable.name}}`;
+    chip.title = variable.description;
+    chip.setAttribute('aria-label', `Inserir ${variable.description.toLowerCase()}`);
+    chip.addEventListener('mousedown', (event) => event.preventDefault());
+    chip.addEventListener('click', () => insertDespachoVariable(`{${variable.name}}`));
+    return chip;
+  }));
+}
+
+// Insere a variável na posição do cursor do último campo usado (o texto, se nenhum).
+function insertDespachoVariable(token) {
+  const field = despachoLastField || despachoFields.corpo;
+  if (!field) return;
+  const start = field.selectionStart ?? field.value.length;
+  const end = field.selectionEnd ?? start;
+  field.value = `${field.value.slice(0, start)}${token}${field.value.slice(end)}`;
+  field.focus();
+  field.setSelectionRange?.(start + token.length, start + token.length);
+  despachoLastField = field;
+}
+
+function fillDespachoEditor(template) {
+  for (const [key, input] of Object.entries(despachoFields)) if (input) input.value = template[key] || '';
+}
+
+function openDespachoEditor(id) {
+  const modelo = despachoModeloInfo(id);
+  if (!modelo || !despachoEditor) return;
+  despachoEditing = id;
+  renderDespachoVariables();
+  fillDespachoEditor(preferencesApi.despachoTemplate(userPreferences, id));
+  despachoEditorTitle.textContent = `Despacho de liquidação — ${modelo.label}`;
+  setFormMessage(despachoFormMessage, '');
+  despachoEditor.hidden = false;
+  despachoLastField = despachoFields.corpo;
+  renderDespachoModels();
+  despachoEditor.scrollIntoView?.({ block: 'nearest' });
+  despachoFields.corpo?.focus();
+}
+
+function closeDespachoEditor() {
+  despachoEditing = '';
+  despachoLastField = null;
+  setFormMessage(despachoFormMessage, '');
+  if (despachoEditor) despachoEditor.hidden = true;
+  renderDespachoModels();
+}
+
+async function saveDespachoModel(event) {
+  event.preventDefault();
+  const modelo = despachoModeloInfo(despachoEditing);
+  if (!modelo) return;
+  const despachoModelos = { ...userPreferences.despachoModelos, [modelo.id]: readFields(despachoFields) };
+  try {
+    await persistPreferences({ ...userPreferences, despachoModelos });
+    closeDespachoEditor();
+    setFormMessage(despachoMessage, `Modelo ${modelo.label} salvo. Vale nos próximos despachos gerados no SIAGES.`);
+  } catch (error) {
+    setFormMessage(despachoFormMessage, formatExtensionAuthError(error), true);
+  }
+}
+
+// Volta ao texto do SIAGES. Com textos comuns do formato anterior, grava o padrão só nesta finalidade.
+async function restoreDespachoModel(id) {
+  const modelo = despachoModeloInfo(id);
+  if (!modelo) return;
+  const despachoModelos = { ...userPreferences.despachoModelos };
+  const legacy = Object.entries(userPreferences.despacho || {}).filter(([, value]) => value);
+  if (legacy.length) {
+    const defaults = preferencesApi.defaultDespachoTemplate(id);
+    despachoModelos[id] = Object.fromEntries(legacy.map(([field]) => [field, defaults[field]]));
+  } else {
+    delete despachoModelos[id];
+  }
+  try {
+    await persistPreferences({ ...userPreferences, despachoModelos });
+    if (despachoEditing === id) fillDespachoEditor(preferencesApi.despachoTemplate(userPreferences, id));
+    setFormMessage(despachoMessage, `Modelo ${modelo.label} voltou ao texto padrão do SIAGES.`);
+  } catch (error) {
+    setFormMessage(despachoMessage, formatExtensionAuthError(error), true);
+  }
+}
+
 async function persistPreferences(next) {
   userPreferences = await preferencesApi.save(next, chrome.storage.sync);
-  renderForwardShortcuts();
+  renderShortcutLists();
+  renderDespachoModels();
   renderSummaryBlocks();
 }
 
@@ -2051,112 +2601,37 @@ summaryBlocksEl?.addEventListener('change', () => {
 });
 document.getElementById('btn-summary-blocks-all')?.addEventListener('click', () => { void saveSummaryBlocks([]); });
 
-async function saveForwardShortcut(event) {
-  event.preventDefault();
-  const item = readForwardForm();
-  const others = userPreferences.forwardShortcuts.filter((_, index) => index !== forwardEditingIndex);
-  const error = preferencesApi.validateForwardShortcut(item, others);
-  if (error) {
-    setFormMessage(forwardFormMessage, error, true);
-    return;
-  }
-  const list = [...userPreferences.forwardShortcuts];
-  if (forwardEditingIndex >= 0) list[forwardEditingIndex] = item;
-  else list.push(item);
-  try {
-    await persistPreferences({ ...userPreferences, forwardShortcuts: list });
-    closeForwardEditor();
-    lastRemovedForward = null;
-    if (forwardUndoButton) forwardUndoButton.hidden = true;
-    setFormMessage(forwardMessage, `Atalho ${item.shortcut} salvo. Na paleta, use “${item.shortcut} <número do processo>”.`);
-  } catch (saveError) {
-    setFormMessage(forwardFormMessage, formatExtensionAuthError(saveError), true);
-  }
-}
-
-async function removeForwardShortcut(index) {
-  const removed = userPreferences.forwardShortcuts[index];
-  if (!removed) return;
-  try {
-    await persistPreferences({ ...userPreferences, forwardShortcuts: userPreferences.forwardShortcuts.filter((_, position) => position !== index) });
-    if (forwardEditingIndex === index) closeForwardEditor();
-    lastRemovedForward = { item: removed, index };
-    if (forwardUndoButton) forwardUndoButton.hidden = false;
-    setFormMessage(forwardMessage, `Atalho ${removed.shortcut} removido.`);
-  } catch (removeError) {
-    setFormMessage(forwardMessage, formatExtensionAuthError(removeError), true);
-  }
-}
-
-async function undoRemoveForwardShortcut() {
-  if (!lastRemovedForward) return;
-  const { item, index } = lastRemovedForward;
-  const list = [...userPreferences.forwardShortcuts];
-  if (preferencesApi.validateForwardShortcut(item, list)) {
-    setFormMessage(forwardMessage, `Não foi possível restaurar ${item.shortcut}: o atalho já está em uso.`, true);
-    return;
-  }
-  list.splice(Math.min(index, list.length), 0, item);
-  try {
-    await persistPreferences({ ...userPreferences, forwardShortcuts: list });
-    lastRemovedForward = null;
-    forwardUndoButton.hidden = true;
-    setFormMessage(forwardMessage, `Atalho ${item.shortcut} restaurado.`);
-  } catch (undoError) {
-    setFormMessage(forwardMessage, formatExtensionAuthError(undoError), true);
-  }
-}
-
 function handleForwardCampusChange() {
   const campusId = cleanSingleLine(forwardFields.campus?.value);
   if (setorSearchTimer) {
     clearTimeout(setorSearchTimer);
     setorSearchTimer = null;
   }
-  if (forwardFields.setorFilter) forwardFields.setorFilter.value = '';
+  setorCombobox.reset();
   renderSetorSelect(campusId, null, {
     loading: Boolean(campusId && !suapCatalog.sectorsByCampus[campusId]?.items?.length),
   });
   if (campusId) void loadSectorsForCampus(campusId);
 }
 
-function handleForwardSetorFilterInput() {
+// A pesquisa sempre consulta o SUAP também (como o próprio campo de setor do SUAP): a lista sem
+// pesquisa pode vir parcial, e os setores encontrados entram na lista do campus.
+function handleForwardSetorSearch(query) {
   const campusId = cleanSingleLine(forwardFields.campus?.value);
-  const query = forwardFields.setorFilter?.value || '';
-  const selectedSetor = getSelectedSuapOption(forwardFields.setor);
-  renderSetorSelect(campusId, selectedSetor, { filterText: query });
   if (setorSearchTimer) {
     clearTimeout(setorSearchTimer);
     setorSearchTimer = null;
   }
-  const entry = campusId ? suapCatalog.sectorsByCampus[campusId] : null;
   const trimmed = cleanSingleLine(query);
-  if (campusId && trimmed && !entry?.complete) {
-    setorSearchTimer = setTimeout(() => {
-      setorSearchTimer = null;
-      void loadSectorsForCampus(campusId, { query: trimmed });
-    }, 250);
+  if (!campusId || trimmed.length < 2) {
+    setorCombobox.setSearching(false);
+    return;
   }
-}
-
-async function saveUploadPreferences(values) {
-  try {
-    await persistPreferences({ ...userPreferences, upload: values });
-    fillUploadForm();
-    setFormMessage(uploadMessage, 'Upload salvo. Vale nos próximos “up” da paleta.');
-  } catch (error) {
-    setFormMessage(uploadMessage, formatExtensionAuthError(error), true);
-  }
-}
-
-async function saveDespachoPreferences(values, message) {
-  try {
-    await persistPreferences({ ...userPreferences, despacho: values });
-    fillDespachoForm();
-    setFormMessage(despachoMessage, message);
-  } catch (error) {
-    setFormMessage(despachoMessage, formatExtensionAuthError(error), true);
-  }
+  setorCombobox.setSearching(true);
+  setorSearchTimer = setTimeout(() => {
+    setorSearchTimer = null;
+    void loadSectorsForCampus(campusId, { query: trimmed }).finally(() => setorCombobox.setSearching(false));
+  }, 250);
 }
 
 const readFields = (fields) => Object.fromEntries(Object.entries(fields).map(([key, input]) => [key, input?.value || '']));
@@ -2169,28 +2644,25 @@ async function initializeTemplates() {
     return;
   }
   userPreferences = await preferencesApi.load(chrome.storage.sync);
-  renderForwardShortcuts();
+  renderShortcutLists();
   renderSummaryBlocks();
-  fillUploadForm();
-  fillDespachoForm();
+  renderDespachoModels();
+  await applyCampusDefaultForward();
 }
 
-forwardNewButton?.addEventListener('click', () => openForwardEditor(-1));
-forwardForm?.addEventListener('submit', (event) => { void saveForwardShortcut(event); });
-document.getElementById('btn-forward-cancel')?.addEventListener('click', closeForwardEditor);
+document.getElementById('btn-document-template-capture')?.addEventListener('click', () => { void captureDocumentTemplate(); });
 forwardRefreshButton?.addEventListener('click', () => { void refreshSuapCatalog({ force: true, campusId: forwardFields.campus?.value || '' }); });
 forwardFields.campus?.addEventListener('change', handleForwardCampusChange);
-forwardFields.setorFilter?.addEventListener('input', handleForwardSetorFilterInput);
-forwardUndoButton?.addEventListener('click', () => { void undoRemoveForwardShortcut(); });
-uploadForm?.addEventListener('submit', (event) => { event.preventDefault(); void saveUploadPreferences(readFields(uploadFields)); });
-document.getElementById('btn-upload-reset')?.addEventListener('click', () => { void saveUploadPreferences({ ...preferencesApi?.DEFAULT_UPLOAD }); });
-despachoForm?.addEventListener('submit', (event) => { event.preventDefault(); void saveDespachoPreferences(readFields(despachoFields), 'Modelo salvo. Vale nos próximos despachos gerados no SUAP.'); });
-document.getElementById('btn-despacho-reset')?.addEventListener('click', () => { void saveDespachoPreferences({}, 'O despacho voltou ao texto padrão do SIAGES.'); });
+despachoForm?.addEventListener('submit', (event) => { void saveDespachoModel(event); });
+document.getElementById('btn-despacho-cancel')?.addEventListener('click', closeDespachoEditor);
+document.getElementById('btn-despacho-reset')?.addEventListener('click', () => { if (despachoEditing) void restoreDespachoModel(despachoEditing); });
+Object.values(despachoFields).forEach((field) => field?.addEventListener('focus', () => { despachoLastField = field; }));
 chrome.storage?.onChanged?.addListener((changes, area) => {
   if (!preferencesApi || area !== 'sync' || !changes?.[preferencesApi.STORAGE_KEY]) return;
   // Mudança feita em outro perfil ou janela: atualiza a lista sem apagar o que está sendo digitado.
   userPreferences = preferencesApi.normalize(changes[preferencesApi.STORAGE_KEY].newValue);
-  renderForwardShortcuts();
+  renderShortcutLists();
+  renderDespachoModels();
   renderSummaryBlocks();
 });
 void initializeTemplates();

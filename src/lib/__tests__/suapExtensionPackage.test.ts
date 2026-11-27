@@ -141,7 +141,9 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(cpScript).toContain('/processo_eletronico/documento_upload/');
     expect(cpScript).toContain('/processo_eletronico/processo/encaminhar/');
     expect(cpScript).toContain('/processo_eletronico/processo/encaminhar_sem_despacho/');
-    expect(cpScript).toContain("'up'");
+    // "up" virou o atalho inicial (configurável) da lista de uploads em user-preferences.js.
+    expect(cpScript).toContain("'upload'");
+    expect(cpScript).toContain('getUploadShortcuts');
     expect(cpScript).toContain("'enc'");
     expect(cpScript).toContain("'encs'");
     expect(cpScript).toContain('suape-cp-chip-processo');

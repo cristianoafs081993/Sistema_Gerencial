@@ -952,15 +952,22 @@
     return null;
   }
 
-  // Preferências do servidor (user-preferences.js): atalhos de encaminhamento e valores do upload.
-  // Sem o módulo, o upload segue os padrões do upload-document.js e não há atalhos de encaminhamento.
+  // Preferências do servidor (user-preferences.js): atalhos de encaminhamento, de upload e de documento.
+  // Sem o módulo, o upload segue os padrões do upload-document.js e não há atalhos configurados.
   const userPreferencesApi = globalThis.SiagesUserPreferences || null;
   let userPreferences = userPreferencesApi ? userPreferencesApi.normalize(null) : null;
 
+  // Falha de leitura (ex.: extensão recarregada com a aba aberta) mantém os atalhos já carregados.
   async function loadUserPreferences() {
     const syncStorage = globalThis.chrome?.storage?.sync;
-    if (!userPreferencesApi || !syncStorage?.get) return;
-    userPreferences = await userPreferencesApi.load(syncStorage);
+    if (!userPreferencesApi || !syncStorage?.get) return false;
+    try {
+      const stored = await syncStorage.get(userPreferencesApi.STORAGE_KEY);
+      userPreferences = userPreferencesApi.normalize(stored?.[userPreferencesApi.STORAGE_KEY]);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
   void loadUserPreferences();
 
@@ -972,8 +979,53 @@
     return userPreferencesApi ? userPreferencesApi.forwardTitle(item) : item.title;
   }
 
-  function buildUploadAutomationData(processId) {
-    const upload = userPreferences?.upload || {};
+  function getUploadShortcuts() {
+    return userPreferences?.uploadShortcuts || [];
+  }
+
+  function uploadShortcutTitle(item) {
+    return userPreferencesApi ? userPreferencesApi.uploadTitle(item) : item.title;
+  }
+
+  function getDocumentShortcuts() {
+    return userPreferences?.documentShortcuts || [];
+  }
+
+  function documentShortcutTitle(item) {
+    return userPreferencesApi ? userPreferencesApi.documentTitle(item) : item.title;
+  }
+
+  // Atalho de documento: abre a clonagem do documento modelo no SUAP; clone-document.js preenche
+  // o assunto e, depois de salvar, o texto no editor (mesmo fluxo do Editor de Documentos do SIAGES).
+  function buildDocumentCloneUrl(item) {
+    const contentHtml = userPreferencesApi ? userPreferencesApi.documentContentHtml(item.texto || '') : '';
+    const payload = {
+      source: 'siages',
+      version: 1,
+      documentType: 'despacho',
+      subject: item.assunto,
+      mode: 'review',
+      ...(contentHtml ? { contentHtml, plainText: item.texto } : {}),
+    };
+    return `${SUAP_APP_URL}/documento_eletronico/clonar_documento/${item.templateId}/#siagesClone=${encodeURIComponent(JSON.stringify(payload))}`;
+  }
+
+  function getDocumentActions() {
+    return getDocumentShortcuts().map((item) => ({
+      id: `action-documento-${item.shortcut}`,
+      title: documentShortcutTitle(item),
+      subtitle: `Criar documento no SUAP a partir do modelo #${item.templateId} · assunto "${item.assunto}"`,
+      keywords: `${item.shortcut} documento modelo clonar ${item.assunto}`,
+      shortcut: item.shortcut,
+      externalUrl: buildDocumentCloneUrl(item),
+      icon: 'filePlus',
+      color: '#059669',
+    }));
+  }
+
+  // Sem item, usa o upload padrão (o primeiro da lista de uploads).
+  function buildUploadAutomationData(processId, item = null) {
+    const upload = item || userPreferences?.upload || {};
     const payload = {
       source: 'siages',
       version: 1,
@@ -1028,16 +1080,31 @@
     if (!processId) return [];
     const uploadData = buildUploadAutomationData(processId);
     return [
+      ...getUploadShortcuts().map((item) => {
+        const data = buildUploadAutomationData(processId, item);
+        return {
+          id: `proc-upload-atalho-${item.shortcut}`,
+          processId: String(processId),
+          title: uploadShortcutTitle(item),
+          subtitle: `Anexar ao processo #${processId} como ${item.tipoDocumento}${item.assunto ? ` · assunto "${item.assunto}"` : ''}`,
+          shortcuts: [item.shortcut],
+          url: data.url,
+          uploadPayload: data.payload,
+          icon: 'upload',
+          color: '#0A7F70',
+          badge: item.shortcut,
+        };
+      }),
       {
         id: 'proc-upload',
         processId: String(processId),
         title: 'Fazer Upload de Documento',
         subtitle: `Anexar arquivo digitalizado ao processo #${processId}`,
-        shortcuts: ['up', 'upload', 'doc', 'upld', 'anexar'],
+        shortcuts: ['upload', 'doc', 'upld', 'anexar'],
         url: uploadData.url,
         icon: 'upload',
         color: '#0A7F70',
-        badge: 'up',
+        badge: 'upload',
       },
       {
         id: 'proc-encaminhar',
@@ -2038,7 +2105,8 @@
     const matchJustId = text.match(/^(?:#(\d{4,8})|([1-9]\d{3,7}))$/);
 
     const PROCESS_SHORTCUTS = new Set([
-      'up', 'upload', 'doc', 'upld', 'anexar',
+      'upload', 'doc', 'upld', 'anexar',
+      ...getUploadShortcuts().map((item) => item.shortcut),
       'enc', 'encaminhar', 'despacho', 'tramitar',
       ...getForwardShortcuts().map((item) => item.shortcut),
       'encs', 'semdespacho', 'encsem', 'tramitarsem', 'sem',
@@ -2184,7 +2252,14 @@
     } else if (!targetProcId && (scope === 'all' || scope === 'actions' || scope === 'processo')) {
       const q = query.trim().toLowerCase();
       const shortcutGuides = [
-        { shortcut: 'up', title: 'Fazer Upload de Documento', example: 'up 498930', desc: 'Digite "up <id_processo>" para abrir o upload direto' },
+        ...getUploadShortcuts().map((item) => ({
+          shortcut: item.shortcut,
+          title: uploadShortcutTitle(item),
+          example: `${item.shortcut} 498930`,
+          desc: `Digite "${item.shortcut} <id_processo>" para abrir o upload com ${item.tipoDocumento} preenchido`,
+          icon: 'upload',
+        })),
+        { shortcut: 'upload', title: 'Fazer Upload de Documento', example: 'upload 498930', desc: 'Digite "upload <id_processo>" para abrir o upload com o upload padrão' },
         { shortcut: 'enc', title: 'Encaminhar Processo', example: 'enc 498930', desc: 'Digite "enc <id_processo>" para tramitar com despacho' },
         ...getForwardShortcuts().map((item) => ({
           shortcut: item.shortcut,
@@ -2207,7 +2282,7 @@
           subtitle: matchedGuide.desc,
           shortcuts: [matchedGuide.shortcut],
           url: `/processo_eletronico/caixa_processos/`,
-          icon: matchedGuide.icon || (matchedGuide.shortcut === 'up' ? 'upload' : (matchedGuide.shortcut.startsWith('enc') ? 'send' : 'folder')),
+          icon: matchedGuide.icon || (matchedGuide.shortcut === 'upload' ? 'upload' : (matchedGuide.shortcut.startsWith('enc') ? 'send' : 'folder')),
           color: '#0A7F70',
           badge: matchedGuide.shortcut,
         });
@@ -2341,6 +2416,11 @@
         if (!qLower) return true;
         return act.title.toLowerCase().includes(qLower) || act.keywords.toLowerCase().includes(qLower) || act.subtitle.toLowerCase().includes(qLower);
       });
+      // Atalhos de documento entram na frente quando o texto é o próprio atalho.
+      const documentActions = getDocumentActions().filter((act) => !qLower
+        || act.title.toLowerCase().includes(qLower) || act.keywords.toLowerCase().includes(qLower));
+      const exactDocument = documentActions.filter((act) => act.shortcut === qLower);
+      matchingActions = [...exactDocument, ...documentActions.filter((act) => act.shortcut !== qLower), ...matchingActions];
     }
 
     return {
@@ -3142,7 +3222,9 @@
       result.type === 'suap_student_search' ||
       result.type === 'suap_document_search'
     ) {
-      if (result.type === 'process_action' && (result.data?.id === 'proc-upload' || result.data?.url?.includes('/documento_upload/'))) {
+      if (result.type === 'process_action' && result.data?.uploadPayload) {
+        persistUploadAutomation(result.data.uploadPayload);
+      } else if (result.type === 'process_action' && (result.data?.id === 'proc-upload' || result.data?.url?.includes('/documento_upload/'))) {
         const uploadPid = result.data?.processId || result.processId || result.data?.url?.match(/\/documento_upload\/(\d+)\//)?.[1];
         if (uploadPid) {
           const uploadData = buildUploadAutomationData(uploadPid);
@@ -3167,6 +3249,11 @@
       void openCondhDocumentDetail(result.data);
     } else if (result.type === 'contrato') {
       openContratoDetail(result.data);
+    } else if (result.type === 'action' && result.data.externalUrl) {
+      // Atalho de documento: no SUAP abre na mesma aba; fora dele, em nova aba.
+      closePalette();
+      if (IS_SUAP_PAGE && !(e && (e.ctrlKey || e.metaKey))) window.location.href = result.data.externalUrl;
+      else window.open(result.data.externalUrl, '_blank');
     } else if (result.type === 'screen' || result.type === 'action') {
       const url = `${SIAGES_APP_URL}${result.data.path}`;
       window.open(url, '_blank');
@@ -3606,6 +3693,10 @@
     selectedIndex = 0;
     renderResults();
     if (!IS_SIAFI_PAGE && !localCommand) loadData(false);
+    // Relê os atalhos do popup a cada abertura, sem depender só do aviso de mudança do Chrome.
+    void loadUserPreferences().then((loaded) => {
+      if (loaded && !commandPaletteDisposed && overlayEl?.classList.contains('suape-cp-visible')) renderResults();
+    });
 
     // Garantir foco imediato e em frames subsequentes
     inputEl.focus();
