@@ -1,7 +1,8 @@
 
 import { supabase } from '@/lib/supabase';
 import { assertSupabaseReadAvailable } from '@/lib/supabaseAvailability';
-import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
+import { fetchAllSupabaseRestRows } from '@/lib/supabaseRest';
+import { fetchAllSupabasePages } from '@/lib/supabasePagination';
 import { Atividade } from '@/types';
 import { normalizeActivityName, normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
 import { resolveTipoAtividade } from '@/utils/atividadeScopes';
@@ -89,17 +90,19 @@ export const atividadesService = {
         campusUasg = DEFAULT_IFRN_CAMPUS_UASG,
         suapUnitCode = getSuapPlanUnitForCampus(campusUasg).value,
     ): Promise<Atividade[]> {
-        const { data, error } = await supabase
+        const { data, error } = await fetchAllSupabasePages<AtividadeRow>((from, to) => supabase
             .from('atividades')
             .select(ATIVIDADES_SELECT)
             .eq('campus_uasg', campusUasg)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: true })
+            .range(from, to));
 
         if (error) {
             assertSupabaseReadAvailable(error);
 
             console.warn('atividadesService.getAll: fallback para Supabase REST', error);
-            const fallbackData = await fetchSupabaseRestRows<AtividadeRow>('atividades', ATIVIDADES_SELECT, {
+            const fallbackData = await fetchAllSupabaseRestRows<AtividadeRow>('atividades', ATIVIDADES_SELECT, {
                 orderBy: 'created_at',
                 filters: { campus_uasg: campusUasg },
             });

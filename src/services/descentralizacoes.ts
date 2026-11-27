@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { assertSupabaseReadAvailable } from '@/lib/supabaseAvailability';
-import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
+import { fetchAllSupabaseRestRows } from '@/lib/supabaseRest';
+import { fetchAllSupabasePages } from '@/lib/supabasePagination';
 import { Descentralizacao } from '@/types';
 import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 
@@ -57,17 +58,19 @@ const mapDescentralizacaoRow = (item: DescentralizacaoRow): Descentralizacao => 
 
 export const descentralizacoesService = {
     async getAll(campusUasg = DEFAULT_IFRN_CAMPUS_UASG): Promise<Descentralizacao[]> {
-        const { data, error } = await supabase
+        const { data, error } = await fetchAllSupabasePages<DescentralizacaoRow>((from, to) => supabase
             .from('descentralizacoes')
             .select(DESCENTRALIZACOES_SELECT)
             .eq('campus_uasg', campusUasg)
-            .order('data_emissao', { ascending: false, nullsFirst: false });
+            .order('data_emissao', { ascending: false, nullsFirst: false })
+            .order('id', { ascending: true })
+            .range(from, to));
 
         if (error) {
             assertSupabaseReadAvailable(error);
 
             console.warn('descentralizacoesService.getAll: fallback para Supabase REST', error);
-            const fallbackData = await fetchSupabaseRestRows<DescentralizacaoRow>('descentralizacoes', DESCENTRALIZACOES_SELECT, {
+            const fallbackData = await fetchAllSupabaseRestRows<DescentralizacaoRow>('descentralizacoes', DESCENTRALIZACOES_SELECT, {
                 orderBy: 'data_emissao',
                 filters: { campus_uasg: campusUasg },
             });

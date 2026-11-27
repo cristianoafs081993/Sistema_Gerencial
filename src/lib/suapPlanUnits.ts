@@ -14,6 +14,8 @@ const SYSTEMIC_CODES = new Set([
   'DIGPE/RE', 'DINFRA/RE', 'DINT/RE', 'DITIC/RE',
 ]);
 
+// [unidade SUAP, sigla, nome, UG emitente das NEs]. Campi com UG própria no SIAFI precisam apontar para ela;
+// do contrário o planejado fica num UASG e o empenhado em outro.
 const UNIT_DEFINITIONS: Array<[string, string, string, string]> = [
   ['38', 'AUDGE', 'Auditoria Geral', '158155'],
   ['39', 'CONTROL/RE', 'Controladoria', '158155'],
@@ -29,19 +31,19 @@ const UNIT_DEFINITIONS: Array<[string, string, string, string]> = [
   ['20', 'DG/IP', 'Ipanguaçu', '158367'],
   ['24', 'DG/JC', 'João Câmara', '158373'],
   ['25', 'DG/JUC', 'Jucurutu', '158366'],
-  ['21', 'DG/LAJ', 'Lajes', '158155'],
+  ['21', 'DG/LAJ', 'Lajes', '158887'],
   ['15', 'DG/MC', 'Mossoró', '158365'],
   ['23', 'DG/MO', 'Macau', '158375'],
   ['31', 'DG/NC', 'Nova Cruz', '152757'],
-  ['29', 'DG/PAAS', 'Parelhas', '158366'],
+  ['29', 'DG/PAAS', 'Parelhas', '158882'],
   ['28', 'DG/PAR', 'Parnamirim', '152756'],
   ['16', 'DG/PF', 'Pau dos Ferros', '158374'],
   ['27', 'DG/SC', 'Santa Cruz', '158372'],
   ['26', 'DG/SGA', 'São Gonçalo do Amarante', '154582'],
-  ['42', 'DG/SM', 'São Miguel', '158155'],
+  ['42', 'DG/SM', 'São Miguel', '158897'],
   ['22', 'DG/SPP', 'São Paulo do Potengi', '154840'],
-  ['43', 'DG/TOU', 'Touros', '158155'],
-  ['44', 'DG/UMZ', 'Umarizal', '158155'],
+  ['43', 'DG/TOU', 'Touros', '158896'],
+  ['44', 'DG/UMZ', 'Umarizal', '158898'],
   ['12', 'DG/ZL', 'Natal - Zona Leste', '158155'],
   ['32', 'DG/ZN', 'Natal - Zona Norte', '158368'],
   ['34', 'GABIN/RE', 'Gabinete da Reitoria', '158155'],

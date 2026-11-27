@@ -1,7 +1,8 @@
 
 import { supabase } from '@/lib/supabase';
 import { assertSupabaseReadAvailable } from '@/lib/supabaseAvailability';
-import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
+import { fetchAllSupabaseRestRows } from '@/lib/supabaseRest';
+import { fetchAllSupabasePages } from '@/lib/supabasePagination';
 import { Empenho } from '@/types';
 import { normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
 import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
@@ -84,17 +85,19 @@ const mapEmpenhoRow = (item: EmpenhoRow): Empenho => ({
 
 export const empenhosService = {
     async getAll(campusUasg = DEFAULT_IFRN_CAMPUS_UASG, client: SupabaseClient = supabase): Promise<Empenho[]> {
-        const { data, error } = await client
+        const { data, error } = await fetchAllSupabasePages<EmpenhoRow>((from, to) => client
             .from('empenhos')
             .select(EMPENHOS_SELECT)
             .eq('campus_uasg', campusUasg)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: true })
+            .range(from, to));
 
         if (error) {
             if (client !== supabase) throw error;
             assertSupabaseReadAvailable(error);
             console.warn('empenhosService.getAll: fallback para Supabase REST', error);
-            const fallbackData = await fetchSupabaseRestRows<EmpenhoRow>('empenhos', EMPENHOS_SELECT, {
+            const fallbackData = await fetchAllSupabaseRestRows<EmpenhoRow>('empenhos', EMPENHOS_SELECT, {
                 orderBy: 'created_at',
                 filters: { campus_uasg: campusUasg },
             });
