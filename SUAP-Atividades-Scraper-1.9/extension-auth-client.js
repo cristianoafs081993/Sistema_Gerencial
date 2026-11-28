@@ -31,6 +31,8 @@
   globalThis.SiagesExtensionAuth = {
     getSession: async () => (await request('get-session')).session || null,
     signIn: async (email, password) => (await request('sign-in', { email, password })).session,
+    signInWithSuap: async () => { await request('sign-in-suap'); },
+    getSuapLoginStatus: async () => (await request('get-suap-login-status')).status || null,
     signOut: async () => { await request('sign-out'); },
     getCampus: async () => (await request('get-campus')).campusUasg || '158366',
     setCampus: async (campusUasg) => (await request('set-campus', { campusUasg })).campusUasg,

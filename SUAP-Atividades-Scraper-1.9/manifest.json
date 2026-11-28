@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SIAGES",
-  "version": "1.9.105",
+  "version": "1.9.106",
   "description": "Paleta Ctrl+K, resumo de processos, caminho BPMN, dados financeiros, atalhos e documentos com IA no SIAGES, SUAP e Comprasnet.",
   "permissions": [
     "activeTab",
@@ -270,7 +270,8 @@
         "https://www.siages.com.br/*"
       ],
       "js": [
-        "siages-portal-sync.js"
+        "siages-portal-sync.js",
+        "siages-session-bridge.js"
       ],
       "run_at": "document_idle"
     },

@@ -215,3 +215,26 @@ it('remove a área administrativa quando não consegue verificar a sessão', asy
   await waitFor(() => expect(element('extension-auth-status').textContent).toBe('Sessão indisponível.'));
   expect(element('sync-section').hidden).toBe(true);
 });
+
+it('oferece o login pelo SUAP sem sessão e inicia o fluxo pelo background', async () => {
+  const context = setup();
+  const signInWithSuap = vi.fn().mockResolvedValue(undefined);
+  Object.assign(context.auth, { signInWithSuap });
+  await waitFor(() => expect(element('extension-auth-status').textContent).toContain('Entre com o SUAP'));
+
+  (element('btn-extension-sign-in-suap') as HTMLButtonElement).click();
+
+  await waitFor(() => expect(signInWithSuap).toHaveBeenCalledTimes(1));
+  expect(element('extension-auth-status').textContent).toContain('Abrindo o SUAP');
+});
+
+it('mostra no popup o erro do último login pelo SUAP', async () => {
+  const context = setup();
+  Object.assign(context.auth, {
+    getSuapLoginStatus: vi.fn().mockResolvedValue({ phase: 'error', message: 'O acesso foi negado no SUAP.', at: Date.now() }),
+  });
+  context.changeSession();
+
+  await waitFor(() => expect(element('extension-auth-status').textContent).toBe('O acesso foi negado no SUAP.'));
+  expect(element('extension-auth-status').dataset.error).toBe('true');
+});

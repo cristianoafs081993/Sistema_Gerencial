@@ -4,7 +4,7 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { env } from '@/lib/env';
-import { getSuapRedirectUri, isValidSuapLoginState } from '@/lib/suapAuth';
+import { getSuapRedirectUri, isExtensionSuapLoginState, isValidSuapLoginState } from '@/lib/suapAuth';
 import { supabase } from '@/lib/supabase';
 
 export default function SuapCallback() {
@@ -19,6 +19,9 @@ export default function SuapCallback() {
     const state = searchParams.get('state');
     const isAppLogin = state === 'app' || (state && state.startsWith('app'));
     const isPublicFeedbackCallback = !!(code && state && !isAppLogin);
+
+    // Login iniciado pela extensão: ela lê o código desta aba e a fecha. O site não troca o código.
+    if (isExtensionSuapLoginState(state)) return;
 
     // 1. If session is already active (e.g. after Supabase hash verify redirects here), redirect to next path
     // But ONLY if we are not actively processing a public feedback login callback.
@@ -147,6 +150,16 @@ export default function SuapCallback() {
 
     void handleCallback();
   }, [searchParams, navigate, session, isLoading]);
+
+  if (isExtensionSuapLoginState(searchParams.get('state'))) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4 text-foreground">
+        <Loader2 className="h-10 w-10 text-emerald-600 animate-spin mb-4" />
+        <p className="text-sm font-semibold text-slate-600">Concluindo o login na extensão do SIAGES...</p>
+        <p className="text-xs text-slate-400 mt-1">Esta aba fecha sozinha. Se continuar aberta, abra o popup da extensão.</p>
+      </div>
+    );
+  }
 
   if (error) {
     return (

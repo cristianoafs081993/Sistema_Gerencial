@@ -34,6 +34,7 @@ const extensionAuthPasswordInput = document.getElementById('extension-auth-passw
 const extensionAuthStatus = document.getElementById('extension-auth-status');
 const extensionSignInButton = document.getElementById('btn-extension-sign-in');
 const extensionSignOutButton = document.getElementById('btn-extension-sign-out');
+const extensionSuapSignInButton = document.getElementById('btn-extension-sign-in-suap');
 const processBoxSyncStatus = document.getElementById('process-box-sync-status');
 const siafiFavorecidosCard = document.getElementById('siafi-favorecidos-card');
 const siafiListSelect = document.getElementById('siafi-list-select');
@@ -254,10 +255,16 @@ async function updateExtensionAuthStatus() {
     const session = await getStoredExtensionSession();
     if (request !== authStatusRequest) return;
     renderExtensionAccount(session);
-    if (session?.accessToken) {
+    const suapStatus = await getRecentSuapLoginStatus();
+    if (request !== authStatusRequest) return;
+    if (suapStatus?.phase === 'error' && !session?.accessToken) {
+      setExtensionAuthStatus(suapStatus.message, true);
+    } else if (suapStatus?.phase === 'done' && session?.accessToken) {
+      setExtensionAuthStatus(suapStatus.message, false, true);
+    } else if (session?.accessToken) {
       setExtensionAuthStatus('Sua sessão é renovada automaticamente.');
     } else {
-      setExtensionAuthStatus('Use sua conta SIAGES para acessar os recursos da extensão.');
+      setExtensionAuthStatus('Entre com o SUAP ou com sua conta SIAGES para acessar os recursos da extensão.');
     }
   } catch (error) {
     if (request !== authStatusRequest) return;
@@ -304,6 +311,32 @@ function updateProcessBoxSyncStatus() {
     },
   );
 }
+const SUAP_LOGIN_STATUS_MAX_AGE_MS = 10 * 60 * 1000;
+
+async function getRecentSuapLoginStatus() {
+  try {
+    const status = await globalThis.SiagesExtensionAuth?.getSuapLoginStatus?.();
+    if (!status?.message || Date.now() - Number(status.at || 0) > SUAP_LOGIN_STATUS_MAX_AGE_MS) return null;
+    return status;
+  } catch {
+    return null;
+  }
+}
+
+async function signInExtensionWithSuap() {
+  try {
+    extensionSuapSignInButton.disabled = true;
+    setExtensionAuthStatus('Abrindo o SUAP. Se você já estiver logado, a aba fecha sozinha.');
+    if (!globalThis.SiagesExtensionAuth?.signInWithSuap) throw new Error('O serviço de autenticação da extensão não está disponível.');
+    // A aba do SUAP abre em primeiro plano e o popup fecha; o resultado aparece ao reabrir o popup.
+    await globalThis.SiagesExtensionAuth.signInWithSuap();
+  } catch (error) {
+    setExtensionAuthStatus(formatExtensionAuthError(error), true);
+  } finally {
+    extensionSuapSignInButton.disabled = false;
+  }
+}
+
 async function signInExtension() {
   const email = extensionAuthEmailInput.value.trim();
   const password = extensionAuthPasswordInput.value;
@@ -332,6 +365,9 @@ async function signInExtension() {
   }
 }
 
+extensionSuapSignInButton?.addEventListener('click', () => {
+  if (!extensionSuapSignInButton.disabled) void signInExtensionWithSuap();
+});
 extensionAuthForm.addEventListener('submit', (event) => {
   event.preventDefault();
   if (!extensionSignInButton.disabled) void signInExtension();
@@ -371,7 +407,7 @@ extensionUserCampusSelect?.addEventListener('change', async () => {
 void updateExtensionAuthStatus();
 chrome?.storage?.onChanged?.addListener((changes, areaName) => {
   if (areaName === 'local' && changes['siages-process-box-sync-state']) updateProcessBoxSyncStatus();
-  if (areaName === 'local' && changes['siages-extension-session']) void updateExtensionAuthStatus();
+  if (areaName === 'local' && (changes['siages-extension-session'] || changes['siages-extension-suap-login-status'])) void updateExtensionAuthStatus();
   if (areaName === 'local' && changes['siages-user-campus-uasg'] && extensionUserCampusSelect) {
     const nextVal = changes['siages-user-campus-uasg'].newValue;
     if (typeof nextVal === 'string' && nextVal) extensionUserCampusSelect.value = nextVal;

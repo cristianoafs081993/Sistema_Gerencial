@@ -205,6 +205,7 @@ Local:
 Chamador:
 
 - [SuapCallback.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/SuapCallback.tsx)
+- [background.js](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/SUAP-Atividades-Scraper-1.9/background.js) da extensão (1.9.106), no botão "Entrar com SUAP" do popup
 
 Uso:
 
@@ -234,6 +235,31 @@ Observacao:
 - a chave operacional do terceirizado e a matricula SUAP; e-mail e usado apenas como fallback legado.
 - o `redirectUri` recebido da UI deve ser o callback canonico `/suap-callback` montado a partir de `VITE_APP_ORIGIN` quando configurada; ele precisa ser identico ao usado no authorize e ao cadastrado no client OAuth do SUAP.
 - para login local, o frontend pode enviar um `VITE_SUAP_CLIENT_ID` proprio; quando ele corresponde a `SUAP_DEV_CLIENT_ID`, a function usa `SUAP_DEV_CLIENT_SECRET`, mantendo o client de producao inalterado.
+- login da extensão: ela usa o mesmo retorno do site (`https://www.siages.com.br/suap-callback`) com `state` `ext:<32 hex>`. O `SuapCallback` não troca códigos com esse prefixo; o service worker lê o `code` da aba (`chrome.tabs.onUpdated`), confere o `state` guardado em `chrome.storage.session`, fecha a aba e chama esta function com `loginSupabase: true`. O `hashed_token` vira a sessão própria da extensão por `POST /auth/v1/verify`. Nenhum redirect novo precisa ser cadastrado no SUAP, mas o site precisa estar publicado com essa regra antes da extensão 1.9.106, senão o site consome o código.
+
+### `extension-session-handoff`
+
+Local:
+
+- [extension-session-handoff/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/extension-session-handoff/index.ts)
+
+Chamador:
+
+- [background.js](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/SUAP-Atividades-Scraper-1.9/background.js), a partir da oferta de [siages-session-bridge.js](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/SUAP-Atividades-Scraper-1.9/siages-session-bridge.js) em `https://www.siages.com.br/*`
+
+Uso:
+
+- recebe `Authorization: Bearer <JWT do site>`, valida com `auth.getUser` e devolve só `hashed_token` (magic link de uso único) do mesmo usuário; a extensão troca esse token por uma sessão própria em `/auth/v1/verify`
+- não copia o refresh token do site, porque a rotação do Supabase derrubaria uma das duas sessões
+- a extensão só chama quando não tem sessão e quando o usuário não clicou em Sair na extensão (`siages-extension-site-session-blocked`, limpo no próximo login manual ou pelo SUAP); o background aceita a oferta apenas do próprio content script com `sender.url` na origem `https://www.siages.com.br`
+- exposição: quem tem o JWT do site tem também o refresh token no mesmo `localStorage`, então a function não amplia o que um token vazado permite
+- `verify_jwt = false` com validação interna por `getUser`
+
+Dependencias:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Deploy: `supabase functions deploy extension-session-handoff`.
 
 ### `suap-proxy`
 

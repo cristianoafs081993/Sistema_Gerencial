@@ -7,6 +7,7 @@ Acionamento global de `Ctrl+K` no Google (Trusted Types CSP) e em páginas com P
 Vínculo de usuário à UASG na extensão e saldo de empenhos por campus (`158366` — Currais Novos):
 - `suapCommandPaletteGlobal.test.ts`: verifica que a paleta `Ctrl+K` filtra `empenhos` e `contratos` por `campus_uasg=eq.158366` (ou pela UASG vinculada ao usuário), exibe o saldo disponível das NEs do Campus Currais Novos sem truncamento por outras UASGs e encontra a NE ao digitar número resumido, sequencial com zeros à esquerda (`000110`) ou código completo do SIAFI (`158366264352026NE000110`);
 - `suapPopupAccount.test.ts`: cobre a exibição e alteração do seletor **Campus vinculado (UASG)** na conta autenticada do popup;
+- `suapExtensionSuapLogin.test.ts`: login pelo SUAP na extensão (authorize com retorno do site e `state` `ext:`, troca do código, recusa de `state` forjado, erro do SUAP) e aproveitamento da sessão do site (`extension-session-handoff`, respeito ao Sair, recusa de outra origem); `SuapCallback.test.tsx` garante que o site não troca o código da extensão;
 - `suapExtensionAuth.test.ts`: cobre `get-campus` (`user_campus_preferences`) e `set-campus` (`rpc/set_user_campus_uasg`) no service worker;
 - `suapProcessFinanceClient.test.ts`: cobre a propagação de `campusUasg` para `empenhosService.getAll`, `contratosService.getContratos`, `contratosService.getContratosEmpenhos` e `contratosApiService.getContratosApi`.
 

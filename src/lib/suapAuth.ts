@@ -49,3 +49,14 @@ export function isValidSuapLoginState(
   storage.removeItem(SUAP_LOGIN_STATE_STORAGE_KEY);
   return Boolean(expected) && expected === state;
 }
+
+/** Prefixo do `state` usado pela extensão quando ela inicia o login SUAP pelo retorno do site. */
+export const EXTENSION_SUAP_LOGIN_STATE_PREFIX = 'ext:';
+
+/**
+ * Login iniciado pela extensão: o código pertence à extensão, que o lê da URL desta aba e fecha a aba.
+ * O site não pode trocar esse código, porque o SUAP aceita cada código uma única vez.
+ */
+export function isExtensionSuapLoginState(state: string | null | undefined) {
+  return typeof state === 'string' && state.startsWith(EXTENSION_SUAP_LOGIN_STATE_PREFIX);
+}

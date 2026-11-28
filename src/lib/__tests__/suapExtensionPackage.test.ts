@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.105');
+    expect(manifest.version).toBe('1.9.106');
     expect(manifest.name).toBe('SIAGES');
     expect(manifest.icons['128']).toBe('logo-transparent.png');
     expect(manifest.action.default_icon['32']).toBe('logo-transparent.png');
@@ -54,9 +54,11 @@ describe('pacote da extensao Suape 1.9', () => {
     const portalSync = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('siages-portal-sync.js'));
     expect(portalSync).toMatchObject({
       matches: ['https://www.siages.com.br/*'],
-      js: ['siages-portal-sync.js'],
+      js: ['siages-portal-sync.js', 'siages-session-bridge.js'],
       run_at: 'document_idle',
     });
+    expect(portalSync.all_frames).toBeUndefined();
+    expect(fs.existsSync(extensionFixturePath('siages-session-bridge.js'))).toBe(true);
     expect(expander).toMatchObject({ matches: ['<all_urls>'], all_frames: true });
     expect(process.matches).toEqual([
       'https://suap.ifrn.edu.br/processo_eletronico/processo/*',

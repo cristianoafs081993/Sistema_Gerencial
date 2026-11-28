@@ -71,3 +71,13 @@ describe('state do login SUAP', () => {
     expect(isValidSuapLoginState('AMB-123', memoryStorage())).toBe(true);
   });
 });
+
+describe('login SUAP iniciado pela extensão', () => {
+  it('reconhece só o state com prefixo ext:', async () => {
+    const { isExtensionSuapLoginState } = await import('@/lib/suapAuth');
+    expect(isExtensionSuapLoginState('ext:abc123')).toBe(true);
+    expect(isExtensionSuapLoginState('app:abc123')).toBe(false);
+    expect(isExtensionSuapLoginState('AMB-ext:1')).toBe(false);
+    expect(isExtensionSuapLoginState(null)).toBe(false);
+  });
+});

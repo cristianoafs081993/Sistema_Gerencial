@@ -18,6 +18,16 @@ const IFRN_CAMPUS_UASGS = new Set([
   '158371', '158372', '158373', '158374', '158375', '158882', '158887',
   '158896', '158897', '158898',
 ]);
+const SUAP_OAUTH_CLIENT_ID = 'Oe1jZhORICjEB840r23FR4P1OGQCInNqyNcCzLip';
+// Mesmo retorno cadastrado para o site: dispensa cadastrar a extensão no cliente OAuth do SUAP.
+const SUAP_OAUTH_REDIRECT_URI = 'https://www.siages.com.br/suap-callback';
+const SUAP_EXTENSION_STATE_PREFIX = 'ext:';
+const SUAP_LOGIN_PENDING_STORAGE_KEY = 'siages-extension-suap-login-pending';
+const SUAP_LOGIN_STATUS_STORAGE_KEY = 'siages-extension-suap-login-status';
+const SUAP_LOGIN_MAX_AGE_MS = 10 * 60 * 1000;
+const SITE_SESSION_SOURCE = 'siages-site-session';
+const SIAGES_SITE_ORIGIN = 'https://www.siages.com.br';
+const SITE_SESSION_ADOPTION_BLOCK_KEY = 'siages-extension-site-session-blocked';
 const SESSION_REFRESH_ALARM = 'siages-extension-session-refresh';
 const REFRESH_AHEAD_SECONDS = 20 * 60;
 const PROCESS_BOX_SYNC_SOURCE = 'siages-extension-process-box-sync';
@@ -124,6 +134,10 @@ async function signIn(email, password) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(getAuthErrorMessage(response, payload, 'password'));
 
+  return persistNewSession(payload, generation);
+}
+
+async function persistNewSession(payload, generation) {
   const session = buildSession(payload);
   if (!session) throw new Error('O SIAGES não devolveu uma sessão válida.');
   if (generation !== sessionGeneration) return readStoredSession();
@@ -133,7 +147,148 @@ async function signIn(email, password) {
     if (latestSession?.refreshToken === session.refreshToken) await chrome.storage.local.remove(EXTENSION_SESSION_STORAGE_KEY);
     return latestSession;
   }
+  // Um login feito de propósito volta a permitir o aproveitamento da sessão do site.
+  await chrome.storage.local.remove(SITE_SESSION_ADOPTION_BLOCK_KEY);
   return session;
+}
+
+// Troca o token de uso único (magic link gerado no servidor) por uma sessão própria da extensão.
+async function verifyHashedToken(hashedToken) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/verify`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'magiclink', token_hash: hashedToken }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`O SIAGES recusou o login (HTTP ${response.status}). Tente entrar novamente.`);
+  return payload;
+}
+
+// ---- Login SUAP (OAuth pelo retorno já cadastrado do site) ----
+
+function createSuapLoginState() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return `${SUAP_EXTENSION_STATE_PREFIX}${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
+function buildSuapAuthorizeUrl(state) {
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: SUAP_OAUTH_CLIENT_ID,
+    redirect_uri: SUAP_OAUTH_REDIRECT_URI,
+    state,
+  });
+  return `${SUAP_ORIGIN}/o/authorize/?${params.toString()}`;
+}
+
+function getSuapLoginStorage() {
+  // storage.session sobrevive ao reinício do service worker e some ao fechar o navegador.
+  return chrome.storage.session || chrome.storage.local;
+}
+
+async function setSuapLoginStatus(status) {
+  await chrome.storage.local.set({ [SUAP_LOGIN_STATUS_STORAGE_KEY]: { ...status, at: Date.now() } });
+}
+
+async function startSuapLogin(sender) {
+  if (!chrome.tabs?.create) throw new Error('A extensão não consegue abrir o SUAP agora. Recarregue a extensão.');
+  const state = createSuapLoginState();
+  const returnTabId = Number.isInteger(sender?.tab?.id) ? sender.tab.id : null;
+  // Guarda o state antes de abrir a aba: com sessão ativa, o SUAP devolve o código quase na hora.
+  await getSuapLoginStorage().set({
+    [SUAP_LOGIN_PENDING_STORAGE_KEY]: { state, returnTabId, createdAt: Date.now() },
+  });
+  await setSuapLoginStatus({ phase: 'pending', message: 'Conclua o login na aba do SUAP.' });
+  await chrome.tabs.create({ url: buildSuapAuthorizeUrl(state), active: true });
+  return { started: true };
+}
+
+function readSuapCallback(url) {
+  let parsed;
+  try { parsed = new URL(String(url || '')); } catch { return null; }
+  if (`${parsed.origin}${parsed.pathname}`.replace(/\/$/, '') !== SUAP_OAUTH_REDIRECT_URI) return null;
+  const state = parsed.searchParams.get('state') || '';
+  if (!state.startsWith(SUAP_EXTENSION_STATE_PREFIX)) return null;
+  return { state, code: parsed.searchParams.get('code') || '', error: parsed.searchParams.get('error') || '' };
+}
+
+let suapCallbackInFlight = null;
+
+async function handleSuapCallback(tabId, callback) {
+  const storage = getSuapLoginStorage();
+  const stored = await storage.get(SUAP_LOGIN_PENDING_STORAGE_KEY);
+  const pending = stored?.[SUAP_LOGIN_PENDING_STORAGE_KEY];
+  // Só aceita o retorno do login que esta extensão iniciou, uma única vez e dentro do prazo.
+  if (!pending?.state || pending.state !== callback.state) return { handled: false };
+  await storage.remove(SUAP_LOGIN_PENDING_STORAGE_KEY);
+  void chrome.tabs?.remove?.(tabId)?.catch?.(() => undefined);
+  if (Number.isInteger(pending.returnTabId)) void chrome.tabs?.update?.(pending.returnTabId, { active: true })?.catch?.(() => undefined);
+
+  try {
+    if (Date.now() - Number(pending.createdAt || 0) > SUAP_LOGIN_MAX_AGE_MS) throw new Error('O login pelo SUAP demorou demais. Tente entrar novamente.');
+    if (callback.error || !callback.code) throw new Error(callback.error === 'access_denied' ? 'O acesso foi negado no SUAP.' : 'O SUAP não devolveu o código de login. Tente entrar novamente.');
+    sessionGeneration += 1;
+    const generation = sessionGeneration;
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/suap-token-exchange`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: callback.code, redirectUri: SUAP_OAUTH_REDIRECT_URI, loginSupabase: true, clientId: SUAP_OAUTH_CLIENT_ID }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.error || `Falha ao autenticar com o SUAP (HTTP ${response.status}).`);
+    if (!data?.hashed_token) throw new Error('O SUAP não informou um e-mail para criar a conta no SIAGES.');
+    const session = await persistNewSession(await verifyHashedToken(data.hashed_token), generation);
+    if (!session) throw new Error('O login foi cancelado.');
+    void snippetsSync?.reconcile();
+    void publishOpenProcessTabs().catch(() => undefined);
+    await setSuapLoginStatus(data.access_pending
+      ? { phase: 'done', message: 'Login feito pelo SUAP. Seu acesso ainda aguarda liberação pelo administrador.' }
+      : { phase: 'done', message: 'Você entrou pelo SUAP. Sua sessão é renovada automaticamente.' });
+    return { handled: true, ok: true };
+  } catch (error) {
+    await setSuapLoginStatus({ phase: 'error', message: error instanceof Error ? error.message : 'Falha no login pelo SUAP.' });
+    return { handled: true, ok: false };
+  }
+}
+
+function onSuapCallbackTab(tabId, url) {
+  const callback = readSuapCallback(url);
+  if (!callback) return;
+  if (suapCallbackInFlight) return;
+  suapCallbackInFlight = handleSuapCallback(tabId, callback).finally(() => { suapCallbackInFlight = null; });
+}
+
+// ---- Sessão do site aproveitada pela extensão ----
+
+let siteAdoptionInFlight = null;
+
+async function adoptSiteSession(accessToken) {
+  const token = String(accessToken || '').trim();
+  if (!token || token.split('.').length !== 3) return { adopted: false };
+  const blocked = await chrome.storage.local.get(SITE_SESSION_ADOPTION_BLOCK_KEY);
+  if (blocked?.[SITE_SESSION_ADOPTION_BLOCK_KEY]) return { adopted: false, reason: 'signed-out' };
+  const current = await readStoredSession();
+  if (current) return { adopted: false, reason: 'has-session' };
+  if (siteAdoptionInFlight) return siteAdoptionInFlight;
+  siteAdoptionInFlight = (async () => {
+    const generation = sessionGeneration;
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/extension-session-handoff`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.hashed_token) return { adopted: false, reason: 'refused' };
+    if (generation !== sessionGeneration || await readStoredSession()) return { adopted: false, reason: 'has-session' };
+    const session = await persistNewSession(await verifyHashedToken(data.hashed_token), generation);
+    if (!session) return { adopted: false };
+    void snippetsSync?.reconcile();
+    void publishOpenProcessTabs().catch(() => undefined);
+    await setSuapLoginStatus({ phase: 'done', message: 'A extensão aproveitou o login do site do SIAGES.' });
+    return { adopted: true };
+  })().finally(() => { siteAdoptionInFlight = null; });
+  return siteAdoptionInFlight;
 }
 
 async function refreshSessionIfNeeded() {
@@ -242,7 +397,7 @@ async function saveUserCampusUasg(targetUasg) {
   return clean;
 }
 
-async function handleAuthMessage(message) {
+async function handleAuthMessage(message, sender) {
   if (message.type === 'get-session') {
     await ensureSessionRefreshAlarm();
     return { session: toPublicSession(await refreshSessionIfNeeded()) };
@@ -263,9 +418,19 @@ async function handleAuthMessage(message) {
     void publishOpenProcessTabs().catch(() => undefined);
     return { session };
   }
+  if (message.type === 'sign-in-suap') {
+    return startSuapLogin(sender);
+  }
+  if (message.type === 'get-suap-login-status') {
+    const stored = await chrome.storage.local.get(SUAP_LOGIN_STATUS_STORAGE_KEY);
+    return { status: stored?.[SUAP_LOGIN_STATUS_STORAGE_KEY] || null };
+  }
   if (message.type === 'sign-out') {
     sessionGeneration += 1;
     await chrome.storage.local.remove(EXTENSION_SESSION_STORAGE_KEY);
+    // Quem saiu de propósito não deve ser logado de novo só por abrir o site.
+    await chrome.storage.local.set({ [SITE_SESSION_ADOPTION_BLOCK_KEY]: true });
+    await chrome.storage.local.remove(SUAP_LOGIN_STATUS_STORAGE_KEY);
     if (PROCESS_REGISTRY_SYNC) await chrome.storage.local.remove(PROCESS_REGISTRY_SYNC.REMOTE_CACHE_KEY);
     // Outro login deve reconciliar do zero em vez de reaproveitar o estado do usuário anterior.
     if (SNIPPETS_SYNC) await chrome.storage.local.remove(SNIPPETS_SYNC.STATE_KEY);
@@ -858,8 +1023,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Não foi possível abrir a nova aba.' }));
     return true;
   }
+  if (message?.source === SITE_SESSION_SOURCE && message.type === 'site-session') {
+    // Só o script da extensão na página do SIAGES pode oferecer a sessão do site.
+    let senderOrigin = '';
+    try { senderOrigin = new URL(String(sender?.url || '')).origin; } catch { senderOrigin = ''; }
+    if (sender?.id !== chrome.runtime.id || senderOrigin !== SIAGES_SITE_ORIGIN) {
+      sendResponse({ ok: false, error: 'Origem não autorizada.' });
+      return undefined;
+    }
+    void adoptSiteSession(message.accessToken)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch(() => sendResponse({ ok: false, error: 'Não foi possível aproveitar a sessão do site.' }));
+    return true;
+  }
   if (message?.source === AUTH_MESSAGE_SOURCE) {
-    void handleAuthMessage(message)
+    void handleAuthMessage(message, sender)
       .then((result) => sendResponse({ ok: true, ...result }))
       .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Falha na autenticação da extensão.' }));
     return true;
@@ -1512,6 +1690,11 @@ function scheduleSessionRefresh() {
 // Edição de atalhos neste perfil (painel do SUAP) sobe para o SIAGES; o que acabou de chegar de lá não retorna.
 chrome.storage.onChanged?.addListener((changes, area) => {
   if (area === 'sync' && changes?.[SNIPPETS_SYNC?.SNIPPETS_KEY]) void snippetsSync?.reconcile();
+});
+
+// Retorno do login SUAP iniciado pela extensão: lê o código da aba antes do site e fecha a aba.
+chrome.tabs?.onUpdated?.addListener?.((tabId, changeInfo, tab) => {
+  onSuapCallbackTab(tabId, changeInfo?.url || tab?.url);
 });
 
 void ensureSessionRefreshAlarm();

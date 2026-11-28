@@ -56,6 +56,10 @@ verify_jwt = false
 [functions.suap-token-exchange]
 verify_jwt = false
 
+# Valida o JWT do site com getUser e devolve só um token de uso único para a extensão.
+[functions.extension-session-handoff]
+verify_jwt = false
+
 [functions.suap-proxy]
 verify_jwt = false
 
